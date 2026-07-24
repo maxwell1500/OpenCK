@@ -1,7 +1,7 @@
 #ifndef STRINGS_H
 #define STRINGS_H
 
-#include "../libs/files/filepaths.hpp"
+#include "../filepaths.hpp"
 
 #include <QString>
 #include <QVector>
@@ -20,7 +20,7 @@ public:
 
     Strings();
 
-    void load(QString filename, const FilePaths& paths);
+    void load(QString filename, const FilePaths& paths, const QString& language = "English");
 
     QString get(Type type, unsigned int index) const;
     bool set(Type type, unsigned int index, const QString& entry);
@@ -42,7 +42,8 @@ private:
 
     unsigned int readHeader(QFile& file);
 
-    QVector<QString> selectList(Type type) const;
+    QVector<QString>& selectList(Type type);
+    const QVector<QString>& selectList(Type type) const;
 
     QVector<QString> strings;
     QVector<QString> ilstrings;

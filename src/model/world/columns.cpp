@@ -21,7 +21,7 @@ const ColumnDesc columnNames[] =
 
 QString getColumnName(ColumnId column)
 {
-    for (int i = 0; i < ColumnId_End; i++)
+    for (int i = 0; i < ColumnId_End; ++i)
     {
         if (column == columnNames[i].id)
         {
@@ -32,21 +32,6 @@ QString getColumnName(ColumnId column)
     return "";
 }
 
-int getColumnId(const QString& name)
-{
-    QString lower = name.toLower();
-
-    for (int i = 0; i < ColumnId_End; i++)
-    {
-        if (lower == name.toLower())
-        {
-            return columnNames[i].id;
-        }
-    }
-
-    return -1;
-}
-
 namespace Columns
 {
     static QString varTypeEnums[8] =
@@ -54,14 +39,14 @@ namespace Columns
         "None", "Short", "Integer", "Long", "Float", "String", "Bool", 0
     };
 
-    static QString modificationEnums[6] =
+    static QString modificationEnums[5] =
     {
-        "Base", "Modified", "Added", "Deleted", "Deleted", 0
+        "Base", "Modified", "Added", "Deleted", 0
     };
 
     bool hasNames(ColumnId column)
     {
-        return getEnumNames(column) != 0 || column == ColumnId::ColumnId_RecordType;
+        return getEnumNames(column) != nullptr || column == ColumnId::ColumnId_RecordType;
     }
 
     QString* getEnumNames(ColumnId column)
@@ -71,6 +56,7 @@ namespace Columns
             case ColumnId::ColumnId_Modification: return modificationEnums;
             case ColumnId::ColumnId_ValueType: return varTypeEnums;
         }
+        return nullptr;
     }
 
     QVector<QPair<int, QString>> getEnums(ColumnId column)
@@ -79,7 +65,7 @@ namespace Columns
 
         if (QString* nameTable = getEnumNames(column))
         {
-            for (int i = 0; nameTable[i] != 0; i++)
+            for (int i = 0; !nameTable[i].isNull(); i++)
             {
                 enums.push_back(QPair<int, QString>(i, nameTable[i]));
             }

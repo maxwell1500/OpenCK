@@ -14,15 +14,15 @@ public:
     {
         Feature_Constant = 1,
         Feature_AllowTouch = 2,
-        Feature_ViewId = 3
+        Feature_ViewId = 4
     };
 
 public:
-    BaseIdTable(unsigned int features);
+    BaseIdTable(unsigned int features, QObject* parent = nullptr);
 
     virtual QModelIndex getModelIndex(const QString& id, int column) const = 0;
     virtual int searchColumnIndex(ColumnId id) const = 0;
-    virtual int findColummnIndex(ColumnId id) const = 0;
+    virtual int findColumnIndex(ColumnId id) const = 0;
 
     virtual bool isDeleted(const QString& id) const = 0;
     virtual int getColumnId(int column) const = 0;

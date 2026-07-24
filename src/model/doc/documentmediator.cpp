@@ -1,49 +1,57 @@
 #include "documentmediator.hpp"
 
 #include "../../view/messageboxhelper.hpp"
+#include "logger.hpp"
 
 DocumentMediator::DocumentMediator()
 {
+    LOG_INFO("DocumentMediator initializing...");
     loader.moveToThread(&loaderThread);
     loaderThread.start();
 
-    connect(&loader, SIGNAL(documentLoaded(Document*)),
-        this, SLOT(documentLoaded(Document*)));
+    connect(&loader, &Loader::documentLoaded,
+        this, &DocumentMediator::documentLoaded);
 
-    connect(&loader, SIGNAL(documentNotLoaded(Document*, const QString&)),
-        this, SLOT(documentNotLoaded(Document*, const QString&)));
+    connect(&loader, &Loader::documentNotLoaded,
+        this, &DocumentMediator::documentNotLoaded);
 
-    connect(this, SIGNAL(loadRequest(Document*)), 
-        &loader, SLOT(loadDocument(Document*)));
+    connect(this, &DocumentMediator::loadRequest, 
+        &loader, &Loader::loadDocument);
 
-    connect(&loader, SIGNAL(nextStage(Document*, const QString&, int)),
-        this, SIGNAL(nextStage(Document*, const QString&, int)));
+    connect(&loader, &Loader::nextStage,
+        this, &DocumentMediator::nextStage);
 
-    connect(&loader, SIGNAL(nextRecord(Document*, int)),
-        this, SIGNAL(nextRecord(Document*, int)));
+    connect(&loader, &Loader::nextRecord,
+        this, &DocumentMediator::nextRecord);
 
     connect(this, &DocumentMediator::cancelLoading, 
         &loader, &Loader::abortLoading);
 
-    connect(&loader, SIGNAL(loadMessage(Document*, const QString&)), 
-        this, SIGNAL(loadMessage(Document*, const QString&)));
+    connect(&loader, &Loader::loadMessage, 
+        this, &DocumentMediator::loadMessage);
+    
+    LOG_INFO("DocumentMediator initialized");
 }
 
 DocumentMediator::~DocumentMediator()
 {
+    LOG_INFO("DocumentMediator shutting down...");
     loaderThread.quit();
     loader.stop();
     loader.hasThingsToDo().wakeAll();
     loaderThread.wait();
+    LOG_INFO("DocumentMediator shut down");
 }
 
 void DocumentMediator::clearFiles()
 {
+    LOG_INFO(QString("Clearing %1 document(s)").arg(documents.size()));
     documents.clear();
 }
 
 void DocumentMediator::addDocument(const QStringList& files, const QString& savePath, bool isNew)
 {
+    LOG_INFO(QString("Adding document: %1 files, isNew=%2").arg(files.size()).arg(isNew ? "true" : "false"));
     Document* document = makeDocument(files, savePath, isNew);
     
     insertDocument(document);
@@ -51,6 +59,7 @@ void DocumentMediator::addDocument(const QStringList& files, const QString& save
 
 Document* DocumentMediator::makeDocument(const QStringList& files, const QString& savePath, bool isNew)
 {
+    LOG_DEBUG(QString("Creating document with %1 files").arg(files.size()));
     Document* doc = new Document(files, savePath, isNew);
 
     return doc;
@@ -58,6 +67,7 @@ Document* DocumentMediator::makeDocument(const QStringList& files, const QString
 
 void DocumentMediator::insertDocument(Document* document)
 {
+    LOG_DEBUG(QString("Inserting document: %1").arg(document->getSavePath()));
     documents.push_back(std::shared_ptr<Document>(document));
 
     emit loadRequest(document);
@@ -67,6 +77,7 @@ void DocumentMediator::insertDocument(Document* document)
 
 Document* DocumentMediator::getDocument(int index)
 {
+    LOG_DEBUG(QString("Getting document at index %1 (total: %2)").arg(index).arg(documents.size()));
     if (documents.size() <= index)
     {
         return nullptr;
@@ -82,18 +93,23 @@ Document* DocumentMediator::getCurrentDocument()
         return nullptr;
     }
 
-    return documents.last().get();
+    Document* doc = documents.last().get();
+    LOG_DEBUG(QString("Getting current document: %1").arg(doc->getSavePath()));
+    return doc;
 }
 
 void DocumentMediator::saveFile(const QString& path)
 {
+    LOG_INFO(QString("Saving file to: %1").arg(path));
     if (documents.empty())
     {
+        LOG_ERROR("Cannot save: no document open");
         msgBoxCritical("No file open, cannot save.");
     }
     else
     {
         documents.back().get()->save(path);
+        LOG_INFO("File saved successfully");
     }
 }
 

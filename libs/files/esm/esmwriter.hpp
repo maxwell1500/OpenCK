@@ -50,6 +50,11 @@ public:
     void writeZString(const QString& str);
     void writeSubZString(NAME name, const QString& str);
 
+    void writeRawData(const char* data, qint32 size)
+    {
+        stream.writeRawData(data, size);
+    }
+
     void close();
 
 private:

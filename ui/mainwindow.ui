@@ -30,10 +30,73 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="actionNewPlugin"/>
     <addaction name="actionData"/>
     <addaction name="actionSave"/>
+    <addaction name="actionSaveAs"/>
+    <addaction name="actionClosePlugin"/>
+    <addaction name="separator"/>
+    <addaction name="actionPreferences"/>
+    <addaction name="actionValidate"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="actionUndo"/>
+    <addaction name="actionRedo"/>
+    <addaction name="separator"/>
+    <addaction name="actionCut"/>
+    <addaction name="actionCopy"/>
+    <addaction name="actionPaste"/>
+    <addaction name="actionDelete"/>
+    <addaction name="actionDuplicate"/>
+    <addaction name="separator"/>
+    <addaction name="actionSelectAll"/>
+    <addaction name="separator"/>
+    <addaction name="actionSearchAndReplace"/>
+    <addaction name="actionFindNext"/>
+    <addaction name="actionFindPrevious"/>
+    <addaction name="separator"/>
+    <addaction name="actionNextRecord"/>
+    <addaction name="actionPreviousRecord"/>
+    <addaction name="actionFirstRecord"/>
+    <addaction name="actionLastRecord"/>
+    <addaction name="separator"/>
+    <addaction name="actionExpandAll"/>
+    <addaction name="actionCollapseAll"/>
+   </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <addaction name="actionObjectWindow"/>
+    <addaction name="action3DViewport"/>
+    <addaction name="actionScriptEditor"/>
+    <addaction name="actionDialogueEditor"/>
+    <addaction name="actionDialogueTree"/>
+    <addaction name="actionQuestGraph"/>
+    <addaction name="actionAIPackages"/>
+    <addaction name="actionWeatherLight"/>
+    <addaction name="actionNavmesh"/>
+    <addaction name="actionWater"/>
+    <addaction name="actionCellTransitions"/>
+    <addaction name="actionMaterialEditor"/>
+    <addaction name="actionPapyrusDebugger"/>
+    <addaction name="actionFormIdEditor"/>
+   </widget>
+   <widget class="QMenu" name="menuWorld">
+    <property name="title">
+     <string>World</string>
+    </property>
+    <addaction name="actionWorldspaces"/>
+    <addaction name="actionCells"/>
+    <addaction name="separator"/>
+    <addaction name="actionLandscapeEditing"/>
+    <addaction name="actionWorldView"/>
+    <addaction name="actionObjectPalette"/>
    </widget>
    <widget class="QMenu" name="menuGameplay">
     <property name="title">
@@ -41,8 +104,34 @@
     </property>
     <addaction name="actionSettings"/>
    </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuGameplay"/>
+   <widget class="QMenu" name="menuPlugins">
+    <property name="title">
+     <string>Plugins</string>
+    </property>
+    <addaction name="actionLoadOrder"/>
+    <addaction name="actionMasterFiles"/>
+    <addaction name="actionConflictDetection"/>
+    <addaction name="actionConflictResolution"/>
+    <addaction name="actionPluginMerge"/>
+     <addaction name="actionLoadOrderOptimizer"/>
+     <addaction name="actionBashedPatch"/>
+     <addaction name="actionExternalTools"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
+     <addaction name="menuFile"/>
+     <addaction name="menuEdit"/>
+     <addaction name="menuView"/>
+     <addaction name="menuWorld"/>
+     <addaction name="menuPlugins"/>
+     <addaction name="menuExport"/>
+     <addaction name="menuTools"/>
+     <addaction name="menuGameplay"/>
+     <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">
@@ -53,8 +142,18 @@
    </attribute>
    <addaction name="actionOpenButton"/>
    <addaction name="actionSaveButton"/>
+   <addaction name="separator"/>
+   <addaction name="actionUndoButton"/>
+   <addaction name="actionRedoButton"/>
   </widget>
-  <widget class="QStatusBar" name="statusBar"/>
+   <widget class="QStatusBar" name="statusBar">
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+      <hsizetype>Expanding</hsizetype>
+      <vsizetype>Preferred</vsizetype>
+     </sizepolicy>
+    </property>
+   </widget>
   <action name="actionData">
    <property name="text">
     <string>Data...</string>
@@ -66,17 +165,362 @@
     <bool>true</bool>
    </property>
   </action>
-  <action name="actionExit">
+  <action name="actionSave">
+    <property name="text">
+     <string>Save</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+S</string>
+    </property>
+   </action>
+   <action name="actionNewPlugin">
+    <property name="text">
+     <string>New Plugin...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+N</string>
+    </property>
+   </action>
+   <action name="actionSaveAs">
+    <property name="text">
+     <string>Save As...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Shift+S</string>
+    </property>
+   </action>
+   <action name="actionClosePlugin">
+    <property name="text">
+     <string>Close Plugin</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+W</string>
+    </property>
+   </action>
+   <action name="actionExit">
    <property name="text">
     <string>Exit</string>
    </property>
   </action>
-  <action name="actionOpenButton">
-   <property name="icon">
-    <iconset>
-     <normalon>:/icons/open</normalon>
-    </iconset>
+    <widget class="QMenu" name="menuExport">
+     <property name="title">
+      <string>Export</string>
+     </property>
+     <addaction name="actionExportDialogue"/>
+     <addaction name="actionExportScripts"/>
+     <addaction name="actionExportTextures"/>
+    </widget>
+    <widget class="QMenu" name="menuTools">
+      <property name="title">
+       <string>Tools</string>
+      </property>
+      <addaction name="actionSoundEditor"/>
+      <addaction name="actionAnimationEditor"/>
+      <addaction name="actionParticleEffectsEditor"/>
+      <addaction name="separator"/>
+      <addaction name="actionModManager"/>
+    </widget>
+
+    <action name="actionPreferences">
+    <property name="text">
+     <string>Preferences...</string>
+    </property>
+   </action>
+   <action name="actionValidate">
+    <property name="text">
+     <string>Validate Loaded Data</string>
+    </property>
+   </action>
+   <action name="actionUndo">
+    <property name="text">
+     <string>Undo</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Z</string>
+    </property>
+   </action>
+   <action name="actionRedo">
+   <property name="text">
+    <string>Redo</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Y</string>
+   </property>
+  </action>
+  <action name="actionCopy">
+   <property name="text">
+    <string>Copy</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
+   </property>
+  </action>
+  <action name="actionCut">
+   <property name="text">
+    <string>Cut</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+X</string>
+   </property>
+  </action>
+  <action name="actionPaste">
+   <property name="text">
+    <string>Paste</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+V</string>
+   </property>
+  </action>
+  <action name="actionDuplicate">
+    <property name="text">
+     <string>Duplicate</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+D</string>
+    </property>
+   </action>
+   <action name="actionDelete">
+    <property name="text">
+     <string>Delete</string>
+    </property>
+    <property name="shortcut">
+     <string>Delete</string>
+    </property>
+   </action>
+   <action name="actionSelectAll">
+    <property name="text">
+     <string>Select All</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+A</string>
+    </property>
+   </action>
+   <action name="actionFindNext">
+    <property name="text">
+     <string>Find Next</string>
+    </property>
+    <property name="shortcut">
+     <string>F3</string>
+    </property>
+   </action>
+   <action name="actionFindPrevious">
+    <property name="text">
+     <string>Find Previous</string>
+    </property>
+    <property name="shortcut">
+     <string>Shift+F3</string>
+    </property>
+   </action>
+  <action name="actionSearchAndReplace">
+    <property name="text">
+     <string>Search and Replace...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+F</string>
+    </property>
+   </action>
+   <action name="actionNextRecord">
+    <property name="text">
+     <string>Next Record</string>
+    </property>
+    <property name="shortcut">
+     <string>Down</string>
+    </property>
+   </action>
+   <action name="actionPreviousRecord">
+    <property name="text">
+     <string>Previous Record</string>
+    </property>
+    <property name="shortcut">
+     <string>Up</string>
+    </property>
+   </action>
+   <action name="actionFirstRecord">
+    <property name="text">
+     <string>First Record</string>
+    </property>
+    <property name="shortcut">
+     <string>Home</string>
+    </property>
+   </action>
+   <action name="actionLastRecord">
+    <property name="text">
+     <string>Last Record</string>
+    </property>
+    <property name="shortcut">
+     <string>End</string>
+    </property>
+   </action>
+   <action name="actionExpandAll">
+    <property name="text">
+     <string>Expand All</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Plus</string>
+    </property>
+   </action>
+   <action name="actionCollapseAll">
+    <property name="text">
+     <string>Collapse All</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Minus</string>
+    </property>
+   </action>
+   <action name="actionObjectWindow">
+   <property name="text">
+    <string>Object Window...</string>
+   </property>
+  </action>
+   <action name="action3DViewport">
+    <property name="text">
+     <string>3D Viewport...</string>
+    </property>
+    <property name="shortcut">
+     <string>F6</string>
+    </property>
+   </action>
+   <action name="actionScriptEditor">
+    <property name="text">
+     <string>Script Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F7</string>
+    </property>
+   </action>
+   <action name="actionDialogueEditor">
+    <property name="text">
+     <string>Dialogue Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F8</string>
+    </property>
+   </action>
+   <action name="actionDialogueTree">
+    <property name="text">
+     <string>Dialogue Tree Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F9</string>
+    </property>
+   </action>
+   <action name="actionQuestGraph">
+    <property name="text">
+     <string>Quest Graph Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F10</string>
+    </property>
+   </action>
+   <action name="actionAIPackages">
+    <property name="text">
+     <string>AI Packages Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F10</string>
+    </property>
+   </action>
+   <action name="actionWeatherLight">
+    <property name="text">
+     <string>Lighting &amp; Weather Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F11</string>
+    </property>
+   </action>
+   <action name="actionNavmesh">
+    <property name="text">
+     <string>Navmesh Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F12</string>
+    </property>
+   </action>
+   <action name="actionWater">
+    <property name="text">
+     <string>Water Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+F11</string>
+    </property>
+   </action>
+   <action name="actionCellTransitions">
+    <property name="text">
+     <string>Cell Transitions Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+F12</string>
+    </property>
+   </action>
+   <action name="actionMaterialEditor">
+    <property name="text">
+     <string>Material Editor...</string>
+    </property>
+    <property name="shortcut">
+     <string>F13</string>
+    </property>
+   </action>
+   <action name="actionPapyrusDebugger">
+   <property name="text">
+    <string>Papyrus Debugger...</string>
+   </property>
+  </action>
+  <action name="actionFormIdEditor">
+   <property name="text">
+    <string>FormID Editor...</string>
+   </property>
+  </action>
+   <action name="actionWorldspaces">
+    <property name="text">
+     <string>Worldspaces...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Shift+W</string>
+    </property>
+   </action>
+   <action name="actionCells">
+    <property name="text">
+     <string>Cells...</string>
+    </property>
+    <property name="shortcut">
+     <string>Ctrl+Shift+C</string>
+    </property>
+   </action>
+    <action name="actionLandscapeEditing">
+     <property name="text">
+      <string>Landscape Editing</string>
+     </property>
+     <property name="shortcut">
+      <string>Ctrl+L</string>
+     </property>
+     </action>
+    <action name="actionWorldView">
+     <property name="text">
+      <string>World View</string>
+     </property>
+     <property name="shortcut">
+      <string>Ctrl+Shift+W</string>
+     </property>
+    </action>
+    <action name="actionObjectPalette">
+     <property name="text">
+      <string>Object Palette</string>
+     </property>
+     <property name="shortcut">
+      <string>Ctrl+P</string>
+     </property>
+     </action>
+   <action name="actionSettings">
+   <property name="text">
+    <string>Settings...</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About OpenCK...</string>
+   </property>
+  </action>
+  <action name="actionOpenButton">
    <property name="text">
     <string>Open</string>
    </property>
@@ -85,38 +529,277 @@
    </property>
   </action>
   <action name="actionSaveButton">
-   <property name="icon">
-    <iconset>
-     <normalon>:/icons/icons/save_48.png</normalon>
-    </iconset>
-   </property>
    <property name="text">
     <string>Save</string>
    </property>
    <property name="toolTip">
     <string>Save Plugin (Ctrl + S)</string>
    </property>
-   <property name="iconVisibleInMenu">
-    <bool>true</bool>
-   </property>
   </action>
-  <action name="actionSave">
+  <action name="actionUndoButton">
    <property name="text">
-    <string>Save</string>
+    <string>Undo</string>
    </property>
-   <property name="shortcut">
-    <string>Ctrl+S</string>
+   <property name="toolTip">
+    <string>Undo (Ctrl+Z)</string>
    </property>
   </action>
-  <action name="actionSettings">
+  <action name="actionRedoButton">
    <property name="text">
-    <string>Settings...</string>
+    <string>Redo</string>
+   </property>
+   <property name="toolTip">
+    <string>Redo (Ctrl+Y)</string>
    </property>
   </action>
- </widget>
+  <action name="actionLoadOrder">
+   <property name="text">
+    <string>Load Order...</string>
+   </property>
+  </action>
+  <action name="actionMasterFiles">
+   <property name="text">
+    <string>Master Files...</string>
+   </property>
+  </action>
+  <action name="actionConflictDetection">
+   <property name="text">
+    <string>Conflict Detection...</string>
+   </property>
+  </action>
+  <action name="actionConflictResolution">
+   <property name="text">
+    <string>Conflict Resolution...</string>
+   </property>
+  </action>
+  <action name="actionPluginMerge">
+   <property name="text">
+    <string>Plugin Merge...</string>
+   </property>
+  </action>
+  <action name="actionLoadOrderOptimizer">
+   <property name="text">
+    <string>Load Order Optimizer...</string>
+   </property>
+  </action>
+  <action name="actionBashedPatch">
+   <property name="text">
+    <string>Bashed Patch...</string>
+   </property>
+  </action>
+    <action name="actionExternalTools">
+     <property name="text">
+      <string>External Tools</string>
+     </property>
+    </action>
+    <action name="actionSoundEditor">
+     <property name="text">
+      <string>Sound Editor...</string>
+     </property>
+    </action>
+    <action name="actionAnimationEditor">
+     <property name="text">
+      <string>Animation Editor...</string>
+     </property>
+    </action>
+    <action name="actionParticleEffectsEditor">
+     <property name="text">
+      <string>Particle Effects Editor...</string>
+     </property>
+    </action>
+    <action name="actionExportDialogue">
+    <property name="text">
+     <string>Dialogue to Text File...</string>
+    </property>
+   </action>
+   <action name="actionExportScripts">
+    <property name="text">
+     <string>Scripts to Text Files...</string>
+    </property>
+   </action>
+    <action name="actionExportTextures">
+     <property name="text">
+      <string>NPC Face Textures...</string>
+     </property>
+    </action>
+    <action name="actionModManager">
+     <property name="text">
+      <string>Mod Manager...</string>
+     </property>
+    </action>
+   </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources>
   <include location="../resources/resources.qrc"/>
  </resources>
- <connections/>
-</ui>
+  <connections>
+    <connection>
+     <sender>actionLandscapeEditing</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionLandscapeEditing_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionWorldView</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionWorldView_triggered()</slot>
+    </connection>
+   <connection>
+    <sender>actionObjectPalette</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionObjectPalette_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionCopy</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionCopy_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionCut</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionCut_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionPaste</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionPaste_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionDuplicate</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionDuplicate_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionLoadOrder</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionLoadOrder_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionMasterFiles</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionMasterFiles_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionConflictDetection</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionConflictDetection_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionConflictResolution</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionConflictResolution_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionDialogueTree</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionDialogueTree_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionQuestGraph</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionQuestGraph_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionAIPackages</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionAIPackages_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionWeatherLight</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionWeatherLight_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionNavmesh</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionNavmesh_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionWater</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionWater_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionCellTransitions</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionCellTransitions_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionMaterialEditor</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionMaterialEditor_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionPapyrusDebugger</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionPapyrusDebugger_triggered()</slot>
+   </connection>
+   <connection>
+    <sender>actionPluginMerge</sender>
+    <signal>triggered()</signal>
+    <receiver>MainWindow</receiver>
+    <slot>on_actionPluginMerge_triggered()</slot>
+   </connection>
+    <connection>
+     <sender>actionLoadOrderOptimizer</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionLoadOrderOptimizer_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionBashedPatch</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionBashedPatch_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionExternalTools</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionExternalTools_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionExportDialogue</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionExportDialogue_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionExportScripts</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionExportScripts_triggered()</slot>
+    </connection>
+     <connection>
+      <sender>actionExportTextures</sender>
+      <signal>triggered()</signal>
+      <receiver>MainWindow</receiver>
+      <slot>on_actionExportTextures_triggered()</slot>
+     </connection>
+     <connection>
+      <sender>actionModManager</sender>
+      <signal>triggered()</signal>
+      <receiver>MainWindow</receiver>
+      <slot>on_actionModManager_triggered()</slot>
+     </connection>
+    </connections>
+  </ui>

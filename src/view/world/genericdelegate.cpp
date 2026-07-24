@@ -7,42 +7,8 @@
 #include <QPlainTextEdit>
 #include <QSpinBox>
 
-TableModelHelper::TableModelHelper(QAbstractItemModel& model)
-    : model(model)
-{
-
-}
-
-int TableModelHelper::rowCount(const QModelIndex& parent) const
-{
-    return model.rowCount(parent);
-}
-
-int TableModelHelper::columnCount(const QModelIndex& parent) const
-{
-    return model.columnCount(parent);
-}
-
-QVariant TableModelHelper::data(const QModelIndex& index, int role) const
-{
-    return model.data(index, role);
-}
-
-bool TableModelHelper::setData(const QModelIndex& index, const QVariant& value, int role)
-{
-    modelData = value;
-
-    return true;
-}
-
-QVariant TableModelHelper::getData() const
-{
-    return modelData;
-}
-
 GenericDelegate::GenericDelegate(Document& document, QObject* parent) :
     QStyledItemDelegate(parent),
-    isLocked(false),
     document(document)
 {
 
@@ -50,10 +16,7 @@ GenericDelegate::GenericDelegate(Document& document, QObject* parent) :
 
 void GenericDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
-    if (!isLocked)
-    {
-        setModelDataImp(editor, model, index);
-    }
+    setModelDataImp(editor, model, index);
 }
 
 QWidget* GenericDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
@@ -125,7 +88,7 @@ QWidget* GenericDelegate::createEditor(QWidget* parent, const QStyleOptionViewIt
         case BaseColumn::Display_SignedInteger8:
         {
             QSpinBox* spin = new QSpinBox(parent);
-            spin->setRange(std::numeric_limits<char>::min(), std::numeric_limits<char>::max());
+            spin->setRange(std::numeric_limits<qint8>::min(), std::numeric_limits<qint8>::max());
             return spin;
         }
         case BaseColumn::Display_Var:
@@ -159,16 +122,6 @@ QWidget* GenericDelegate::createEditor(QWidget* parent, const QStyleOptionViewIt
     }
 }
 
-void GenericDelegate::setEditLock(bool locked)
-{
-    isLocked = locked;
-}
-
-bool GenericDelegate::isEditLocked() const
-{
-    return isLocked;
-}
-
 void GenericDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
     setEditorData(editor, index, false);
@@ -189,16 +142,41 @@ void GenericDelegate::setEditorData(QWidget* editor, const QModelIndex& index, b
                 return;
             }
         }
+    }
 
-        QPlainTextEdit* edit = qobject_cast<QPlainTextEdit*>(editor);
+    QPlainTextEdit* edit = qobject_cast<QPlainTextEdit*>(editor);
+    if (edit)
+    {
+        edit->setPlainText(variant.toString());
+        return;
+    }
 
-        if (edit)
-        {
-            if (edit->toPlainText() == variant.toString())
-            {
-                return;
-            }
-        }
+    QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+    if (lineEdit)
+    {
+        lineEdit->setText(variant.toString());
+        return;
+    }
+
+    QSpinBox* spinBox = qobject_cast<QSpinBox*>(editor);
+    if (spinBox)
+    {
+        spinBox->setValue(variant.toUInt());
+        return;
+    }
+
+    QDoubleSpinBox* doubleSpinBox = qobject_cast<QDoubleSpinBox*>(editor);
+    if (doubleSpinBox)
+    {
+        doubleSpinBox->setValue(variant.toDouble());
+        return;
+    }
+
+    QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
+    if (checkBox)
+    {
+        checkBox->setChecked(variant.toBool());
+        return;
     }
 }
 
@@ -218,12 +196,46 @@ void GenericDelegate::setModelDataImp(QWidget* editor, QAbstractItemModel* model
 {
     QVariant variant;
 
-    TableModelHelper helper(*model);
-    QStyledItemDelegate::setModelData(editor, &helper, index);
-    variant = helper.getData();
+    QPlainTextEdit* edit = qobject_cast<QPlainTextEdit*>(editor);
+    if (edit)
+    {
+        variant = edit->toPlainText();
+    }
+    else
+    {
+        QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
+        if (lineEdit)
+        {
+            variant = lineEdit->text();
+        }
+        else
+        {
+            QSpinBox* spinBox = qobject_cast<QSpinBox*>(editor);
+            if (spinBox)
+            {
+                variant = spinBox->value();
+            }
+            else
+            {
+                QDoubleSpinBox* doubleSpinBox = qobject_cast<QDoubleSpinBox*>(editor);
+                if (doubleSpinBox)
+                {
+                    variant = doubleSpinBox->value();
+                }
+                else
+                {
+                    QCheckBox* checkBox = qobject_cast<QCheckBox*>(editor);
+                    if (checkBox)
+                    {
+                        variant = checkBox->isChecked();
+                    }
+                }
+            }
+        }
+    }
 
     if (model->data(index) != variant && model->flags(index) & Qt::ItemIsEditable)
     {
-        // Modify record
+        model->setData(index, variant, Qt::EditRole);
     }
 }

@@ -8,33 +8,6 @@
 #include <QVariant>
 
 template<typename ESXRecord>
-struct FloatColumn : public Column<ESXRecord>
-{
-    FloatColumn() :
-        Column<ESXRecord>(ColumnId::ColumnId_Value, BaseColumn::Display_Float)
-    {
-
-    }
-
-    virtual QVariant get(const Record<ESXRecord>& record) const
-    {
-        return record.get().value.getFloat();
-    }
-
-    virtual void set(Record<ESXRecord>& record, const QVariant& data)
-    {
-        ESXRecord newRecord = record.get();
-        newRecord.value.setFloat(data.toFloat());
-        record.setModified(newRecord);
-    }
-
-    virtual bool isEditable() const
-    {
-        return true;
-    }
-};
-
-template<typename ESXRecord>
 struct StringIdColumn : public Column<ESXRecord>
 {
     StringIdColumn(bool hidden = false) :
@@ -46,7 +19,7 @@ struct StringIdColumn : public Column<ESXRecord>
 
     virtual QVariant get(const Record<ESXRecord>& record) const
     {
-        return record.get().id;
+        return record.get().editorId;
     }
 
     virtual bool isEditable() const
@@ -141,6 +114,120 @@ struct VarTypeColumn : public Column<ESXRecord>
 };
 
 template<typename ESXRecord>
+struct StringColumn : public Column<ESXRecord>
+{
+    QString columnName;
+    QString ESXRecord::*getter;
+
+    StringColumn(const QString& name, QString ESXRecord::*g)
+        : Column<ESXRecord>(ColumnId::ColumnId_Custom, BaseColumn::Display_String),
+          columnName(name),
+          getter(g)
+    {
+
+    }
+
+    virtual QVariant get(const Record<ESXRecord>& record) const override
+    {
+        return record.get().*getter;
+    }
+
+    virtual bool isEditable() const
+    {
+        return true;
+    }
+};
+
+template<typename ESXRecord>
+struct IntColumn : public Column<ESXRecord>
+{
+    QString columnName;
+    quint32 ESXRecord::*getter;
+
+    IntColumn(const QString& name, quint32 ESXRecord::*g)
+        : Column<ESXRecord>(ColumnId::ColumnId_Custom, BaseColumn::Display_SignedInteger32),
+          columnName(name),
+          getter(g)
+    {
+
+    }
+
+    virtual QVariant get(const Record<ESXRecord>& record) const override
+    {
+        return static_cast<int>(record.get().*getter);
+    }
+
+    virtual void set(Record<ESXRecord>& record, const QVariant& data)
+    {
+        ESXRecord newRecord = record.get();
+        newRecord.*getter = static_cast<quint32>(data.toInt());
+        record.setModified(newRecord);
+    }
+
+    virtual bool isEditable() const
+    {
+        return true;
+    }
+};
+
+template<typename ESXRecord>
+struct FloatColumn : public Column<ESXRecord>
+{
+    QString columnName;
+    float ESXRecord::*getter;
+
+    FloatColumn(const QString& name, float ESXRecord::*g)
+        : Column<ESXRecord>(ColumnId::ColumnId_Custom, BaseColumn::Display_Float),
+          columnName(name),
+          getter(g)
+    {
+
+    }
+
+    virtual QVariant get(const Record<ESXRecord>& record) const override
+    {
+        return static_cast<double>(record.get().*getter);
+    }
+
+    virtual void set(Record<ESXRecord>& record, const QVariant& data)
+    {
+        ESXRecord newRecord = record.get();
+        newRecord.*getter = static_cast<float>(data.toDouble());
+        record.setModified(newRecord);
+    }
+
+    virtual bool isEditable() const
+    {
+        return true;
+    }
+};
+
+template<typename ESXRecord>
+struct VariantColumn : public Column<ESXRecord>
+{
+    QString columnName;
+    Variant ESXRecord::*getter;
+
+    VariantColumn(const QString& name, Variant ESXRecord::*g)
+        : Column<ESXRecord>(ColumnId::ColumnId_Custom, BaseColumn::Display_Var),
+          columnName(name),
+          getter(g)
+    {
+
+    }
+
+    virtual QVariant get(const Record<ESXRecord>& record) const override
+    {
+        return (record.get().*getter).getData();
+    }
+
+    virtual bool isEditable() const
+    {
+        return true;
+    }
+};
+
+template<typename ESXRecord>
 struct VarValueColumn : public Column<ESXRecord>
 {
     VarValueColumn() :
@@ -184,6 +271,7 @@ struct VarValueColumn : public Column<ESXRecord>
 
             case VariantType::Var_LString:
                 newRecord.value.setLString(data.getLString());
+                break;
 
             case VariantType::Var_Int:
             case VariantType::Var_Short:

@@ -27,6 +27,9 @@ public slots:
     void showDataDialog();
     void dataDialogAccepted(const QStringList& files, const QString& path, bool isNew);
     void showSaveDialog();
+    void showNewPluginDialog();
+    void showSaveAsDialog();
+    void closeCurrentPlugin();
     void showGmstDialog();
 
 private:

@@ -13,7 +13,7 @@ class ReportModel : public QAbstractTableModel
     Q_OBJECT
 
 public:
-    ReportModel(bool fieldColumn = false, bool levelColumn = true);
+    ReportModel(QObject* parent = nullptr, bool fieldColumn = false, bool levelColumn = true);
     
     virtual int rowCount(const QModelIndex& parent = QModelIndex()) const;
     virtual int columnCount(const QModelIndex& parent = QModelIndex()) const;

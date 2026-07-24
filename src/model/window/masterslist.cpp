@@ -1,6 +1,7 @@
 #include "masterslist.hpp"
 
 MastersList::MastersList(QObject* parent)
+    : QAbstractTableModel(parent)
 {
 }
 

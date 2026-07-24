@@ -3,17 +3,18 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 
-void GameSetting::load(ESMReader& esm)
+void GameSetting::load(ESMReader& esm, bool)
 {
     esm.readHeader();
-    id = esm.readSubZString('EDID');
+    formId = esm.currentFormId();
+    editorId = esm.readSubZString('EDID');
 
-    value.load(esm, Variant::Format_GMST, id);
+    value.load(esm, Variant::Format_GMST, editorId);
 }
 
 void GameSetting::save(ESMWriter& esm) const
 {
-    esm.writeSubZString('EDID', id);
+    esm.writeSubZString('EDID', editorId);
 
     esm.startSubRecord('DATA');
     value.write(esm, Variant::Format_GMST);
@@ -22,7 +23,7 @@ void GameSetting::save(ESMWriter& esm) const
 
 void GameSetting::blank()
 {
-    id = "";
+    editorId = "";
     value.setType(VariantType::Var_None);
 }
 

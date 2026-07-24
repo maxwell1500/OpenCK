@@ -4,6 +4,7 @@
 #include "fileinfo.hpp"
 
 #include <QAbstractTableModel>
+#include <QStringList>
 
 const int NONE_ACTIVE = -1;
 
@@ -16,6 +17,7 @@ public:
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+    bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     FileInfo getInfoAtSelected(const QModelIndex& selected);
@@ -24,6 +26,9 @@ public:
     bool isPlugin(int row) const;
     std::tuple<QStringList, int> getFiles() const;
     QString getFilename() const;
+    int getActiveRow() const;
+    void setSelectedFiles(const QStringList& files);
+    QStringList getLoadErrors() const { return loadErrors; }
 
 public slots:
     void doubleClicked(const QModelIndex& index);
@@ -33,6 +38,7 @@ private:
     QVector<FileInfo> filesInfo;
     QVector<bool> selected;
     int active;
+    QStringList loadErrors;
 
 signals:
     void newFileSelected(FileInfo info);

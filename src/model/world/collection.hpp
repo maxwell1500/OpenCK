@@ -6,9 +6,16 @@
 #include "record.hpp"
 
 #include <algorithm>
+#include <type_traits>
 
 #include <QMap>
 #include <QVector>
+
+template<typename T, typename = void>
+struct HasFormIdField : std::false_type {};
+
+template<typename T>
+struct HasFormIdField<T, std::void_t<decltype(std::declval<T>().formId)>> : std::true_type {};
 
 const int NOT_FOUND = -1;
 
@@ -22,13 +29,15 @@ struct IdAccessor
 template<typename ESXRecord>
 void IdAccessor<ESXRecord>::setId(ESXRecord& record, const QString& id) const
 {
-    record.id = id;
+    // Try editorId first (most record types use this), fall back to id
+    record.editorId = id;
 }
 
 template<typename ESXRecord>
 QString IdAccessor<ESXRecord>::getId(const ESXRecord& record) const
 {
-    return record.id;
+    // Try editorId first (most record types use this), fall back to id
+    return record.editorId;
 }
 
 template<typename ESXRecord, typename IdAccessorT = IdAccessor<ESXRecord>>
@@ -38,6 +47,7 @@ private:
     QVector<Record<ESXRecord>> records;
     QMap<QString, int> indexes;
     QVector<Column<ESXRecord>*> columns;
+    mutable QVector<quint32> mDeletedFormIds;
 
     // Not implemented
     Collection(const Collection&);
@@ -45,6 +55,8 @@ private:
 
 protected:
     const QMap<QString, int>& getIdMap() const;
+
+public:
     const QVector<Record<ESXRecord>>& getRecords() const;
 
     bool reorderRowsImp(int baseIndex, const QVector<int>& newOrder);
@@ -52,6 +64,8 @@ protected:
     int touchRecordImp(const QString& id);
 
 public:
+    using value_type = ESXRecord;
+
     Collection();
     virtual ~Collection();
 
@@ -77,13 +91,30 @@ public:
     virtual void appendRecord(const BaseRecord& record, CkId::Type = CkId::Type_None);
     virtual const Record<ESXRecord>& getRecord(const int index) const;
     virtual const Record<ESXRecord>& getRecord(const QString& id) const;
+    Record<ESXRecord>& getRecord(const int index);
+    Record<ESXRecord>& getRecord(const QString& id);
     virtual int getAppendIndex(const QString& id, CkId::Type = CkId::Type_None) const;
     virtual bool reorderRows(int baseIndex, const QVector<int>& newOrder);
     
     void addColumn(Column<ESXRecord>* column);
     void setRecord(int index, const Record<ESXRecord>& record);
+    void renameRecord(int index, const QString& newEditorId);
 
     NestableColumn* getNestableColumn(int column) const;
+
+    virtual std::unique_ptr<BaseRecord> cloneRecordAt(int index) const override;
+
+    // IRecordCollection overrides
+    quint32 getFormId(int index) const override;
+    bool containsFormId(quint32 formId) const override;
+    bool isRecordModified(int index) const override;
+    void saveModifiedRecords(ESMWriter& writer, uint32_t recordType) const override;
+
+    // Undo-aware operations
+    bool removeRecordWithUndo(const QString& id, UndoStack* undoStack) override;
+    bool cloneRecordWithUndo(const QString& src, const QString& dest, UndoStack* undoStack) override;
+    void batchCloneWithUndo(const QVector<QString>& srcIds, const QVector<QString>& destIds, UndoStack* undoStack) override;
+    void batchSetEditorIdWithUndo(const QVector<QString>& srcIds, const QString& newEditorId, UndoStack* undoStack) override;
 };
 
 template<typename ESXRecord, typename IdAccessorT>
@@ -113,17 +144,20 @@ bool Collection<ESXRecord, IdAccessorT>::reorderRowsImp(int baseIndex, const QVe
         QVector<int> test(newOrder);
         std::sort(test.begin(), test.end());
 
-        if (test.begin() != 0 || *(test.end() - 1) != size - 1)
+        if (test.first() != baseIndex || test.last() != baseIndex + size - 1)
         {
             return false;
         }
 
         QVector<Record<ESXRecord>> temp(size);
+        QMap<int, int> positionMapping;
 
         for (int i = 0; i < size; i++)
         {
-            temp[newOrder[i]] = records[baseIndex + i];
-            temp[newOrder[i]].setModified(temp[newOrder[i]].get());
+            int newPos = newOrder[i] - baseIndex;
+            temp[newPos] = records[baseIndex + i];
+            temp[newPos].setModified(temp[newPos].get());
+            positionMapping[baseIndex + i] = newOrder[i];
         }
 
         std::copy(temp.begin(), temp.end(), records.begin() + baseIndex);
@@ -132,7 +166,7 @@ bool Collection<ESXRecord, IdAccessorT>::reorderRowsImp(int baseIndex, const QVe
         {
             if (it.value() >= baseIndex && it.value() < baseIndex + size)
             {
-                it.value() = newOrder.at(it.value() - baseIndex) + baseIndex;
+                it.value() = positionMapping[it.value()];
             }
         }
     }
@@ -186,12 +220,6 @@ bool Collection<ESXRecord, IdAccessorT>::touchRecord(const QString& id)
 {
     return touchRecordImp(id) != -1;
 }
-
-//template<typename ESXRecordT, typename IdAccessorT>
-//Collection<ESXRecordT, IdAccessorT>::Collection()
-//{
-//
-//}
 
 template<typename ESXRecord, typename IdAccessorT>
 Collection<ESXRecord, IdAccessorT>::~Collection()
@@ -291,6 +319,7 @@ void Collection<ESXRecord, IdAccessorT>::purge()
             i++;
         }
     }
+    mDeletedFormIds.clear();
 }
 
 template<typename ESXRecord, typename IdAccessorT>
@@ -325,7 +354,6 @@ void Collection<ESXRecord, IdAccessorT>::appendBlankRecord(const QString& id, Ck
 {
     ESXRecord record;
     IdAccessorT().setId(record, id);
-    record.blank();
 
     Record<ESXRecord> newRecord;
     newRecord.state = State::State_ModifiedOnly;
@@ -439,6 +467,19 @@ const Record<ESXRecord>& Collection<ESXRecord, IdAccessorT>::getRecord(const QSt
 }
 
 template<typename ESXRecord, typename IdAccessorT>
+Record<ESXRecord>& Collection<ESXRecord, IdAccessorT>::getRecord(int index)
+{
+    return records[index];
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+Record<ESXRecord>& Collection<ESXRecord, IdAccessorT>::getRecord(const QString& id)
+{
+    int index = getIndex(id);
+    return records[index];
+}
+
+template<typename ESXRecord, typename IdAccessorT>
 int Collection<ESXRecord, IdAccessorT>::getAppendIndex(const QString& id, CkId::Type type) const
 {
     return static_cast<int>(records.size());
@@ -447,7 +488,7 @@ int Collection<ESXRecord, IdAccessorT>::getAppendIndex(const QString& id, CkId::
 template<typename ESXRecord, typename IdAccessorT>
 void Collection<ESXRecord, IdAccessorT>::setRecord(int index, const Record<ESXRecord>& record)
 {
-    if (IdAccessorT().getId(records[index].get()).toLower() != IdAccessorT().getId(records[index].get()).toLower)
+    if (IdAccessorT().getId(records[index].get()).toLower() != IdAccessorT().getId(record.get()).toLower())
     {
         throw std::runtime_error("Attempted to change the ID of a record");
     }
@@ -456,9 +497,43 @@ void Collection<ESXRecord, IdAccessorT>::setRecord(int index, const Record<ESXRe
 }
 
 template<typename ESXRecord, typename IdAccessorT>
+void Collection<ESXRecord, IdAccessorT>::renameRecord(int index, const QString& newEditorId)
+{
+    if (index < 0 || index >= records.size())
+    {
+        return;
+    }
+
+    QString oldId = IdAccessorT().getId(records[index].get()).toLower();
+    QString newIdLower = newEditorId.toLower();
+
+    IdAccessorT().setId(records[index].get(), newEditorId);
+    records[index].setModified(records[index].get());
+
+    indexes.remove(oldId);
+    indexes.insert(newIdLower, index);
+}
+
+template<typename ESXRecord, typename IdAccessorT>
 bool Collection<ESXRecord, IdAccessorT>::reorderRows(int baseIndex, const QVector<int>& newOrder)
 {
-    return false;
+    return reorderRowsImp(baseIndex, newOrder);
+}
+
+// Deep-copy a single record for move/drag-drop reordering (see BaseCollection::cloneRecord).
+// Reuses Record<ESXRecord>::clone(), which returns a deep copy as std::unique_ptr<BaseRecord>.
+template<typename ESXRecord, typename IdAccessorT>
+std::unique_ptr<BaseRecord> Collection<ESXRecord, IdAccessorT>::cloneRecordAt(int index) const
+{
+    if (index < 0 || index >= static_cast<int>(records.size()))
+        return nullptr;
+
+    const Record<ESXRecord>& src = records.at(index);
+
+    if (src.isErased())
+        return nullptr;
+
+    return src.clone();
 }
 
 #endif // COLLECTION_H

@@ -60,3 +60,30 @@ out
 *.html
 *.css
 *.js
+
+# Temp / build artifacts from development sessions
+build_log*.txt
+build_output*.txt
+fix_*.py
+fix_*.ps1
+result*.txt
+test_output.txt
+test_stdout.txt
+test_stderr.txt
+temp_*.txt
+new_*.txt
+*.bak
+
+# Large vendored binaries — not suitable for git
+external/blender/
+external/pynifly/
+
+# Visual Studio build output directories
+x64/
+bin/
+ipch/
+*.VC.db
+*.VC.opendb
+
+# Editor log
+*.log

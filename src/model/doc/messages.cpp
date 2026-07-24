@@ -51,3 +51,18 @@ Messages::Iterator Messages::end() const
 {
     return messages.constEnd();
 }
+
+bool Messages::hasMessages() const
+{
+    return !messages.empty();
+}
+
+QString Messages::toString() const
+{
+    QString result;
+    for (Iterator it = begin(); it != end(); ++it)
+    {
+        result += Message::toString(it->level) + ": " + it->message + "\n";
+    }
+    return result;
+}

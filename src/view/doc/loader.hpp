@@ -25,7 +25,6 @@ public:
     void nextStage(const QString& name, int records);
     void nextRecord(int records);
     void abort(const QString& error);
-    void addMessage(const QString& message) {}
 
 private:
     Document* document;
@@ -62,7 +61,6 @@ public slots:
     void loadingStopped(Document* document, bool completed, const QString& error);
     void nextStage(Document* document, const QString& name, int totalRecords);
     void nextRecord(Document* document, int records);
-    void loadMessage(Document* document, const QString& message) {}
 };
 
 #endif // VIEW_LOADER_H

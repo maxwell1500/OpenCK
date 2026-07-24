@@ -2,7 +2,8 @@
 
 #include <sstream>
 
-ReportModel::ReportModel(bool fieldColumn, bool levelColumn) :
+ReportModel::ReportModel(QObject* parent, bool fieldColumn, bool levelColumn) :
+    QAbstractTableModel(parent),
     columnField(-1), columnLevel(-1)
 {
     int index = Columns;

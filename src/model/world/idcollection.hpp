@@ -12,13 +12,13 @@ public:
     int load(const ESXRecord& record, int index, bool base);
 
 private:
-    virtual void loadRecord(ESXRecord& record, ESMReader& reader);
+    virtual void loadRecord(ESXRecord& record, ESMReader& reader, bool base);
 };
 
 template<typename ESXRecord, typename IdAccessorT>
-void IdCollection<ESXRecord, IdAccessorT>::loadRecord(ESXRecord& record, ESMReader& reader)
+void IdCollection<ESXRecord, IdAccessorT>::loadRecord(ESXRecord& record, ESMReader& reader, bool base)
 {
-    record.load(reader);
+    record.load(reader, base);
 }
 
 template<typename ESXRecord, typename IdAccessorT>
@@ -41,7 +41,7 @@ template<typename ESXRecord, typename IdAccessorT>
 int IdCollection<ESXRecord, IdAccessorT>::load(ESMReader& esm, bool base)
 {
     ESXRecord record;
-    loadRecord(record, esm);
+    loadRecord(record, esm, base);
 
     QString id = IdAccessorT().getId(record);
     int index = this->searchId(id);

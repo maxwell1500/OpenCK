@@ -8,6 +8,7 @@
 #include "../../../libs/files/filepaths.hpp"
 
 #include <QObject>
+#include <memory>
 
 class ESMReader;
 class ESMWriter;
@@ -43,7 +44,7 @@ private:
 
     std::shared_ptr<ReportModel> reports;
 
-    Data data;
+    std::unique_ptr<Data> data;
 };
 
 #endif // DOCUMENT_H

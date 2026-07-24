@@ -5,6 +5,7 @@
 #include "../data/strings.hpp"
 
 #include <QFile>
+#include <QSettings>
 
 struct ESMFile
 {
@@ -33,7 +34,12 @@ struct ESMFile
         : file(fileName),
           localised(false)
     {
-        strings.load(fileName, filePaths);
+        QSettings conf(filePaths.configPath, QSettings::IniFormat);
+        conf.beginGroup("OpenCK");
+        QString language = conf.value("Language", "English").toString();
+        conf.endGroup();
+
+        strings.load(fileName, filePaths, language);
 
         size = file.size();
         left = file.size();

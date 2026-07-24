@@ -1,0 +1,48 @@
+#ifndef FlorRECORD_H
+#define FlorRECORD_H
+#include "records.hpp"
+#include "variant.hpp"
+#include "../../components/component.hpp"
+#include "../../components/formcomponents.hpp"
+#include "../../components/tesfullname.hpp"
+#include "../../components/tier1_components.hpp"
+#include <QString>
+#include <QVector>
+class ESMReader;
+class ESMWriter;
+struct FlorRecord {
+    QString editorId;
+    quint32 formId = 0;
+    quint32 flags = 0;
+    QString fullName;
+    QString modelPath;
+    QString iconPath;
+    quint32 ingredient = 0;
+    quint32 spring = 0;
+    quint32 summer = 0;
+    quint32 fall = 0;
+    quint32 winter = 0;
+    QVector<RawSubRecord> rawSubRecords;
+
+    openck::FormComponents components;
+
+    void load(ESMReader& esm, bool base);
+    void save(ESMWriter& esm) const;
+    void blank();
+};
+
+inline bool operator==(const FlorRecord& l, const FlorRecord& r)
+{
+    return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
+        && l.fullName == r.fullName && l.modelPath == r.modelPath
+        && l.iconPath == r.iconPath && l.ingredient == r.ingredient
+        && l.spring == r.spring && l.summer == r.summer
+        && l.fall == r.fall && l.winter == r.winter
+        && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
+}
+
+inline bool operator!=(const FlorRecord& l, const FlorRecord& r)
+{
+    return !(l == r);
+}
+#endif

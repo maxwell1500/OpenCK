@@ -1,48 +1,55 @@
 #include "datatable.hpp"
 
-#include "../../view/messageboxhelper.hpp"
+#include "logger.hpp"
 
 #include <QBrush>
 #include <QDir>
-#include <QMessageBox>
 
 DataTable::DataTable(const QString& path, QObject* parent)
     : QAbstractTableModel(parent),
       active(NONE_ACTIVE)
 {
+    LOG_INFO(QString("DataTable::DataTable starting with path='%1'").arg(path));
     QDir dataDir{ path };
 
     QStringList filters{ "*.esm", "*.esp", "*.esl" };
     dataDir.setNameFilters(filters);
     QStringList files{ dataDir.entryList() };
+    LOG_INFO(QString("DataTable: entryList found %1 files").arg(files.size()));
 
     if (!dataDir.exists() || files.empty())
     {
-        msgBoxCritical(
-            "Failed to find data files.\n"
-            "Please ensure DataDirectory setting in config.ini is correct."
-        );
+        loadErrors.append(QString("No data files found in '%1'.").arg(path));
+        LOG_WARNING(QString("DataTable: no data files in '%1'").arg(path));
     }
 
-    // TODO: Sort between plugins/masters
+    // NOTE: Files are sorted alphabetically. Plugin/master load order is
+    // determined by the application layer if needed; here we just ensure
+    // a deterministic ordering.
     files.sort();
 
+    int idx = 0;
     for (auto file: files)
     {
         try
         {
             QString fileName{ path + "/" + file };
+            LOG_INFO(QString("DataTable: opening '%1' (%2/%3)").arg(file).arg(idx + 1).arg(files.size()));
             ESMReader reader{ fileName };
             reader.open();
             FileInfo info = getFileInfo(file, reader.getHeader());
             filesInfo.push_back(info);
             selected.push_back(false);
+            LOG_INFO(QString("DataTable: parsed '%1' OK").arg(file));
         }
         catch (std::runtime_error& e)
         {
-            msgBoxCritical(e.what());
+            loadErrors.append(QString("%1: %2").arg(file, e.what()));
+            LOG_WARNING(QString("DataTable: failed to read '%1': %2").arg(file, e.what()));
         }
+        ++idx;
     }
+    LOG_INFO(QString("DataTable::DataTable complete, %1 files loaded, %2 errors").arg(filesInfo.size()).arg(loadErrors.size()));
 }
 
 int DataTable::rowCount(const QModelIndex &parent) const
@@ -65,13 +72,17 @@ QVariant DataTable::data(const QModelIndex& index, int role) const
             return filesInfo.at(index.row()).fileName;
         case 1:
         {
-            if (!isPlugin(index))
+            if (index.row() == active)
+            {
+                return "Active file";
+            }
+            else if (filesInfo.at(index.row()).fileName.endsWith(".esm", Qt::CaseInsensitive))
             {
                 return "Master File";
             }
-            else if (index.row() == active)
+            else if (filesInfo.at(index.row()).fileName.endsWith(".esl", Qt::CaseInsensitive))
             {
-                return "Active file";
+                return "Light Master";
             }
             else
             {
@@ -82,10 +93,25 @@ QVariant DataTable::data(const QModelIndex& index, int role) const
     }
     else if (role == Qt::CheckStateRole && index.column() == 0)
     {
-        return QVariant::fromValue(selected.at(index.row()));
+        return QVariant::fromValue(
+            selected.at(index.row()) ? Qt::Checked : Qt::Unchecked
+        );
     }
 
     return QVariant();
+}
+
+bool DataTable::setData(const QModelIndex& index, const QVariant& value, int role)
+{
+    if (role == Qt::CheckStateRole && index.column() == 0)
+    {
+        selected.replace(index.row(), value.toBool());
+        QModelIndex topLeft(this->index(0, 0));
+        QModelIndex bottomRight(this->index(rowCount(), columnCount()));
+        emit dataChanged(topLeft, bottomRight);
+        return true;
+    }
+    return QAbstractTableModel::setData(index, value, role);
 }
 
 void DataTable::doubleClicked(const QModelIndex& indx)
@@ -108,11 +134,8 @@ void DataTable::doubleClicked(const QModelIndex& indx)
 
 void DataTable::setActive(const QModelIndex& indx)
 {
-    if (isPlugin(indx))
-    {
-        active = indx.row();
-        selected.replace(indx.row(), true);
-    }
+    active = indx.row();
+    selected.replace(indx.row(), true);
 
     QModelIndex topLeft(index(0, 0));
     QModelIndex bottomRight(index(rowCount(), columnCount()));
@@ -194,6 +217,21 @@ FileInfo DataTable::getFileInfo(QString fileName, Header header)
     return info;
 }
 
+void DataTable::setSelectedFiles(const QStringList& files)
+{
+    for (int i = 0; i < filesInfo.size(); i++)
+    {
+        if (files.contains(filesInfo.at(i).fileName))
+        {
+            selected.replace(i, true);
+        }
+    }
+
+    QModelIndex topLeft(index(0, 0));
+    QModelIndex bottomRight(index(rowCount(), columnCount()));
+    emit dataChanged(topLeft, bottomRight);
+}
+
 std::tuple<QStringList, int> DataTable::getFiles() const
 {
     int active_ = -1;
@@ -207,7 +245,7 @@ std::tuple<QStringList, int> DataTable::getFiles() const
             {
                 files << filesInfo.at(i).fileName;
 
-                if (active >= 0 && filesInfo.at(active).fileName == files.last())
+                if (i == active)
                 {
                     active_ = files.size() - 1;
                 }
@@ -224,4 +262,9 @@ std::tuple<QStringList, int> DataTable::getFiles() const
     }
 
     return std::make_tuple(files, active_);
+}
+
+int DataTable::getActiveRow() const
+{
+    return active;
 }

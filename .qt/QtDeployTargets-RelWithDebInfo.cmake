@@ -1,0 +1,6 @@
+set(__QT_DEPLOY_TARGET_openck_tests_FILE C:/Users/max/Projects/OpenCK/openck/bin/RelWithDebInfo/openck_tests.exe)
+set(__QT_DEPLOY_TARGET_openck_tests_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_openck_tests_RUNTIME_DLLS C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6Test.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6Core.dll)
+set(__QT_DEPLOY_TARGET_openck_FILE C:/Users/max/Projects/OpenCK/openck/bin/RelWithDebInfo/openck.exe)
+set(__QT_DEPLOY_TARGET_openck_TYPE EXECUTABLE)
+set(__QT_DEPLOY_TARGET_openck_RUNTIME_DLLS C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt63DExtras.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt63DInput.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6OpenGLWidgets.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt63DRender.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt63DLogic.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt63DCore.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6Concurrent.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6Network.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6Widgets.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6OpenGL.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6Gui.dll;C:/Users/max/Projects/OpenCK/6.7.3/msvc2019_64/bin/Qt6Core.dll)

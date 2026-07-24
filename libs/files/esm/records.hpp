@@ -4,10 +4,28 @@
 #include "common.hpp"
 
 #include <QtGlobal>
+#include <QByteArray>
 
 typedef quint32 FormID;
 
 class ESMWriter;
+class ESMReader;
+
+struct RawSubRecord
+{
+    NAME name;
+    QByteArray data;
+
+    inline bool operator==(const RawSubRecord& other) const
+    {
+        return name == other.name && data == other.data;
+    }
+
+    inline bool operator!=(const RawSubRecord& other) const
+    {
+        return !(*this == other);
+    }
+};
 
 struct Flags
 {

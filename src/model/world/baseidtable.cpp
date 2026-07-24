@@ -1,6 +1,7 @@
 #include "baseidtable.hpp"
 
-BaseIdTable::BaseIdTable(unsigned int features) :
+BaseIdTable::BaseIdTable(unsigned int features, QObject* parent) :
+    QAbstractItemModel(parent),
     features(features)
 {
 

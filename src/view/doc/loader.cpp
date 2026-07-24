@@ -2,8 +2,6 @@
 #include "../../model/doc/document.hpp"
 #include "../../../ui/ui_loaderdialog.h"
 
-#include <sstream>
-
 LoaderDialog::LoaderDialog(QWidget* parent) :
     QDialog(parent),
     ui(new Ui::loaderdialog)
@@ -21,9 +19,7 @@ void LoaderDialog::assign(Document* document)
 {
     this->document = document;
 
-    std::stringstream ss;
-    ss << "Loading " << document->getSavePath().toStdString();
-    setWindowTitle(QString::fromStdString(ss.str()));
+    setWindowTitle(tr("Loading %1").arg(document->getSavePath()));
 
     int size = static_cast<int>(document->getContentFiles().size()) + 1;
     if (document->isNewFile())
@@ -63,10 +59,7 @@ void LoaderDialog::nextRecord(int records)
     {
         ui->recordProgressBar->setValue(records);
 
-        std::stringstream ss;
-        ss << records << "/" << totalRecords;
-
-        ui->recordLabel->setText(QString::fromStdString(ss.str()));
+        ui->recordLabel->setText(tr("%1/%2").arg(records).arg(totalRecords));
     }
 }
 

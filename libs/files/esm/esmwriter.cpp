@@ -1,4 +1,5 @@
 #include "esmwriter.hpp"
+#include "tes4codes.hpp"
 
 #include "common.hpp"
 
@@ -41,6 +42,7 @@ void ESMWriter::addMaster(QString name, quint64 size)
 void ESMWriter::save(QFile& file)
 {
     stream.setDevice(&file);
+    stream.setByteOrder(QDataStream::LittleEndian);
     recordsWritten = 0;
 
     startRecord('TES4');
@@ -66,6 +68,7 @@ void ESMWriter::endRecord()
 
 void ESMWriter::startSubRecord(NAME name)
 {
+    name = Tes4Codes::toTes4(name);
     writeType<NAME>(swapName(name));
     subSizePos = stream.device()->pos();
     writeType<quint16>(0);
@@ -82,12 +85,12 @@ void ESMWriter::endSubRecord()
 
 void ESMWriter::writeZString(const QString& str)
 {
-    qint32 size{ str.size() + 1 };
+    qint32 size = static_cast<qint32>(str.size()) + 1;
     buf.resize(size);
     buf.fill('\0', size);
     QByteArray bytes{ str.toUtf8() };
     bytes.push_back('\0');
-    stream.writeRawData(bytes.data(), size);
+    stream.writeRawData(bytes.data(), bytes.size());
 }
 
 void ESMWriter::writeSubZString(NAME name, const QString &str)

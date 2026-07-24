@@ -131,22 +131,22 @@ void Variant::load(ESMReader& esm, Format format, const QString& editorId)
 
         if (editorId.size() > 0)
         {
-            if (editorId.front() == "b")
+            if (editorId.front() == 'b')
             {
                 setType(Var_Bool);
                 setBool(esm.readType<quint32>());
             }
-            else if (editorId.front() == "i")
+            else if (editorId.front() == 'i')
             {
                 setType(Var_Int);
-                setFloat(esm.readType<quint32>());
+                setInt(esm.readType<quint32>());
             }
-            else if (editorId.front() == "f")
+            else if (editorId.front() == 'f')
             {
                 setType(Var_Float);
                 setFloat(esm.readType<float>());
             }
-            else if (editorId.front() == "s")
+            else if (editorId.front() == 's')
             {
                 if (esm.localised())
                 {

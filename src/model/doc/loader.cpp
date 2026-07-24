@@ -4,6 +4,7 @@
 #include "documentstate.hpp"
 #include "messages.hpp"
 #include "../tools/reports.hpp"
+#include "logger.hpp"
 
 #include <iostream>
 #include <stdexcept>
@@ -16,9 +17,10 @@ Loader::Stage::Stage() :
 Loader::Loader() :
     shouldStop(false)
 {
+    LOG_INFO("Loader initialized");
     timer = std::make_unique<QTimer>(this);
 
-    connect(timer.get(), SIGNAL(timeout()), this, SLOT(load()));
+    connect(timer.get(), &QTimer::timeout, this, &Loader::load);
     timer->start();
 }
 
@@ -42,6 +44,7 @@ void Loader::load()
 
         if (shouldStop)
         {
+            LOG_DEBUG("Loader stopping due to shouldStop flag");
             timer->stop();
         }
 
@@ -55,10 +58,13 @@ void Loader::load()
     int editedIndex = size - 1;
     bool done = false;
 
+    LOG_DEBUG(QString("Loader processing %1 document(s)").arg(documents.size()));
+
     try
     {
         if (it->second.recordsLeft)
         {
+            LOG_DEBUG(QString("Loading batch for %1, recordsLoaded=%2").arg(document->getSavePath()).arg(it->second.recordsLoaded));
             Messages messages(Message::Error);
             const int batchSize = 50;
 
@@ -66,6 +72,7 @@ void Loader::load()
             {
                 if (document->getData().continueLoading(messages))
                 {
+                    LOG_DEBUG(QString("Batch loading complete for %1").arg(document->getSavePath()));
                     it->second.recordsLeft = false;
                     break;
                 }
@@ -74,8 +81,6 @@ void Loader::load()
                     ++(it->second.recordsLoaded);
                 }
             }
-
-            CkId log(CkId::Type_LoadingLog, 0);
 
             for (Messages::Iterator messageIt = messages.begin(); messageIt != messages.end(); ++messageIt)
             {
@@ -91,7 +96,9 @@ void Loader::load()
         if (it->second.file < size)
         {
             QString file = document->getContentFiles()[it->second.file];
+            LOG_INFO(QString("Loading file: %1 (master=%2)").arg(file).arg(it->second.file == editedIndex ? "no" : "yes"));
             int recordCount = document->getData().preload(file, it->second.file != editedIndex);
+            LOG_INFO(QString("File loaded: %1, %2 records").arg(file).arg(recordCount));
 
             it->second.recordsLeft = true;
             it->second.recordsLoaded = 0;
@@ -100,6 +107,7 @@ void Loader::load()
         }
         else
         {
+            LOG_INFO(QString("All files loaded for %1").arg(document->getSavePath()));
             done = true;
         }
 
@@ -107,6 +115,7 @@ void Loader::load()
     }
     catch (const std::exception& e)
     {
+        LOG_ERROR(QString("Error loading %1: %2").arg(document->getSavePath()).arg(e.what()));
         documents.erase(it);
         emit documentNotLoaded(document, e.what());
         return;
@@ -114,6 +123,7 @@ void Loader::load()
 
     if (done)
     {
+        LOG_INFO(QString("Document loaded successfully: %1").arg(document->getSavePath()));
         documents.erase(it);
         emit documentLoaded(document);
     }

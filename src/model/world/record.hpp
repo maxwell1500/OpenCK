@@ -20,8 +20,8 @@ public:
 
     virtual ~BaseRecord();
 
-    virtual BaseRecord* clone() = 0;
-    virtual BaseRecord* modifiedCopy() = 0;
+    virtual std::unique_ptr<BaseRecord> clone() const = 0;
+    virtual std::unique_ptr<BaseRecord> modifiedCopy() const = 0;
     virtual void assign(const BaseRecord& record) = 0;
 
     bool isModified() const;
@@ -34,14 +34,14 @@ class Record : public BaseRecord
 {
 public:
     Record();
-    Record(State inState, ESXRecord* base = nullptr, ESXRecord* modified = nullptr);
-    
+    Record(State inState, const ESXRecord* base = nullptr, const ESXRecord* modified = nullptr);
+
     ESXRecord& get();
     const ESXRecord& get() const;
     const ESXRecord& getBase() const;
 
-    BaseRecord* clone() override;
-    BaseRecord* modifiedCopy() override;
+    std::unique_ptr<BaseRecord> clone() const override;
+    std::unique_ptr<BaseRecord> modifiedCopy() const override;
     void assign(const BaseRecord& record) override;
 
     void setModified(const ESXRecord& modified);
@@ -55,10 +55,11 @@ template<typename ESXRecord>
 Record<ESXRecord>::Record()
     : baseRecord(), modifiedRecord()
 {
+    state = State_Base;
 }
 
 template<typename ESXRecord>
-Record<ESXRecord>::Record(State inState, ESXRecord* base, ESXRecord* modified)
+Record<ESXRecord>::Record(State inState, const ESXRecord* base, const ESXRecord* modified)
 {
     state = inState;
 
@@ -74,15 +75,15 @@ Record<ESXRecord>::Record(State inState, ESXRecord* base, ESXRecord* modified)
 }
 
 template<typename ESXRecord>
-BaseRecord* Record<ESXRecord>::modifiedCopy()
+std::unique_ptr<BaseRecord> Record<ESXRecord>::modifiedCopy() const
 {
-    return new Record<ESXRecord>(State_ModifiedOnly, nullptr, &(this->get()));
+    return std::make_unique<Record<ESXRecord>>(State_ModifiedOnly, nullptr, &(this->get()));
 }
 
 template<typename ESXRecord>
-BaseRecord* Record<ESXRecord>::clone()
+std::unique_ptr<BaseRecord> Record<ESXRecord>::clone() const
 {
-    return new Record<ESXRecord>(*this);
+    return std::make_unique<Record<ESXRecord>>(*this);
 }
 
 template<typename ESXRecord>

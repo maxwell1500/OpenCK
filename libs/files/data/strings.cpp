@@ -7,10 +7,9 @@ Strings::Strings()
 
 }
 
-void Strings::load(QString filename, const FilePaths& paths)
+void Strings::load(QString filename, const FilePaths& paths, const QString& language)
 {
-    // TODO: Replace with application settings value
-    QString defaultLanguage = "English";
+    QString defaultLanguage = language;
 
     QFileInfo info(filename);
     QString filenameOnly = info.fileName();
@@ -39,14 +38,17 @@ void Strings::load(QString filename, const FilePaths& paths)
         case Type::LString:
         {
             loadLStrings(file);
+            break;
         }
         case Type::ILString:
         {
             loadILStrings(file);
+            break;
         }
         case Type::DLString:
         {
             loadDLStrings(file);
+            break;
         }
         }
     }
@@ -70,31 +72,47 @@ void Strings::loadLStrings(QFile& file)
 
 void Strings::loadILStrings(QFile& file)
 {
+    unsigned int count = readHeader(file);
 
+    QByteArray all = file.readAll();
+
+    QByteArrayList bytesList = all.split('\0');
+
+    for (const auto& bytes : bytesList)
+    {
+        QString entry = QString::fromLatin1(bytes.data(), bytes.size());
+
+        ilstrings.push_back(entry);
+    }
 }
 
 void Strings::loadDLStrings(QFile& file)
 {
+    unsigned int count = readHeader(file);
 
+    QByteArray all = file.readAll();
+
+    QByteArrayList bytesList = all.split('\0');
+
+    for (const auto& bytes : bytesList)
+    {
+        QString entry = QString::fromLatin1(bytes.data(), bytes.size());
+
+        dlstrings.push_back(entry);
+    }
 }
 
 unsigned int Strings::readHeader(QFile& file)
 {
     QDataStream stream;
     stream.setDevice(&file);
+    stream.setByteOrder(QDataStream::LittleEndian);
 
-    unsigned int count;
-    unsigned int dataSize;
+    quint32 count;
+    quint32 dataSize;
 
-    QByteArray buf;
-    buf.resize(sizeof(int));
-    stream.readRawData(buf.data(), sizeof(int));
-    memcpy(&count, buf.data(), sizeof(int));
-
-    buf.clear();
-    buf.resize(sizeof(int));
-    stream.readRawData(buf.data(), sizeof(int));
-    memcpy(&dataSize, buf.data(), sizeof(int));
+    stream >> count;
+    stream >> dataSize;
 
     stream.skipRawData(count * sizeof(int) * 2);
 
@@ -103,9 +121,9 @@ unsigned int Strings::readHeader(QFile& file)
 
 QString Strings::get(Type type, unsigned int index) const
 {
-    QVector<QString> stringlist = selectList(type);
+    const QVector<QString>& stringlist = selectList(type);
 
-    if (stringlist.size() > index)
+    if (stringlist.size() <= index)
     {
         return QString("");
     }
@@ -117,9 +135,9 @@ QString Strings::get(Type type, unsigned int index) const
 
 bool Strings::set(Type type, unsigned int index, const QString& entry)
 {
-    QVector<QString> stringlist = selectList(type);
+    QVector<QString>& stringlist = selectList(type);
 
-    if (stringlist.size() <= index)
+    if (stringlist.size() > index)
     {
         stringlist[index] = entry;
 
@@ -133,7 +151,7 @@ bool Strings::set(Type type, unsigned int index, const QString& entry)
 
 unsigned int Strings::append(Type type, const QString& entry)
 {
-    QVector<QString> stringlist = selectList(type);
+    QVector<QString>& stringlist = selectList(type);
 
     stringlist.push_back(entry);
 
@@ -142,9 +160,9 @@ unsigned int Strings::append(Type type, const QString& entry)
 
 bool Strings::remove(Type type, unsigned int index)
 {
-    QVector<QString> stringlist = selectList(type);
+    QVector<QString>& stringlist = selectList(type);
 
-    if (stringlist.size() <= index)
+    if (stringlist.size() > index)
     {
         stringlist.remove(index);
 
@@ -158,12 +176,12 @@ bool Strings::remove(Type type, unsigned int index)
 
 unsigned int Strings::find(Type type, const QString& entry)
 {
-    QVector<QString> stringlist = selectList(type);
+    const QVector<QString>& stringlist = selectList(type);
 
-    return stringlist.indexOf(entry);
+    return static_cast<unsigned int>(stringlist.indexOf(entry));
 }
 
-QVector<QString> Strings::selectList(Type type) const
+QVector<QString>& Strings::selectList(Type type)
 {
     switch (type)
     {
@@ -180,4 +198,27 @@ QVector<QString> Strings::selectList(Type type) const
         return dlstrings;
     }
     }
+
+    return strings;
+}
+
+const QVector<QString>& Strings::selectList(Type type) const
+{
+    switch (type)
+    {
+    case Type::LString:
+    {
+        return strings;
+    }
+    case Type::ILString:
+    {
+        return ilstrings;
+    }
+    case Type::DLString:
+    {
+        return dlstrings;
+    }
+    }
+
+    return strings;
 }

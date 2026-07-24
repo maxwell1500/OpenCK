@@ -11,12 +11,12 @@ enum ColumnId
     ColumnId_Modification = 2,
     ColumnId_RecordType = 3,
     ColumnId_ValueType = 4,
+    ColumnId_Custom = 5,
 
-    ColumnId_End = 4
+    ColumnId_End = ColumnId_Custom + 1
 };
 
 QString getColumnName(ColumnId column);
-int getColumnId(const QString& name);
 
 namespace Columns
 {

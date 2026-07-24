@@ -9,6 +9,8 @@ class Document;
 
 class DelegateFactory
 {
+public:
+    virtual ~DelegateFactory() = default;
     virtual GenericDelegate* makeDelegate(Document& document, QObject* parent) const = 0;
 };
 

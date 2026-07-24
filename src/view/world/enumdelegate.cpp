@@ -14,7 +14,7 @@ EnumDelegateFactory::EnumDelegateFactory(ColumnId column)
     {
         QString* names = Columns::getEnumNames(column);
 
-        for (int i = 0; names[i] != 0; i++)
+        for (int i = 0; !names[i].isNull(); i++)
         {
             values.push_back(QPair<int, QString>(i, names[i]));
         }
@@ -62,7 +62,7 @@ QWidget* EnumDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem&
 
 void EnumDelegate::setEditorData(QWidget* editor, const QModelIndex& index, bool tryDisplay) const
 {
-    if (QComboBox* comboBox = dynamic_cast<QComboBox*>(editor))
+    if (QComboBox* comboBox = qobject_cast<QComboBox*>(editor))
     {
         int role = Qt::EditRole;
 
@@ -113,7 +113,7 @@ QSize EnumDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelInd
         itemOption.state = option.state;
 
         const QString& valueText = values.at(valueIndex).second;
-        QSize valueSize = QSize(itemOption.fontMetrics.width(valueText), itemOption.fontMetrics.height());
+        QSize valueSize = QSize(itemOption.fontMetrics.horizontalAdvance(valueText), itemOption.fontMetrics.height());
 
         itemOption.currentText = valueText;
 
@@ -125,7 +125,7 @@ QSize EnumDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelInd
 
 void EnumDelegate::setModelDataImp(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
-    if (QComboBox * comboBox = dynamic_cast<QComboBox*>(editor))
+    if (QComboBox * comboBox = qobject_cast<QComboBox*>(editor))
     {
         QString value = comboBox->currentText();
 

@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>600</width>
-    <height>300</height>
+    <height>350</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,28 @@
   <property name="modal">
    <bool>true</bool>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_3">
+  <layout class="QVBoxLayout" name="verticalLayout_outer">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_top">
+     <item>
+      <widget class="QLabel" name="label_game">
+       <property name="text">
+        <string>Game:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="gameSelector"/>
+     </item>
+     <item>
+      <widget class="QPushButton" name="browseButton">
+       <property name="text">
+        <string>Browse...</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="45,35,20">
      <item>
@@ -98,9 +119,6 @@
        <item>
         <widget class="QListView" name="mastersListView"/>
        </item>
-       <item>
-        <layout class="QVBoxLayout" name="verticalLayout_7"/>
-       </item>
       </layout>
      </item>
     </layout>
@@ -118,18 +136,6 @@
        <property name="minimumSize">
         <size>
          <width>110</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>16777215</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="baseSize">
-        <size>
-         <width>0</width>
          <height>0</height>
         </size>
        </property>

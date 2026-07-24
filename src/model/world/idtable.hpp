@@ -8,13 +8,14 @@
 #include <QVariant>
 
 class BaseRecord;
+class UndoStack;
 
 class IdTable : public BaseIdTable
 {
     Q_OBJECT
 
 public:
-    IdTable(BaseCollection* idCollection, unsigned int features = 0);
+    IdTable(BaseCollection* idCollection, unsigned int features = 0, QObject* parent = nullptr);
     virtual ~IdTable();
 
     virtual int rowCount(const QModelIndex& parent = QModelIndex()) const;
@@ -24,12 +25,14 @@ public:
     virtual bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
     virtual Qt::ItemFlags flags(const QModelIndex& index) const;
     virtual bool removeRows(int row, int count, const QModelIndex& parent = QModelIndex());
+    virtual bool moveRows(const QModelIndex& sourceParent, int sourceRow, int count,
+                          const QModelIndex& destParent, int destRow);
     virtual QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const;
     virtual QModelIndex parent(const QModelIndex& index) const;
 
     virtual QModelIndex getModelIndex(const QString& id, int column) const;
     virtual int searchColumnIndex(ColumnId id) const;
-    virtual int findColummnIndex(ColumnId id) const;
+    virtual int findColumnIndex(ColumnId id) const;
     void reorderRows(int baseIndex, const QVector<int>& newOrder);
     virtual int getColumnId(int column) const;
 
@@ -44,11 +47,14 @@ public:
     virtual bool isDeleted(const QString& id) const;
     virtual QPair<CkId, QString> view(int row) const;
 
+    void setUndoStack(UndoStack* stack);
+
 protected:
     virtual BaseCollection* idCollection() const;
 
 private:
     BaseCollection* collection;
+    UndoStack* mUndoStack;
 
     IdTable(const IdTable&);
     IdTable& operator= (const IdTable&);

@@ -1,0 +1,32 @@
+   <action name="actionWater">
+    <property name="text">
+     <string>Water Editor...</string>
+    </parameter>
+    <property name="shortcut">
+     <string>Ctrl+F11</string>
+    </parameter>
+   </action>
+   <action name="actionCellTransitions">
+    <property name="text">
+     <string>Cell Transitions Editor...</string>
+    </parameter>
+    <property name="shortcut">
+     <string>Ctrl+F12</string>
+    </parameter>
+   </action>
+   <action name="actionMaterialEditor">
+    <property name="text">
+     <string>Material Editor...</string>
+    </parameter>
+    <property name="shortcut">
+     <string>F13</string>
+    </parameter>
+   </action>
+   <action name="actionPapyrusDebugger">
+    <property name="text">
+     <string>Papyrus Debugger...</string>
+    </parameter>
+    <property name="shortcut">
+     <string>F14</string>
+    </parameter>
+   </action>

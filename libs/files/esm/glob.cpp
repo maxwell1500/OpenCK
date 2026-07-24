@@ -3,27 +3,22 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 
-void GlobalVariable::load(ESMReader& esm)
+void GlobalVariable::load(ESMReader& esm, bool)
 {
     constant = esm.readHeader().flags.test(GlobalVariable::Constant);
-    id = esm.readSubZString('EDID');
+    editorId = esm.readSubZString('EDID');
     value.load(esm, Variant::Format_GLOB);
 }
 
 void GlobalVariable::save(ESMWriter& esm) const
 {
-    esm.writeSubZString('EDID', id);
-    value.write(esm, Variant::Format_GMST);
+    esm.writeSubZString('EDID', editorId);
+    value.write(esm, Variant::Format_GLOB);
 }
 
 void GlobalVariable::blank()
 {
-    id = "";
+    editorId = "";
     value.setType(VariantType::Var_None);
     constant = false;
-}
-
-bool operator==(const GlobalVariable& l, const GlobalVariable& r)
-{
-    return l.value == r.value;
 }

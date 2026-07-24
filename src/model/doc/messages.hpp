@@ -41,6 +41,9 @@ public:
     Iterator begin() const;
     Iterator end() const;
 
+    bool hasMessages() const;
+    QString toString() const;
+
 private:
     QVector<Message> messages;
     Message::Level defaultLevel;
