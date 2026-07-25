@@ -1,13 +1,34 @@
 #include "npcrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier1_components.hpp"
+#include "../../components/tesfullname.hpp"
+
+void NpcRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESFullName_Component>();
+}
 
 void NpcRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
+        }
+        if (handled) continue;
+        if (sub == 'FULL')
+        {
+            auto* fn = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
+            if (fn) fn->fullName = esm.readZString();
+            continue;
+        }
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
@@ -18,7 +39,6 @@ void NpcRecord::load(ESMReader& esm, bool)
                 level = static_cast<quint32>(acbs.level);
                 break;
             }
-            case 'FULL': fullName = esm.readZString(); break;
             case 'RNAM': race = esm.readType<quint32>(); break;
             case 'CNAM': class_ = esm.readType<quint32>(); break;
             case 'ANAM': faction = esm.readType<quint32>(); break;
@@ -52,15 +72,21 @@ void NpcRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    auto* fn = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
+    if (fn) fullName = fn->fullName;
 }
 
 void NpcRecord::save(ESMWriter& esm) const
 {
+    auto* fn = const_cast<NpcRecord*>(this)->components.findByName(QStringLiteral("TESFullName"));
+    if (fn) static_cast<tescomponents::TESFullName_Component*>(fn)->fullName = fullName;
+
     esm.writeSubZString('EDID', editorId);
     ACBS saveAcbs = acbs;
     saveAcbs.flags = flags;
     saveAcbs.level = static_cast<qint16>(level);
     esm.writeSubData<ACBS>('ACBS', saveAcbs);
+    components.saveAll(esm);
     esm.writeSubZString('FULL', fullName);
     esm.writeSubData<quint32>('RNAM', race);
     esm.writeSubData<quint32>('CNAM', class_);
@@ -161,4 +187,5 @@ void NpcRecord::blank()
     inventoryItems.clear();
     relationships.clear();
     rawSubRecords.clear();
+    initComponents();
 }

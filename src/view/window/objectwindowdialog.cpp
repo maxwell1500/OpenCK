@@ -232,21 +232,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getNpcCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            NpcRecord originalState = collection.getRecord(recordIndex).get();
-            NpcRecord editedState = originalState;
-            NpcEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getNpcCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<NpcRecord>* cmd = new EditRecordCommand<NpcRecord>(&coll, idx, originalState, editedState,
-                        "Edit NPC: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("NPC '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            NpcRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -291,21 +280,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getQuestCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            QuestRecord originalState = collection.getRecord(recordIndex).get();
-            QuestRecord editedState = originalState;
-            QuestEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getQuestCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<QuestRecord>* cmd = new EditRecordCommand<QuestRecord>(&coll, idx, originalState, editedState,
-                        "Edit Quest: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Quest '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            QuestRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -550,21 +528,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getCellCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            CellRecord originalState = collection.getRecord(recordIndex).get();
-            CellRecord editedState = originalState;
-            CellEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getCellCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<CellRecord>* cmd = new EditRecordCommand<CellRecord>(&coll, idx, originalState, editedState,
-                        "Edit Cell: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Cell '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            CellRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }

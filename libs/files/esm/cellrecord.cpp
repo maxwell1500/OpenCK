@@ -3,13 +3,21 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../log/logger.hpp"
+#include "../../components/tier1_components.hpp"
+#include "../../components/tesfullname.hpp"
+
+void CellRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESFullName_Component>();
+}
 
 void CellRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     qint64 filePos = esm.filePos();
     qint64 recLeft = esm.recLeft();
-    // Peek next 8 bytes to confirm subrecord structure
     quint64 peek = esm.peekType<quint64>();
     LOG_DEBUG(QString("CellRecord::load: formId=0x%1 recLeft=%2 filePos=0x%3 peek=0x%4")
         .arg(formId, 8, 16, QChar('0'))
@@ -22,6 +30,18 @@ void CellRecord::load(ESMReader& esm, bool)
         NAME sub = esm.readNSubHeader();
         LOG_DEBUG(QString("CellRecord::load iter %1 sub=0x%2 recLeft=%3 subLeft=%4")
             .arg(iter).arg(QString::number(sub, 16)).arg(esm.recLeft()).arg(esm.subLeft()));
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
+        }
+        if (handled) continue;
+        if (sub == 'FULL')
+        {
+            auto* fn = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
+            if (fn) fn->fullName = esm.readZString();
+            continue;
+        }
         switch (sub)
         {
         case 'EDID': editorId = esm.readZString(); break;
@@ -34,7 +54,6 @@ void CellRecord::load(ESMReader& esm, bool)
         }
         case 'XOWN': owner = esm.readType<quint32>(); break;
         case 'XLOC': lockLevel = esm.readType<quint32>(); break;
-        case 'FULL': cellName = esm.readZString(); break;
         default:
         {
             RawSubRecord raw;
@@ -51,11 +70,16 @@ void CellRecord::load(ESMReader& esm, bool)
             break;
         }
     }
+    auto* fn = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
+    if (fn) cellName = fn->fullName;
     LOG_DEBUG(QString("CellRecord::load complete, recLeft=%1").arg(esm.recLeft()));
 }
 
 void CellRecord::save(ESMWriter& esm) const
 {
+    auto* fn = const_cast<CellRecord*>(this)->components.findByName(QStringLiteral("TESFullName"));
+    if (fn) static_cast<tescomponents::TESFullName_Component*>(fn)->fullName = cellName;
+
     esm.writeSubZString('EDID', editorId);
     esm.writeSubData<quint8>('DATA', flags);
     esm.startSubRecord('XCLC');
@@ -64,6 +88,7 @@ void CellRecord::save(ESMWriter& esm) const
     esm.endSubRecord();
     esm.writeSubData<quint32>('XOWN', owner);
     esm.writeSubData<quint32>('XLOC', lockLevel);
+    components.saveAll(esm);
     esm.writeSubZString('FULL', cellName);
 
     for (const auto& raw : rawSubRecords)
@@ -85,4 +110,5 @@ void CellRecord::blank()
     lockLevel = 0;
     cellName = "";
     rawSubRecords.clear();
+    initComponents();
 }

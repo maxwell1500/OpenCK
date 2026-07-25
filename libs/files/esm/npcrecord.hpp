@@ -3,6 +3,7 @@
 
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 
 #include <QString>
 #include <QVector>
@@ -26,6 +27,7 @@ struct ACBS {
 
 struct NpcRecord
 {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
@@ -109,6 +111,7 @@ struct NpcRecord
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const NpcRecord& l, const NpcRecord& r)
@@ -164,6 +167,7 @@ inline bool operator==(const NpcRecord& l, const NpcRecord& r)
         && l.aiFactionTargetClassTargetHazard == r.aiFactionTargetClassTargetHazard
         && l.spells == r.spells && l.inventoryItems == r.inventoryItems
         && l.relationships == r.relationships
+        && l.components == r.components
         && l.rawSubRecords == r.rawSubRecords;
 }
 
