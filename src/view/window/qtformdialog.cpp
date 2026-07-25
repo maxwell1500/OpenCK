@@ -19,16 +19,13 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
     setWindowTitle(QStringLiteral("Form — %1").arg(formIdKey));
     resize(640, 480);
 
-    auto* layout = new QVBoxLayout(this);
+    m_layout = new QVBoxLayout(this);
 
-    // The property grid scrolls so it can grow as the user adds
-    // records with many components without the dialog becoming
-    // unmanageable.
     auto* scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     m_grid = new EditorPropertyGrid(scroll);
     scroll->setWidget(m_grid);
-    layout->addWidget(scroll, 1);
+    m_layout->addWidget(scroll, 1);
 
     if (m_components)
     {
@@ -46,7 +43,7 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
         QDialogButtonBox::ApplyRole);
     auto* okBtn = buttons->addButton(QDialogButtonBox::Ok);
     auto* cancelBtn = buttons->addButton(QDialogButtonBox::Cancel);
-    layout->addWidget(buttons);
+    m_layout->addWidget(buttons);
 
     connect(applyBtn, &QPushButton::clicked, this, &QtFormDialog::onApply);
     connect(okBtn, &QPushButton::clicked, this, &QtFormDialog::onOk);
@@ -55,13 +52,22 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
 
 QtFormDialog::~QtFormDialog() = default;
 
+void QtFormDialog::setCustomWidget(QWidget* widget)
+{
+    if (m_customWidget)
+    {
+        m_layout->removeWidget(m_customWidget);
+        m_customWidget->deleteLater();
+    }
+    m_customWidget = widget;
+    if (widget)
+    {
+        m_layout->insertWidget(m_layout->count() - 1, widget);
+    }
+}
+
 void QtFormDialog::onApply()
 {
-    // Pull any pending edits back into the components. The editor
-    // widgets already push values into storage via their signal
-    // connections, so this method is mostly a no-op today; it
-    // exists so explicit Apply behaves the same way as the user
-    // pressing OK.
     if (m_grid) m_grid->apply();
 }
 

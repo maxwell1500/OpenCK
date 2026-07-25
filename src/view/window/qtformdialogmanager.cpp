@@ -18,16 +18,36 @@ QtFormDialogManager::QtFormDialogManager(QObject* parent)
 
 QtFormDialogManager::~QtFormDialogManager() = default;
 
+void QtFormDialogManager::registerFactory(const QString& recordType,
+                                           FormDataWidgetFactory factory)
+{
+    if (factory)
+        m_factories[recordType] = std::move(factory);
+}
+
+bool QtFormDialogManager::hasFactory(const QString& recordType) const
+{
+    return m_factories.contains(recordType);
+}
+
 void QtFormDialogManager::openOrFocus(const QString& formIdKey,
-                                      FormComponents* components,
-                                      QWidget* parent)
+                                       FormComponents* components,
+                                       QWidget* parent)
+{
+    openOrFocus(formIdKey, QString(), components, nullptr, parent);
+}
+
+void QtFormDialogManager::openOrFocus(const QString& formIdKey,
+                                       const QString& recordType,
+                                       FormComponents* components,
+                                       void* recordPtr,
+                                       QWidget* parent)
 {
     if (!components) return;
 
     auto it = m_dialogs.find(formIdKey);
     if (it != m_dialogs.end() && it.value())
     {
-        // Dialog already open for this form ID — just raise it.
         QtFormDialog* dlg = it.value();
         dlg->raise();
         dlg->activateWindow();
@@ -37,6 +57,15 @@ void QtFormDialogManager::openOrFocus(const QString& formIdKey,
     }
 
     auto* dlg = new QtFormDialog(formIdKey, components, parent);
+
+    auto factoryIt = m_factories.find(recordType);
+    if (factoryIt != m_factories.end() && factoryIt.value())
+    {
+        QWidget* customWidget = factoryIt.value()(components, recordPtr, dlg);
+        if (customWidget)
+            dlg->setCustomWidget(customWidget);
+    }
+
     m_dialogs.insert(formIdKey, dlg);
     connect(dlg, &QObject::destroyed, this, &QtFormDialogManager::onDialogDestroyed);
     dlg->show();
@@ -46,8 +75,6 @@ void QtFormDialogManager::openOrFocus(const QString& formIdKey,
 
 void QtFormDialogManager::closeAll()
 {
-    // Take a copy of the values because destroying the dialogs
-    // mutates m_dialogs via the destroyed() signal.
     const auto all = m_dialogs.values();
     for (QtFormDialog* dlg : all)
     {
@@ -58,7 +85,6 @@ void QtFormDialogManager::closeAll()
 
 void QtFormDialogManager::onDialogDestroyed(QObject* obj)
 {
-    // Remove the destroyed dialog from the registry.
     for (auto it = m_dialogs.begin(); it != m_dialogs.end(); ++it)
     {
         if (it.value() == obj)

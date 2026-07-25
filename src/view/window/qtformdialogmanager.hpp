@@ -6,6 +6,10 @@
 // whose form ID is already open just focuses the existing dialog
 // rather than creating a duplicate. Mirrors the real CK's
 // QtCreationKitFormDialogManager (see docs/CK_Real_Integration_Plan.md).
+//
+// Complex record types (NPC, RACE, CELL, etc.) can register a
+// FormDataWidgetFactory to create a record-specific widget that
+// appears below the generic component grid in the dialog.
 
 #include "../libs/components/component.hpp"
 #include "../libs/components/formcomponents.hpp"
@@ -14,11 +18,20 @@
 #include <QObject>
 #include <QString>
 
+#include <functional>
+
 class QWidget;
 
 namespace openck {
 
 class QtFormDialog;
+
+// A factory function that creates a custom data widget for a record
+// type. The widget will be placed below the generic component grid
+// in the QtFormDialog. The factory receives the record's components,
+// an opaque pointer to the record struct itself (cast by the widget),
+// and the parent widget for the dialog.
+using FormDataWidgetFactory = std::function<QWidget*(FormComponents*, void* recordPtr, QWidget*)>;
 
 class QtFormDialogManager : public QObject
 {
@@ -30,18 +43,25 @@ public:
     // Open (or focus) a dialog for the given record. The formIdKey
     // is the deduplication key, typically the string form of the
     // record's form ID. The components pointer is non-owning and
-    // must outlive the dialog (typically: it's a member of the
-    // record itself). The parent widget is used as the dialog's
-    // transient parent so the dialog stays on top of the main
-    // window.
+    // must outlive the dialog.
     void openOrFocus(const QString& formIdKey, FormComponents* components,
                      QWidget* parent = nullptr);
 
-    // Closes all open dialogs. Used when a document is unloaded
-    // so we don't keep dangling pointers to the old data tree.
-    void closeAll();
+    // Overload that accepts a record type string and optional record
+    // pointer. If a factory is registered for that type, the dialog
+    // will include a custom widget below the generic component grid.
+    void openOrFocus(const QString& formIdKey, const QString& recordType,
+                     FormComponents* components, void* recordPtr = nullptr,
+                     QWidget* parent = nullptr);
 
-    // The number of currently-open dialogs. Useful for tests.
+    // Register a factory that creates custom data widgets for a
+    // specific record type (e.g. "NPC_", "RACE", "CELL").
+    void registerFactory(const QString& recordType,
+                         FormDataWidgetFactory factory);
+
+    bool hasFactory(const QString& recordType) const;
+
+    void closeAll();
     int openCount() const { return m_dialogs.size(); }
 
 private slots:
@@ -54,6 +74,7 @@ private:
     QtFormDialogManager& operator=(const QtFormDialogManager&) = delete;
 
     QHash<QString, QtFormDialog*> m_dialogs;
+    QHash<QString, FormDataWidgetFactory> m_factories;
 };
 
 } // namespace openck

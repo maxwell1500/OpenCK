@@ -25,6 +25,7 @@
 class QFormLayout;
 class QVBoxLayout;
 class QPushButton;
+class QWidget;
 
 namespace openck {
 
@@ -37,14 +38,13 @@ public:
                  QWidget* parent = nullptr);
     ~QtFormDialog() override;
 
-    // The form ID key used to deduplicate dialogs. This is the
-    // string form of the record's form ID, e.g. "0x00012345".
     QString formIdKey() const { return m_formIdKey; }
-
-    // The form components the dialog is editing. The dialog does
-    // not own these — the caller does. They typically live on the
-    // record that was opened.
     FormComponents* components() const { return m_components; }
+
+    // Set an optional custom widget that appears below the component
+    // property grid. Used by complex record types (NPC, RACE, CELL, etc.)
+    // to add record-specific editing sections beyond the generic grid.
+    void setCustomWidget(QWidget* widget);
 
 private slots:
     void onApply();
@@ -53,7 +53,9 @@ private slots:
 private:
     QString m_formIdKey;
     FormComponents* m_components;
+    QVBoxLayout* m_layout = nullptr;
     EditorPropertyGrid* m_grid = nullptr;
+    QWidget* m_customWidget = nullptr;
 };
 
 } // namespace openck

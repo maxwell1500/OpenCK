@@ -8,6 +8,7 @@
 #include "../../model/tools/undostack.hpp"
 #include "../../view/messageboxhelper.hpp"
 #include "qtformdialogmanager.hpp"
+#include "npcrecorddatawidget.hpp"
 #include "npceditor.hpp"
 #include "weaponeditor.hpp"
 #include "armor_editor.hpp"
@@ -75,6 +76,18 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
 {
     setWindowTitle("Object Window");
     setupUI();
+
+    static bool factoriesRegistered = false;
+    if (!factoriesRegistered)
+    {
+        factoriesRegistered = true;
+        using namespace openck;
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("NPC_"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new NpcRecordDataWidget(recPtr, comps, parent);
+            });
+    }
 }
 
 ObjectWindowDialog::~ObjectWindowDialog()
@@ -235,7 +248,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             NpcRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("NPC_"), &rec.components, &rec, this);
         }
         break;
     }
