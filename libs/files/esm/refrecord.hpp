@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "records.hpp"
+#include "../../components/formcomponents.hpp"
 
 #include <QString>
 #include <QVector>
@@ -12,6 +13,7 @@ class ESMWriter;
 
 struct RefrRecord
 {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId;
     quint32 baseId;
@@ -27,6 +29,7 @@ struct RefrRecord
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const RefrRecord& l, const RefrRecord& r)
@@ -36,6 +39,7 @@ inline bool operator==(const RefrRecord& l, const RefrRecord& r)
         && l.rotX == r.rotX && l.rotY == r.rotY && l.rotZ == r.rotZ
         && l.scale == r.scale && l.owner == r.owner && l.lockLevel == r.lockLevel
         && l.initiallyDisabled == r.initiallyDisabled && l.scriptIds == r.scriptIds
+        && l.components == r.components
         && l.rawSubRecords == r.rawSubRecords;
 }
 

@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "records.hpp"
+#include "../../components/formcomponents.hpp"
 
 #include <QString>
 #include <QVector>
@@ -12,6 +13,7 @@ class ESMWriter;
 
 struct LocationRecord
 {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId;
     quint32 flags;
@@ -25,13 +27,16 @@ struct LocationRecord
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const LocationRecord& l, const LocationRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.locationName == r.locationName && l.parentId == r.parentId
-        && l.x == r.x && l.y == r.y && l.z == r.z && l.rawSubRecords == r.rawSubRecords;
+        && l.x == r.x && l.y == r.y && l.z == r.z
+        && l.components == r.components
+        && l.rawSubRecords == r.rawSubRecords;
 }
 
 inline bool operator!=(const LocationRecord& l, const LocationRecord& r)

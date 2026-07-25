@@ -3,6 +3,7 @@
 
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 
 #include <QString>
 #include <QVector>
@@ -12,6 +13,7 @@ class ESMWriter;
 
 struct MaterialRecord
 {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
@@ -43,6 +45,7 @@ struct MaterialRecord
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const MaterialRecord& l, const MaterialRecord& r)
@@ -58,6 +61,7 @@ inline bool operator==(const MaterialRecord& l, const MaterialRecord& r)
         && l.magicka == r.magicka && l.stamina == r.stamina
         && l.level == r.level && l.race == r.race && l.faction == r.faction
         && l.stage == r.stage && l.difficulty == r.difficulty
+        && l.components == r.components
         && l.rawSubRecords == r.rawSubRecords;
 }
 

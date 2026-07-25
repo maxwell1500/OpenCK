@@ -2,40 +2,36 @@
 
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier3_components.hpp"
+
+void RefrRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::BGSRefData_Component>();
+}
 
 void RefrRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub))
+            {
+                c->handleSubrecord(sub, esm);
+                handled = true;
+                break;
+            }
+        }
+        if (handled) continue;
+
         switch (sub)
         {
-        case 'NAME': baseId = esm.readType<quint32>(); break;
-        case 'DATA':
-        {
-            posX = esm.readType<float>();
-            posY = esm.readType<float>();
-            posZ = esm.readType<float>();
-            rotX = esm.readType<float>();
-            rotY = esm.readType<float>();
-            rotZ = esm.readType<float>();
-            scale = esm.readType<float>();
-            break;
-        }
-        case 'XOWN': owner = esm.readType<quint32>(); break;
-        case 'DNAM': lockLevel = esm.readType<quint32>(); break;
-        case 'XESP': initiallyDisabled = (esm.readType<quint32>() != 0); break;
-        case 'SCRI':
-        {
-            quint32 count = esm.readType<quint32>();
-            scriptIds.resize(count);
-            for (int i = 0; i < count; i++)
-            {
-                scriptIds[i] = esm.readType<quint32>();
-            }
-            break;
-        }
+        case 'EDID': editorId = esm.readZString(); break;
         default:
         {
             RawSubRecord raw;
@@ -46,30 +42,39 @@ void RefrRecord::load(ESMReader& esm, bool)
         }
         }
     }
+    auto* comp = static_cast<tescomponents::BGSRefData_Component*>(
+        components.findByName(QStringLiteral("BGSRefData")));
+    if (comp)
+    {
+        baseId = comp->baseId;
+        posX = comp->posX; posY = comp->posY; posZ = comp->posZ;
+        rotX = comp->rotX; rotY = comp->rotY; rotZ = comp->rotZ;
+        scale = comp->scale;
+        owner = comp->owner;
+        lockLevel = comp->lockLevel;
+        initiallyDisabled = comp->initiallyDisabled;
+        scriptIds = comp->scriptIds;
+    }
 }
 
 void RefrRecord::save(ESMWriter& esm) const
 {
-    esm.writeSubData<quint32>('NAME', baseId);
-    esm.startSubRecord('DATA');
-    esm.writeType<float>(posX);
-    esm.writeType<float>(posY);
-    esm.writeType<float>(posZ);
-    esm.writeType<float>(rotX);
-    esm.writeType<float>(rotY);
-    esm.writeType<float>(rotZ);
-    esm.writeType<float>(scale);
-    esm.endSubRecord();
-    esm.writeSubData<quint32>('XOWN', owner);
-    esm.writeSubData<quint32>('DNAM', lockLevel);
-    esm.writeSubData<quint32>('XESP', initiallyDisabled ? 1 : 0);
-    esm.startSubRecord('SCRI');
-    esm.writeType<quint32>(scriptIds.size());
-    for (auto id : scriptIds)
+    auto* comp = static_cast<tescomponents::BGSRefData_Component*>(
+        const_cast<RefrRecord*>(this)->components.findByName(QStringLiteral("BGSRefData")));
+    if (comp)
     {
-        esm.writeType<quint32>(id);
+        comp->baseId = baseId;
+        comp->posX = posX; comp->posY = posY; comp->posZ = posZ;
+        comp->rotX = rotX; comp->rotY = rotY; comp->rotZ = rotZ;
+        comp->scale = scale;
+        comp->owner = owner;
+        comp->lockLevel = lockLevel;
+        comp->initiallyDisabled = initiallyDisabled;
+        comp->scriptIds = scriptIds;
     }
-    esm.endSubRecord();
+
+    esm.writeSubZString('EDID', editorId);
+    components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)
     {
@@ -81,6 +86,7 @@ void RefrRecord::save(ESMWriter& esm) const
 
 void RefrRecord::blank()
 {
+    editorId.clear();
     formId = 0;
     baseId = 0;
     posX = 0;
@@ -89,10 +95,11 @@ void RefrRecord::blank()
     rotX = 0;
     rotY = 0;
     rotZ = 0;
-    scale = 1.0;
+    scale = 1.0f;
     owner = 0;
     lockLevel = 0;
     initiallyDisabled = false;
     scriptIds.clear();
     rawSubRecords.clear();
+    initComponents();
 }

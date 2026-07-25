@@ -1,24 +1,43 @@
 #include "Packagerecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier3_components.hpp"
+
+void PackageRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESFlags_Component>();
+}
 
 void PackageRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub))
+            {
+                c->handleSubrecord(sub, esm);
+                handled = true;
+                break;
+            }
+        }
+        if (handled) continue;
+
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'PKDT': packageType = esm.readType<quint32>(); break;
             case 'PLDT': targetType = esm.readType<quint32>(); break;
             case 'PTDT':
             {
                 quint32 count = esm.readType<quint32>();
                 targetIds.resize(count);
-                for (int i = 0; i < count; i++)
+                for (quint32 i = 0; i < count; i++)
                     targetIds[i] = esm.readType<quint32>();
                 break;
             }
@@ -32,12 +51,15 @@ void PackageRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    if (auto* f = static_cast<tescomponents::TESFlags_Component*>(components.findByName(QStringLiteral("TESFlags")))) { flags = f->flags; }
 }
 
 void PackageRecord::save(ESMWriter& esm) const
 {
+    if (auto* f = static_cast<tescomponents::TESFlags_Component*>(const_cast<PackageRecord*>(this)->components.findByName(QStringLiteral("TESFlags")))) { f->flags = flags; }
+
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
+    components.saveAll(esm);
     esm.writeSubData<quint32>('PKDT', packageType);
     esm.writeSubData<quint32>('PLDT', targetType);
     esm.startSubRecord('PTDT');
@@ -64,4 +86,5 @@ void PackageRecord::blank()
     targetIds.clear();
     parameters.clear();
     rawSubRecords.clear();
+    initComponents();
 }

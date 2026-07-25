@@ -1,24 +1,37 @@
 #include "sounrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier3_components.hpp"
+
+void SounRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::BGSSoundDescriptor_Component>();
+}
 
 void SounRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader();
     formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub))
+            {
+                c->handleSubrecord(sub, esm);
+                handled = true;
+                break;
+            }
+        }
+        if (handled) continue;
+
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': soundFile = esm.readZString(); break;
-            case 'SNDD':
-            case 'SNDX':
-            {
-                flags = esm.readType<quint32>();
-                break;
-            }
             default:
             {
                 RawSubRecord raw;
@@ -29,15 +42,27 @@ void SounRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    auto* comp = static_cast<tescomponents::BGSSoundDescriptor_Component*>(
+        components.findByName(QStringLiteral("BGSSoundDescriptor")));
+    if (comp)
+    {
+        soundFile = comp->soundFile;
+        flags = comp->soundFlags;
+    }
 }
 
 void SounRecord::save(ESMWriter& esm) const
 {
+    auto* comp = static_cast<tescomponents::BGSSoundDescriptor_Component*>(
+        const_cast<SounRecord*>(this)->components.findByName(QStringLiteral("BGSSoundDescriptor")));
+    if (comp)
+    {
+        comp->soundFile = soundFile;
+        comp->soundFlags = flags;
+    }
+
     esm.writeSubZString('EDID', editorId);
-    if (!soundFile.isEmpty())
-        esm.writeSubZString('FNAM', soundFile);
-    if (flags != 0)
-        esm.writeSubData<quint32>('SNDX', flags);
+    components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)
     {
@@ -54,4 +79,5 @@ void SounRecord::blank()
     flags = 0;
     soundFile.clear();
     rawSubRecords.clear();
+    initComponents();
 }
