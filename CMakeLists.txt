@@ -529,6 +529,7 @@ set(VIEW_SOURCES
     src/view/widgets/formcomponentwidget.cpp
     src/view/window/qtformdialog.cpp
     src/view/window/qtformdialogmanager.cpp
+    src/view/window/windowlayout.cpp
     src/view/window/scripteditorwidget.cpp
     src/view/window/dialogueeditorwidget.cpp
     src/view/window/formideditorwidget.cpp
@@ -615,6 +616,7 @@ set(VIEW_HEADERS
     src/view/widgets/formcomponentwidget.hpp
     src/view/window/qtformdialog.hpp
     src/view/window/qtformdialogmanager.hpp
+    src/view/window/windowlayout.hpp
     src/view/window/scripteditorwidget.hpp
     src/view/window/dialogueeditorwidget.hpp
     src/view/window/formideditorwidget.hpp

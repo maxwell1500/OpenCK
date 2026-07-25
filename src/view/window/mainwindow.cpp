@@ -13,6 +13,7 @@
 #include "filepaths.hpp"
 #include "searchdialog.hpp"
 #include "loadorderdialog.hpp"
+#include "windowlayout.hpp"
 #include "masterslistdialog.hpp"
 #include "conflictdialog.hpp"
 #include "nifviewportwidget.hpp"
@@ -127,6 +128,15 @@ MainWindow::MainWindow(QWidget *parent) :
     // Connect toolbar buttons
     connect(ui->actionUndoButton, &QAction::triggered, this, &MainWindow::on_actionUndo_triggered);
     connect(ui->actionRedoButton, &QAction::triggered, this, &MainWindow::on_actionRedo_triggered);
+
+    // Add Reset Window Layout action to View menu
+    QAction* resetLayoutAction = new QAction(tr("Reset Window Layout"), this);
+    resetLayoutAction->setStatusTip(tr("Reset dock window positions to the default layout"));
+    connect(resetLayoutAction, &QAction::triggered, this, [this]() {
+        WindowLayout::applyDefaultLayout(this);
+        LOG_INFO("Window layout reset to default");
+    });
+    ui->menuView->addAction(resetLayoutAction);
 }
 
 MainWindow::~MainWindow()
@@ -1772,6 +1782,7 @@ void MainWindow::saveUiState()
     conf.setValue("geometry", saveGeometry());
     conf.setValue("windowState", saveState());
     conf.setValue("maximized", isMaximized());
+    WindowLayout::saveLayout(this, conf);
 
     conf.endGroup();
     conf.sync();
@@ -1799,6 +1810,8 @@ void MainWindow::restoreUiState()
     if (conf.value("maximized", false).toBool()) {
         showMaximized();
     }
+
+    WindowLayout::restoreLayout(this, conf);
 
     conf.endGroup();
 
