@@ -7,8 +7,8 @@
 // rather than creating a duplicate. Mirrors the real CK's
 // QtCreationKitFormDialogManager (see docs/CK_Real_Integration_Plan.md).
 
-#include "component.hpp"
-#include "formcomponents.hpp"
+#include "../libs/components/component.hpp"
+#include "../libs/components/formcomponents.hpp"
 
 #include <QHash>
 #include <QObject>

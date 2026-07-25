@@ -12,8 +12,8 @@ void LtexRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
-            case 'ITM2': iconPath = esm.readZString(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
             case 'HNAM': havokMaterial = esm.readType<quint32>(); break;
             case 'SNAM':
             {
@@ -37,9 +37,9 @@ void LtexRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
     if (flags != 0)
-        esm.writeSubData<quint32>('FLAG', flags);
+        esm.writeSubData<quint32>('FNAM', flags);
     if (!iconPath.isEmpty())
-        esm.writeSubZString('ITM2', iconPath);
+        esm.writeSubZString('ICON', iconPath);
     if (havokMaterial != 0)
         esm.writeSubData<quint32>('HNAM', havokMaterial);
     if (!grassFormIds.isEmpty())

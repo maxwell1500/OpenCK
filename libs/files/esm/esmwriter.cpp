@@ -1,5 +1,4 @@
 #include "esmwriter.hpp"
-#include "tes4codes.hpp"
 
 #include "common.hpp"
 
@@ -68,7 +67,6 @@ void ESMWriter::endRecord()
 
 void ESMWriter::startSubRecord(NAME name)
 {
-    name = Tes4Codes::toTes4(name);
     writeType<NAME>(swapName(name));
     subSizePos = stream.device()->pos();
     writeType<quint16>(0);

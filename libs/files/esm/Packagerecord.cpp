@@ -11,7 +11,7 @@ void PackageRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'PKDT': packageType = esm.readType<quint32>(); break;
             case 'PLDT': targetType = esm.readType<quint32>(); break;
             case 'PTDT':
@@ -37,7 +37,7 @@ void PackageRecord::load(ESMReader& esm, bool)
 void PackageRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint32>('PKDT', packageType);
     esm.writeSubData<quint32>('PLDT', targetType);
     esm.startSubRecord('PTDT');

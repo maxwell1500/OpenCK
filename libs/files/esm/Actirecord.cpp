@@ -11,9 +11,9 @@ void ActiRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
-            case 'ITM2': iconPath = esm.readZString(); break;
-            case 'ODIT': modelPath = esm.readZString(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
+            case 'MODL': modelPath = esm.readZString(); break;
             default:
             {
                 RawSubRecord raw;
@@ -29,9 +29,9 @@ void ActiRecord::load(ESMReader& esm, bool)
 void ActiRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
-    esm.writeSubZString('ITM2', iconPath);
-    esm.writeSubZString('ODIT', modelPath);
+    esm.writeSubData<quint32>('FNAM', flags);
+    esm.writeSubZString('ICON', iconPath);
+    esm.writeSubZString('MODL', modelPath);
 
     for (const auto& raw : rawSubRecords)
     {

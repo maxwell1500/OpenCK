@@ -10,7 +10,7 @@ void InfoRecord::load(ESMReader& esm, bool)
         NAME sub = esm.readNSubHeader();
         switch (sub)
         {
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'CNAM': responseText = esm.readZString(); break;
             case 'CTDA':
             {
@@ -35,7 +35,7 @@ void InfoRecord::load(ESMReader& esm, bool)
 
 void InfoRecord::save(ESMWriter& esm) const
 {
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('CNAM', responseText);
     esm.startSubRecord('CTDA');
     esm.writeType<quint32>(conditionIds.size());

@@ -12,7 +12,7 @@ void WeaponRecord::load(ESMReader& esm, bool)
         {
             case 'FULL': fullName = esm.readZString(); break;
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'DATA': {
                 weaponType = esm.readType<quint32>();
                 weight = esm.readType<float>();
@@ -25,8 +25,8 @@ void WeaponRecord::load(ESMReader& esm, bool)
                 reach = esm.readType<float>();
                 break;
             }
-            case 'ITM2': iconPath = esm.readZString(); break;
-            case 'ODIT': modelPath = esm.readZString(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
+            case 'MODL': modelPath = esm.readZString(); break;
             case 'EAMT': enchantment = esm.readType<quint32>(); break;
             case 'MDOB': magicSchool = esm.readType<quint32>(); break;
             case 'ENAM': enchantLimit = esm.readType<quint32>(); break;
@@ -46,7 +46,7 @@ void WeaponRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('FULL', fullName);
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.startSubRecord('DATA');
     esm.writeType<quint32>(weaponType);
     esm.writeType<float>(weight);
@@ -57,8 +57,8 @@ void WeaponRecord::save(ESMWriter& esm) const
     esm.writeType<float>(speed);
     esm.writeType<float>(reach);
     esm.endSubRecord();
-    esm.writeSubZString('ITM2', iconPath);
-    esm.writeSubZString('ODIT', modelPath);
+    esm.writeSubZString('ICON', iconPath);
+    esm.writeSubZString('MODL', modelPath);
     esm.writeSubData<quint32>('EAMT', enchantment);
     esm.writeSubData<quint32>('MDOB', magicSchool);
     esm.writeSubData<quint32>('ENAM', enchantLimit);

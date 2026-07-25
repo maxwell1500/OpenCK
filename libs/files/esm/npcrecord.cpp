@@ -22,7 +22,7 @@ void NpcRecord::load(ESMReader& esm, bool)
             case 'RNAM': race = esm.readType<quint32>(); break;
             case 'CNAM': class_ = esm.readType<quint32>(); break;
             case 'ANAM': faction = esm.readType<quint32>(); break;
-            case 'INPC':
+            case 'SPLO':
             {
                 quint32 count = esm.readType<quint32>();
                 spells.resize(count);
@@ -32,7 +32,7 @@ void NpcRecord::load(ESMReader& esm, bool)
                 }
                 break;
             }
-            case 'IACL':
+            case 'CNTO':
             {
                 quint32 count = esm.readType<quint32>();
                 inventoryItems.resize(count);
@@ -62,17 +62,17 @@ void NpcRecord::save(ESMWriter& esm) const
     saveAcbs.level = static_cast<qint16>(level);
     esm.writeSubData<ACBS>('ACBS', saveAcbs);
     esm.writeSubZString('FULL', fullName);
-    esm.writeSubData<quint32>('RACE', race);
-    esm.writeSubData<quint32>('CLAS', class_);
+    esm.writeSubData<quint32>('RNAM', race);
+    esm.writeSubData<quint32>('CNAM', class_);
     esm.writeSubData<quint32>('ANAM', faction);
-    esm.startSubRecord('INPC');
+    esm.startSubRecord('SPLO');
     esm.writeType<quint32>(spells.size());
     for (auto spell : spells)
     {
         esm.writeType<quint32>(spell);
     }
     esm.endSubRecord();
-    esm.startSubRecord('IACL');
+    esm.startSubRecord('CNTO');
     esm.writeType<quint32>(inventoryItems.size());
     for (auto item : inventoryItems)
     {

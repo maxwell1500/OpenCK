@@ -7,6 +7,7 @@
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../view/messageboxhelper.hpp"
+#include "qtformdialogmanager.hpp"
 #include "npceditor.hpp"
 #include "weaponeditor.hpp"
 #include "armor_editor.hpp"
@@ -392,21 +393,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getStatCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            StatRecord originalState = collection.getRecord(recordIndex).get();
-            StatRecord editedState = originalState;
-            StatEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getStatCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<StatRecord>* cmd = new EditRecordCommand<StatRecord>(&coll, idx, originalState, editedState,
-                        "Edit Stat: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Stat '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            StatRecord& stat = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(stat.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &stat.components, this);
         }
         break;
     }

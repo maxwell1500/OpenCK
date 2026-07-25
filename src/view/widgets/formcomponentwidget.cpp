@@ -25,7 +25,7 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
     {
         auto* cb = new QCheckBox(parent);
         cb->setChecked(prop->value().toBool());
-        QObject::connect(cb, &QCheckBox::toggled, prop, [prop](bool v) {
+        QObject::connect(cb, &QCheckBox::toggled, parent, [prop](bool v) {
             prop->setValue(v);
         });
         return cb;
@@ -36,7 +36,7 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
         auto* sb = new QSpinBox(parent);
         sb->setRange(INT_MIN, INT_MAX);
         sb->setValue(prop->value().toInt());
-        QObject::connect(sb, qOverload<int>(&QSpinBox::valueChanged), prop,
+        QObject::connect(sb, qOverload<int>(&QSpinBox::valueChanged), parent,
             [prop](int v) { prop->setValue(v); });
         return sb;
     }
@@ -47,19 +47,16 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
         sb->setDecimals(2);
         sb->setSingleStep(0.1);
         sb->setValue(prop->value().toDouble());
-        QObject::connect(sb, qOverload<double>(&QDoubleSpinBox::valueChanged), prop,
+        QObject::connect(sb, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
             [prop](double v) { prop->setValue(v); });
         return sb;
     }
     if (dynamic_cast<FormEditorProperty*>(prop))
     {
-        // For now, render form IDs as a hex line edit. The grid can
-        // later swap in a FormPickerWidget once the data model is
-        // wired up.
         auto* le = new QLineEdit(parent);
         le->setPlaceholderText(QStringLiteral("0x00000000"));
         le->setText(QString::number(prop->value().toUInt(), 16));
-        QObject::connect(le, &QLineEdit::editingFinished, prop, [le, prop]() {
+        QObject::connect(le, &QLineEdit::editingFinished, parent, [le, prop]() {
             QString text = le->text().trimmed();
             if (text.startsWith(QStringLiteral("0x"))) text.remove(0, 2);
             bool ok = false;
@@ -94,8 +91,7 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
         layout->addLayout(sideLayout);
 
         auto* currentList = static_cast<FormArrayEditorProperty*>(prop);
-        QObject::connect(addBtn, &QToolButton::clicked, w, [list, currentList, prop]() {
-            Q_UNUSED(currentList);
+        QObject::connect(addBtn, &QToolButton::clicked, parent, [list, prop]() {
             // Add a placeholder zero form ID; user can edit text to set.
             // The proper picker is a Tier 3 enhancement.
             int row = list->currentRow();
@@ -110,7 +106,7 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
             }
             prop->setValue(newList);
         });
-        QObject::connect(rmBtn, &QToolButton::clicked, w, [list, prop]() {
+        QObject::connect(rmBtn, &QToolButton::clicked, parent, [list, prop]() {
             int row = list->currentRow();
             if (row < 0) return;
             delete list->takeItem(row);
@@ -123,7 +119,7 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
             }
             prop->setValue(newList);
         });
-        QObject::connect(list, &QListWidget::itemChanged, w, [list, prop](QListWidgetItem* item) {
+        QObject::connect(list, &QListWidget::itemChanged, parent, [list, prop](QListWidgetItem* item) {
             Q_UNUSED(item);
             QVariantList newList;
             for (int i = 0; i < list->count(); ++i)
@@ -140,7 +136,7 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
     {
         auto* le = new QLineEdit(parent);
         le->setText(prop->value().toString());
-        QObject::connect(le, &QLineEdit::editingFinished, prop, [le, prop]() {
+        QObject::connect(le, &QLineEdit::editingFinished, parent, [le, prop]() {
             prop->setValue(le->text());
         });
         return le;
@@ -164,7 +160,7 @@ FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent)
     m_properties = m_component->createEditorProperties();
 
     auto* header = new QLabel(m_component->name(), this);
-    auto* font = header->font();
+    QFont font = header->font();
     font.setBold(true);
     header->setFont(font);
     header->setStyleSheet(QStringLiteral("color: #6cf; padding: 2px 0;"));

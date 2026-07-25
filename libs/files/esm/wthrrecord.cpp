@@ -12,7 +12,7 @@ void WthrRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'SNAM': sunTexture = esm.readZString(); break;
             default:
             {
@@ -30,7 +30,7 @@ void WthrRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
     if (flags != 0)
-        esm.writeSubData<quint32>('FLAG', flags);
+        esm.writeSubData<quint32>('FNAM', flags);
     if (!sunTexture.isEmpty())
         esm.writeSubZString('SNAM', sunTexture);
 

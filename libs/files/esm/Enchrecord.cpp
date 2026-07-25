@@ -11,7 +11,7 @@ void EnchRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'FULL': name = esm.readZString(); break;
             case 'ENIT':
             {
@@ -35,7 +35,7 @@ void EnchRecord::load(ESMReader& esm, bool)
 void EnchRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('FULL', name);
     esm.startSubRecord('ENIT');
     esm.writeType<quint32>(type);

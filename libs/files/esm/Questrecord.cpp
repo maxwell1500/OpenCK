@@ -11,7 +11,7 @@ void QuestRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'FULL': questName = esm.readZString(); break;
             case 'DNAM': questDesc = esm.readZString(); break;
             case 'DATA': questType = esm.readType<quint32>(); break;
@@ -30,7 +30,7 @@ void QuestRecord::load(ESMReader& esm, bool)
 void QuestRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('FULL', questName);
     esm.writeSubZString('DNAM', questDesc);
     esm.writeSubData<quint32>('DATA', questType);

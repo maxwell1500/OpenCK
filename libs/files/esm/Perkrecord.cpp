@@ -11,9 +11,9 @@ void PerkRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'DESC': description = esm.readZString(); break;
-            case 'ITM2': iconPath = esm.readZString(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
             case 'CTDA':
             {
                 quint32 count = esm.readType<quint32>();
@@ -39,9 +39,9 @@ void PerkRecord::load(ESMReader& esm, bool)
 void PerkRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('DESC', description);
-    esm.writeSubZString('ITM2', iconPath);
+    esm.writeSubZString('ICON', iconPath);
     esm.startSubRecord('CTDA');
     esm.writeType<quint32>(conditions.size());
     for (auto cond : conditions)

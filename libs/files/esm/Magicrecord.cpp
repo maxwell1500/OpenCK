@@ -11,11 +11,11 @@ void MagicRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'MDOB': schools = esm.readType<quint32>(); break;
             case 'SNAM': castingSound = esm.readType<quint32>(); break;
-            case 'ITM2': iconPath = esm.readZString(); break;
-            case 'ODIT': modelPath = esm.readZString(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
+            case 'MODL': modelPath = esm.readZString(); break;
             default:
             {
                 RawSubRecord raw;
@@ -31,11 +31,11 @@ void MagicRecord::load(ESMReader& esm, bool)
 void MagicRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint32>('MDOB', schools);
     esm.writeSubData<quint32>('SNAM', castingSound);
-    esm.writeSubZString('ITM2', iconPath);
-    esm.writeSubZString('ODIT', modelPath);
+    esm.writeSubZString('ICON', iconPath);
+    esm.writeSubZString('MODL', modelPath);
 
     for (const auto& raw : rawSubRecords)
     {

@@ -11,11 +11,11 @@ void ClassRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'FULL': className = esm.readZString(); break;
             case 'DESC': description = esm.readZString(); break;
             case 'CNAM': serviceFlags = esm.readType<quint32>(); break;
-            case 'ITM2': iconPath = esm.readZString(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
             default:
             {
                 RawSubRecord raw;
@@ -31,11 +31,11 @@ void ClassRecord::load(ESMReader& esm, bool)
 void ClassRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('FULL', className);
     esm.writeSubZString('DESC', description);
     esm.writeSubData<quint32>('CNAM', serviceFlags);
-    esm.writeSubZString('ITM2', iconPath);
+    esm.writeSubZString('ICON', iconPath);
 
     for (const auto& raw : rawSubRecords)
     {

@@ -14,8 +14,8 @@
 // duplicate — same behavior as the real CK.
 
 #include "../widgets/editorpropertygrid.hpp"
-#include "component.hpp"
-#include "formcomponents.hpp"
+#include "../libs/components/component.hpp"
+#include "../libs/components/formcomponents.hpp"
 
 #include <QDialog>
 #include <QString>

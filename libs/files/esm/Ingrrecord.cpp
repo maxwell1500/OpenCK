@@ -11,9 +11,9 @@ void IngrRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
-            case 'ITM2': iconPath = esm.readZString(); break;
-            case 'ODIT': modelPath = esm.readZString(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
+            case 'MODL': modelPath = esm.readZString(); break;
             case 'DATA': {
                 weight = esm.readType<float>();
                 value = esm.readType<quint32>();
@@ -34,9 +34,9 @@ void IngrRecord::load(ESMReader& esm, bool)
 void IngrRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
-    esm.writeSubZString('ITM2', iconPath);
-    esm.writeSubZString('ODIT', modelPath);
+    esm.writeSubData<quint32>('FNAM', flags);
+    esm.writeSubZString('ICON', iconPath);
+    esm.writeSubZString('MODL', modelPath);
     esm.startSubRecord('DATA');
     esm.writeType<float>(weight);
     esm.writeType<quint32>(value);

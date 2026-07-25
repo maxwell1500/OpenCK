@@ -11,7 +11,7 @@ void FactRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'FULL': factionName = esm.readZString(); break;
             case 'XNAM':
             {
@@ -23,7 +23,7 @@ void FactRecord::load(ESMReader& esm, bool)
                 }
                 break;
             }
-            case 'ITM2': iconPath = esm.readZString(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
             case 'RNAM':
             {
                 quint32 count = esm.readType<quint32>();
@@ -50,9 +50,9 @@ void FactRecord::load(ESMReader& esm, bool)
 void FactRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('FULL', factionName);
-    esm.writeSubZString('ITM2', iconPath);
+    esm.writeSubZString('ICON', iconPath);
     esm.startSubRecord('RNAM');
     esm.writeType<quint32>(ranks.size());
     for (auto rank : ranks)

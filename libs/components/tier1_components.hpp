@@ -50,13 +50,12 @@ public:
     bool canHandle(quint32 subrecordName) const override
     {
         return subrecordName == NAME('MODL')
-            || subrecordName == NAME('ODIT')
             || subrecordName == NAME('MNAM');
     }
 
     void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
     {
-        if (subrecordName == NAME('MODL') || subrecordName == NAME('ODIT'))
+        if (subrecordName == NAME('MODL'))
         {
             modelPath = esm.readZString();
         }
@@ -133,13 +132,12 @@ public:
     bool canHandle(quint32 subrecordName) const override
     {
         return subrecordName == NAME('ICON')
-            || subrecordName == NAME('ITM2')
             || subrecordName == NAME('ICO2');
     }
 
     void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
     {
-        if (subrecordName == NAME('ICON') || subrecordName == NAME('ITM2'))
+        if (subrecordName == NAME('ICON'))
         {
             iconPath = esm.readZString();
         }

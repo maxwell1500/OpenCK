@@ -29,7 +29,6 @@ public:
     ~FormComponentWidget() override;
 
     Component* component() const { return m_component; }
-    const Component* component() const { return m_component; }
 
     // Returns the editor properties the widget was constructed with,
     // so the surrounding grid can wire up batch-edit operations

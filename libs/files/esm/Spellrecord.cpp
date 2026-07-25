@@ -12,7 +12,7 @@ void SpellRecord::load(ESMReader& esm, bool)
         {
             case 'FULL': fullName = esm.readZString(); break;
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'SPIT': cost = esm.readType<quint32>(); break;
             case 'SNAM': castingSound = esm.readType<quint32>(); break;
             case 'SPDT':
@@ -41,7 +41,7 @@ void SpellRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('FULL', fullName);
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint32>('SPIT', cost);
     esm.writeSubData<quint32>('SNAM', castingSound);
     esm.startSubRecord('SPDT');

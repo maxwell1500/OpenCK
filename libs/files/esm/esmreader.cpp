@@ -1,5 +1,4 @@
 #include "esmreader.hpp"
-#include "tes4codes.hpp"
 #include "../log/logger.hpp"
 
 #include <QBuffer>
@@ -255,7 +254,6 @@ NAME ESMReader::readNSubHeader()
     }
 
     NAME name{ readName() };
-    name = Tes4Codes::fromTes4(name);
     quint16 sz = readType<quint16>();
     esm.subLeft = sz;
 

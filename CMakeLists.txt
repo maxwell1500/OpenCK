@@ -107,7 +107,6 @@ set(ESM_HEADERS
     libs/files/filepaths.hpp
     libs/files/data/strings.hpp
     libs/files/esm/common.hpp
-    libs/files/esm/tes4codes.hpp
     libs/files/esm/esmfile.hpp
     libs/files/esm/esmreader.hpp
     libs/files/esm/esmwriter.hpp
@@ -157,6 +156,12 @@ set(ESM_HEADERS
     libs/files/esm/sounrecord.hpp
     libs/files/esm/wthrrecord.hpp
     libs/files/esm/ltexrecord.hpp
+    libs/components/component.hpp
+    libs/components/editorproperty.hpp
+    libs/components/formcomponents.hpp
+    libs/components/tier1_components.hpp
+    libs/components/tier2_components.hpp
+    libs/components/tesfullname.hpp
 )
 
 add_library(openck_esm STATIC
@@ -520,6 +525,10 @@ set(VIEW_SOURCES
     src/view/window/particlesystem.cpp
     src/view/window/particlerenderer.cpp
     src/view/widgets/quickfilterbar.cpp
+    src/view/widgets/editorpropertygrid.cpp
+    src/view/widgets/formcomponentwidget.cpp
+    src/view/window/qtformdialog.cpp
+    src/view/window/qtformdialogmanager.cpp
     src/view/window/scripteditorwidget.cpp
     src/view/window/dialogueeditorwidget.cpp
     src/view/window/formideditorwidget.cpp
@@ -602,6 +611,10 @@ set(VIEW_HEADERS
     src/view/window/particlesystem.hpp
     src/view/window/particlerenderer.hpp
     src/view/widgets/quickfilterbar.hpp
+    src/view/widgets/editorpropertygrid.hpp
+    src/view/widgets/formcomponentwidget.hpp
+    src/view/window/qtformdialog.hpp
+    src/view/window/qtformdialogmanager.hpp
     src/view/window/scripteditorwidget.hpp
     src/view/window/dialogueeditorwidget.hpp
     src/view/window/formideditorwidget.hpp

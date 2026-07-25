@@ -12,10 +12,10 @@ void ArmorRecord::load(ESMReader& esm, bool)
         {
             case 'FULL': fullName = esm.readZString(); break;
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             case 'DNAM': armorRating = esm.readType<quint32>(); break;
-            case 'ITM2': iconPath = esm.readZString(); break;
-            case 'ODIT': modelPath = esm.readZString(); break;
+            case 'ICON': iconPath = esm.readZString(); break;
+            case 'MODL': modelPath = esm.readZString(); break;
             case 'DATA': {
                 value = esm.readType<quint32>();
                 health = esm.readType<quint16>();
@@ -38,10 +38,10 @@ void ArmorRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('FULL', fullName);
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint32>('DNAM', armorRating);
-    esm.writeSubZString('ITM2', iconPath);
-    esm.writeSubZString('ODIT', modelPath);
+    esm.writeSubZString('ICON', iconPath);
+    esm.writeSubZString('MODL', modelPath);
     esm.startSubRecord('DATA');
     esm.writeType<quint32>(value);
     esm.writeType<quint16>(static_cast<quint16>(health));

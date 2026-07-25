@@ -11,7 +11,7 @@ void RaceRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': flags = esm.readType<quint32>(); break;
             default:
             {
                 RawSubRecord raw;
@@ -27,7 +27,7 @@ void RaceRecord::load(ESMReader& esm, bool)
 void RaceRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FLAG', flags);
+    esm.writeSubData<quint32>('FNAM', flags);
 
     for (const auto& raw : rawSubRecords)
     {
