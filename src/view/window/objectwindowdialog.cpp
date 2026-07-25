@@ -279,21 +279,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getSpellCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            SpellRecord originalState = collection.getRecord(recordIndex).get();
-            SpellRecord editedState = originalState;
-            SpellEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getSpellCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<SpellRecord>* cmd = new EditRecordCommand<SpellRecord>(&coll, idx, originalState, editedState,
-                        "Edit Spell: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Spell '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            SpellRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -432,21 +421,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getEnchCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            EnchRecord originalState = collection.getRecord(recordIndex).get();
-            EnchRecord editedState = originalState;
-            EnchEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getEnchCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<EnchRecord>* cmd = new EditRecordCommand<EnchRecord>(&coll, idx, originalState, editedState,
-                        "Edit Ench: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Ench '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            EnchRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }

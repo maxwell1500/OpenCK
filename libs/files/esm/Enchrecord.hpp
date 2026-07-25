@@ -2,16 +2,17 @@
 #define EnchRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct EnchRecord {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
-    // Item-specific fields
     QString name;
     quint32 costLimit = 0;
     quint32 charges = 0;
@@ -24,6 +25,7 @@ struct EnchRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const EnchRecord& l, const EnchRecord& r)

@@ -1,18 +1,32 @@
 #include "Enchrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier1_components.hpp"
+#include "../../components/tesfullname.hpp"
+
+void EnchRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESFullName_Component>();
+}
 
 void EnchRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
+        }
+        if (handled) continue;
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
-            case 'FULL': name = esm.readZString(); break;
             case 'ENIT':
             {
                 type = esm.readType<quint32>();
@@ -30,13 +44,18 @@ void EnchRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    auto* nameComp = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
+    if (nameComp) name = nameComp->fullName;
 }
 
 void EnchRecord::save(ESMWriter& esm) const
 {
+    auto* nameComp = static_cast<tescomponents::TESFullName_Component*>(const_cast<EnchRecord*>(this)->components.findByName(QStringLiteral("TESFullName")));
+    if (nameComp) nameComp->fullName = name;
+
     esm.writeSubZString('EDID', editorId);
+    components.saveAll(esm);
     esm.writeSubData<quint32>('FNAM', flags);
-    esm.writeSubZString('FULL', name);
     esm.startSubRecord('ENIT');
     esm.writeType<quint32>(type);
     esm.writeType<quint32>(charges);
@@ -53,10 +72,10 @@ void EnchRecord::save(ESMWriter& esm) const
 
 void EnchRecord::blank()
 {
-    editorId = "";
+    editorId.clear();
     formId = 0;
     flags = 0;
-    name = "";
+    name.clear();
     costLimit = 0;
     charges = 0;
     enchantmentData = 0;
@@ -66,4 +85,5 @@ void EnchRecord::blank()
     type = 0;
     soulGem = 0;
     rawSubRecords.clear();
+    initComponents();
 }

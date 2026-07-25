@@ -2,11 +2,13 @@
 #define SpellRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct SpellRecord {
+    openck::FormComponents components;
     QString editorId;
     QString fullName;
     quint32 formId = 0;
@@ -19,6 +21,7 @@ struct SpellRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const SpellRecord& l, const SpellRecord& r)
