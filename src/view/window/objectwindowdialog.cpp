@@ -255,21 +255,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getWeaponCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            WeaponRecord originalState = collection.getRecord(recordIndex).get();
-            WeaponRecord editedState = originalState;
-            WeaponEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getWeaponCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<WeaponRecord>* cmd = new EditRecordCommand<WeaponRecord>(&coll, idx, originalState, editedState,
-                        "Edit Weapon: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Weapon '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            WeaponRecord& weap = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(weap.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &weap.components, this);
         }
         break;
     }
@@ -278,21 +267,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getArmorCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            ArmorRecord originalState = collection.getRecord(recordIndex).get();
-            ArmorRecord editedState = originalState;
-            ArmorEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getArmorCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<ArmorRecord>* cmd = new EditRecordCommand<ArmorRecord>(&coll, idx, originalState, editedState,
-                        "Edit Armor: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Armor '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            ArmorRecord& armor = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(armor.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &armor.components, this);
         }
         break;
     }
@@ -405,21 +383,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getActiCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            ActiRecord originalState = collection.getRecord(recordIndex).get();
-            ActiRecord editedState = originalState;
-            ActiEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getActiCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<ActiRecord>* cmd = new EditRecordCommand<ActiRecord>(&coll, idx, originalState, editedState,
-                        "Edit Acti: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Acti '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            ActiRecord& acti = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(acti.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &acti.components, this);
         }
         break;
     }
@@ -428,21 +395,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getMiscCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            MiscRecord originalState = collection.getRecord(recordIndex).get();
-            MiscRecord editedState = originalState;
-            MiscEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getMiscCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<MiscRecord>* cmd = new EditRecordCommand<MiscRecord>(&coll, idx, originalState, editedState,
-                        "Edit Misc: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Misc '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            MiscRecord& misc = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(misc.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &misc.components, this);
         }
         break;
     }
@@ -451,21 +407,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getAlchCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            AlchRecord originalState = collection.getRecord(recordIndex).get();
-            AlchRecord editedState = originalState;
-            AlchEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getAlchCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<AlchRecord>* cmd = new EditRecordCommand<AlchRecord>(&coll, idx, originalState, editedState,
-                        "Edit Alch: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Alch '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            AlchRecord& alch = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(alch.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &alch.components, this);
         }
         break;
     }
@@ -497,21 +442,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getBookCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            BookRecord originalState = collection.getRecord(recordIndex).get();
-            BookRecord editedState = originalState;
-            BookEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getBookCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<BookRecord>* cmd = new EditRecordCommand<BookRecord>(&coll, idx, originalState, editedState,
-                        "Edit Book: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Book '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            BookRecord& book = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(book.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &book.components, this);
         }
         break;
     }
@@ -543,21 +477,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getContCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            ContRecord originalState = collection.getRecord(recordIndex).get();
-            ContRecord editedState = originalState;
-            ContEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getContCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<ContRecord>* cmd = new EditRecordCommand<ContRecord>(&coll, idx, originalState, editedState,
-                        "Edit Cont: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Cont '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            ContRecord& cont = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(cont.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &cont.components, this);
         }
         break;
     }

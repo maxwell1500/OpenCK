@@ -2,15 +2,16 @@
 #define MiscRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct MiscRecord {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
-    // Item-specific fields
     QString iconPath;
     QString modelPath;
     float weight = 0.0f;
@@ -19,6 +20,7 @@ struct MiscRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const MiscRecord& l, const MiscRecord& r)

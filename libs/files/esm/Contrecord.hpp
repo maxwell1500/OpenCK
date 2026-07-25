@@ -2,16 +2,17 @@
 #define ContRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct ContRecord {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
-    // Item-specific fields
     QString iconPath;
     QString modelPath;
     quint32 contents = 0;
@@ -21,6 +22,7 @@ struct ContRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const ContRecord& l, const ContRecord& r)

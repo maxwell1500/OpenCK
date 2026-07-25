@@ -1,13 +1,28 @@
 #include "Bookrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier1_components.hpp"
+
+void BookRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESModel_Component>();
+    components.add<tescomponents::TESTexture_Component>();
+}
 
 void BookRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
+        }
+        if (handled) continue;
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
@@ -17,8 +32,6 @@ void BookRecord::load(ESMReader& esm, bool)
                 pages = esm.readZString();
                 break;
             }
-            case 'ICON': iconPath = esm.readZString(); break;
-            case 'MODL': modelPath = esm.readZString(); break;
             default:
             {
                 RawSubRecord raw;
@@ -29,15 +42,23 @@ void BookRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    auto* tex = static_cast<tescomponents::TESTexture_Component*>(components.findByName(QStringLiteral("TESTexture")));
+    if (tex) iconPath = tex->iconPath;
+    auto* model = static_cast<tescomponents::TESModel_Component*>(components.findByName(QStringLiteral("TESModel")));
+    if (model) modelPath = model->modelPath;
 }
 
 void BookRecord::save(ESMWriter& esm) const
 {
+    auto* tex = static_cast<tescomponents::TESTexture_Component*>(const_cast<BookRecord*>(this)->components.findByName(QStringLiteral("TESTexture")));
+    if (tex) tex->iconPath = iconPath;
+    auto* model = static_cast<tescomponents::TESModel_Component*>(const_cast<BookRecord*>(this)->components.findByName(QStringLiteral("TESModel")));
+    if (model) model->modelPath = modelPath;
+
     esm.writeSubZString('EDID', editorId);
     esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('DATA', pages);
-    esm.writeSubZString('ICON', iconPath);
-    esm.writeSubZString('MODL', modelPath);
+    components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)
     {
@@ -49,12 +70,13 @@ void BookRecord::save(ESMWriter& esm) const
 
 void BookRecord::blank()
 {
-    editorId = "";
+    editorId.clear();
     formId = 0;
     flags = 0;
     pageCount = 0;
-    pages = "";
-    iconPath = "";
-    modelPath = "";
+    pages.clear();
+    iconPath.clear();
+    modelPath.clear();
     rawSubRecords.clear();
+    initComponents();
 }

@@ -2,17 +2,18 @@
 #define WEAPRECORD_H
 #include "common.hpp"
 #include "records.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct WeaponRecord {
+    openck::FormComponents components;
     QString editorId;
     QString fullName;
     quint32 formId = 0;
     quint32 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
-    // Item-specific fields
     quint32 weaponType = 0;
     float damage = 0.0f;
     float speed = 0.0f;
@@ -27,6 +28,7 @@ struct WeaponRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const WeaponRecord& l, const WeaponRecord& r)

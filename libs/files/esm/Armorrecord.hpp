@@ -2,17 +2,18 @@
 #define ArmorRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct ArmorRecord {
+    openck::FormComponents components;
     QString editorId;
     QString fullName;
     quint32 formId = 0;
     quint32 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
-    // Item-specific fields
     quint32 armorRating = 0;
     float weight = 0.0f;
     quint32 value = 0;
@@ -22,6 +23,7 @@ struct ArmorRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const ArmorRecord& l, const ArmorRecord& r)
