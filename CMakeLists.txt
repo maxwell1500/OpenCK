@@ -162,6 +162,7 @@ set(ESM_HEADERS
     libs/components/tier1_components.hpp
     libs/components/tier2_components.hpp
     libs/components/tesfullname.hpp
+    libs/components/tier3_components.hpp
 )
 
 add_library(openck_esm STATIC

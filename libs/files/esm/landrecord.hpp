@@ -1,11 +1,13 @@
 #ifndef LandRECORD_H
 #define LandRECORD_H
 #include "records.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct LandRecord {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
@@ -45,6 +47,7 @@ struct LandRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const LandRecord& l, const LandRecord& r)
@@ -54,7 +57,7 @@ inline bool operator==(const LandRecord& l, const LandRecord& r)
         || l.baseHeight != r.baseHeight
         || l.hasHeightData != r.hasHeightData || l.hasNormalData != r.hasNormalData
         || l.hasColorData != r.hasColorData || l.numTextureLayers != r.numTextureLayers
-        || l.rawSubRecords != r.rawSubRecords)
+        || l.rawSubRecords != r.rawSubRecords || l.components != r.components)
         return false;
 
     if (l.hasHeightData && memcmp(l.heightData, r.heightData, sizeof(l.heightData)) != 0)

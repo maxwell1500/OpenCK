@@ -1,17 +1,34 @@
 #include "landrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier3_components.hpp"
+
+void LandRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESFlags_Component>();
+}
 
 void LandRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        if (sub == 0) break;
+        bool handled = false;
         switch (sub)
         {
-            case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'EDID': editorId = esm.readZString(); handled = true; break;
+            default: break;
+        }
+        if (handled) continue;
+        for (auto& c : components.all())
+            if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
+        if (handled) continue;
+        switch (sub)
+        {
             case 'VHGT':
             {
                 hasHeightData = true;
@@ -67,12 +84,22 @@ void LandRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    if (auto* f = static_cast<tescomponents::TESFlags_Component*>(
+            components.findByName(QStringLiteral("TESFlags"))))
+    {
+        flags = f->flags;
+    }
 }
 
 void LandRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
+    if (auto* f = const_cast<LandRecord*>(this)->components.findByName(
+            QStringLiteral("TESFlags")))
+    {
+        static_cast<tescomponents::TESFlags_Component*>(f)->flags = flags;
+    }
+    components.saveAll(esm);
 
     if (hasHeightData)
     {
@@ -147,4 +174,5 @@ void LandRecord::blank()
     memset(textureLayers, 0, sizeof(textureLayers));
     numTextureLayers = 0;
     rawSubRecords.clear();
+    initComponents();
 }
