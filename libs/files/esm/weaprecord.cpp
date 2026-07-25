@@ -2,6 +2,7 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
+#include "../../components/tier2_components.hpp"
 #include "../../components/tesfullname.hpp"
 
 void WeaponRecord::initComponents()
@@ -10,6 +11,7 @@ void WeaponRecord::initComponents()
     components.add<tescomponents::TESFullName_Component>();
     components.add<tescomponents::TESModel_Component>();
     components.add<tescomponents::TESTexture_Component>();
+    components.add<tescomponents::BGSPickupPutdownSounds_Component>();
 }
 
 void WeaponRecord::load(ESMReader& esm, bool)

@@ -1,6 +1,7 @@
 #include "keymrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier2_components.hpp"
 
 void KeymRecord::load(ESMReader& esm, bool)
 {
@@ -12,6 +13,8 @@ void KeymRecord::load(ESMReader& esm, bool)
         components.add<tescomponents::TESModel_Component>();
     if (!components.findByName(QStringLiteral("TESTexture")))
         components.add<tescomponents::TESTexture_Component>();
+    if (!components.findByName(QStringLiteral("BGSPickupPutdownSounds")))
+        components.add<tescomponents::BGSPickupPutdownSounds_Component>();
 
     while (esm.isRecLeft())
     {

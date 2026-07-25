@@ -1,6 +1,7 @@
 #include "ammorecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier2_components.hpp"
 
 void AmmoRecord::load(ESMReader& esm, bool)
 {
@@ -12,6 +13,10 @@ void AmmoRecord::load(ESMReader& esm, bool)
         components.add<tescomponents::TESModel_Component>();
     if (!components.findByName(QStringLiteral("TESTexture")))
         components.add<tescomponents::TESTexture_Component>();
+    if (!components.findByName(QStringLiteral("BGSPickupPutdownSounds")))
+        components.add<tescomponents::BGSPickupPutdownSounds_Component>();
+    if (!components.findByName(QStringLiteral("TESEnchantableForm")))
+        components.add<tescomponents::TESEnchantableForm_Component>();
 
     while (esm.isRecLeft())
     {

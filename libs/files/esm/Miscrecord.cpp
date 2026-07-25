@@ -2,12 +2,14 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
+#include "../../components/tier2_components.hpp"
 
 void MiscRecord::initComponents()
 {
     components.clear();
     components.add<tescomponents::TESModel_Component>();
     components.add<tescomponents::TESTexture_Component>();
+    components.add<tescomponents::BGSPickupPutdownSounds_Component>();
 }
 
 void MiscRecord::load(ESMReader& esm, bool)

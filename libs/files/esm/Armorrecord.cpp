@@ -2,6 +2,7 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
+#include "../../components/tier2_components.hpp"
 #include "../../components/tesfullname.hpp"
 
 void ArmorRecord::initComponents()
@@ -10,6 +11,9 @@ void ArmorRecord::initComponents()
     components.add<tescomponents::TESFullName_Component>();
     components.add<tescomponents::TESModel_Component>();
     components.add<tescomponents::TESTexture_Component>();
+    components.add<tescomponents::TESBipedModel_Component>();
+    components.add<tescomponents::TESEnchantableForm_Component>();
+    components.add<tescomponents::BGSPickupPutdownSounds_Component>();
 }
 
 void ArmorRecord::load(ESMReader& esm, bool)

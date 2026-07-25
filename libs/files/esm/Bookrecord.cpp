@@ -2,12 +2,14 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
+#include "../../components/tier2_components.hpp"
 
 void BookRecord::initComponents()
 {
     components.clear();
     components.add<tescomponents::TESModel_Component>();
     components.add<tescomponents::TESTexture_Component>();
+    components.add<tescomponents::BGSPickupPutdownSounds_Component>();
 }
 
 void BookRecord::load(ESMReader& esm, bool)
