@@ -573,21 +573,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getWorldspaceCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            WorldspaceRecord originalState = collection.getRecord(recordIndex).get();
-            WorldspaceRecord editedState = originalState;
-            WorldspaceEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getWorldspaceCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<WorldspaceRecord>* cmd = new EditRecordCommand<WorldspaceRecord>(&coll, idx, originalState, editedState,
-                        "Edit Worldspace: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Worldspace '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            WorldspaceRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }

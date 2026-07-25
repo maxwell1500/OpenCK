@@ -2,18 +2,36 @@
 
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier1_components.hpp"
+#include "../../components/tesfullname.hpp"
+
+void WorldspaceRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESFullName_Component>();
+    components.add<tescomponents::TESTexture_Component>();
+}
 
 void WorldspaceRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        if (sub == 0) break;
+        bool handled = false;
         switch (sub)
         {
-        case 'EDID': editorId = esm.readZString(); break;
-        case 'FULL': name = esm.readZString(); break;
-        case 'ICON': iconPath = esm.readZString(); break;
+        case 'EDID': editorId = esm.readZString(); handled = true; break;
+        default: break;
+        }
+        if (handled) continue;
+        for (auto& c : components.all())
+            if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
+        if (handled) continue;
+        switch (sub)
+        {
         case 'XNAM': waterType = esm.readType<quint32>(); break;
         case 'TNAM': templ = esm.readType<quint32>(); break;
         case 'WNAM': terrain = esm.readType<quint32>(); break;
@@ -43,8 +61,7 @@ void WorldspaceRecord::load(ESMReader& esm, bool)
 void WorldspaceRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubZString('FULL', name);
-    esm.writeSubZString('ICON', iconPath);
+    components.saveAll(esm);
     esm.writeSubData<quint32>('XNAM', waterType);
     esm.writeSubData<quint32>('TNAM', templ);
     esm.writeSubData<quint32>('WNAM', terrain);
@@ -89,4 +106,5 @@ void WorldspaceRecord::blank()
     cellIds.clear();
     navPointIds.clear();
     rawSubRecords.clear();
+    initComponents();
 }

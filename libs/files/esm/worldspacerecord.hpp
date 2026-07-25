@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "records.hpp"
+#include "../../components/formcomponents.hpp"
 
 #include <QString>
 #include <QVector>
@@ -12,6 +13,7 @@ class ESMWriter;
 
 struct WorldspaceRecord
 {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
@@ -37,6 +39,7 @@ struct WorldspaceRecord
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const WorldspaceRecord& l, const WorldspaceRecord& r)
@@ -52,7 +55,7 @@ inline bool operator==(const WorldspaceRecord& l, const WorldspaceRecord& r)
         && l.music == r.music && l.dnam == r.dnam
         && l.dataMinX == r.dataMinX && l.dataMinY == r.dataMinY
         && l.cellIds == r.cellIds && l.navPointIds == r.navPointIds
-        && l.rawSubRecords == r.rawSubRecords;
+        && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 
 inline bool operator!=(const WorldspaceRecord& l, const WorldspaceRecord& r)
