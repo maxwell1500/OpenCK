@@ -12,7 +12,7 @@ void SpellRecord::load(ESMReader& esm, bool)
         {
             case 'FULL': fullName = esm.readZString(); break;
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'SPIT': cost = esm.readType<quint32>(); break;
             case 'SNAM': castingSound = esm.readType<quint32>(); break;
             case 'SPDT':

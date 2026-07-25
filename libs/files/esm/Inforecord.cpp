@@ -10,7 +10,7 @@ void InfoRecord::load(ESMReader& esm, bool)
         NAME sub = esm.readNSubHeader();
         switch (sub)
         {
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'CNAM': responseText = esm.readZString(); break;
             case 'CTDA':
             {

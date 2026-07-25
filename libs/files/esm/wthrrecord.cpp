@@ -12,7 +12,7 @@ void WthrRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'SNAM': sunTexture = esm.readZString(); break;
             default:
             {

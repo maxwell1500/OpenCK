@@ -20,7 +20,7 @@ void DoorRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); handled = true; break;
-            case 'FNAM': flags = esm.readType<quint32>(); handled = true; break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
             case 'SNAM': sound = esm.readType<quint32>(); handled = true; break;
             default: break;
         }

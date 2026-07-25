@@ -22,7 +22,7 @@ void AmmoRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); handled = true; break;
-            case 'FNAM': flags = esm.readType<quint32>(); handled = true; break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
             case 'DATA':
             {
                 speed = esm.readType<float>();

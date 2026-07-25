@@ -540,6 +540,98 @@ public:
     }
 };
 
+// ---------------------------------------------------------------------------
+// TypedFormValuePair — a form ID paired with a 32-bit integer value,
+// used by TESContainer_Component (CNTO subrecord entries).
+// ---------------------------------------------------------------------------
+struct TypedFormValuePair
+{
+    quint32 formId = 0;
+    qint32 count = 0;
+};
+
+inline bool operator==(const TypedFormValuePair& l, const TypedFormValuePair& r)
+{
+    return l.formId == r.formId && l.count == r.count;
+}
+
+// ---------------------------------------------------------------------------
+// TESContainer_Component — container inventory items. Handles the CNTO
+// subrecord (array of TypedFormValuePair) used by CONT, NPC_, LVLI, etc.
+// ---------------------------------------------------------------------------
+class TESContainer_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    QVector<TypedFormValuePair> items;
+
+    QString name() const override { return QStringLiteral("Contents"); }
+    QString className() const override { return QStringLiteral("TESContainer"); }
+    static QString staticClassName() { return QStringLiteral("TESContainer"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('CNTO');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        if (subrecordName == NAME('CNTO'))
+        {
+            TypedFormValuePair entry;
+            entry.formId = esm.readType<quint32>();
+            entry.count = static_cast<qint32>(esm.readType<qint32>());
+            items.append(entry);
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        for (const auto& entry : items)
+        {
+            esm.startSubRecord(NAME('CNTO'));
+            esm.writeType<quint32>(entry.formId);
+            esm.writeType<qint32>(entry.count);
+            esm.endSubRecord();
+        }
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        return {};
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESContainer_Component>();
+        c->items = items;
+        return c;
+    }
+
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        items = static_cast<const TESContainer_Component*>(other)->items;
+    }
+
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        return items == static_cast<const TESContainer_Component*>(other)->items;
+    }
+
+    void mergeWith(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        const auto& o = static_cast<const TESContainer_Component*>(other)->items;
+        for (const auto& entry : o)
+        {
+            if (!items.contains(entry)) items.append(entry);
+        }
+    }
+};
+
 } // namespace tescomponents
 
 #endif // TIER1_COMPONENTS_HPP

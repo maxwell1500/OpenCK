@@ -11,7 +11,7 @@ void PackageRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'PKDT': packageType = esm.readType<quint32>(); break;
             case 'PLDT': targetType = esm.readType<quint32>(); break;
             case 'PTDT':

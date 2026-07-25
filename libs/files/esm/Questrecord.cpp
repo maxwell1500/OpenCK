@@ -11,7 +11,7 @@ void QuestRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'FULL': questName = esm.readZString(); break;
             case 'DNAM': questDesc = esm.readZString(); break;
             case 'DATA': questType = esm.readType<quint32>(); break;

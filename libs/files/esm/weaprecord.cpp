@@ -12,7 +12,7 @@ void WeaponRecord::load(ESMReader& esm, bool)
         {
             case 'FULL': fullName = esm.readZString(); break;
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'DATA': {
                 weaponType = esm.readType<quint32>();
                 weight = esm.readType<float>();

@@ -34,7 +34,7 @@ void StatRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'RNAM': lodFlags = esm.readType<quint32>(); break;
             default:
             {

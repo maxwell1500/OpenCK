@@ -11,7 +11,7 @@ void MagicRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'MDOB': schools = esm.readType<quint32>(); break;
             case 'SNAM': castingSound = esm.readType<quint32>(); break;
             case 'ICON': iconPath = esm.readZString(); break;

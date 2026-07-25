@@ -11,7 +11,7 @@ void ClassRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'FULL': className = esm.readZString(); break;
             case 'DESC': description = esm.readZString(); break;
             case 'CNAM': serviceFlags = esm.readType<quint32>(); break;

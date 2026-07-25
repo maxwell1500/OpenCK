@@ -12,7 +12,7 @@ void LocationRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
         case 'EDID': editorId = esm.readZString(); break;
-        case 'FNAM': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
         case 'FULL': locationName = esm.readZString(); break;
         case 'PNAM': parentId = esm.readType<quint32>(); break;
         case 'DATA':
