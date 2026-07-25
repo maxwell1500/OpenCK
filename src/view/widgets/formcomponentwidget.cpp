@@ -1,10 +1,13 @@
 #include "formcomponentwidget.hpp"
 
+#include "../../libs/components/tier1_components.hpp"
+
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
@@ -14,6 +17,7 @@
 #include <QTableWidget>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QAbstractItemView>
 
 namespace openck {
 
@@ -249,6 +253,46 @@ FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent)
         QWidget* editor = makeEditorWidget(prop.get(), this);
         if (!editor) continue;
         m_layout->addRow(prop->name() + QStringLiteral(":"), editor);
+    }
+
+    // Container items: render as a table if the component is
+    // TESContainer_Component (which returns no EditorProperties
+    // and relies on this custom rendering instead).
+    if (m_component->className() == QStringLiteral("TESContainer"))
+    {
+        auto* container = static_cast<tescomponents::TESContainer_Component*>(m_component);
+        auto* table = new QTableWidget(this);
+        table->setColumnCount(2);
+        table->setHorizontalHeaderLabels({QStringLiteral("Form ID"), QStringLiteral("Count")});
+        table->horizontalHeader()->setStretchLastSection(true);
+        table->setSelectionBehavior(QAbstractItemView::SelectRows);
+        int row = 0;
+        for (const auto& item : container->items)
+        {
+            table->insertRow(row);
+            auto* formItem = new QTableWidgetItem(
+                QStringLiteral("0x%1").arg(item.formId, 8, 16, QChar('0')));
+            auto* countItem = new QTableWidgetItem();
+            countItem->setData(Qt::DisplayRole, item.count);
+            table->setItem(row, 0, formItem);
+            table->setItem(row, 1, countItem);
+            ++row;
+        }
+        auto* addBtn = new QPushButton(QStringLiteral("Add Item"), this);
+        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table]() {
+            table->insertRow(table->rowCount());
+        });
+        auto* rmBtn = new QPushButton(QStringLiteral("Remove"), this);
+        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table]() {
+            int row = table->currentRow();
+            if (row >= 0) table->removeRow(row);
+        });
+        auto* btnLayout = new QHBoxLayout();
+        btnLayout->addWidget(addBtn);
+        btnLayout->addWidget(rmBtn);
+        btnLayout->addStretch();
+        m_layout->addRow(QStringLiteral("Items:"), table);
+        m_layout->addRow(QString(), btnLayout);
     }
 }
 
