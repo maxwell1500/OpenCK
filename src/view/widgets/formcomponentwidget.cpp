@@ -1,6 +1,8 @@
 #include "formcomponentwidget.hpp"
 
 #include "../../libs/components/tier1_components.hpp"
+#include "../../libs/components/tier2_components.hpp"
+#include "../../libs/components/tier3_components.hpp"
 
 #include <QCheckBox>
 #include <QColorDialog>
@@ -266,32 +268,123 @@ FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent)
         table->setHorizontalHeaderLabels({QStringLiteral("Form ID"), QStringLiteral("Count")});
         table->horizontalHeader()->setStretchLastSection(true);
         table->setSelectionBehavior(QAbstractItemView::SelectRows);
-        int row = 0;
-        for (const auto& item : container->items)
-        {
-            table->insertRow(row);
-            auto* formItem = new QTableWidgetItem(
-                QStringLiteral("0x%1").arg(item.formId, 8, 16, QChar('0')));
-            auto* countItem = new QTableWidgetItem();
-            countItem->setData(Qt::DisplayRole, item.count);
-            table->setItem(row, 0, formItem);
-            table->setItem(row, 1, countItem);
-            ++row;
-        }
+        auto refreshTable = [this, table, container]() {
+            table->setRowCount(0);
+            for (const auto& item : container->items)
+            {
+                int r = table->rowCount();
+                table->insertRow(r);
+                table->setItem(r, 0, new QTableWidgetItem(
+                    QStringLiteral("0x%1").arg(item.formId, 8, 16, QChar('0'))));
+                auto* ci = new QTableWidgetItem();
+                ci->setData(Qt::DisplayRole, item.count);
+                table->setItem(r, 1, ci);
+            }
+        };
+        refreshTable();
         auto* addBtn = new QPushButton(QStringLiteral("Add Item"), this);
-        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table]() {
-            table->insertRow(table->rowCount());
+        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table, container, refreshTable]() {
+            container->items.append({0, 1});
+            refreshTable();
         });
         auto* rmBtn = new QPushButton(QStringLiteral("Remove"), this);
-        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table]() {
+        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table, container, refreshTable]() {
             int row = table->currentRow();
-            if (row >= 0) table->removeRow(row);
+            if (row >= 0 && row < container->items.size())
+            {
+                container->items.removeAt(row);
+                refreshTable();
+            }
         });
         auto* btnLayout = new QHBoxLayout();
         btnLayout->addWidget(addBtn);
         btnLayout->addWidget(rmBtn);
         btnLayout->addStretch();
         m_layout->addRow(QStringLiteral("Items:"), table);
+        m_layout->addRow(QString(), btnLayout);
+    }
+
+    // Keyword form: render as a table for BGSKeywordForm_Component.
+    if (m_component->className() == QStringLiteral("BGSKeywordForm"))
+    {
+        auto* kw = static_cast<tescomponents::BGSKeywordForm_Component*>(m_component);
+        auto* table = new QTableWidget(this);
+        table->setColumnCount(1);
+        table->setHorizontalHeaderLabels({QStringLiteral("Keyword Form ID")});
+        table->horizontalHeader()->setStretchLastSection(true);
+        table->setSelectionBehavior(QAbstractItemView::SelectRows);
+        auto refreshTable = [this, table, kw]() {
+            table->setRowCount(0);
+            for (quint32 id : kw->keywords)
+            {
+                int r = table->rowCount();
+                table->insertRow(r);
+                table->setItem(r, 0, new QTableWidgetItem(
+                    QStringLiteral("0x%1").arg(id, 8, 16, QChar('0'))));
+            }
+        };
+        refreshTable();
+        auto* addBtn = new QPushButton(QStringLiteral("Add Keyword"), this);
+        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table, kw, refreshTable]() {
+            kw->keywords.append(0);
+            refreshTable();
+        });
+        auto* rmBtn = new QPushButton(QStringLiteral("Remove"), this);
+        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table, kw, refreshTable]() {
+            int row = table->currentRow();
+            if (row >= 0 && row < kw->keywords.size())
+            {
+                kw->keywords.removeAt(row);
+                refreshTable();
+            }
+        });
+        auto* btnLayout = new QHBoxLayout();
+        btnLayout->addWidget(addBtn);
+        btnLayout->addWidget(rmBtn);
+        btnLayout->addStretch();
+        m_layout->addRow(QStringLiteral("Keywords:"), table);
+        m_layout->addRow(QString(), btnLayout);
+    }
+
+    // Spell list: render as a table for TESSpellList_Component.
+    if (m_component->className() == QStringLiteral("TESSpellList"))
+    {
+        auto* sl = static_cast<tescomponents::TESSpellList_Component*>(m_component);
+        auto* table = new QTableWidget(this);
+        table->setColumnCount(1);
+        table->setHorizontalHeaderLabels({QStringLiteral("Spell Form ID")});
+        table->horizontalHeader()->setStretchLastSection(true);
+        table->setSelectionBehavior(QAbstractItemView::SelectRows);
+        auto refreshTable = [this, table, sl]() {
+            table->setRowCount(0);
+            for (quint32 id : sl->spells)
+            {
+                int r = table->rowCount();
+                table->insertRow(r);
+                table->setItem(r, 0, new QTableWidgetItem(
+                    QStringLiteral("0x%1").arg(id, 8, 16, QChar('0'))));
+            }
+        };
+        refreshTable();
+        auto* addBtn = new QPushButton(QStringLiteral("Add Spell"), this);
+        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table, sl, refreshTable]() {
+            sl->spells.append(0);
+            refreshTable();
+        });
+        auto* rmBtn = new QPushButton(QStringLiteral("Remove"), this);
+        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table, sl, refreshTable]() {
+            int row = table->currentRow();
+            if (row >= 0 && row < sl->spells.size())
+            {
+                sl->spells.removeAt(row);
+                refreshTable();
+            }
+        });
+        auto* btnLayout = new QHBoxLayout();
+        btnLayout->addWidget(addBtn);
+        btnLayout->addWidget(rmBtn);
+        btnLayout->addStretch();
+        m_layout->addRow(QStringLiteral("Spells:"), table);
         m_layout->addRow(QString(), btnLayout);
     }
 }
