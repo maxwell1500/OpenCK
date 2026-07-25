@@ -37,8 +37,9 @@
 // the rest in Tier 3 (e.g. TemplateEditorProperty for leveled lists).
 
 #include <QString>
-#include <QVariant>
+#include <QStringList>
 #include <QVector>
+#include <QVariant>
 
 #include <memory>
 #include <vector>
@@ -222,6 +223,96 @@ public:
 private:
     QString m_name;
     QVector<quint32>* m_storage;
+};
+
+// A bitmask editor property. Renders as a group of checkboxes,
+// one per bit in the mask. The label list defines each checkbox's
+// display name and which bit it toggles.
+struct BitfieldDef {
+    const char* label;
+    quint32 mask;
+};
+
+class BitfieldEditorProperty : public EditorProperty
+{
+public:
+    BitfieldEditorProperty(QString name, quint32* storage,
+                           std::vector<BitfieldDef> bits)
+        : m_name(std::move(name)), m_storage(storage), m_bits(std::move(bits))
+    {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override { return m_storage ? QVariant(*m_storage) : QVariant(0u); }
+    void setValue(const QVariant& v) override
+    {
+        if (m_storage) *m_storage = v.toUInt();
+    }
+
+    const std::vector<BitfieldDef>& bits() const { return m_bits; }
+
+private:
+    QString m_name;
+    quint32* m_storage;
+    std::vector<BitfieldDef> m_bits;
+};
+
+// An enum dropdown property. Maps integer values to display strings.
+class EnumEditorProperty : public EditorProperty
+{
+public:
+    struct Entry { QString label; quint32 value; };
+
+    EnumEditorProperty(QString name, quint32* storage,
+                       std::vector<Entry> entries)
+        : m_name(std::move(name)), m_storage(storage), m_entries(std::move(entries))
+    {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override { return m_storage ? QVariant(*m_storage) : QVariant(0u); }
+    void setValue(const QVariant& v) override
+    {
+        if (m_storage) *m_storage = v.toUInt();
+    }
+
+    const std::vector<Entry>& entries() const { return m_entries; }
+
+private:
+    QString m_name;
+    quint32* m_storage;
+    std::vector<Entry> m_entries;
+};
+
+// A color picker property. Stores RGBA as four floats.
+class ColorEditorProperty : public EditorProperty
+{
+public:
+    ColorEditorProperty(QString name, float* r, float* g, float* b, float* a = nullptr)
+        : m_name(std::move(name)), m_r(r), m_g(g), m_b(b), m_a(a)
+    {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override
+    {
+        QVariantList v;
+        v << (m_r ? *m_r : 0.0f) << (m_g ? *m_g : 0.0f)
+          << (m_b ? *m_b : 0.0f) << (m_a ? *m_a : 1.0f);
+        return v;
+    }
+    void setValue(const QVariant& v) override
+    {
+        QVariantList list = v.toList();
+        if (list.size() >= 1 && m_r) *m_r = list[0].toFloat();
+        if (list.size() >= 2 && m_g) *m_g = list[1].toFloat();
+        if (list.size() >= 3 && m_b) *m_b = list[2].toFloat();
+        if (list.size() >= 4 && m_a) *m_a = list[3].toFloat();
+    }
+
+private:
+    QString m_name;
+    float* m_r;
+    float* m_g;
+    float* m_b;
+    float* m_a;
 };
 
 #endif // EDITOR_PROPERTY_HPP

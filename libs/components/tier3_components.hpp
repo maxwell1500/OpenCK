@@ -28,6 +28,9 @@ public:
     void load(ESMReader& esm) override {}
 
     quint32 flags = 0;
+    std::vector<BitfieldDef> bitDefs;
+
+    void setBitDefs(std::vector<BitfieldDef> defs) { bitDefs = std::move(defs); }
 
     QString name() const override { return QStringLiteral("Flags"); }
     QString className() const override { return QStringLiteral("TESFlags"); }
@@ -58,8 +61,16 @@ public:
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
     {
         std::vector<std::unique_ptr<EditorProperty>> out;
-        out.push_back(std::make_unique<UIntEditorProperty>(
-            QStringLiteral("Flags"), &flags));
+        if (!bitDefs.empty())
+        {
+            out.push_back(std::make_unique<BitfieldEditorProperty>(
+                QStringLiteral("Flags"), &flags, bitDefs));
+        }
+        else
+        {
+            out.push_back(std::make_unique<UIntEditorProperty>(
+                QStringLiteral("Flags"), &flags));
+        }
         return out;
     }
 

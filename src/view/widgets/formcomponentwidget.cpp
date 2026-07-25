@@ -1,8 +1,9 @@
 #include "formcomponentwidget.hpp"
 
 #include <QCheckBox>
+#include <QColorDialog>
+#include <QComboBox>
 #include <QDoubleSpinBox>
-#include <QFormLayout>
 #include <QFormLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -12,6 +13,7 @@
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QToolButton>
+#include <QVBoxLayout>
 
 namespace openck {
 
@@ -131,6 +133,78 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
             prop->setValue(newList);
         });
         return w;
+    }
+    if (dynamic_cast<BitfieldEditorProperty*>(prop))
+    {
+        auto* bf = static_cast<BitfieldEditorProperty*>(prop);
+        auto* w = new QWidget(parent);
+        auto* vl = new QVBoxLayout(w);
+        vl->setContentsMargins(0, 0, 0, 0);
+        vl->setSpacing(2);
+        quint32 currentVal = bf->value().toUInt();
+        for (const auto& bit : bf->bits())
+        {
+            auto* cb = new QCheckBox(QString::fromLatin1(bit.label), w);
+            cb->setChecked(currentVal & bit.mask);
+            QObject::connect(cb, &QCheckBox::toggled, parent, [bf, bit](bool checked) {
+                quint32 v = bf->value().toUInt();
+                if (checked) v |= bit.mask;
+                else v &= ~bit.mask;
+                bf->setValue(v);
+            });
+            vl->addWidget(cb);
+        }
+        return w;
+    }
+    if (dynamic_cast<EnumEditorProperty*>(prop))
+    {
+        auto* en = static_cast<EnumEditorProperty*>(prop);
+        auto* cb = new QComboBox(parent);
+        int idx = 0;
+        int selectIdx = -1;
+        quint32 currentVal = en->value().toUInt();
+        for (const auto& entry : en->entries())
+        {
+            cb->addItem(entry.label, entry.value);
+            if (entry.value == currentVal) selectIdx = idx;
+            ++idx;
+        }
+        if (selectIdx >= 0) cb->setCurrentIndex(selectIdx);
+        QObject::connect(cb, qOverload<int>(&QComboBox::currentIndexChanged), parent,
+            [en, cb](int i) { en->setValue(cb->itemData(i).toUInt()); });
+        return cb;
+    }
+    if (dynamic_cast<ColorEditorProperty*>(prop))
+    {
+        auto* btn = new QPushButton(parent);
+        auto updateColor = [btn, prop]() {
+            QVariantList v = prop->value().toList();
+            QColor c;
+            if (v.size() >= 3)
+                c = QColor::fromRgbF(v[0].toFloat(), v[1].toFloat(), v[2].toFloat(),
+                                     v.size() >= 4 ? v[3].toFloat() : 1.0f);
+            btn->setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid gray; min-height: 20px;")
+                .arg(c.name()));
+        };
+        updateColor();
+        QObject::connect(btn, &QPushButton::clicked, parent, [btn, prop, updateColor]() {
+            QVariantList v = prop->value().toList();
+            QColor cur = (v.size() >= 3)
+                ? QColor::fromRgbF(v[0].toFloat(), v[1].toFloat(), v[2].toFloat())
+                : Qt::white;
+            QColor c = QColorDialog::getColor(cur, btn, QStringLiteral("Choose Color"));
+            if (c.isValid())
+            {
+                prop->setValue(QVariantList{
+                    static_cast<double>(c.redF()),
+                    static_cast<double>(c.greenF()),
+                    static_cast<double>(c.blueF()),
+                    static_cast<double>(c.alphaF())
+                });
+                updateColor();
+            }
+        });
+        return btn;
     }
     if (dynamic_cast<StringEditorProperty*>(prop))
     {

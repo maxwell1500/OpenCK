@@ -6,7 +6,11 @@
 void RaceRecord::initComponents()
 {
     components.clear();
-    components.add<tescomponents::TESFlags_Component>();
+    auto* flags = components.add<tescomponents::TESFlags_Component>();
+    flags->setBitDefs({
+        { "Playable", 0x01 },
+        { "Child Race", 0x02 },
+    });
 }
 
 void RaceRecord::load(ESMReader& esm, bool)
