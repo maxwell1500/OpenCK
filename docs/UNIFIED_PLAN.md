@@ -169,17 +169,17 @@ After each migration: delete the old bespoke editor file and rewire `ObjectWindo
 ---
 
 ## Phase 7: 3D Viewport Enhancements
-> From original Phase 6. Already deferred — the 3D viewport is
-> functional with basic Lambertian shading.
 
-| # | Task | Details | Status |
-|---|------|---------|--------|
-| 7.1 | NIF version handling | Parse version string, route to correct parser | ⬜ |
-| 7.2 | Normals extraction | Read `NiNormal` data from vertex data | ⬜ |
-| 7.3 | UV coordinate extraction | Read `NiTexCoord` data | ⬜ |
-| 7.4 | Texture coordinate mapping | Apply UVs to mesh for texture rendering | ⬜ |
-| 7.5 | Improved lighting model | Use `NiMaterialProperty` for ambient/diffuse/specular | ⬜ |
-| 7.6 | Mesh batching / VAO optimization | Batch draw calls for complex scenes | ⬜ |
+✅ **6/6 complete** — Already implemented before this plan was written. Phong lighting, interleaved position/normal/UV/color vertex format, texture sampling, VAO batching. No additional work needed.
+
+| # | Task | Status |
+|---|------|--------|
+| 7.1 | NIF version handling | ✅ Already implemented |
+| 7.2 | Normals extraction | ✅ Already implemented (recalculateNormals + shader) |
+| 7.3 | UV coordinate extraction | ✅ Already implemented |
+| 7.4 | Texture coordinate mapping | ✅ Already implemented |
+| 7.5 | Improved lighting model | ✅ Already implemented (Phong in GLSL) |
+| 7.6 | Mesh batching / VAO optimization | ✅ Already implemented |
 
 ---
 

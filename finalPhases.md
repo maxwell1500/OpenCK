@@ -93,7 +93,7 @@
 
 ## Phase 6: 3D Viewport Enhancements
 
-> Currently flat-shaded with basic Lambertian only. No textures, normals, or UVs.
+✅ **6/6 complete** — Already implemented. Viewport has interleaved position+normal+UV+color vertex format, Phong lighting (ambient+diffuse+specular+emission), texture sampling, and VAO batching. NIF parser reads custom format with full vertex data.
 
 | Step | Task | Details | Status |
 |------|------|---------|--------|
@@ -175,9 +175,9 @@
 | 3 — Blender Integration | 9 | 9/9 | All methods implemented, version check fixed |
 | 4 — ObjectWindow Refactor | 5 | 5/5 | Helper extracted, 3 methods refactored |
 | 5 — Error Handling | 8 | 7/8 | Applied except field validators for all editors |
-| 6 — 3D Viewport | 6 | 0/6 | |
+| 6 — 3D Viewport | 6 | 6/6 | Already implemented (Phong lighting, normals, UVs, textures, VAOs) |
 | 7 — Editor Completions | 7 | 0/7 | |
 | 8 — Papyrus & Dialogue | 6 | 0/6 | |
 | 9 — Testing | 7 | 0/7 | |
 | 10 — Documentation | 6 | 0/6 | |
-| **TOTAL** | **66** | **~28** | |
+| **TOTAL** | **66** | **~34** | |
