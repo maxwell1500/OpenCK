@@ -1,16 +1,35 @@
 #include "Inforecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier3_components.hpp"
+
+void InfoRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESFlags_Component>();
+}
 
 void InfoRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub))
+            {
+                c->handleSubrecord(sub, esm);
+                handled = true;
+                break;
+            }
+        }
+        if (handled) continue;
+
         switch (sub)
         {
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'CNAM': responseText = esm.readZString(); break;
             case 'CTDA':
             {
@@ -31,11 +50,21 @@ void InfoRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    auto* flagsComp = static_cast<tescomponents::TESFlags_Component*>(components.findByName(QStringLiteral("TESFlags")));
+    if (flagsComp) {
+        flags = flagsComp->flags;
+    }
 }
 
 void InfoRecord::save(ESMWriter& esm) const
 {
-    esm.writeSubData<quint32>('FNAM', flags);
+    auto* flagsComp = static_cast<tescomponents::TESFlags_Component*>(const_cast<InfoRecord*>(this)->components.findByName(QStringLiteral("TESFlags")));
+    if (flagsComp) {
+        flagsComp->flags = flags;
+    }
+
+    components.saveAll(esm);
+
     esm.writeSubZString('CNAM', responseText);
     esm.startSubRecord('CTDA');
     esm.writeType<quint32>(conditionIds.size());
@@ -50,4 +79,18 @@ void InfoRecord::save(ESMWriter& esm) const
         esm.writeRawData(raw.data.data(), raw.data.size());
         esm.endSubRecord();
     }
+}
+
+void InfoRecord::blank()
+{
+    editorId.clear();
+    formId = 0;
+    flags = 0;
+    responseText.clear();
+    voiceFile.clear();
+    conditionIds.clear();
+    targetId = 0;
+    scriptIds.clear();
+    rawSubRecords.clear();
+    initComponents();
 }

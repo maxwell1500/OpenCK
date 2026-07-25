@@ -2,11 +2,13 @@
 #define InfoRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
 class ESMWriter;
 struct InfoRecord {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId;
     quint32 flags;
@@ -18,6 +20,8 @@ struct InfoRecord {
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
+    void blank();
+    void initComponents();
 };
 
 inline bool operator==(const InfoRecord& l, const InfoRecord& r)
@@ -25,7 +29,8 @@ inline bool operator==(const InfoRecord& l, const InfoRecord& r)
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.responseText == r.responseText && l.voiceFile == r.voiceFile
         && l.conditionIds == r.conditionIds && l.targetId == r.targetId
-        && l.scriptIds == r.scriptIds && l.rawSubRecords == r.rawSubRecords;
+        && l.scriptIds == r.scriptIds && l.rawSubRecords == r.rawSubRecords
+        && l.components == r.components;
 }
 
 inline bool operator!=(const InfoRecord& l, const InfoRecord& r)

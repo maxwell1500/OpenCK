@@ -34,7 +34,6 @@
 #include "location_editor.hpp"
 #include "ref_editor.hpp"
 #include "dialeditor.hpp"
-#include "infoeditor.hpp"
 #include "facteditor.hpp"
 #include "logger.hpp"
 #include "../../model/tools/blenderlauncher.hpp"
@@ -578,22 +577,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getInfoCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            InfoRecord originalState = collection.getRecord(recordIndex).get();
-            InfoRecord editedState = originalState;
-            InfoEditor editor(mData, this);
-            editor.loadRecord(&editedState);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getInfoCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<InfoRecord>* cmd = new EditRecordCommand<InfoRecord>(&coll, idx, originalState, editedState,
-                        "Edit Dialogue Info: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Dialogue Info '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            InfoRecord& info = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(info.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &info.components, this);
         }
         break;
     }
