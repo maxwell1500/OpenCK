@@ -315,4 +315,84 @@ private:
     float* m_a;
 };
 
+class Point2EditorProperty : public EditorProperty
+{
+public:
+    Point2EditorProperty(QString name, float* x, float* y)
+        : m_name(std::move(name)), m_x(x), m_y(y) {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override
+    {
+        QVariantList v;
+        v << (m_x ? *m_x : 0.0f) << (m_y ? *m_y : 0.0f);
+        return v;
+    }
+    void setValue(const QVariant& v) override
+    {
+        QVariantList list = v.toList();
+        if (list.size() >= 1 && m_x) *m_x = list[0].toFloat();
+        if (list.size() >= 2 && m_y) *m_y = list[1].toFloat();
+    }
+
+private:
+    QString m_name;
+    float* m_x;
+    float* m_y;
+};
+
+class Point3EditorProperty : public EditorProperty
+{
+public:
+    Point3EditorProperty(QString name, float* x, float* y, float* z)
+        : m_name(std::move(name)), m_x(x), m_y(y), m_z(z) {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override
+    {
+        QVariantList v;
+        v << (m_x ? *m_x : 0.0f) << (m_y ? *m_y : 0.0f) << (m_z ? *m_z : 0.0f);
+        return v;
+    }
+    void setValue(const QVariant& v) override
+    {
+        QVariantList list = v.toList();
+        if (list.size() >= 1 && m_x) *m_x = list[0].toFloat();
+        if (list.size() >= 2 && m_y) *m_y = list[1].toFloat();
+        if (list.size() >= 3 && m_z) *m_z = list[2].toFloat();
+    }
+
+private:
+    QString m_name;
+    float* m_x;
+    float* m_y;
+    float* m_z;
+};
+
+class MinMaxEditorProperty : public EditorProperty
+{
+public:
+    MinMaxEditorProperty(QString name, float* min, float* max)
+        : m_name(std::move(name)), m_min(min), m_max(max) {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override
+    {
+        QVariantList v;
+        v << (m_min ? *m_min : 0.0f) << (m_max ? *m_max : 0.0f);
+        return v;
+    }
+    void setValue(const QVariant& v) override
+    {
+        QVariantList list = v.toList();
+        if (list.size() >= 1 && m_min) *m_min = list[0].toFloat();
+        if (list.size() >= 2 && m_max) *m_max = list[1].toFloat();
+    }
+
+private:
+    QString m_name;
+    float* m_min;
+    float* m_max;
+};
+
 #endif // EDITOR_PROPERTY_HPP

@@ -510,6 +510,9 @@ set(VIEW_SOURCES
     src/view/window/npceditor.cpp
     src/view/window/npcrecorddatawidget.cpp
     src/view/window/racedatawidget.cpp
+    src/view/window/wthrdatawidget.cpp
+    src/view/window/sounddatawidget.cpp
+    src/view/window/classdatawidget.cpp
     src/view/window/searchdialog.cpp
     src/view/world/enumdelegate.cpp
     src/view/world/genericdelegate.cpp
@@ -598,6 +601,9 @@ set(VIEW_HEADERS
     src/view/window/npceditor.hpp
     src/view/window/npcrecorddatawidget.hpp
     src/view/window/racedatawidget.hpp
+    src/view/window/wthrdatawidget.hpp
+    src/view/window/sounddatawidget.hpp
+    src/view/window/classdatawidget.hpp
     src/view/window/searchdialog.hpp
     src/view/world/delegatefactory.hpp
     src/view/world/enumdelegate.hpp

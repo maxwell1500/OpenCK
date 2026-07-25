@@ -10,6 +10,9 @@
 #include "qtformdialogmanager.hpp"
 #include "npcrecorddatawidget.hpp"
 #include "racedatawidget.hpp"
+#include "wthrdatawidget.hpp"
+#include "sounddatawidget.hpp"
+#include "classdatawidget.hpp"
 #include "celldatawidget.hpp"
 #include "questdatawidget.hpp"
 #include "globvar_editor.hpp"
@@ -69,6 +72,21 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("RACE"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new RaceDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("WTHR"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new WthrDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("SOUN"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new SoundDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("CLAS"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new ClassDataWidget(recPtr, comps, parent);
             });
     }
 }
@@ -495,7 +513,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ClassRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("CLAS"), &rec.components, &rec, this);
         }
         break;
     }
@@ -592,7 +611,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             SounRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("SOUN"), &rec.components, &rec, this);
         }
         break;
     }
@@ -604,7 +624,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             WthrRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("WTHR"), &rec.components, &rec, this);
         }
         break;
     }

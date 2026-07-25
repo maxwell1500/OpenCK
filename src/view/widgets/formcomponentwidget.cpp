@@ -212,6 +212,104 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
         });
         return btn;
     }
+    if (dynamic_cast<Point2EditorProperty*>(prop))
+    {
+        auto* w = new QWidget(parent);
+        auto* hl = new QHBoxLayout(w);
+        hl->setContentsMargins(0, 0, 0, 0);
+        auto* sbx = new QDoubleSpinBox(w);
+        auto* sby = new QDoubleSpinBox(w);
+        sbx->setRange(-1.0e9, 1.0e9);
+        sbx->setDecimals(2);
+        sbx->setSingleStep(0.1);
+        sby->setRange(-1.0e9, 1.0e9);
+        sby->setDecimals(2);
+        sby->setSingleStep(0.1);
+        QVariantList pt = prop->value().toList();
+        if (pt.size() >= 1) sbx->setValue(pt[0].toDouble());
+        if (pt.size() >= 2) sby->setValue(pt[1].toDouble());
+        hl->addWidget(sbx);
+        hl->addWidget(sby);
+        QObject::connect(sbx, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
+            [prop, sbx, sby](double) {
+                prop->setValue(QVariantList{sbx->value(), sby->value()});
+            });
+        QObject::connect(sby, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
+            [prop, sbx, sby](double) {
+                prop->setValue(QVariantList{sbx->value(), sby->value()});
+            });
+        return w;
+    }
+    if (dynamic_cast<Point3EditorProperty*>(prop))
+    {
+        auto* w = new QWidget(parent);
+        auto* hl = new QHBoxLayout(w);
+        hl->setContentsMargins(0, 0, 0, 0);
+        auto* sbx = new QDoubleSpinBox(w);
+        auto* sby = new QDoubleSpinBox(w);
+        auto* sbz = new QDoubleSpinBox(w);
+        sbx->setRange(-1.0e9, 1.0e9);
+        sbx->setDecimals(2);
+        sbx->setSingleStep(0.1);
+        sby->setRange(-1.0e9, 1.0e9);
+        sby->setDecimals(2);
+        sby->setSingleStep(0.1);
+        sbz->setRange(-1.0e9, 1.0e9);
+        sbz->setDecimals(2);
+        sbz->setSingleStep(0.1);
+        QVariantList pt = prop->value().toList();
+        if (pt.size() >= 1) sbx->setValue(pt[0].toDouble());
+        if (pt.size() >= 2) sby->setValue(pt[1].toDouble());
+        if (pt.size() >= 3) sbz->setValue(pt[2].toDouble());
+        hl->addWidget(sbx);
+        hl->addWidget(sby);
+        hl->addWidget(sbz);
+        QObject::connect(sbx, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
+            [prop, sbx, sby, sbz](double) {
+                prop->setValue(QVariantList{sbx->value(), sby->value(), sbz->value()});
+            });
+        QObject::connect(sby, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
+            [prop, sbx, sby, sbz](double) {
+                prop->setValue(QVariantList{sbx->value(), sby->value(), sbz->value()});
+            });
+        QObject::connect(sbz, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
+            [prop, sbx, sby, sbz](double) {
+                prop->setValue(QVariantList{sbx->value(), sby->value(), sbz->value()});
+            });
+        return w;
+    }
+    if (dynamic_cast<MinMaxEditorProperty*>(prop))
+    {
+        auto* w = new QWidget(parent);
+        auto* hl = new QHBoxLayout(w);
+        hl->setContentsMargins(0, 0, 0, 0);
+        auto* lblMin = new QLabel(QStringLiteral("Min"), w);
+        auto* sbMin = new QDoubleSpinBox(w);
+        auto* lblMax = new QLabel(QStringLiteral("Max"), w);
+        auto* sbMax = new QDoubleSpinBox(w);
+        sbMin->setRange(-1.0e9, 1.0e9);
+        sbMin->setDecimals(2);
+        sbMin->setSingleStep(0.1);
+        sbMax->setRange(-1.0e9, 1.0e9);
+        sbMax->setDecimals(2);
+        sbMax->setSingleStep(0.1);
+        QVariantList mm = prop->value().toList();
+        if (mm.size() >= 1) sbMin->setValue(mm[0].toDouble());
+        if (mm.size() >= 2) sbMax->setValue(mm[1].toDouble());
+        hl->addWidget(lblMin);
+        hl->addWidget(sbMin);
+        hl->addWidget(lblMax);
+        hl->addWidget(sbMax);
+        QObject::connect(sbMin, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
+            [prop, sbMin, sbMax](double) {
+                prop->setValue(QVariantList{sbMin->value(), sbMax->value()});
+            });
+        QObject::connect(sbMax, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
+            [prop, sbMin, sbMax](double) {
+                prop->setValue(QVariantList{sbMin->value(), sbMax->value()});
+            });
+        return w;
+    }
     if (dynamic_cast<StringEditorProperty*>(prop))
     {
         auto* le = new QLineEdit(parent);
@@ -386,6 +484,60 @@ FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent)
         btnLayout->addStretch();
         m_layout->addRow(QStringLiteral("Spells:"), table);
         m_layout->addRow(QString(), btnLayout);
+    }
+
+    if (m_component->className() == QStringLiteral("TESBipedModel"))
+    {
+        auto* comp = static_cast<tescomponents::TESBipedModel_Component*>(m_component);
+        auto* malePath = new QLineEdit(this);
+        malePath->setText(comp->maleWorldPath);
+        QObject::connect(malePath, &QLineEdit::editingFinished, this, [comp, malePath]() {
+            comp->maleWorldPath = malePath->text();
+        });
+        m_layout->addRow(QStringLiteral("Male World Model:"), malePath);
+
+        auto* femalePath = new QLineEdit(this);
+        femalePath->setText(comp->femaleWorldPath);
+        QObject::connect(femalePath, &QLineEdit::editingFinished, this, [comp, femalePath]() {
+            comp->femaleWorldPath = femalePath->text();
+        });
+        m_layout->addRow(QStringLiteral("Female World Model:"), femalePath);
+
+        auto* flags = new QSpinBox(this);
+        flags->setRange(0, INT_MAX);
+        flags->setValue(static_cast<int>(comp->bipedFlags));
+        QObject::connect(flags, qOverload<int>(&QSpinBox::valueChanged), this, [comp](int v) {
+            comp->bipedFlags = static_cast<quint32>(v);
+        });
+        m_layout->addRow(QStringLiteral("Biped Flags:"), flags);
+    }
+
+    if (m_component->className() == QStringLiteral("BGSPickupPutdownSounds"))
+    {
+        auto* comp = static_cast<tescomponents::BGSPickupPutdownSounds_Component*>(m_component);
+        auto* pickup = new QLineEdit(this);
+        pickup->setPlaceholderText(QStringLiteral("0x00000000"));
+        pickup->setText(QStringLiteral("0x%1").arg(comp->pickupSound, 8, 16, QChar('0')));
+        QObject::connect(pickup, &QLineEdit::editingFinished, this, [comp, pickup]() {
+            QString text = pickup->text().trimmed();
+            if (text.startsWith(QStringLiteral("0x"))) text.remove(0, 2);
+            bool ok = false;
+            quint32 v = text.toUInt(&ok, 16);
+            if (ok) comp->pickupSound = v;
+        });
+        m_layout->addRow(QStringLiteral("Pickup Sound:"), pickup);
+
+        auto* putdown = new QLineEdit(this);
+        putdown->setPlaceholderText(QStringLiteral("0x00000000"));
+        putdown->setText(QStringLiteral("0x%1").arg(comp->putdownSound, 8, 16, QChar('0')));
+        QObject::connect(putdown, &QLineEdit::editingFinished, this, [comp, putdown]() {
+            QString text = putdown->text().trimmed();
+            if (text.startsWith(QStringLiteral("0x"))) text.remove(0, 2);
+            bool ok = false;
+            quint32 v = text.toUInt(&ok, 16);
+            if (ok) comp->putdownSound = v;
+        });
+        m_layout->addRow(QStringLiteral("Putdown Sound:"), putdown);
     }
 }
 
