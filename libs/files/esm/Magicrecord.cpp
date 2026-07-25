@@ -1,21 +1,34 @@
 #include "Magicrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier1_components.hpp"
+
+void MagicRecord::initComponents()
+{
+    components.clear();
+    components.add<tescomponents::TESModel_Component>();
+    components.add<tescomponents::TESTexture_Component>();
+}
 
 void MagicRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    initComponents();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        bool handled = false;
+        for (auto& c : components.all())
+        {
+            if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
+        }
+        if (handled) continue;
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'MDOB': schools = esm.readType<quint32>(); break;
             case 'SNAM': castingSound = esm.readType<quint32>(); break;
-            case 'ICON': iconPath = esm.readZString(); break;
-            case 'MODL': modelPath = esm.readZString(); break;
             default:
             {
                 RawSubRecord raw;
@@ -26,16 +39,24 @@ void MagicRecord::load(ESMReader& esm, bool)
             }
         }
     }
+    auto* tex = static_cast<tescomponents::TESTexture_Component*>(components.findByName(QStringLiteral("TESTexture")));
+    if (tex) iconPath = tex->iconPath;
+    auto* model = static_cast<tescomponents::TESModel_Component*>(components.findByName(QStringLiteral("TESModel")));
+    if (model) modelPath = model->modelPath;
 }
 
 void MagicRecord::save(ESMWriter& esm) const
 {
+    auto* tex = static_cast<tescomponents::TESTexture_Component*>(const_cast<MagicRecord*>(this)->components.findByName(QStringLiteral("TESTexture")));
+    if (tex) tex->iconPath = iconPath;
+    auto* model = static_cast<tescomponents::TESModel_Component*>(const_cast<MagicRecord*>(this)->components.findByName(QStringLiteral("TESModel")));
+    if (model) model->modelPath = modelPath;
+
     esm.writeSubZString('EDID', editorId);
     esm.writeSubData<quint32>('FNAM', flags);
+    components.saveAll(esm);
     esm.writeSubData<quint32>('MDOB', schools);
     esm.writeSubData<quint32>('SNAM', castingSound);
-    esm.writeSubZString('ICON', iconPath);
-    esm.writeSubZString('MODL', modelPath);
 
     for (const auto& raw : rawSubRecords)
     {
@@ -47,14 +68,15 @@ void MagicRecord::save(ESMWriter& esm) const
 
 void MagicRecord::blank()
 {
-    editorId = "";
+    editorId.clear();
     formId = 0;
     flags = 0;
     schools = 0;
     damageType = 0;
     castingSound = 0;
-    iconPath = "";
-    modelPath = "";
+    iconPath.clear();
+    modelPath.clear();
     effects.clear();
     rawSubRecords.clear();
+    initComponents();
 }

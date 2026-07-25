@@ -348,21 +348,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getTreeCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            TreeRecord originalState = collection.getRecord(recordIndex).get();
-            TreeRecord editedState = originalState;
-            TreeEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getTreeCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<TreeRecord>* cmd = new EditRecordCommand<TreeRecord>(&coll, idx, originalState, editedState,
-                        "Edit Tree: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Tree '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            TreeRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -419,21 +408,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getIngrCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            IngrRecord originalState = collection.getRecord(recordIndex).get();
-            IngrRecord editedState = originalState;
-            IngrEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getIngrCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<IngrRecord>* cmd = new EditRecordCommand<IngrRecord>(&coll, idx, originalState, editedState,
-                        "Edit Ingr: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Ingr '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            IngrRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -512,21 +490,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getPerkCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            PerkRecord originalState = collection.getRecord(recordIndex).get();
-            PerkRecord editedState = originalState;
-            PerkEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getPerkCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<PerkRecord>* cmd = new EditRecordCommand<PerkRecord>(&coll, idx, originalState, editedState,
-                        "Edit Perk: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Perk '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            PerkRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -535,21 +502,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getMagicCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            MagicRecord originalState = collection.getRecord(recordIndex).get();
-            MagicRecord editedState = originalState;
-            MagicEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getMagicCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<MagicRecord>* cmd = new EditRecordCommand<MagicRecord>(&coll, idx, originalState, editedState,
-                        "Edit Magic: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Magic '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            MagicRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -604,21 +560,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getClassCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            ClassRecord originalState = collection.getRecord(recordIndex).get();
-            ClassRecord editedState = originalState;
-            ClassEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getClassCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<ClassRecord>* cmd = new EditRecordCommand<ClassRecord>(&coll, idx, originalState, editedState,
-                        "Edit Class: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Class '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            ClassRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }
@@ -767,21 +712,10 @@ void ObjectWindowDialog::editSelected()
         auto& collection = mData->getFactCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
         {
-            FactRecord originalState = collection.getRecord(recordIndex).get();
-            FactRecord editedState = originalState;
-            FactEditor editor(mData, &editedState, this);
-            if (editor.exec() == QDialog::Accepted)
-            {
-                auto& coll = mData->getFactCollection();
-                int idx = coll.searchId(editedState.editorId);
-                if (idx >= 0 && mData->getUndoStack())
-                {
-                    EditRecordCommand<FactRecord>* cmd = new EditRecordCommand<FactRecord>(&coll, idx, originalState, editedState,
-                        "Edit Faction: " + editedState.editorId);
-                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-                }
-                LOG_INFO(QString("Faction '%1' edited").arg(editorId));
-            }
+            auto& record = collection.getRecord(recordIndex);
+            FactRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
         }
         break;
     }

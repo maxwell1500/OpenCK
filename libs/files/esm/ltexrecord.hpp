@@ -3,6 +3,7 @@
 
 #include "records.hpp"
 #include "variant.hpp"
+#include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
 
@@ -10,6 +11,7 @@ class ESMReader;
 class ESMWriter;
 
 struct LtexRecord {
+    openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
@@ -21,6 +23,7 @@ struct LtexRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+    void initComponents();
 };
 
 inline bool operator==(const LtexRecord& l, const LtexRecord& r)
