@@ -16,7 +16,6 @@ struct FurnRecord {
     quint32 flags = 0;
     QString fullName;
     QString modelPath;
-    quint32 markerCount = 0;
     QVector<RawSubRecord> rawSubRecords;
 
     openck::FormComponents components;
@@ -29,8 +28,7 @@ struct FurnRecord {
 inline bool operator==(const FurnRecord& l, const FurnRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
-        && l.fullName == r.fullName && l.modelPath == r.modelPath
-        && l.markerCount == r.markerCount
+        && l.fullName == r.fullName         && l.modelPath == r.modelPath
         && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 

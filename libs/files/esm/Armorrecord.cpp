@@ -32,7 +32,7 @@ void ArmorRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'DNAM': armorRating = esm.readType<quint32>(); break;
             case 'DATA': {
                 value = esm.readType<quint32>();
@@ -69,7 +69,6 @@ void ArmorRecord::save(ESMWriter& esm) const
 
     esm.writeSubZString('EDID', editorId);
     components.saveAll(esm);
-    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint32>('DNAM', armorRating);
     esm.startSubRecord('DATA');
     esm.writeType<quint32>(value);

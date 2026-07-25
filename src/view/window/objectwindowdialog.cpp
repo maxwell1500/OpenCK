@@ -14,6 +14,8 @@
 #include "sounddatawidget.hpp"
 #include "classdatawidget.hpp"
 #include "celldatawidget.hpp"
+#include "dialdatawidget.hpp"
+#include "infodatawidget.hpp"
 #include "questdatawidget.hpp"
 #include "globvar_editor.hpp"
 #include "lcrteditor.hpp"
@@ -87,6 +89,16 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("CLAS"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new ClassDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("DIAL"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new DialDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("INFO"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new InfoDataWidget(recPtr, comps, parent);
             });
     }
 }
@@ -575,7 +587,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             DialRecord& dial = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(dial.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &dial.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("DIAL"), &dial.components, &dial, this);
         }
         break;
     }
@@ -587,7 +600,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             InfoRecord& info = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(info.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &info.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("INFO"), &info.components, &info, this);
         }
         break;
     }

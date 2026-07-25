@@ -21,7 +21,7 @@ void FurnRecord::load(ESMReader& esm, bool)
         {
             case 'EDID': editorId = esm.readZString(); handled = true; break;
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
-            case 'MNAM': markerCount = esm.readType<quint32>(); handled = true; break;
+
             default: break;
         }
         if (handled) continue;
@@ -59,9 +59,6 @@ void FurnRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
     esm.writeSubData<quint32>('FNAM', flags);
-    if (markerCount != 0)
-        esm.writeSubData<quint32>('MNAM', markerCount);
-
     components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)
@@ -79,7 +76,7 @@ void FurnRecord::blank()
     flags = 0;
     fullName = "";
     modelPath = "";
-    markerCount = 0;
+
     rawSubRecords.clear();
     components.clear();
 }

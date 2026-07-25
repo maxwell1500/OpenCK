@@ -33,7 +33,6 @@ void TreeRecord::load(ESMReader& esm, bool)
                 while (esm.isSubLeft()) { esm.readType<quint8>(); }
                 break;
             }
-            case 'SNAM': lodModelPath = esm.readZString(); break;
             case 'PFIG': lodFlags = esm.readType<quint32>(); break;
             default:
             {
@@ -65,8 +64,6 @@ void TreeRecord::save(ESMWriter& esm) const
     esm.writeType<float>(leafCurvature);
     esm.writeType<float>(leafAmplitude);
     esm.endSubRecord();
-    if (!lodModelPath.isEmpty())
-        esm.writeSubZString('SNAM', lodModelPath);
     if (lodFlags != 0)
         esm.writeSubData<quint32>('PFIG', lodFlags);
 

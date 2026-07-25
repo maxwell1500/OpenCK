@@ -513,6 +513,8 @@ set(VIEW_SOURCES
     src/view/window/wthrdatawidget.cpp
     src/view/window/sounddatawidget.cpp
     src/view/window/classdatawidget.cpp
+    src/view/window/dialdatawidget.cpp
+    src/view/window/infodatawidget.cpp
     src/view/window/searchdialog.cpp
     src/view/world/enumdelegate.cpp
     src/view/world/genericdelegate.cpp
@@ -604,6 +606,8 @@ set(VIEW_HEADERS
     src/view/window/wthrdatawidget.hpp
     src/view/window/sounddatawidget.hpp
     src/view/window/classdatawidget.hpp
+    src/view/window/dialdatawidget.hpp
+    src/view/window/infodatawidget.hpp
     src/view/window/searchdialog.hpp
     src/view/world/delegatefactory.hpp
     src/view/world/enumdelegate.hpp
