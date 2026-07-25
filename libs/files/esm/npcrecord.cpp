@@ -2,12 +2,14 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
+#include "../../components/tier3_components.hpp"
 #include "../../components/tesfullname.hpp"
 
 void NpcRecord::initComponents()
 {
     components.clear();
     components.add<tescomponents::TESFullName_Component>();
+    components.add<tescomponents::TESActorBaseData_Component>();
 }
 
 void NpcRecord::load(ESMReader& esm, bool)
@@ -17,6 +19,7 @@ void NpcRecord::load(ESMReader& esm, bool)
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        if (sub == 0) break;
         bool handled = false;
         for (auto& c : components.all())
         {
@@ -32,13 +35,6 @@ void NpcRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'ACBS':
-            {
-                acbs = esm.readType<ACBS>();
-                flags = acbs.flags;
-                level = static_cast<quint32>(acbs.level);
-                break;
-            }
             case 'RNAM': race = esm.readType<quint32>(); break;
             case 'CNAM': class_ = esm.readType<quint32>(); break;
             case 'ANAM': faction = esm.readType<quint32>(); break;
@@ -74,20 +70,41 @@ void NpcRecord::load(ESMReader& esm, bool)
     }
     auto* fn = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
     if (fn) fullName = fn->fullName;
+    auto* ab = static_cast<tescomponents::TESActorBaseData_Component*>(components.findByName(QStringLiteral("TESActorBaseData")));
+    if (ab)
+    {
+        acbs.flags = ab->flags;
+        acbs.baseSpell = ab->baseSpell;
+        acbs.fatigue = ab->fatigue;
+        acbs.barterGold = ab->barterGold;
+        acbs.level = ab->level;
+        acbs.calcMin = ab->calcMin;
+        acbs.calcMax = ab->calcMax;
+        acbs.speedMult = ab->speedMult;
+        flags = ab->flags;
+        level = static_cast<quint32>(ab->level);
+    }
 }
 
 void NpcRecord::save(ESMWriter& esm) const
 {
     auto* fn = const_cast<NpcRecord*>(this)->components.findByName(QStringLiteral("TESFullName"));
     if (fn) static_cast<tescomponents::TESFullName_Component*>(fn)->fullName = fullName;
+    auto* ab = static_cast<tescomponents::TESActorBaseData_Component*>(const_cast<NpcRecord*>(this)->components.findByName(QStringLiteral("TESActorBaseData")));
+    if (ab)
+    {
+        ab->flags = flags;
+        ab->baseSpell = acbs.baseSpell;
+        ab->fatigue = acbs.fatigue;
+        ab->barterGold = acbs.barterGold;
+        ab->level = acbs.level;
+        ab->calcMin = acbs.calcMin;
+        ab->calcMax = acbs.calcMax;
+        ab->speedMult = acbs.speedMult;
+    }
 
     esm.writeSubZString('EDID', editorId);
-    ACBS saveAcbs = acbs;
-    saveAcbs.flags = flags;
-    saveAcbs.level = static_cast<qint16>(level);
-    esm.writeSubData<ACBS>('ACBS', saveAcbs);
     components.saveAll(esm);
-    esm.writeSubZString('FULL', fullName);
     esm.writeSubData<quint32>('RNAM', race);
     esm.writeSubData<quint32>('CNAM', class_);
     esm.writeSubData<quint32>('ANAM', faction);

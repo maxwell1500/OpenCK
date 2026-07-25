@@ -430,6 +430,116 @@ public:
     void mergeWith(const Component* other) override { copyFrom(other); }
 };
 
+// ---------------------------------------------------------------------------
+// TESActorBaseData_Component — NPC/creature base data from the ACBS
+// subrecord. Handles flags, base spell, fatigue, barter gold, level,
+// calc min/max, and speed multiplier.
+// ---------------------------------------------------------------------------
+class TESActorBaseData_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    quint32 flags = 0;
+    quint16 baseSpell = 0;
+    quint16 fatigue = 0;
+    quint16 barterGold = 0;
+    qint16 level = 0;
+    quint16 calcMin = 0;
+    quint16 calcMax = 0;
+    quint16 speedMult = 0;
+
+    QString name() const override { return QStringLiteral("Actor Base Data"); }
+    QString className() const override { return QStringLiteral("TESActorBaseData"); }
+    static QString staticClassName() { return QStringLiteral("TESActorBaseData"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('ACBS');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        if (subrecordName == NAME('ACBS'))
+        {
+            flags = esm.readType<quint32>();
+            baseSpell = esm.readType<quint16>();
+            fatigue = esm.readType<quint16>();
+            barterGold = esm.readType<quint16>();
+            level = esm.readType<qint16>();
+            calcMin = esm.readType<quint16>();
+            calcMax = esm.readType<quint16>();
+            speedMult = esm.readType<quint16>();
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        esm.startSubRecord(NAME('ACBS'));
+        esm.writeType<quint32>(flags);
+        esm.writeType<quint16>(baseSpell);
+        esm.writeType<quint16>(fatigue);
+        esm.writeType<quint16>(barterGold);
+        esm.writeType<qint16>(level);
+        esm.writeType<quint16>(calcMin);
+        esm.writeType<quint16>(calcMax);
+        esm.writeType<quint16>(speedMult);
+        esm.endSubRecord();
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        std::vector<std::unique_ptr<EditorProperty>> out;
+        out.push_back(std::make_unique<UIntEditorProperty>(
+            QStringLiteral("Flags"), &flags));
+        out.push_back(std::make_unique<IntEditorProperty>(
+            QStringLiteral("Base Spell"), reinterpret_cast<qint32*>(&baseSpell)));
+        out.push_back(std::make_unique<IntEditorProperty>(
+            QStringLiteral("Fatigue"), reinterpret_cast<qint32*>(&fatigue)));
+        out.push_back(std::make_unique<IntEditorProperty>(
+            QStringLiteral("Barter Gold"), reinterpret_cast<qint32*>(&barterGold)));
+        out.push_back(std::make_unique<IntEditorProperty>(
+            QStringLiteral("Level"), reinterpret_cast<qint32*>(&level)));
+        out.push_back(std::make_unique<IntEditorProperty>(
+            QStringLiteral("Calc Min"), reinterpret_cast<qint32*>(&calcMin)));
+        out.push_back(std::make_unique<IntEditorProperty>(
+            QStringLiteral("Calc Max"), reinterpret_cast<qint32*>(&calcMax)));
+        out.push_back(std::make_unique<IntEditorProperty>(
+            QStringLiteral("Speed Mult"), reinterpret_cast<qint32*>(&speedMult)));
+        return out;
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESActorBaseData_Component>();
+        c->flags = flags; c->baseSpell = baseSpell; c->fatigue = fatigue;
+        c->barterGold = barterGold; c->level = level;
+        c->calcMin = calcMin; c->calcMax = calcMax; c->speedMult = speedMult;
+        return c;
+    }
+
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        const auto* o = static_cast<const TESActorBaseData_Component*>(other);
+        flags = o->flags; baseSpell = o->baseSpell; fatigue = o->fatigue;
+        barterGold = o->barterGold; level = o->level;
+        calcMin = o->calcMin; calcMax = o->calcMax; speedMult = o->speedMult;
+    }
+
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        const auto* o = static_cast<const TESActorBaseData_Component*>(other);
+        return flags == o->flags && baseSpell == o->baseSpell
+            && fatigue == o->fatigue && barterGold == o->barterGold
+            && level == o->level && calcMin == o->calcMin
+            && calcMax == o->calcMax && speedMult == o->speedMult;
+    }
+
+    void mergeWith(const Component* other) override { copyFrom(other); }
+};
+
 } // namespace tescomponents
 
 #endif // TIER3_COMPONENTS_HPP
