@@ -9,6 +9,7 @@
 #include "../../view/messageboxhelper.hpp"
 #include "qtformdialogmanager.hpp"
 #include "npcrecorddatawidget.hpp"
+#include "racedatawidget.hpp"
 #include "npceditor.hpp"
 #include "weaponeditor.hpp"
 #include "armor_editor.hpp"
@@ -86,6 +87,11 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("NPC_"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new NpcRecordDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("RACE"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new RaceDataWidget(recPtr, comps, parent);
             });
     }
 }
@@ -440,7 +446,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             RaceRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("RACE"), &rec.components, &rec, this);
         }
         break;
     }
