@@ -10,6 +10,7 @@ void NpcRecord::initComponents()
     components.clear();
     components.add<tescomponents::TESFullName_Component>();
     components.add<tescomponents::TESActorBaseData_Component>();
+    components.add<tescomponents::TESSpellList_Component>();
 }
 
 void NpcRecord::load(ESMReader& esm, bool)
@@ -38,16 +39,6 @@ void NpcRecord::load(ESMReader& esm, bool)
             case 'RNAM': race = esm.readType<quint32>(); break;
             case 'CNAM': class_ = esm.readType<quint32>(); break;
             case 'ANAM': faction = esm.readType<quint32>(); break;
-            case 'SPLO':
-            {
-                quint32 count = esm.readType<quint32>();
-                spells.resize(count);
-                for (int i = 0; i < count; i++)
-                {
-                    spells[i] = esm.readType<quint32>();
-                }
-                break;
-            }
             case 'CNTO':
             {
                 quint32 count = esm.readType<quint32>();
@@ -84,6 +75,8 @@ void NpcRecord::load(ESMReader& esm, bool)
         flags = ab->flags;
         level = static_cast<quint32>(ab->level);
     }
+    auto* sl = static_cast<tescomponents::TESSpellList_Component*>(components.findByName(QStringLiteral("TESSpellList")));
+    if (sl) spells = sl->spells;
 }
 
 void NpcRecord::save(ESMWriter& esm) const
@@ -102,19 +95,14 @@ void NpcRecord::save(ESMWriter& esm) const
         ab->calcMax = acbs.calcMax;
         ab->speedMult = acbs.speedMult;
     }
+    auto* sl = static_cast<tescomponents::TESSpellList_Component*>(const_cast<NpcRecord*>(this)->components.findByName(QStringLiteral("TESSpellList")));
+    if (sl) sl->spells = spells;
 
     esm.writeSubZString('EDID', editorId);
     components.saveAll(esm);
     esm.writeSubData<quint32>('RNAM', race);
     esm.writeSubData<quint32>('CNAM', class_);
     esm.writeSubData<quint32>('ANAM', faction);
-    esm.startSubRecord('SPLO');
-    esm.writeType<quint32>(spells.size());
-    for (auto spell : spells)
-    {
-        esm.writeType<quint32>(spell);
-    }
-    esm.endSubRecord();
     esm.startSubRecord('CNTO');
     esm.writeType<quint32>(inventoryItems.size());
     for (auto item : inventoryItems)

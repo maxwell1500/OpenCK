@@ -540,6 +540,78 @@ public:
     void mergeWith(const Component* other) override { copyFrom(other); }
 };
 
+// ---------------------------------------------------------------------------
+// TESSpellList_Component — a counted-array SPLO subrecord containing
+// form IDs of spells known by an NPC or actor. Used by NPC_ and CREA
+// records.
+// ---------------------------------------------------------------------------
+class TESSpellList_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    QVector<quint32> spells;
+
+    QString name() const override { return QStringLiteral("Spell List"); }
+    QString className() const override { return QStringLiteral("TESSpellList"); }
+    static QString staticClassName() { return QStringLiteral("TESSpellList"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('SPLO');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        if (subrecordName == NAME('SPLO'))
+        {
+            qint64 count = esm.subLeft() / 4;
+            spells.clear();
+            spells.reserve(count);
+            for (qint64 i = 0; i < count; ++i)
+                spells.append(esm.readType<quint32>());
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        if (spells.isEmpty()) return;
+        esm.startSubRecord(NAME('SPLO'));
+        for (quint32 id : spells)
+            esm.writeType<quint32>(id);
+        esm.endSubRecord();
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        std::vector<std::unique_ptr<EditorProperty>> out;
+        out.push_back(std::make_unique<FormArrayEditorProperty>(
+            QStringLiteral("Spells"), &spells));
+        return out;
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESSpellList_Component>();
+        c->spells = spells;
+        return c;
+    }
+
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        spells = static_cast<const TESSpellList_Component*>(other)->spells;
+    }
+
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        return spells == static_cast<const TESSpellList_Component*>(other)->spells;
+    }
+
+    void mergeWith(const Component* other) override { copyFrom(other); }
+};
+
 } // namespace tescomponents
 
 #endif // TIER3_COMPONENTS_HPP
