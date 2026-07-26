@@ -11,6 +11,10 @@ void NpcRecord::initComponents()
     components.add<tescomponents::TESFullName_Component>();
     components.add<tescomponents::TESActorBaseData_Component>();
     components.add<tescomponents::TESSpellList_Component>();
+    components.add<tescomponents::TESBodyParts_Component>();
+    components.add<tescomponents::TESAIForm_Component>();
+    components.add<tescomponents::TESSkills_Component>();
+    components.add<tescomponents::TESAttributes_Component>();
 }
 
 void NpcRecord::load(ESMReader& esm, bool)

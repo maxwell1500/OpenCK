@@ -1,6 +1,7 @@
 #include "creaturerecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "../../components/tier3_components.hpp"
 
 void CreatureRecord::load(ESMReader& esm, bool)
 {
@@ -8,6 +9,8 @@ void CreatureRecord::load(ESMReader& esm, bool)
 
     if (!components.findByName(QStringLiteral("TESFullName")))
         components.add<tescomponents::TESFullName_Component>();
+    if (!components.findByName(QStringLiteral("TESAIForm")))
+        components.add<tescomponents::TESAIForm_Component>();
 
     while (esm.isRecLeft())
     {

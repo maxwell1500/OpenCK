@@ -11,6 +11,7 @@ void RaceRecord::initComponents()
         { "Playable", 0x01 },
         { "Child Race", 0x02 },
     });
+    components.add<tescomponents::TESBodyParts_Component>();
 }
 
 void RaceRecord::load(ESMReader& esm, bool)

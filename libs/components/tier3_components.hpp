@@ -612,6 +612,376 @@ public:
     void mergeWith(const Component* other) override { copyFrom(other); }
 };
 
+// ---------------------------------------------------------------------------
+// TESBodyParts_Component — handles BODT/BOD2 (body part data) subrecords.
+// BODT is the legacy format (12 bytes: partType + flags). BOD2 is the newer
+// format (12 bytes: partType + flags + partCount).
+// ---------------------------------------------------------------------------
+class TESBodyParts_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    quint32 partType = 0;
+    quint32 flags = 0;
+    quint32 partCount = 0;
+
+    QString name() const override { return QStringLiteral("Body Data"); }
+    QString className() const override { return QStringLiteral("TESBodyParts"); }
+    static QString staticClassName() { return QStringLiteral("TESBodyParts"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('BODT')
+            || subrecordName == NAME('BOD2');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        if (subrecordName == NAME('BODT'))
+        {
+            partType = esm.readType<quint32>();
+            flags = esm.readType<quint32>();
+        }
+        else if (subrecordName == NAME('BOD2'))
+        {
+            partType = esm.readType<quint32>();
+            flags = esm.readType<quint32>();
+            partCount = esm.readType<quint32>();
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        if (partCount == 0)
+        {
+            esm.startSubRecord(NAME('BODT'));
+            esm.writeType<quint32>(partType);
+            esm.writeType<quint32>(flags);
+            esm.endSubRecord();
+        }
+        else
+        {
+            esm.startSubRecord(NAME('BOD2'));
+            esm.writeType<quint32>(partType);
+            esm.writeType<quint32>(flags);
+            esm.writeType<quint32>(partCount);
+            esm.endSubRecord();
+        }
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        std::vector<std::unique_ptr<EditorProperty>> out;
+        out.push_back(std::make_unique<UIntEditorProperty>(QStringLiteral("Part Type"), &partType));
+        out.push_back(std::make_unique<UIntEditorProperty>(QStringLiteral("Body Flags"), &flags));
+        out.push_back(std::make_unique<UIntEditorProperty>(QStringLiteral("Part Count"), &partCount));
+        return out;
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESBodyParts_Component>();
+        c->partType = partType; c->flags = flags; c->partCount = partCount;
+        return c;
+    }
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        const auto* o = static_cast<const TESBodyParts_Component*>(other);
+        partType = o->partType; flags = o->flags; partCount = o->partCount;
+    }
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        const auto* o = static_cast<const TESBodyParts_Component*>(other);
+        return partType == o->partType && flags == o->flags && partCount == o->partCount;
+    }
+    void mergeWith(const Component* other) override { copyFrom(other); }
+};
+
+// ---------------------------------------------------------------------------
+// TESAIForm_Component — AI data (AIDT subrecord) for NPC_ and CREA records.
+// Stores aggression, confidence, energy, morality, mood, and disposition.
+// ---------------------------------------------------------------------------
+class TESAIForm_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    quint8 aggression = 0;
+    quint8 confidence = 0;
+    quint8 energy = 0;
+    quint8 morality = 0;
+    qint16 mood = 0;
+    quint8 moodSpeed = 0;
+    quint8 disposition = 0;
+    quint8 aggressionLevel = 0;
+
+    QString name() const override { return QStringLiteral("AI Data"); }
+    QString className() const override { return QStringLiteral("TESAIForm"); }
+    static QString staticClassName() { return QStringLiteral("TESAIForm"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('AIDT');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        if (subrecordName == NAME('AIDT'))
+        {
+            aggression = esm.readType<quint8>();
+            confidence = esm.readType<quint8>();
+            energy = esm.readType<quint8>();
+            morality = esm.readType<quint8>();
+            mood = esm.readType<qint16>();
+            moodSpeed = esm.readType<quint8>();
+            disposition = esm.readType<quint8>();
+            aggressionLevel = esm.readType<quint8>();
+            esm.skip(2); // padding
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        esm.startSubRecord(NAME('AIDT'));
+        esm.writeType<quint8>(aggression);
+        esm.writeType<quint8>(confidence);
+        esm.writeType<quint8>(energy);
+        esm.writeType<quint8>(morality);
+        esm.writeType<qint16>(mood);
+        esm.writeType<quint8>(moodSpeed);
+        esm.writeType<quint8>(disposition);
+        esm.writeType<quint8>(aggressionLevel);
+        static const quint8 padding[2] = {0, 0};
+        esm.writeRawData(reinterpret_cast<const char*>(padding), 2);
+        esm.endSubRecord();
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        std::vector<std::unique_ptr<EditorProperty>> out;
+        out.push_back(std::make_unique<EnumEditorProperty>(QStringLiteral("Aggression"), reinterpret_cast<quint32*>(&aggression),
+            std::vector<EnumEditorProperty::Entry>{
+                {"Unaggressive", 0}, {"Aggressive", 1}, {"Very Aggressive", 2},
+                {"Frenzied", 3}, {"Defensive", 4}, {"Cowardly", 5}}));
+        out.push_back(std::make_unique<EnumEditorProperty>(QStringLiteral("Confidence"), reinterpret_cast<quint32*>(&confidence),
+            std::vector<EnumEditorProperty::Entry>{
+                {"Cowardly", 0}, {"Cautious", 1}, {"Average", 2},
+                {"Brave", 3}, {"Foolhardy", 4}, {"Berserk", 5}}));
+        out.push_back(std::make_unique<EnumEditorProperty>(QStringLiteral("Morality"), reinterpret_cast<quint32*>(&morality),
+            std::vector<EnumEditorProperty::Entry>{
+                {"Any", 0}, {"Low", 1}, {"Standard", 2},
+                {"High", 3}, {"None", 4}}));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Energy"), reinterpret_cast<qint32*>(&energy)));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood"), reinterpret_cast<qint32*>(&mood)));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood Speed"), reinterpret_cast<qint32*>(&moodSpeed)));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Disposition"), reinterpret_cast<qint32*>(&disposition)));
+        return out;
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESAIForm_Component>();
+        c->aggression = aggression; c->confidence = confidence;
+        c->energy = energy; c->morality = morality; c->mood = mood;
+        c->moodSpeed = moodSpeed; c->disposition = disposition;
+        c->aggressionLevel = aggressionLevel;
+        return c;
+    }
+
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        const auto* o = static_cast<const TESAIForm_Component*>(other);
+        aggression = o->aggression; confidence = o->confidence;
+        energy = o->energy; morality = o->morality; mood = o->mood;
+        moodSpeed = o->moodSpeed; disposition = o->disposition;
+        aggressionLevel = o->aggressionLevel;
+    }
+
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        const auto* o = static_cast<const TESAIForm_Component*>(other);
+        return aggression == o->aggression && confidence == o->confidence
+            && energy == o->energy && morality == o->morality && mood == o->mood
+            && moodSpeed == o->moodSpeed && disposition == o->disposition
+            && aggressionLevel == o->aggressionLevel;
+    }
+
+    void mergeWith(const Component* other) override { copyFrom(other); }
+};
+
+class TESSkills_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    QVector<qint32> skillValues;
+    QVector<RawSubRecord> rawSub;
+
+    QString name() const override { return QStringLiteral("Skills"); }
+    QString className() const override { return QStringLiteral("TESSkills"); }
+    static QString staticClassName() { return QStringLiteral("TESSkills"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('SKIL');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        if (subrecordName == NAME('SKIL'))
+        {
+            quint32 skillId = esm.readType<quint32>();
+            qint32 val = esm.readType<qint32>();
+            if (skillId >= static_cast<quint32>(skillValues.size()))
+                skillValues.resize(skillId + 1);
+            skillValues[skillId] = val;
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        for (int i = 0; i < skillValues.size(); ++i)
+        {
+            if (skillValues[i] == 0) continue;
+            esm.startSubRecord(NAME('SKIL'));
+            esm.writeType<quint32>(static_cast<quint32>(i));
+            esm.writeType<qint32>(skillValues[i]);
+            esm.endSubRecord();
+        }
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        std::vector<std::unique_ptr<EditorProperty>> out;
+        QStringList skillNames = {
+            "Block", "Armorer", "Medium Armor", "Heavy Armor",
+            "Blunt", "Long Blade", "Axe", "Spear",
+            "Athletics", "Enchant", "Destruction", "Alteration",
+            "Illusion", "Conjuration", "Mysticism", "Restoration",
+            "Alchemy", "Unarmored", "Security", "Sneak",
+            "Acrobatics", "Light Armor", "Short Blade", "Marksman",
+            "Mercantile", "Speechcraft", "Hand-to-Hand"
+        };
+        for (int i = 0; i < skillValues.size() && i < skillNames.size(); ++i)
+        {
+            out.push_back(std::make_unique<IntEditorProperty>(
+                skillNames[i], &skillValues[i]));
+        }
+        return out;
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESSkills_Component>();
+        c->skillValues = skillValues;
+        return c;
+    }
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        skillValues = static_cast<const TESSkills_Component*>(other)->skillValues;
+    }
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        return skillValues == static_cast<const TESSkills_Component*>(other)->skillValues;
+    }
+    void mergeWith(const Component* other) override { copyFrom(other); }
+};
+
+// ---------------------------------------------------------------------------
+// TESAttributes_Component — handles game-version-specific attribute data.
+// Morrowind: multiple BYDT subrecords (one per attribute, ID+int32).
+// Skyrim:    ATTR subrecord with 8 packed uint16 values.
+// Fallout 4: SPECIAL (7 attributes) via ATTR.
+// Starfield: ATTR subrecord.
+// ---------------------------------------------------------------------------
+class TESAttributes_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    QVector<qint32> attributes;
+    QVector<RawSubRecord> rawSub;
+
+    QString name() const override { return QStringLiteral("Attributes"); }
+    QString className() const override { return QStringLiteral("TESAttributes"); }
+    static QString staticClassName() { return QStringLiteral("TESAttributes"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('ATTR')
+            || subrecordName == NAME('BYDT');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        if (subrecordName == NAME('ATTR'))
+        {
+            qint64 count = esm.subLeft() / 2;
+            attributes.clear();
+            attributes.reserve(count);
+            for (qint64 i = 0; i < count; ++i)
+                attributes.append(esm.readType<qint16>());
+        }
+        else if (subrecordName == NAME('BYDT'))
+        {
+            quint8 attrId = esm.readType<quint8>();
+            qint32 val = esm.readType<qint32>();
+            if (attrId >= static_cast<quint32>(attributes.size()))
+                attributes.resize(attrId + 1);
+            attributes[attrId] = val;
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        if (attributes.isEmpty()) return;
+        esm.startSubRecord(NAME('ATTR'));
+        for (qint32 a : attributes)
+            esm.writeType<qint16>(static_cast<qint16>(a));
+        esm.endSubRecord();
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        std::vector<std::unique_ptr<EditorProperty>> out;
+        QStringList attrNames = {
+            "Strength", "Intelligence", "Willpower", "Agility",
+            "Speed", "Endurance", "Personality", "Luck"
+        };
+        for (int i = 0; i < attributes.size() && i < attrNames.size(); ++i)
+        {
+            out.push_back(std::make_unique<IntEditorProperty>(
+                attrNames[i], &attributes[i]));
+        }
+        return out;
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESAttributes_Component>();
+        c->attributes = attributes;
+        return c;
+    }
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        attributes = static_cast<const TESAttributes_Component*>(other)->attributes;
+    }
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        return attributes == static_cast<const TESAttributes_Component*>(other)->attributes;
+    }
+    void mergeWith(const Component* other) override { copyFrom(other); }
+};
+
 } // namespace tescomponents
 
 #endif // TIER3_COMPONENTS_HPP
