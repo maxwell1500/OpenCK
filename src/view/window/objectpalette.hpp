@@ -59,6 +59,7 @@ private:
     void setupUI();
     void renderPlacement();
     void syncPlacementsToCell();
+    void syncPlacementsToRefrCollection();
 
     // Data model
     Data* mData;

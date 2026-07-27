@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "Armorrecord.hpp"
+#include "fieldvalidators.hpp"
 #include "logger.hpp"
 
 #include <QVBoxLayout>
@@ -67,21 +68,19 @@ void ArmorEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Stats</b>"));
 
     mValueSpin = new QSpinBox();
-    mValueSpin->setRange(-999999, 999999);
-    mValueSpin->setSingleStep(10);
+    setValueValidator(mValueSpin);
     infoLayout->addRow("Value:", mValueSpin);
 
     mWeightSpin = new QSpinBox();
-    mWeightSpin->setRange(0, 9999);
-    mWeightSpin->setSingleStep(10);
+    setIntRangeValidator(mWeightSpin, 0, 9999, 10);
     infoLayout->addRow("Weight:", mWeightSpin);
 
     mArmorSpin = new QSpinBox();
-    mArmorSpin->setRange(0, 9999);
+    setArmorRatingValidator(mArmorSpin);
     infoLayout->addRow("Armor Rating:", mArmorSpin);
 
     mHealthSpin = new QSpinBox();
-    mHealthSpin->setRange(0, 9999);
+    setHealthValidator(mHealthSpin);
     infoLayout->addRow("Health:", mHealthSpin);
 
     mainLayout->addWidget(infoGroup);

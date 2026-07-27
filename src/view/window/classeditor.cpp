@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "Classrecord.hpp"
+#include "fieldvalidators.hpp"
 #include "logger.hpp"
 
 #include <QVBoxLayout>
@@ -51,7 +52,7 @@ void ClassEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Details</b>"));
 
     mFactionSpin = new QSpinBox();
-    mFactionSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mFactionSpin);
     infoLayout->addRow("Faction:", mFactionSpin);
 
     mIconPathEdit = new QLineEdit();

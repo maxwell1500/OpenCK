@@ -5,6 +5,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "CellRecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -54,19 +55,19 @@ void CellEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Properties</b>"));
 
     mCellXSpin = new QSpinBox();
-    mCellXSpin->setRange(-99999, 99999);
+    setIntRangeValidator(mCellXSpin, -99999, 99999, 1);
     infoLayout->addRow("Cell X:", mCellXSpin);
 
     mCellYSpin = new QSpinBox();
-    mCellYSpin->setRange(-99999, 99999);
+    setIntRangeValidator(mCellYSpin, -99999, 99999, 1);
     infoLayout->addRow("Cell Y:", mCellYSpin);
 
     mOwnerSpin = new QSpinBox();
-    mOwnerSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mOwnerSpin);
     infoLayout->addRow("Owner:", mOwnerSpin);
 
     mLockLevelSpin = new QSpinBox();
-    mLockLevelSpin->setRange(0, 100);
+    setLockLevelValidator(mLockLevelSpin);
     infoLayout->addRow("Lock Level:", mLockLevelSpin);
 
     mainLayout->addWidget(infoGroup);

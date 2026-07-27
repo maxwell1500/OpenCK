@@ -515,6 +515,8 @@ set(VIEW_SOURCES
     src/view/window/classdatawidget.cpp
     src/view/window/dialdatawidget.cpp
     src/view/window/infodatawidget.cpp
+    src/view/window/celldatawidget.cpp
+    src/view/window/questdatawidget.cpp
     src/view/window/searchdialog.cpp
     src/view/world/enumdelegate.cpp
     src/view/world/genericdelegate.cpp
@@ -553,6 +555,7 @@ set(VIEW_SOURCES
     src/view/window/exporttemplatesdialog.cpp
     src/view/window/landscapeeditor.cpp
     src/view/window/objectpalette.cpp
+    src/view/window/brushtool.cpp
     src/view/window/papyruscompiler.cpp
     src/view/window/dialeditor.cpp
     src/view/window/infoeditor.cpp
@@ -608,6 +611,8 @@ set(VIEW_HEADERS
     src/view/window/classdatawidget.hpp
     src/view/window/dialdatawidget.hpp
     src/view/window/infodatawidget.hpp
+    src/view/window/celldatawidget.hpp
+    src/view/window/questdatawidget.hpp
     src/view/window/searchdialog.hpp
     src/view/world/delegatefactory.hpp
     src/view/world/enumdelegate.hpp
@@ -656,6 +661,7 @@ set(VIEW_HEADERS
     src/view/window/exporttemplatesdialog.hpp
     src/view/window/landscapeeditor.hpp
     src/view/window/objectpalette.hpp
+    src/view/window/brushtool.hpp
     src/view/window/papyruscompiler.hpp
     src/view/window/dialeditor.hpp
     src/view/window/infoeditor.hpp

@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "WorldspaceRecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -55,15 +56,15 @@ void WorldspaceEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Properties</b>"));
 
     mWaterTypeSpin = new QSpinBox();
-    mWaterTypeSpin->setRange(0, 999999);
+    setIntNonNegativeValidator(mWaterTypeSpin);
     infoLayout->addRow("Water Type:", mWaterTypeSpin);
 
     mTemplSpin = new QSpinBox();
-    mTemplSpin->setRange(0, 999999);
+    setIntNonNegativeValidator(mTemplSpin);
     infoLayout->addRow("Template:", mTemplSpin);
 
     mTerrainSpin = new QSpinBox();
-    mTerrainSpin->setRange(0, 999999);
+    setIntNonNegativeValidator(mTerrainSpin);
     infoLayout->addRow("Terrain:", mTerrainSpin);
 
     mMapImageEdit = new QLineEdit();
@@ -76,7 +77,7 @@ void WorldspaceEditor::setupUI()
     infoLayout->addRow("Billboard Texture:", mBillboardTextureEdit);
 
     mMusicSpin = new QSpinBox();
-    mMusicSpin->setRange(0, 999999);
+    setIntNonNegativeValidator(mMusicSpin);
     infoLayout->addRow("Music:", mMusicSpin);
 
     mainLayout->addWidget(infoGroup);

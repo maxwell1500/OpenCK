@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "../../../libs/files/esm/bookrecord.hpp"
+#include "fieldvalidators.hpp"
 #include "logger.hpp"
 
 #include <QVBoxLayout>
@@ -47,7 +48,7 @@ void BookEditor::setupUI()
     infoLayout->addRow("Model Path:", mModelPathEdit);
 
     mPageCountSpin = new QSpinBox();
-    mPageCountSpin->setRange(0, 99999);
+    setIntNonNegativeValidator(mPageCountSpin);
     infoLayout->addRow("Page Count:", mPageCountSpin);
 
     mPagesEdit = new QPlainTextEdit();

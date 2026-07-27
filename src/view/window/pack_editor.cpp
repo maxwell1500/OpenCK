@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "packagerecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -41,20 +42,20 @@ void PackEditor::setupUI()
     infoLayout->addRow("Editor ID:", mEditorIdEdit);
 
     mPackageTypeSpin = new QSpinBox();
-    mPackageTypeSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mPackageTypeSpin);
     infoLayout->addRow("Package Type:", mPackageTypeSpin);
 
     mTargetTypeSpin = new QSpinBox();
-    mTargetTypeSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mTargetTypeSpin);
     infoLayout->addRow("Target Type:", mTargetTypeSpin);
 
     mTargetIdsSpin = new QSpinBox();
-    mTargetIdsSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mTargetIdsSpin);
     mTargetIdsSpin->setReadOnly(true);
     infoLayout->addRow("Target IDs (read-only):", mTargetIdsSpin);
 
     mParametersSpin = new QSpinBox();
-    mParametersSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mParametersSpin);
     mParametersSpin->setReadOnly(true);
     infoLayout->addRow("Parameters (read-only):", mParametersSpin);
 

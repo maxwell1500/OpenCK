@@ -5,6 +5,7 @@
 #include "../../../libs/files/esm/alchrecord.hpp"
 #include "../../../libs/files/esm/ingrrecord.hpp"
 #include "../../../libs/files/esm/magicrecord.hpp"
+#include "fieldvalidators.hpp"
 #include "logger.hpp"
 
 #include <QVBoxLayout>
@@ -105,17 +106,15 @@ void AlchEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Stats</b>"));
 
     mEnchantmentSpin = new QSpinBox();
-    mEnchantmentSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mEnchantmentSpin);
     infoLayout->addRow("Enchantment:", mEnchantmentSpin);
 
     mWeightSpin = new QDoubleSpinBox();
-    mWeightSpin->setRange(0.0, 9999.0);
-    mWeightSpin->setSingleStep(0.1);
+    setWeightValidator(mWeightSpin);
     infoLayout->addRow("Weight:", mWeightSpin);
 
     mValueSpin = new QSpinBox();
-    mValueSpin->setRange(-999999, 999999);
-    mValueSpin->setSingleStep(10);
+    setValueValidator(mValueSpin);
     infoLayout->addRow("Value:", mValueSpin);
 
     generalLayout->addWidget(infoGroup);

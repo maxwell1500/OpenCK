@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "Contrecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -51,21 +52,19 @@ void ContEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Stats</b>"));
 
     mContentsSpin = new QSpinBox();
-    mContentsSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mContentsSpin);
     infoLayout->addRow("Contents:", mContentsSpin);
 
     mInventoryControlSpin = new QSpinBox();
-    mInventoryControlSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mInventoryControlSpin);
     infoLayout->addRow("Inventory Control:", mInventoryControlSpin);
 
     mWeightSpin = new QDoubleSpinBox();
-    mWeightSpin->setRange(0, 9999);
-    mWeightSpin->setSingleStep(0.1);
+    setWeightValidator(mWeightSpin);
     infoLayout->addRow("Weight:", mWeightSpin);
 
     mValueSpin = new QSpinBox();
-    mValueSpin->setRange(-999999, 999999);
-    mValueSpin->setSingleStep(10);
+    setValueValidator(mValueSpin);
     infoLayout->addRow("Value:", mValueSpin);
 
     mainLayout->addWidget(infoGroup);

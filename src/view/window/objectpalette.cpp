@@ -23,8 +23,10 @@
 #include <cmath>
 
 #include "../../libs/files/esm/cellrecord.hpp"
+#include "../../libs/files/esm/refrecord.hpp"
 #include "../../model/world/data.hpp"
 #include "../../model/world/idcollection.hpp"
+#include "../../model/world/record.hpp"
 #include "../../libs/files/esm/weaprecord.hpp"
 #include "../../libs/files/esm/armorrecord.hpp"
 #include "../../libs/files/esm/spellrecord.hpp"
@@ -340,8 +342,8 @@ void ObjectPalette::onSavePlacementClicked()
         .arg(placement.baseObjectName)
         .arg(placement.baseObjectFormId, 8, 16, QChar('0')));
 
-    // Sync to CellRecord
     syncPlacementsToCell();
+    syncPlacementsToRefrCollection();
 }
 
 void ObjectPalette::onLoadPlacementClicked()
@@ -379,8 +381,8 @@ void ObjectPalette::onLoadPlacementClicked()
     objectCountLabel->setText(QString("Objects: %1").arg(placements.size()));
     statusLabel->setText(QString("Loaded %1 placements").arg(count));
 
-    // Sync to CellRecord
     syncPlacementsToCell();
+    syncPlacementsToRefrCollection();
 }
 
 void ObjectPalette::onTogglePlacementMode()
@@ -462,4 +464,31 @@ void ObjectPalette::syncPlacementsToCell()
 float ObjectPalette::snapToGrid(float value, int gridSize) const
 {
     return std::round(value / gridSize) * gridSize;
+}
+
+void ObjectPalette::syncPlacementsToRefrCollection()
+{
+    if (!mData) {
+        return;
+    }
+
+    for (const auto& p : placements) {
+        RefrRecord ref;
+        ref.blank();
+        ref.initComponents();
+        ref.formId = nextRefFormId++;
+        ref.baseId = p.baseObjectFormId;
+        ref.posX = p.x;
+        ref.posY = p.y;
+        ref.posZ = p.z;
+        ref.rotX = p.rotX;
+        ref.rotY = p.rotY;
+        ref.rotZ = p.rotZ;
+        ref.scale = p.scale;
+        ref.initiallyDisabled = !p.active;
+        ref.editorId = QString("REFR_%1").arg(ref.formId, 8, 16, QChar('0')).toUpper();
+        mData->addRef(ref);
+    }
+
+    LOG_INFO(QString("Synced %1 placements to RefrCollection").arg(placements.size()));
 }

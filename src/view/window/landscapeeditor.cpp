@@ -27,8 +27,11 @@
 #include "../../libs/files/esm/cellrecord.hpp"
 #include "../../libs/files/esm/landrecord.hpp"
 #include "../../model/world/data.hpp"
+#include "../../model/world/idcollection.hpp"
+#include "../../model/world/record.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../model/tools/landscapeeditcommand.hpp"
+#include "brushtool.hpp"
 #include "logger.hpp"
 
 #include <QFile>
@@ -74,7 +77,10 @@ LandscapeEditor::LandscapeEditor(QWidget* parent) :
     depthAttenuationSpinBox(nullptr),
     reflectionAmountSpinBox(nullptr),
     mData(nullptr),
-    currentLand(nullptr)
+    currentLand(nullptr),
+    mBrushTool(nullptr),
+    mHeightSlider(nullptr),
+    mApplyButton(nullptr)
 {
     setupUI();
 }
@@ -94,6 +100,8 @@ LandscapeEditor::~LandscapeEditor()
 
 void LandscapeEditor::setupUI()
 {
+    mBrushTool = new BrushTool(this);
+
     auto* mainLayout = new QVBoxLayout(this);
 
     auto* controlLayout = new QHBoxLayout();
@@ -127,10 +135,19 @@ void LandscapeEditor::setupUI()
     heightLimitSpin->setValue(100);
     controlLayout->addWidget(heightLimitSpin);
 
+    controlLayout->addWidget(new QLabel("Height Clamp:"));
+    mHeightSlider = new QSlider(Qt::Horizontal);
+    mHeightSlider->setRange(0, 100);
+    mHeightSlider->setValue(100);
+    mHeightSlider->setTickPosition(QSlider::TicksBelow);
+    controlLayout->addWidget(mHeightSlider);
+
     saveButton = new QPushButton("Save");
     loadButton = new QPushButton("Load");
+    mApplyButton = new QPushButton("Apply");
     controlLayout->addWidget(saveButton);
     controlLayout->addWidget(loadButton);
+    controlLayout->addWidget(mApplyButton);
 
     controlLayout->addSpacing(20);
     controlLayout->addWidget(new QLabel("Copy/Paste:"));
@@ -175,6 +192,25 @@ void LandscapeEditor::setupUI()
     connect(loadButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadClicked);
     connect(copyHeightmapButton, &QPushButton::clicked, this, &LandscapeEditor::onCopyHeightmapClicked);
     connect(pasteHeightmapButton, &QPushButton::clicked, this, &LandscapeEditor::onPasteHeightmapClicked);
+    connect(mApplyButton, &QPushButton::clicked, this, &LandscapeEditor::applyHeightmap);
+
+    connect(mHeightSlider, &QSlider::valueChanged, this, [this](int value) {
+        float maxHeight = value / 100.0f * 2048.0f;
+        if (!heightmap.isEmpty()) {
+            for (int i = 0; i < heightmap.size(); ++i) {
+                if (heightmap[i] > maxHeight) heightmap[i] = maxHeight;
+                if (heightmap[i] < -maxHeight) heightmap[i] = -maxHeight;
+            }
+            glWidget->update();
+            statusLabel->setText(QString("Clamped heights to ±%1").arg(maxHeight));
+        }
+    });
+
+    connect(mBrushTool, &BrushTool::strokeApplied, this, [this]() {
+        if (glWidget) {
+            glWidget->update();
+        }
+    });
 }
 
 void LandscapeEditor::setupTextureLayersTab(QWidget* tab)
@@ -416,6 +452,49 @@ void LandscapeEditor::saveToLand(LandRecord* land)
     land->hasHeightData = true;
 }
 
+void LandscapeEditor::saveHeightmap(LandRecord& rec)
+{
+    saveToLand(&rec);
+    if (mData) {
+        const auto& landCollection = mData->getLandCollection();
+        for (int i = 0; i < landCollection.size(); ++i) {
+            Record<LandRecord>& record = const_cast<IdCollection<LandRecord>&>(landCollection).getRecord(i);
+            if (&record.get() == &rec) {
+                record.setModified(rec);
+                break;
+            }
+        }
+        LOG_INFO(QString("Saved heightmap to LandRecord 0x%1").arg(rec.formId, 8, 16, QChar('0')));
+    }
+}
+
+void LandscapeEditor::applyHeightmap()
+{
+    if (!currentLand) {
+        if (!currentCell) {
+            statusLabel->setText("No cell loaded");
+            return;
+        }
+        if (!mData) {
+            statusLabel->setText("No data model set");
+            return;
+        }
+        LandRecord newLand;
+        newLand.blank();
+        newLand.editorId = QString("LAND_%1_%2").arg(currentCell->cellX).arg(currentCell->cellY);
+        newLand.cellX = static_cast<qint32>(currentCell->cellX);
+        newLand.cellY = static_cast<qint32>(currentCell->cellY);
+        saveHeightmap(newLand);
+        mData->addLand(newLand);
+        currentLand = &mData->getLandCollection().getRecord(newLand.editorId).get();
+        statusLabel->setText(QString("Applied new LandRecord %1").arg(newLand.editorId));
+        return;
+    }
+    saveHeightmap(*currentLand);
+    statusLabel->setText(QString("Applied heightmap to LandRecord 0x%1")
+        .arg(currentLand->formId, 8, 16, QChar('0')));
+}
+
 void LandscapeEditor::loadHeightmap()
 {
     if (!currentCell) {
@@ -632,6 +711,10 @@ void LandscapeEditor::mousePressEvent(QMouseEvent* event)
             int x = event->pos().x() / terrainSize;
             int y = event->pos().y() / terrainSize;
             applyBrush(x, y);
+            if (mBrushTool) {
+                mBrushTool->beginStroke();
+                mBrushTool->notifyStrokeApplied();
+            }
             glWidget->update();
         }
         dragging = true;
@@ -651,6 +734,9 @@ void LandscapeEditor::mouseMoveEvent(QMouseEvent* event)
             int x = event->pos().x() / terrainSize;
             int y = event->pos().y() / terrainSize;
             applyBrush(x, y);
+            if (mBrushTool) {
+                mBrushTool->notifyStrokeApplied();
+            }
             glWidget->update();
         } else {
             QPoint delta = event->pos() - lastMousePos;

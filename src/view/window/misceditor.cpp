@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "../../../libs/files/esm/miscrecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -48,18 +49,15 @@ void MiscEditor::setupUI()
     infoLayout->addRow("Model Path:", mModelPathEdit);
 
     mEnchantmentSpin = new QSpinBox();
-    mEnchantmentSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mEnchantmentSpin);
     infoLayout->addRow("Enchantment:", mEnchantmentSpin);
 
     mWeightSpin = new QDoubleSpinBox();
-    mWeightSpin->setRange(0, 9999);
-    mWeightSpin->setSingleStep(0.1);
-    mWeightSpin->setDecimals(2);
+    setWeightValidator(mWeightSpin);
     infoLayout->addRow("Weight:", mWeightSpin);
 
     mValueSpin = new QSpinBox();
-    mValueSpin->setRange(0, 999999);
-    mValueSpin->setSingleStep(10);
+    setValueValidator(mValueSpin);
     infoLayout->addRow("Value:", mValueSpin);
 
     mainLayout->addWidget(infoGroup);

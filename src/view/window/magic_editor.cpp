@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "Magicrecord.hpp"
 #include "nifviewportwidget.hpp"
+#include "fieldvalidators.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 
 #include <QVBoxLayout>
@@ -54,19 +55,19 @@ void MagicEditor::setupUI()
     infoLayout->addRow("Editor ID:", mEditorIdEdit);
 
     mSchoolsSpin = new QSpinBox();
-    mSchoolsSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mSchoolsSpin);
     infoLayout->addRow("Schools:", mSchoolsSpin);
 
     mDamageTypeSpin = new QSpinBox();
-    mDamageTypeSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mDamageTypeSpin);
     infoLayout->addRow("Damage Type:", mDamageTypeSpin);
 
     mCastingSoundSpin = new QSpinBox();
-    mCastingSoundSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mCastingSoundSpin);
     infoLayout->addRow("Casting Sound:", mCastingSoundSpin);
 
     mEffectsSpin = new QSpinBox();
-    mEffectsSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mEffectsSpin);
     infoLayout->addRow("Effects:", mEffectsSpin);
 
     mainLayout->addWidget(infoGroup);

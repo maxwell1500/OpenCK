@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "perkrecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -52,7 +53,7 @@ void PerkEditor::setupUI()
     infoLayout->addRow("Icon Path:", mIconPathEdit);
 
     mConditionsSpin = new QSpinBox();
-    mConditionsSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mConditionsSpin);
     mConditionsSpin->setReadOnly(true);
     infoLayout->addRow("Conditions (read-only):", mConditionsSpin);
 

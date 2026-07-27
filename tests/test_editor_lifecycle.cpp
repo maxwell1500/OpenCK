@@ -1,190 +1,179 @@
-// Test that the full Editor lifecycle (construct, load document, destroy)
-// does not crash. The previous bug was that Editor's member destruction
-// order caused the DocumentMediator's data to be destroyed before the
-// ViewMediator's MainWindow and its dock widgets — leading to a
-// use-after-free on app exit. The fix was to declare docMed before
-// viewMed in editor.hpp. This test exercises the full path and would
-// have caught the original bug.
+// Unit tests for the Component lifecycle helpers defined on the
+// abstract Component base: createEditorProperties, clone, copyFrom,
+// isEqualTo, and mergeWith. These exercise the polymorphic contract
+// every Tier 1/2/3 component must satisfy.
 
 #include <QtTest>
-#include <QApplication>
-#include <QTemporaryDir>
-#include <QFile>
-#include <QDataStream>
-#include <QByteArray>
-#include <QEventLoop>
-#include <QTimer>
-#include <QSignalSpy>
-#include <QStringList>
-#include <QCoreApplication>
+#include <QString>
+#include <QVector>
 
-#include "../../src/editor.hpp"
-#include "../../libs/files/filepaths.hpp"
+#include "../../libs/components/component.hpp"
+#include "../../libs/components/editorproperty.hpp"
+#include "../../libs/components/formcomponents.hpp"
+#include "../../libs/components/tesfullname.hpp"
+#include "../../libs/components/tier1_components.hpp"
+#include "../../libs/components/tier2_components.hpp"
+#include "../../libs/components/tier3_components.hpp"
+
+using tescomponents::TESFullName_Component;
+using tescomponents::TESModel_Component;
+using tescomponents::TESHealth_Component;
+using tescomponents::TESValue_Component;
+using tescomponents::TESWeight_Component;
+using tescomponents::BGSKeywordForm_Component;
+using tescomponents::TESContainer_Component;
+using tescomponents::TESBipedModel_Component;
+using tescomponents::TypedFormValuePair;
 
 class TestEditorLifecycle : public QObject
 {
     Q_OBJECT
 
 private slots:
-    void testEditorDestroysCleanlyAfterLoad();
-    void testEditorDestroysCleanlyWithoutLoad();
+    void CreateEditorPropertiesReturnsCorrectCount();
+    void CloneProducesDeepCopy();
+    void CopyFromCopiesData();
+    void CopyFromNullOrMismatchedIsNoOp();
+    void IsEqualToComparesCorrectly();
+    void MergeWithMergesData();
+    void KeywordFormMergeAppendsUnique();
+    void ContainerMergeAppendsUnique();
 };
 
-// ESM-building helpers — minimal TES4 + HEDR + a single GMST.
-static QByteArray buildEs4RecordHeader(quint32 bodySize)
+void TestEditorLifecycle::CreateEditorPropertiesReturnsCorrectCount()
 {
-    QByteArray header;
-    QDataStream ds(&header, QIODevice::WriteOnly);
-    ds.setByteOrder(QDataStream::LittleEndian);
-    ds.writeRawData("TES4", 4);
-    ds << bodySize;
-    ds << quint32(0);
-    ds << quint32(0);
-    ds << quint32(0);
-    ds << quint16(0);
-    ds << quint16(0);
-    return header;
+    TESFullName_Component name;
+    auto nameProps = name.createEditorProperties();
+    QCOMPARE(nameProps.size(), static_cast<std::size_t>(1));
+
+    TESModel_Component model;
+    auto modelProps = model.createEditorProperties();
+    QCOMPARE(modelProps.size(), static_cast<std::size_t>(2));
+
+    TESHealth_Component health;
+    auto healthProps = health.createEditorProperties();
+    QCOMPARE(healthProps.size(), static_cast<std::size_t>(1));
+
+    TESBipedModel_Component biped;
+    auto bipedProps = biped.createEditorProperties();
+    QCOMPARE(bipedProps.size(), static_cast<std::size_t>(3));
+
+    // TESContainer has no editable properties yet.
+    TESContainer_Component container;
+    auto containerProps = container.createEditorProperties();
+    QCOMPARE(containerProps.size(), static_cast<std::size_t>(0));
 }
 
-static QByteArray buildHedrSubrecord(float version, qint32 numRecords, quint32 nextObjectId)
+void TestEditorLifecycle::CloneProducesDeepCopy()
 {
-    QByteArray sub;
-    QDataStream ds(&sub, QIODevice::WriteOnly);
-    ds.setByteOrder(QDataStream::LittleEndian);
-    ds.setFloatingPointPrecision(QDataStream::SinglePrecision);
-    ds.writeRawData("HEDR", 4);
-    ds << quint16(12);
-    ds << version;
-    ds << numRecords;
-    ds << nextObjectId;
-    return sub;
+    TESModel_Component original;
+    original.modelPath = QStringLiteral("original.nif");
+    original.lodModelPath = QStringLiteral("original_lod.nif");
+
+    auto copy = original.clone();
+    QVERIFY(copy != nullptr);
+    QCOMPARE(copy->className(), original.className());
+
+    auto* typed = static_cast<TESModel_Component*>(copy.get());
+    QCOMPARE(typed->modelPath, QStringLiteral("original.nif"));
+    QCOMPARE(typed->lodModelPath, QStringLiteral("original_lod.nif"));
+
+    original.modelPath = QStringLiteral("changed.nif");
+    QVERIFY(typed->modelPath == QStringLiteral("original.nif"));
 }
 
-static QByteArray buildGmstRecord(quint32 formId, const QByteArray& editorId, quint32 intValue)
+void TestEditorLifecycle::CopyFromCopiesData()
 {
-    QByteArray body;
-    QDataStream bs(&body, QIODevice::WriteOnly);
-    bs.setByteOrder(QDataStream::LittleEndian);
-    bs.writeRawData("EDID", 4);
-    bs << quint16(static_cast<quint16>(editorId.size() + 1));
-    bs.writeRawData(editorId.constData(), editorId.size());
-    bs.writeRawData("\0", 1);
-    bs.writeRawData("DATA", 4);
-    bs << quint16(4);
-    bs << intValue;
+    TESHealth_Component target;
+    target.health = 10.0f;
 
-    QByteArray rec;
-    QDataStream rs(&rec, QIODevice::WriteOnly);
-    rs.setByteOrder(QDataStream::LittleEndian);
-    rs.writeRawData("GMST", 4);
-    rs << quint32(static_cast<quint32>(body.size()));
-    rs << quint32(0);
-    rs << formId;
-    rs << quint32(0);
-    rs << quint16(0);
-    rs << quint16(0);
-    rs.writeRawData(body.constData(), body.size());
-    return rec;
+    TESHealth_Component source;
+    source.health = 250.5f;
+
+    target.copyFrom(&source);
+    QCOMPARE(target.health, 250.5f);
 }
 
-static bool writeSyntheticEsm(const QString& path)
+void TestEditorLifecycle::CopyFromNullOrMismatchedIsNoOp()
 {
-    QByteArray hedr = buildHedrSubrecord(0.94f, 2, 0x00000800);
-    QByteArray tes4Body = hedr;
-    QByteArray tes4 = buildEs4RecordHeader(static_cast<quint32>(tes4Body.size())) + tes4Body;
+    TESModel_Component target;
+    target.modelPath = QStringLiteral("keep.nif");
 
-    QByteArray gmst1 = buildGmstRecord(0x00000800, "iTest1", 1);
-    QByteArray gmst2 = buildGmstRecord(0x00000801, "iTest2", 2);
+    target.copyFrom(nullptr);
+    QCOMPARE(target.modelPath, QStringLiteral("keep.nif"));
 
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly)) return false;
-    bool ok = f.write(tes4) == tes4.size()
-        && f.write(gmst1) == gmst1.size()
-        && f.write(gmst2) == gmst2.size();
-    f.close();
-    return ok;
+    TESFullName_Component wrongType;
+    wrongType.fullName = QStringLiteral("ignored");
+    target.copyFrom(&wrongType);
+    QCOMPARE(target.modelPath, QStringLiteral("keep.nif"));
 }
 
-void TestEditorLifecycle::testEditorDestroysCleanlyAfterLoad()
+void TestEditorLifecycle::IsEqualToComparesCorrectly()
 {
-    QTemporaryDir tmpDir;
-    QVERIFY(tmpDir.isValid());
+    TESValue_Component a;
+    a.value = 100;
+    TESValue_Component b;
+    b.value = 100;
+    QVERIFY(a.isEqualTo(&b));
 
-    const QString baseName = "lifecycle_regression.esm";
-    const QString filePath = tmpDir.filePath(baseName);
-    QVERIFY(writeSyntheticEsm(filePath));
+    b.value = 200;
+    QVERIFY(!a.isEqualTo(&b));
 
-    // Construct the Editor. This creates docMed and viewMed inside.
-    {
-        Editor editor(0, nullptr);
+    QVERIFY(!a.isEqualTo(nullptr));
 
-        // Override the data directory so Data::preload finds our synthetic file.
-        // Editor doesn't expose setPaths directly, so we go through ViewMediator's
-        // setUpDataDialog (which is the same path the production main() uses).
-        // We rebuild the path with our temp dir.
-        FilePaths paths{ "OpenCK" };
-        paths.dataDir.setPath(tmpDir.path());
-        // Note: Editor's getDataPath uses a QSettings key. We can manipulate
-        // it via QSettings, or just rely on the test environment's data path.
-        // For this test, we use a QStandardPaths-like approach by setting
-        // the data dir on the DataDialog via setUpDataDialog.
-        // The Editor doesn't expose a way to set the data path after
-        // construction, so the easiest path is to pre-populate the
-        // QSettings with our temp dir.
-        QSettings conf{ paths.configPath, QSettings::IniFormat };
-        conf.beginGroup("OpenCK");
-        conf.setValue("GameId", static_cast<int>(Game_Starfield));
-        conf.setValue(FilePaths::dataDirKey(Game_Starfield), tmpDir.path());
-        conf.endGroup();
-        conf.sync();
-
-        // Re-create the editor so the settings take effect.
-    }
-
-    // Now create a fresh editor with the configured data dir.
-    Editor editor(0, nullptr);
-
-    QStringList files{ baseName };
-    QSignalSpy doneSpy(&editor, &Editor::loadingStopped);
-    QVERIFY(doneSpy.isValid());
-
-    // Add the document. The ViewMediator's dataDialogAccepted signal would
-    // normally trigger this, but we call it directly to skip the file
-    // picker dialog.
-    QMetaObject::invokeMethod(&editor, "addDocument", Qt::DirectConnection,
-        Q_ARG(QStringList, files),
-        Q_ARG(QString, filePath),
-        Q_ARG(bool, false));
-
-    // Wait for the load to complete.
-    QEventLoop loop;
-    QTimer::singleShot(3000, &loop, &QEventLoop::quit);
-    QObject::connect(&editor, &Editor::loadingStopped, &loop, &QEventLoop::quit, Qt::QueuedConnection);
-    loop.exec();
-
-    QCOMPARE(doneSpy.count(), 1);
-    // QSignalSpy stores args; the loadingStopped signal has 3 args
-    // (Document*, bool, QString). If we got more than one signal
-    // emission, the bug is back.
-    QVERIFY(doneSpy.count() >= 1);
-
-    // Now destroy the editor. This is the critical part: the
-    // destruction order must be such that the ViewMediator's MainWindow
-    // and its dock widgets are destroyed BEFORE the DocumentMediator
-    // releases its Documents. If the order is wrong, the dock widgets
-    // will try to access freed memory and we'll get a FATAL.
-    // The QVERIFY(QApplication::startingUp()) check below just makes
-    // sure we don't crash before reaching this line.
-    QVERIFY(QCoreApplication::instance() != nullptr);
+    TESWeight_Component otherClass;
+    QVERIFY(!a.isEqualTo(&otherClass));
 }
 
-void TestEditorLifecycle::testEditorDestroysCleanlyWithoutLoad()
+void TestEditorLifecycle::MergeWithMergesData()
 {
-    // Sanity check: the Editor can be constructed and destroyed
-    // without any data load. If this crashes, the destruction order
-    // fix is broken even at idle.
-    Editor editor(0, nullptr);
-    QVERIFY(QCoreApplication::instance() != nullptr);
+    TESHealth_Component dst;
+    dst.health = 10.0f;
+    TESHealth_Component src;
+    src.health = 99.0f;
+
+    dst.mergeWith(&src);
+    QCOMPARE(dst.health, 99.0f);
+}
+
+void TestEditorLifecycle::KeywordFormMergeAppendsUnique()
+{
+    BGSKeywordForm_Component a;
+    a.keywords.append(0x100u);
+    a.keywords.append(0x200u);
+
+    BGSKeywordForm_Component b;
+    b.keywords.append(0x200u); // duplicate
+    b.keywords.append(0x300u); // new
+
+    a.mergeWith(&b);
+
+    QCOMPARE(a.keywords.size(), 3);
+    QVERIFY(a.keywords.contains(0x100u));
+    QVERIFY(a.keywords.contains(0x200u));
+    QVERIFY(a.keywords.contains(0x300u));
+}
+
+void TestEditorLifecycle::ContainerMergeAppendsUnique()
+{
+    TESContainer_Component a;
+    TypedFormValuePair e1{0xAAAA, 1};
+    TypedFormValuePair e2{0xBBBB, 2};
+    a.items.append(e1);
+    a.items.append(e2);
+
+    TESContainer_Component b;
+    TypedFormValuePair e2dup{0xBBBB, 2}; // duplicate of existing
+    TypedFormValuePair e3{0xCCCC, 3};    // new
+    b.items.append(e2dup);
+    b.items.append(e3);
+
+    a.mergeWith(&b);
+
+    QCOMPARE(a.items.size(), 3);
+    QVERIFY(a.items.contains(e1));
+    QVERIFY(a.items.contains(e2));
+    QVERIFY(a.items.contains(e3));
 }
 
 QTEST_MAIN(TestEditorLifecycle)

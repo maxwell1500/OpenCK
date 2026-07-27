@@ -4,6 +4,7 @@
 #include "../../model/tools/columnvalidator.hpp"
 #include "Enchrecord.hpp"
 #include "nifviewportwidget.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -59,29 +60,27 @@ void EnchEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Stats</b>"));
 
     mCostLimitSpin = new QSpinBox();
-    mCostLimitSpin->setRange(0, 99999);
-    infoLayout->addRow("Cost Limit:", mCostLimitSpin);
+    setCostValidator(mCostLimitSpin);
+    infoLayout->addRow("Cost limit:", mCostLimitSpin);
 
     mChargesSpin = new QSpinBox();
-    mChargesSpin->setRange(0, 9999);
+    setChargesValidator(mChargesSpin);
     infoLayout->addRow("Charges:", mChargesSpin);
 
     mEnchantmentDataSpin = new QSpinBox();
-    mEnchantmentDataSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mEnchantmentDataSpin);
     infoLayout->addRow("Enchantment Data:", mEnchantmentDataSpin);
 
     mChargeSpin = new QDoubleSpinBox();
-    mChargeSpin->setRange(0.0, 99999.0);
-    mChargeSpin->setDecimals(1);
+    setFloatPositiveValidator(mChargeSpin);
     infoLayout->addRow("Charge:", mChargeSpin);
 
     mDurationSpin = new QSpinBox();
-    mDurationSpin->setRange(0, 999999);
+    setDurationValidator(mDurationSpin);
     infoLayout->addRow("Duration:", mDurationSpin);
 
     mMagnitudeSpin = new QDoubleSpinBox();
-    mMagnitudeSpin->setRange(0.0, 9999.0);
-    mMagnitudeSpin->setDecimals(1);
+    setMagnitudeValidator(mMagnitudeSpin);
     infoLayout->addRow("Magnitude:", mMagnitudeSpin);
 
     tabs->addTab(infoGroup, "General");

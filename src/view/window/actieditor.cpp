@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "../../../libs/files/esm/actirecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -46,7 +47,7 @@ void ActiEditor::setupUI()
     infoLayout->addRow("Model Path:", mModelPathEdit);
 
     mEnchantmentSpin = new QSpinBox();
-    mEnchantmentSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mEnchantmentSpin);
     infoLayout->addRow("Enchantment:", mEnchantmentSpin);
 
     mainLayout->addWidget(infoGroup);

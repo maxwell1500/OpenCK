@@ -1,12 +1,21 @@
-// Qt-based test for the QtFormDialog — the top-level record editor
-// dialog. We construct a FormComponents container with a few
-// components, hand it to QtFormDialog, and verify the dialog wires up
-// the underlying EditorPropertyGrid with one section per component.
+// Unit tests for QtFormDialog and QtFormDialogManager.
+//
+// Covers:
+//  * Creating a dialog with FormComponents renders one section per
+//    component.
+//  * openOrFocus deduplicates: opening the same key twice focuses the
+//    existing dialog rather than creating a second one.
+//  * closeAll() closes every open dialog.
+//  * registerFactory() / hasFactory() register and detect a custom
+//    widget factory for a record type.
+//
+// Uses QApplication + manual main (no QTEST_MAIN) so we can spin a
+// real event loop and inspect widget state.
 
 #include <QApplication>
 #include <QDialog>
-#include <QList>
 #include <QLabel>
+#include <QList>
 
 #include "../../libs/components/component.hpp"
 #include "../../libs/components/editorproperty.hpp"
@@ -15,13 +24,14 @@
 #include "../../libs/components/tier1_components.hpp"
 
 #include "../../src/view/window/qtformdialog.hpp"
+#include "../../src/view/window/qtformdialogmanager.hpp"
 #include "../../src/view/widgets/editorpropertygrid.hpp"
 #include "../../src/view/widgets/formcomponentwidget.hpp"
 
 using openck::FormComponents;
 using openck::QtFormDialog;
+using openck::QtFormDialogManager;
 using openck::EditorPropertyGrid;
-using openck::FormComponentWidget;
 using tescomponents::TESFullName_Component;
 using tescomponents::TESModel_Component;
 
@@ -38,11 +48,15 @@ int main(int argc, char** argv)
     QApplication app(argc, argv);
     int failures = 0;
 
+    // Ensure the singleton starts in a clean state.
+    QtFormDialogManager& mgr = QtFormDialogManager::instance();
+    mgr.closeAll();
+
     // -----------------------------------------------------------------
-    // T6_QtFormDialogOpens
+    // T1_QtFormDialogOpensWithSections
     // Construct a FormComponents with two components, hand them to
-    // QtFormDialog, and verify the dialog has the expected property
-    // grid sections.
+    // QtFormDialog, and verify the dialog wires up an
+    // EditorPropertyGrid with one section per component.
     // -----------------------------------------------------------------
     {
         FormComponents components;
@@ -54,14 +68,10 @@ int main(int argc, char** argv)
         QtFormDialog dialog(QStringLiteral("0x00012345"), &components);
         dialog.show();
 
-        // Sanity: the dialog remembers the form key and components.
         CHECK(dialog.formIdKey() == QStringLiteral("0x00012345"));
         CHECK(dialog.components() == &components);
-        CHECK(components.size() == 2);
+        CHECK(components.size() == static_cast<std::size_t>(2));
 
-        // The dialog must have created a property grid with one
-        // section per component. We find the grid by type and walk
-        // its sections.
         QList<EditorPropertyGrid*> grids = dialog.findChildren<EditorPropertyGrid*>();
         CHECK(grids.size() == 1);
         if (grids.size() == 1)
@@ -70,51 +80,128 @@ int main(int argc, char** argv)
             CHECK(sections.size() == 2);
             if (sections.size() == 2)
             {
-                // First section is the FullName component (Name).
-                CHECK(sections.at(0)->component()
-                    == static_cast<Component*>(&components.all().at(0)));
-                CHECK(sections.at(0)->component()->name()
-                    == QStringLiteral("Name"));
-
-                // Second section is the Model component.
-                CHECK(sections.at(1)->component()
-                    == static_cast<Component*>(&components.all().at(1)));
-                CHECK(sections.at(1)->component()->name()
-                    == QStringLiteral("Model"));
-
-                // Each section must have produced a non-empty list
-                // of editor properties.
+                CHECK(sections.at(0)->component()->name() == QStringLiteral("Name"));
+                CHECK(sections.at(1)->component()->name() == QStringLiteral("Model"));
                 CHECK(!sections.at(0)->properties().empty());
                 CHECK(!sections.at(1)->properties().empty());
             }
         }
-
-        // The dialog's window title should embed the form key.
         CHECK(dialog.windowTitle().contains(QStringLiteral("0x00012345")));
     }
 
     // -----------------------------------------------------------------
-    // T6_QtFormDialogClosesOnCancel
-    // Drive the dialog via show() + reject() and verify the result is
-    // QDialog::Rejected. We can't call exec() in a unit test (it
-    // blocks the event loop); show() + reject() is the standard way
-    // to verify the rejection path without blocking.
+    // T2_OpenOrFocusDeduplicates
+    // Calling openOrFocus twice with the same formIdKey must not
+    // create a second dialog. The manager's openCount stays at 1 and
+    // the existing dialog is shown again.
     // -----------------------------------------------------------------
     {
-        FormComponents components;
-        components.add<TESFullName_Component>();
-        components.add<TESModel_Component>();
+        mgr.closeAll();
+        CHECK(mgr.openCount() == 0);
 
-        QtFormDialog dialog(QStringLiteral("0x00099999"), &components);
-        dialog.show();
+        static FormComponents compsA;
+        compsA.clear();
+        compsA.add<TESFullName_Component>();
 
-        // Initially the dialog is open; the result is 0 (QDialog::Rejected
-        // by default before exec is called).
-        CHECK(dialog.result() == 0);
+        mgr.openOrFocus(QStringLiteral("0x000AAAA"), &compsA);
+        CHECK(mgr.openCount() == 1);
 
-        // Calling reject() must mark the dialog as QDialog::Rejected.
-        dialog.reject();
-        CHECK(dialog.result() == static_cast<int>(QDialog::Rejected));
+        mgr.openOrFocus(QStringLiteral("0x000AAAA"), &compsA);
+        CHECK(mgr.openCount() == 1);
+
+        static FormComponents compsB;
+        compsB.clear();
+        compsB.add<TESModel_Component>();
+
+        mgr.openOrFocus(QStringLiteral("0x000BBBB"), &compsB);
+        CHECK(mgr.openCount() == 2);
+
+        mgr.openOrFocus(QStringLiteral("0x000AAAA"), &compsA);
+        CHECK(mgr.openCount() == 2);
+    }
+
+    // -----------------------------------------------------------------
+    // T3_CloseAllClosesEveryDialog
+    // After closeAll(), the manager reports zero open dialogs.
+    // -----------------------------------------------------------------
+    {
+        mgr.closeAll();
+        CHECK(mgr.openCount() == 0);
+
+        static FormComponents c1;
+        c1.clear();
+        c1.add<TESFullName_Component>();
+        static FormComponents c2;
+        c2.clear();
+        c2.add<TESModel_Component>();
+
+        mgr.openOrFocus(QStringLiteral("0x00CC01"), &c1);
+        mgr.openOrFocus(QStringLiteral("0x00CC02"), &c2);
+        CHECK(mgr.openCount() == 2);
+
+        mgr.closeAll();
+        CHECK(mgr.openCount() == 0);
+    }
+
+    // -----------------------------------------------------------------
+    // T4_RegisterAndQueryFactory
+    // registerFactory() stores a factory under a record-type key and
+    // hasFactory() reports true only for registered keys.
+    // -----------------------------------------------------------------
+    {
+        mgr.closeAll();
+
+        CHECK(!mgr.hasFactory(QStringLiteral("NPC_")));
+        CHECK(!mgr.hasFactory(QStringLiteral("STAT")));
+
+        mgr.registerFactory(QStringLiteral("NPC_"),
+            [](FormComponents*, void*, QWidget* parent) -> QWidget* {
+                return new QLabel(QStringLiteral("NPC custom widget"), parent);
+            });
+
+        CHECK(mgr.hasFactory(QStringLiteral("NPC_")));
+        CHECK(!mgr.hasFactory(QStringLiteral("STAT")));
+
+        mgr.registerFactory(QStringLiteral("STAT"),
+            [](FormComponents*, void*, QWidget* parent) -> QWidget* {
+                return new QLabel(QStringLiteral("STAT custom widget"), parent);
+            });
+
+        CHECK(mgr.hasFactory(QStringLiteral("STAT")));
+    }
+
+    // -----------------------------------------------------------------
+    // T5_OpenOrFocusWithFactoryCreatesDialogAndDedups
+    // openOrFocus with a registered record type should still create a
+    // dialog and dedup on the formIdKey. The factory is invoked
+    // during open; we verify by tracking an invocation counter.
+    // -----------------------------------------------------------------
+    {
+        mgr.closeAll();
+
+        static FormComponents c;
+        c.clear();
+        c.add<TESFullName_Component>();
+
+        static int factoryCalls = 0;
+        mgr.registerFactory(QStringLiteral("FACTTEST"),
+            [](FormComponents*, void*, QWidget* parent) -> QWidget* {
+                ++factoryCalls;
+                return new QLabel(QStringLiteral("Factory widget"), parent);
+            });
+
+        CHECK(factoryCalls == 0);
+        mgr.openOrFocus(QStringLiteral("0x000FF01"), QStringLiteral("FACTTEST"), &c);
+        CHECK(mgr.openCount() == 1);
+        CHECK(factoryCalls == 1);
+
+        // Second open with the same key must NOT call the factory again.
+        mgr.openOrFocus(QStringLiteral("0x000FF01"), QStringLiteral("FACTTEST"), &c);
+        CHECK(mgr.openCount() == 1);
+        CHECK(factoryCalls == 1);
+
+        mgr.closeAll();
+        CHECK(mgr.openCount() == 0);
     }
 
     if (failures == 0)

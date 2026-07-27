@@ -158,3 +158,53 @@ add_executable(test_headerparsing test_headerparsing.cpp)
 target_link_libraries(test_headerparsing PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_headerparsing PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_headerparsing)
+
+# FormComponents container tests
+add_executable(test_component test_component.cpp)
+target_link_libraries(test_component PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_component PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_component)
+
+# EditorProperty leaf-type tests (value/setValue roundtrips)
+add_executable(test_editorproperty test_editorproperty.cpp)
+target_link_libraries(test_editorproperty PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_editorproperty PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_editorproperty)
+
+# Component lifecycle tests (clone / copyFrom / isEqualTo / mergeWith)
+add_executable(test_editor_lifecycle test_editor_lifecycle.cpp)
+target_link_libraries(test_editor_lifecycle PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_editor_lifecycle PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_editor_lifecycle)
+
+# QtFormDialog + QtFormDialogManager tests (dedup, closeAll, factory).
+# We compile the dialog/widget sources directly here rather than link
+# openck_view, because openck_view currently pulls in the (pre-existing
+# broken) landscapeeditor.cpp which would otherwise block this test.
+add_executable(test_qtformdialog test_qtformdialog.cpp
+    ${CMAKE_SOURCE_DIR}/src/view/window/qtformdialog.cpp
+    ${CMAKE_SOURCE_DIR}/src/view/window/qtformdialogmanager.cpp
+    ${CMAKE_SOURCE_DIR}/src/view/widgets/editorpropertygrid.cpp
+    ${CMAKE_SOURCE_DIR}/src/view/widgets/formcomponentwidget.cpp
+)
+target_link_libraries(test_qtformdialog PRIVATE openck_esm Qt6::Test Qt6::Widgets)
+target_include_directories(test_qtformdialog PRIVATE
+    ${TEST_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/view
+    ${CMAKE_SOURCE_DIR}/src/view/widgets
+    ${CMAKE_SOURCE_DIR}/src/view/window
+)
+openck_add_test(test_qtformdialog)
+
+# Tier 3 component tests
+add_executable(test_tier3_components test_tier3_components.cpp)
+target_link_libraries(test_tier3_components PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_tier3_components PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_tier3_components)
+
+# Specialized editor widget tests
+add_executable(test_editor_widgets test_editor_widgets.cpp)
+target_link_libraries(test_editor_widgets PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_editor_widgets PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_editor_widgets)

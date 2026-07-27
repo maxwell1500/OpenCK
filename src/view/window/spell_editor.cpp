@@ -5,6 +5,7 @@
 #include "Spellrecord.hpp"
 #include "Magicrecord.hpp"
 #include "nifviewportwidget.hpp"
+#include "fieldvalidators.hpp"
 #include "logger.hpp"
 
 #include <QVBoxLayout>
@@ -63,13 +64,11 @@ void SpellEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Properties</b>"));
 
     mCostSpin = new QSpinBox();
-    mCostSpin->setRange(0, 999999);
-    mCostSpin->setSingleStep(1);
+    setCostValidator(mCostSpin);
     infoLayout->addRow("Cast Point Cost:", mCostSpin);
 
     mCastingSoundSpin = new QSpinBox();
-    mCastingSoundSpin->setRange(0, 999999);
-    mCastingSoundSpin->setSingleStep(1);
+    setIntNonNegativeValidator(mCastingSoundSpin);
     infoLayout->addRow("Casting Sound ID:", mCastingSoundSpin);
 
     tabs->addTab(infoGroup, "General");
@@ -89,18 +88,17 @@ void SpellEditor::setupUI()
     addLayout->addRow("Effect:", mEffectCombo);
 
     mMagnitudeSpin = new QDoubleSpinBox();
-    mMagnitudeSpin->setRange(0.0, 9999.0);
+    setMagnitudeValidator(mMagnitudeSpin);
     mMagnitudeSpin->setValue(10.0);
-    mMagnitudeSpin->setDecimals(1);
     addLayout->addRow("Magnitude:", mMagnitudeSpin);
 
     mDurationSpin = new QSpinBox();
-    mDurationSpin->setRange(0, 999999);
+    setDurationValidator(mDurationSpin);
     mDurationSpin->setValue(10);
     addLayout->addRow("Duration (s):", mDurationSpin);
 
     mAreaSpin = new QSpinBox();
-    mAreaSpin->setRange(0, 999999);
+    setAreaValidator(mAreaSpin);
     mAreaSpin->setValue(0);
     addLayout->addRow("Area:", mAreaSpin);
 

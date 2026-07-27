@@ -23,6 +23,7 @@ class CellRecord;
 class LandRecord;
 class Data;
 class UndoStack;
+class BrushTool;
 
 struct TextureLayer
 {
@@ -51,6 +52,9 @@ public:
     void clear();
     void setData(Data* data);
     void setUndoStack(UndoStack* stack);
+
+    void saveHeightmap(LandRecord& rec);
+    void applyHeightmap();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -105,6 +109,9 @@ private:
     Data* mData;
     UndoStack* mUndoStack;
 
+    // Brush tool (emits stroke signals for viewport repaint)
+    BrushTool* mBrushTool;
+
     // Terrain data
     QVector<float> heightmap;
     int terrainSize;
@@ -135,10 +142,12 @@ private:
     // UI elements
     QSlider* brushSizeSlider;
     QSlider* brushStrengthSlider;
+    QSlider* mHeightSlider;
     QComboBox* brushTypeCombo;
     QSpinBox* heightLimitSpin;
     QPushButton* saveButton;
     QPushButton* loadButton;
+    QPushButton* mApplyButton;
     QPushButton* copyHeightmapButton;
     QPushButton* pasteHeightmapButton;
     QLabel* statusLabel;

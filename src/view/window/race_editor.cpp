@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "Racerecord.hpp"
+#include "fieldvalidators.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -43,19 +44,19 @@ void RaceEditor::setupUI()
     infoLayout->addRow("", new QLabel("<b>Stats</b>"));
 
     mRaceFlagsSpin = new QSpinBox();
-    mRaceFlagsSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mRaceFlagsSpin);
     infoLayout->addRow("Race Flags:", mRaceFlagsSpin);
 
     mNpcVariablesSpin = new QSpinBox();
-    mNpcVariablesSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mNpcVariablesSpin);
     infoLayout->addRow("NPC Variables:", mNpcVariablesSpin);
 
     mFaceDataSpin = new QSpinBox();
-    mFaceDataSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mFaceDataSpin);
     infoLayout->addRow("Face Data:", mFaceDataSpin);
 
     mHeadDataSpin = new QSpinBox();
-    mHeadDataSpin->setRange(0, 9999);
+    setIntNonNegativeValidator(mHeadDataSpin);
     infoLayout->addRow("Head Data:", mHeadDataSpin);
 
     mainLayout->addWidget(infoGroup);
