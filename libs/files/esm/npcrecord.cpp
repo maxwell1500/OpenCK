@@ -15,6 +15,7 @@ void NpcRecord::initComponents()
     components.add<tescomponents::TESAIForm_Component>();
     components.add<tescomponents::TESSkills_Component>();
     components.add<tescomponents::TESAttributes_Component>();
+    components.add<tescomponents::TESNPCFaceGen_Component>();
 }
 
 void NpcRecord::load(ESMReader& esm, bool)

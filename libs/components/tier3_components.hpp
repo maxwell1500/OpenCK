@@ -982,6 +982,189 @@ public:
     void mergeWith(const Component* other) override { copyFrom(other); }
 };
 
+// ---------------------------------------------------------------------------
+// TESNPCFaceGen_Component — NPC face/head data across game versions.
+// HNAM/ENAM (hair/eyes) in Morrowind/Skyrim, QNAM (face tint texture) in
+// Skyrim/FO4, PNAM (head parts list) in Skyrim/FO4, NAMA/NAM9 (sym/asym
+// face morph values) in Skyrim. Game-specific subrecords (FGGS, FGGA,
+// FGTR, NIFT, ...) are preserved verbatim in rawSub.
+// ---------------------------------------------------------------------------
+class TESNPCFaceGen_Component : public Component
+{
+public:
+    void load(ESMReader& esm) override {}
+
+    quint32 hairFormId = 0;          // HNAM — hair form (Morrowind/Skyrim)
+    quint32 eyesFormId = 0;          // ENAM — eyes form (Morrowind/Skyrim)
+    quint32 faceTextureFormId = 0;   // QNAM — face tint texture (Skyrim/FO4)
+    QVector<quint32> headParts;     // PNAM — head parts list (Skyrim/FO4)
+    QVector<float> faceMorphSym;    // NAMA — symmetric face morph values (Skyrim)
+    QVector<float> faceMorphAsym;   // NAM9 — asymmetric face morph values (Skyrim)
+    QVector<RawSubRecord> rawSub;   // for unknown face gen subrecords
+
+    QString name() const override { return QStringLiteral("Face Gen"); }
+    QString className() const override { return QStringLiteral("TESNPCFaceGen"); }
+    static QString staticClassName() { return QStringLiteral("TESNPCFaceGen"); }
+
+    bool canHandle(quint32 subrecordName) const override
+    {
+        return subrecordName == NAME('HNAM')
+            || subrecordName == NAME('ENAM')
+            || subrecordName == NAME('QNAM')
+            || subrecordName == NAME('PNAM')
+            || subrecordName == NAME('NAMA')
+            || subrecordName == NAME('NAM9')
+            || subrecordName == NAME('FGGS')
+            || subrecordName == NAME('FGGA')
+            || subrecordName == NAME('FGTR')
+            || subrecordName == NAME('NIFT');
+    }
+
+    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
+    {
+        switch (subrecordName)
+        {
+        case NAME('HNAM'):
+            hairFormId = esm.readType<quint32>();
+            break;
+        case NAME('ENAM'):
+            eyesFormId = esm.readType<quint32>();
+            break;
+        case NAME('QNAM'):
+            faceTextureFormId = esm.readType<quint32>();
+            break;
+        case NAME('PNAM'):
+        {
+            qint64 n = esm.subLeft() / 4;
+            headParts.clear();
+            headParts.reserve(n);
+            for (qint64 i = 0; i < n; ++i)
+                headParts.append(esm.readType<quint32>());
+            break;
+        }
+        case NAME('NAMA'):
+        {
+            qint64 n = esm.subLeft() / 4;
+            faceMorphSym.clear();
+            faceMorphSym.reserve(n);
+            for (qint64 i = 0; i < n; ++i)
+                faceMorphSym.append(esm.readType<float>());
+            break;
+        }
+        case NAME('NAM9'):
+        {
+            qint64 n = esm.subLeft() / 4;
+            faceMorphAsym.clear();
+            faceMorphAsym.reserve(n);
+            for (qint64 i = 0; i < n; ++i)
+                faceMorphAsym.append(esm.readType<float>());
+            break;
+        }
+        default:
+        {
+            // Unknown face gen subrecord — preserve raw bytes
+            RawSubRecord raw;
+            raw.name = subrecordName;
+            esm.readRawSubData(raw.data);
+            rawSub.append(raw);
+            break;
+        }
+        }
+    }
+
+    void save(ESMWriter& esm) const override
+    {
+        if (hairFormId != 0)
+            esm.writeSubData<quint32>(NAME('HNAM'), hairFormId);
+        if (eyesFormId != 0)
+            esm.writeSubData<quint32>(NAME('ENAM'), eyesFormId);
+        if (faceTextureFormId != 0)
+            esm.writeSubData<quint32>(NAME('QNAM'), faceTextureFormId);
+        if (!headParts.isEmpty())
+        {
+            esm.startSubRecord(NAME('PNAM'));
+            for (quint32 p : headParts)
+                esm.writeType<quint32>(p);
+            esm.endSubRecord();
+        }
+        if (!faceMorphSym.isEmpty())
+        {
+            esm.startSubRecord(NAME('NAMA'));
+            for (float v : faceMorphSym)
+                esm.writeType<float>(v);
+            esm.endSubRecord();
+        }
+        if (!faceMorphAsym.isEmpty())
+        {
+            esm.startSubRecord(NAME('NAM9'));
+            for (float v : faceMorphAsym)
+                esm.writeType<float>(v);
+            esm.endSubRecord();
+        }
+        for (const auto& raw : rawSub)
+        {
+            esm.startSubRecord(raw.name);
+            esm.writeRawData(raw.data.data(), raw.data.size());
+            esm.endSubRecord();
+        }
+    }
+
+    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
+    {
+        std::vector<std::unique_ptr<EditorProperty>> out;
+        out.push_back(std::make_unique<FormEditorProperty>(
+            QStringLiteral("Hair"), &hairFormId));
+        out.push_back(std::make_unique<FormEditorProperty>(
+            QStringLiteral("Eyes"), &eyesFormId));
+        out.push_back(std::make_unique<FormEditorProperty>(
+            QStringLiteral("Face Texture"), &faceTextureFormId));
+        out.push_back(std::make_unique<FormArrayEditorProperty>(
+            QStringLiteral("Head Parts"), &headParts));
+        return out;
+    }
+
+    std::unique_ptr<Component> clone() const override
+    {
+        auto c = std::make_unique<TESNPCFaceGen_Component>();
+        c->hairFormId = hairFormId;
+        c->eyesFormId = eyesFormId;
+        c->faceTextureFormId = faceTextureFormId;
+        c->headParts = headParts;
+        c->faceMorphSym = faceMorphSym;
+        c->faceMorphAsym = faceMorphAsym;
+        c->rawSub = rawSub;
+        return c;
+    }
+
+    void copyFrom(const Component* other) override
+    {
+        if (!other || other->className() != className()) return;
+        const auto* o = static_cast<const TESNPCFaceGen_Component*>(other);
+        hairFormId = o->hairFormId;
+        eyesFormId = o->eyesFormId;
+        faceTextureFormId = o->faceTextureFormId;
+        headParts = o->headParts;
+        faceMorphSym = o->faceMorphSym;
+        faceMorphAsym = o->faceMorphAsym;
+        rawSub = o->rawSub;
+    }
+
+    bool isEqualTo(const Component* other) const override
+    {
+        if (!other || other->className() != className()) return false;
+        const auto* o = static_cast<const TESNPCFaceGen_Component*>(other);
+        return hairFormId == o->hairFormId
+            && eyesFormId == o->eyesFormId
+            && faceTextureFormId == o->faceTextureFormId
+            && headParts == o->headParts
+            && faceMorphSym == o->faceMorphSym
+            && faceMorphAsym == o->faceMorphAsym
+            && rawSub == o->rawSub;
+    }
+
+    void mergeWith(const Component* other) override { copyFrom(other); }
+};
+
 } // namespace tescomponents
 
 #endif // TIER3_COMPONENTS_HPP
