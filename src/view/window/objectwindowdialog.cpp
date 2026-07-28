@@ -100,6 +100,11 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new InfoDataWidget(recPtr, comps, parent);
             });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("QUST"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new QuestDataWidget(recPtr, comps, parent);
+            });
     }
 }
 
@@ -310,7 +315,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             QuestRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("QUST"), &rec.components, &rec, this);
         }
         break;
     }
