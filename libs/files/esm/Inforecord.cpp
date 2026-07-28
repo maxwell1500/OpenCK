@@ -89,6 +89,8 @@ void InfoRecord::blank()
     responseText.clear();
     voiceFile.clear();
     conditionIds.clear();
+    conditions.clear();
+    scriptFragment.clear();
     targetId = 0;
     scriptIds.clear();
     rawSubRecords.clear();

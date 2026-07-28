@@ -218,8 +218,22 @@ void DialogueTreeEditor::showInfoDetails(const InfoRecord* info)
     text += QString("<p>%1</p>").arg(info->responseText);
     text += QString("<p><b>FormID:</b> 0x%1</p>").arg(info->formId, 8, 16, QChar('0')).toUpper();
     text += QString("<p><b>Target ID:</b> 0x%1</p>").arg(info->targetId, 8, 16, QChar('0')).toUpper();
-    text += QString("<p><b>Conditions:</b> %1</p>").arg(info->conditionIds.size());
+    text += QString("<p><b>Conditions:</b> %1</p>").arg(info->conditions.size());
+    if (!info->conditions.isEmpty())
+    {
+        text += QStringLiteral("<ul>");
+        for (const auto& c : info->conditions)
+            text += QString("<li>%1 %2 %3 <i>(%4)</i></li>")
+                .arg(c.function, c.comparison, c.value.toString(),
+                     c.useAND ? QStringLiteral("AND") : QStringLiteral("OR"));
+        text += QStringLiteral("</ul>");
+    }
     text += QString("<p><b>Scripts:</b> %1</p>").arg(info->scriptIds.size());
+    if (!info->voiceFile.isEmpty())
+        text += QString("<p><b>Voice File:</b> %1</p>").arg(info->voiceFile);
+    if (!info->scriptFragment.isEmpty())
+        text += QString("<p><b>Script Fragment:</b> <pre>%1</pre></p>")
+            .arg(info->scriptFragment.toHtmlEscaped());
 
     mDetailEdit->setHtml(text);
 }

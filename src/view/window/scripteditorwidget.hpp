@@ -9,6 +9,7 @@
 #include <QTreeWidget>
 #include <QPushButton>
 #include <QSplitter>
+#include <QRegularExpression>
 
 class ScriptTextEdit : public QPlainTextEdit
 {
@@ -19,6 +20,14 @@ public:
     using QPlainTextEdit::contentOffset;
     using QPlainTextEdit::blockBoundingRect;
     using QAbstractScrollArea::setViewportMargins;
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
+
+private:
+    QString leadingWhitespace(const QString& line) const;
+    bool isControlFlowBlockStart(const QString& line) const;
+    bool isControlFlowBlockEnd(const QString& line) const;
 };
 
 class LineNumberWidget;
@@ -76,6 +85,7 @@ private:
     void highlightErrorLine(int lineNumber);
     void updateFoldRegions();
     void recalcVisibility();
+    void refreshTypeSquiggles();
 
     bool findFoldStart(const QString& text, QString& keyword) const;
     bool findFoldEnd(const QString& text, QString& keyword) const;
@@ -103,6 +113,9 @@ private:
     QSplitter* m_splitter;
     QPushButton* m_toggleConsoleBtn;
     QWidget* m_consoleContainer;
+
+    class PapyrusTypeChecker* m_typeChecker;
+    class QToolTip* m_toolTipHelper;
 };
 
 class LineNumberWidget : public QWidget

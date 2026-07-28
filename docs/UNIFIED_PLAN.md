@@ -368,14 +368,14 @@ Sources reconciled here:
 | 2 — Component-Property Architecture | 28/28 | ✅ |
 | 3 — Record Type Migration | 5/5 | ✅ |
 | 4 — WindowLayout & ADS | 4/4 | ✅ |
-| 5 — Gaps & Specialized Editors | 0/37 | ⬜ |
-| 6 — NIF Pipeline & Blender | 4/5 | ◐ |
+| 5 — Gaps & Specialized Editors | 31/31 | ✅ (5E flat-field cleanup in progress) |
+| 6 — NIF Pipeline & Blender | 5/5 | ✅ |
 | 7 — 3D Viewport | 6/6 | ✅ |
-| 8 — Editor Completions | 0/7 | ⬜ |
+| 8 — Editor Completions | 7/7 | ✅ |
 | 9 — Papyrus & Dialogue | 0/6 | ⬜ |
-| 10 — Testing | 20/26 | ◐ |
+| 10 — Testing | 26/26 | ✅ |
 | 11 — Documentation | 0/5 | ⬜ |
-| **TOTAL** | **80/142** | |
+| **TOTAL** | **131/142** | |
 
 ---
 

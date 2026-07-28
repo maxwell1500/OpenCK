@@ -7,6 +7,7 @@
 #include <QVector>
 #include <QMap>
 #include <QSet>
+#include "../../../libs/files/filepaths.hpp"
 
 struct CompilerError
 {
@@ -40,6 +41,10 @@ public:
     bool setScriptPath(const QString& path);
     bool setOutputPath(const QString& path);
     void addIncludePath(const QString& path);
+
+    void setGameVersion(GameId version);
+    QStringList getCompilerFlags() const;
+    GameId getGameVersion() const { return gameVersion; }
 
     QVector<CompilerError> getLastErrors() const { return lastErrors; }
 
@@ -89,6 +94,7 @@ private:
     QVector<CompilerError> lastErrors;
     QString output;
     QProcess process;
+    GameId gameVersion = Game_None;
     
     QMap<QString, ScriptDependency> dependencyGraph;
     QVector<QString> compilationOrder;

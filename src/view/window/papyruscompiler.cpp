@@ -132,6 +132,49 @@ void PapyrusCompiler::addIncludePath(const QString& path)
     }
 }
 
+void PapyrusCompiler::setGameVersion(GameId version)
+{
+    gameVersion = version;
+    LOG_INFO(QString("PapyrusCompiler: Game version set to %1").arg(FilePaths::gameName(version)));
+}
+
+QStringList PapyrusCompiler::getCompilerFlags() const
+{
+    QStringList flags;
+
+    switch (gameVersion) {
+        case Game_Skyrim:
+        case Game_SkyrimSpecialEdition:
+        case Game_SkyrimAnniversaryEdition:
+            flags << QStringLiteral("-i=\"Data/Scripts/Source\"")
+                  << QStringLiteral("-o=\"Data/Scripts\"")
+                  << QStringLiteral("-f=\"Papyrus Flags.flg\"");
+            break;
+        case Game_Fallout4:
+            flags << QStringLiteral("-i=\"Data/Scripts/Source\"")
+                  << QStringLiteral("-o=\"Data/Scripts\"")
+                  << QStringLiteral("-f=\"Papyrus Flags.flg\"");
+            break;
+        case Game_Starfield:
+            flags << QStringLiteral("-i=\"Data/Scripts/Source\"")
+                  << QStringLiteral("-o=\"Data/Scripts\"")
+                  << QStringLiteral("-f=\"Papyrus Flags.flg\"");
+            break;
+        case Game_Morrowind:
+        case Game_Oblivion:
+        case Game_Fallout3:
+        case Game_FalloutNewVegas:
+        case Game_None:
+        default:
+            flags << QStringLiteral("-i=\"Data/Scripts/Source\"")
+                  << QStringLiteral("-o=\"Data/Scripts\"")
+                  << QStringLiteral("-f=\"Papyrus Flags.flg\"");
+            break;
+    }
+
+    return flags;
+}
+
 bool PapyrusCompiler::compile()
 {
     if (compilerPath.isEmpty()) {
@@ -173,6 +216,9 @@ bool PapyrusCompiler::compile()
     if (!modFile.isEmpty()) {
         arguments << "-mod" << escapePath(modFile);
     }
+
+    // Add game-specific compiler flags
+    arguments << getCompilerFlags();
 
     // Add include paths
     for (const auto& includePath : includePaths) {
@@ -708,6 +754,8 @@ bool PapyrusCompiler::compileScript(const QString& scriptPath)
     if (!modFile.isEmpty()) {
         arguments << "-mod" << escapePath(modFile);
     }
+
+    arguments << getCompilerFlags();
 
     for (const auto& includePath : includePaths) {
         arguments << "-i" << escapePath(includePath);

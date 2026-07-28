@@ -5,6 +5,8 @@
 #include <QVector>
 #include <QPair>
 
+#include "papyrustypechecker.hpp"
+
 struct PapyrusValidationError
 {
     enum class Type {
@@ -26,6 +28,7 @@ class PapyrusPreValidator
 {
 public:
     static QVector<PapyrusValidationError> validate(const QString& scriptContent);
+    static PapyrusTypeChecker buildTypeChecker(const QString& scriptContent);
     
 private:
     static QVector<PapyrusValidationError> checkSyntax(const QString& scriptContent);

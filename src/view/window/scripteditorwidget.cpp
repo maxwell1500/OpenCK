@@ -19,10 +19,16 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QDateTime>
+#include <QRegularExpression>
+#include <QKeyEvent>
 
 #include "papyruscompiler.hpp"
 #include "../../model/tools/papyrusprevalidator.hpp"
+#include "../../model/tools/papyrustypechecker.hpp"
 #include "logger.hpp"
+
+#include <QToolTip>
+#include <QHelpEvent>
 
 class BlockData : public QTextBlockUserData
 {
@@ -34,6 +40,9 @@ public:
 
     bool hasError = false;
     QString errorMessage;
+
+    bool hasTypeError = false;
+    QString typeErrorMessage;
 };
 
 static QStringList buildCompleterWords()
@@ -71,6 +80,9 @@ public:
         KeywordFormat.setForeground(Qt::blue);
         KeywordFormat.setFontWeight(QFont::Bold);
 
+        ControlFlowFormat.setForeground(QColor(0, 0, 160));
+        ControlFlowFormat.setFontWeight(QFont::Bold);
+
         TypeFormat.setForeground(Qt::darkCyan);
         TypeFormat.setFontWeight(QFont::Bold);
 
@@ -104,6 +116,9 @@ public:
                     << "Quest" << "QuestStage" << "QuestObjective" << "QuestTopic"
                     << "QuestTopicInfo" << "DialogueTopic" << "DialogueTopicInfo"
                     << "Conversation" << "Topic" << "Info";
+
+        controlFlowPattern.setPatternOptions(QRegularExpression::CaseInsensitiveOption);
+        controlFlowPattern.setPattern("\\b(if|elseif|else|endif|while|endwhile|for|endfor)\\b");
     }
 
 protected:
@@ -142,6 +157,12 @@ protected:
             startIndex = stringEnd + 1;
         }
 
+        QRegularExpressionMatchIterator it = controlFlowPattern.globalMatch(text);
+        while (it.hasNext()) {
+            QRegularExpressionMatch m = it.next();
+            setFormat(m.capturedStart(), m.capturedLength(), ControlFlowFormat);
+        }
+
         foreach (const QString& pattern, keywordPatterns) {
             int pos = 0;
             while ((pos = text.indexOf(pattern, pos)) != -1) {
@@ -171,6 +192,7 @@ protected:
 
 private:
     QTextCharFormat KeywordFormat;
+    QTextCharFormat ControlFlowFormat;
     QTextCharFormat TypeFormat;
     QTextCharFormat StringFormat;
     QTextCharFormat CommentFormat;
@@ -178,6 +200,7 @@ private:
 
     QStringList keywordPatterns;
     QStringList typePatterns;
+    QRegularExpression controlFlowPattern;
 };
 
 ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
@@ -195,9 +218,13 @@ ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
     m_consoleOutput(nullptr),
     m_splitter(nullptr),
     m_toggleConsoleBtn(nullptr),
-    m_consoleContainer(nullptr)
+    m_consoleContainer(nullptr),
+    m_typeChecker(nullptr),
+    m_toolTipHelper(nullptr)
 {
     LOG_DEBUG("ScriptEditorWidget created");
+
+    m_typeChecker = new PapyrusTypeChecker();
 
     compiler = new PapyrusCompiler(this);
     connect(compiler, &PapyrusCompiler::compilationStarted, this, &ScriptEditorWidget::compilationStarted);
@@ -261,10 +288,12 @@ ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
     connect(m_textEdit, &QPlainTextEdit::textChanged, this, [this]() {
         modified = true;
         performCompletion();
+        refreshTypeSquiggles();
     });
 
     connect(m_textEdit->document(), &QTextDocument::contentsChanged, this, &ScriptEditorWidget::updateFoldRegions);
 
+    m_textEdit->setMouseTracking(true);
     m_textEdit->installEventFilter(this);
 
     m_toggleBrowserBtn = new QPushButton("<<", editorArea);
@@ -314,6 +343,7 @@ ScriptEditorWidget::~ScriptEditorWidget()
     LOG_DEBUG("ScriptEditorWidget destroyed");
     delete highlighter;
     delete lineNumberWidget;
+    delete m_typeChecker;
 }
 
 int ScriptEditorWidget::lineNumberWidth() const
@@ -398,10 +428,33 @@ void ScriptEditorWidget::resizeEvent(QResizeEvent* event)
 
 bool ScriptEditorWidget::eventFilter(QObject* obj, QEvent* event)
 {
-    if (obj == m_textEdit && event->type() == QEvent::Resize) {
-        if (lineNumberWidget) {
-            QRect cr = m_textEdit->contentsRect();
-            lineNumberWidget->setGeometry(QRect(cr.left(), cr.top(), lineNumberWidth(), cr.height()));
+    if (obj == m_textEdit) {
+        if (event->type() == QEvent::Resize) {
+            if (lineNumberWidget) {
+                QRect cr = m_textEdit->contentsRect();
+                lineNumberWidget->setGeometry(QRect(cr.left(), cr.top(), lineNumberWidth(), cr.height()));
+            }
+        } else if (event->type() == QEvent::ToolTip) {
+            QHelpEvent* helpEvent = static_cast<QHelpEvent*>(event);
+            QTextCursor cursor = m_textEdit->cursorForPosition(helpEvent->pos());
+            QString word;
+            QTextCursor wc = cursor;
+            wc.select(QTextCursor::WordUnderCursor);
+            word = wc.selectedText();
+            if (!word.isEmpty() && m_typeChecker && m_typeChecker->hasVariable(word)) {
+                auto ti = m_typeChecker->variableType(word);
+                QString typeStr = ti.isArray ? QString("%1[]").arg(ti.name) : ti.name;
+                QString tip = QString("%1 : %2").arg(word, typeStr);
+                QTextBlock block = cursor.block();
+                BlockData* data = dynamic_cast<BlockData*>(block.userData());
+                if (data && data->hasTypeError) {
+                    tip += QString("\n\u26A0 %1").arg(data->typeErrorMessage);
+                }
+                QToolTip::showText(helpEvent->globalPos(), tip, m_textEdit);
+            } else {
+                QToolTip::hideText();
+            }
+            return true;
         }
     }
     return QWidget::eventFilter(obj, event);
@@ -427,6 +480,7 @@ void ScriptEditorWidget::loadScript(const QString& fileName)
     modified = false;
 
     updateFoldRegions();
+    refreshTypeSquiggles();
 
     LOG_INFO("Script loaded successfully");
 }
@@ -611,6 +665,53 @@ void ScriptEditorWidget::setupSyntaxHighlighter()
     highlighter = new PapyrusHighlighter(m_textEdit->document());
 }
 
+void ScriptEditorWidget::refreshTypeSquiggles()
+{
+    if (!m_textEdit || !m_typeChecker) return;
+
+    QString content = m_textEdit->toPlainText();
+    *m_typeChecker = PapyrusPreValidator::buildTypeChecker(content);
+
+    QList<QTextEdit::ExtraSelection> selections;
+    QTextCharFormat fmt;
+    fmt.setUnderlineStyle(QTextCharFormat::WaveUnderline);
+    fmt.setUnderlineColor(QColor(190, 80, 200));
+    fmt.setForeground(Qt::magenta);
+
+    const auto typedErrors = m_typeChecker->typedErrors();
+    for (const auto& te : typedErrors) {
+        int lineIdx = te.line - 1;
+        if (lineIdx < 0) continue;
+        QTextBlock block = m_textEdit->document()->findBlockByNumber(lineIdx);
+        if (!block.isValid()) continue;
+        BlockData* data = dynamic_cast<BlockData*>(block.userData());
+        if (!data) {
+            data = new BlockData();
+            block.setUserData(data);
+        }
+        data->hasTypeError = true;
+        data->typeErrorMessage = te.message;
+        QTextEdit::ExtraSelection sel;
+        sel.format = fmt;
+        sel.format.setProperty(QTextFormat::FullWidthSelection, true);
+        sel.cursor = QTextCursor(block);
+        sel.cursor.movePosition(QTextCursor::StartOfBlock);
+        selections.append(sel);
+    }
+
+    for (QTextBlock b = m_textEdit->document()->begin(); b.isValid(); b = b.next()) {
+        BlockData* data = dynamic_cast<BlockData*>(b.userData());
+        if (data && !data->hasTypeError) {
+            data->hasTypeError = false;
+            data->typeErrorMessage.clear();
+        }
+    }
+
+    if (!selections.isEmpty()) {
+        m_textEdit->setExtraSelections(selections);
+    }
+}
+
 void ScriptEditorWidget::setupFont()
 {
     QFont font("Consolas", 10);
@@ -780,12 +881,47 @@ void ScriptEditorWidget::performCompletion()
     if (!completer) return;
 
     QTextCursor cursor = m_textEdit->textCursor();
-    cursor.movePosition(QTextCursor::StartOfWord, QTextCursor::KeepAnchor);
-    QString prefix = cursor.selectedText();
+    QTextCursor wordCursor = cursor;
+    wordCursor.movePosition(QTextCursor::StartOfWord, QTextCursor::KeepAnchor);
+    QString prefix = wordCursor.selectedText();
 
     if (prefix.length() < 2) {
         completer->popup()->hide();
         return;
+    }
+
+    QStringList baseWords = buildCompleterWords();
+
+    QString lineText = cursor.block().text().left(cursor.positionInBlock());
+    static QRegularExpression assignCtxRe(R"((\w+)\s*=\s*$)");
+    auto am = assignCtxRe.match(lineText);
+    if (am.hasMatch() && m_typeChecker && m_typeChecker->hasVariable(am.captured(1))) {
+        auto varType = m_typeChecker->variableType(am.captured(1));
+        QStringList typed;
+        const auto& fns = m_typeChecker->functions();
+        for (auto it = fns.begin(); it != fns.end(); ++it) {
+            if (it.value().returnType.name == varType.name &&
+                it.value().returnType.isArray == varType.isArray) {
+                typed << it.key();
+            }
+        }
+        if (!typed.isEmpty()) {
+            baseWords += typed;
+            baseWords.removeDuplicates();
+        }
+    }
+
+    if (m_typeChecker) {
+        const auto& syms = m_typeChecker->symbols();
+        for (auto it = syms.begin(); it != syms.end(); ++it) {
+            baseWords << it.key();
+        }
+        baseWords.removeDuplicates();
+    }
+
+    QStringListModel* model = qobject_cast<QStringListModel*>(completer->model());
+    if (model) {
+        model->setStringList(baseWords);
     }
 
     if (prefix != completer->completionPrefix()) {
@@ -797,12 +933,14 @@ void ScriptEditorWidget::performCompletion()
         cr.setWidth(completer->popup()->sizeHintForColumn(0)
                     + completer->popup()->verticalScrollBar()->sizeHint().width() + 4);
         completer->complete(cr);
+    } else {
+        completer->popup()->hide();
     }
 }
 
 bool ScriptEditorWidget::findFoldStart(const QString& text, QString& keyword) const
 {
-    static const QStringList startKeywords = {"ScriptName", "Function", "Event", "Property", "If", "While"};
+    static const QStringList startKeywords = {"ScriptName", "Function", "Event", "Property", "If", "While", "For"};
 
     int bestPos = -1;
     for (const QString& kw : startKeywords) {
@@ -825,7 +963,7 @@ bool ScriptEditorWidget::findFoldStart(const QString& text, QString& keyword) co
 
 bool ScriptEditorWidget::findFoldEnd(const QString& text, QString& keyword) const
 {
-    static const QStringList endKeywords = {"EndScript", "EndFunction", "EndEvent", "EndProperty", "EndIf", "EndWhile"};
+    static const QStringList endKeywords = {"EndScript", "EndFunction", "EndEvent", "EndProperty", "EndIf", "EndWhile", "EndFor"};
 
     int bestPos = -1;
     for (const QString& kw : endKeywords) {
@@ -854,6 +992,7 @@ QString ScriptEditorWidget::foldEndToStart(const QString& endKeyword) const
     if (endKeyword == "EndProperty") return "Property";
     if (endKeyword == "EndIf")       return "If";
     if (endKeyword == "EndWhile")    return "While";
+    if (endKeyword == "EndFor")      return "For";
     return QString();
 }
 
@@ -979,4 +1118,102 @@ void LineNumberWidget::mousePressEvent(QMouseEvent* event)
     }
 
     QWidget::mousePressEvent(event);
+}
+
+QString ScriptTextEdit::leadingWhitespace(const QString& line) const
+{
+    QString ws;
+    for (int i = 0; i < line.length(); ++i) {
+        if (line.at(i).isSpace()) {
+            ws.append(line.at(i));
+        } else {
+            break;
+        }
+    }
+    return ws;
+}
+
+bool ScriptTextEdit::isControlFlowBlockStart(const QString& line) const
+{
+    static const QRegularExpression re("\\b(if|while|for)\\b", QRegularExpression::CaseInsensitiveOption);
+    QRegularExpressionMatch m = re.match(line);
+    return m.hasMatch();
+}
+
+bool ScriptTextEdit::isControlFlowBlockEnd(const QString& line) const
+{
+    static const QRegularExpression re("\\b(endif|endwhile|endfor)\\b", QRegularExpression::CaseInsensitiveOption);
+    QRegularExpressionMatch m = re.match(line);
+    return m.hasMatch();
+}
+
+void ScriptTextEdit::keyPressEvent(QKeyEvent* event)
+{
+    const int indentSize = 4;
+    const QString indentUnit = QString(" ").repeated(indentSize);
+
+    if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        QTextCursor cursor = textCursor();
+        QTextBlock block = cursor.block();
+        QString currentText = block.text();
+        QString ws = leadingWhitespace(currentText);
+
+        bool wasBlockStart = isControlFlowBlockStart(currentText);
+
+        QPlainTextEdit::keyPressEvent(event);
+
+        if (wasBlockStart) {
+            cursor.insertText(ws + indentUnit);
+            setTextCursor(cursor);
+        } else {
+            cursor.insertText(ws);
+            setTextCursor(cursor);
+        }
+        return;
+    }
+
+    if (event->key() == Qt::Key_BraceRight || event->text() == "}") {
+        QPlainTextEdit::keyPressEvent(event);
+        return;
+    }
+
+    if (event->key() == Qt::Key_Tab) {
+        QTextCursor cursor = textCursor();
+        if (cursor.hasSelection()) {
+            int start = cursor.selectionStart();
+            int end = cursor.selectionEnd();
+            QTextBlock startBlock = document()->findBlock(start);
+            QTextBlock endBlock = document()->findBlock(end);
+            cursor.beginEditBlock();
+            for (QTextBlock b = startBlock; b.isValid() && b.blockNumber() <= endBlock.blockNumber(); b = b.next()) {
+                cursor.setPosition(b.position());
+                cursor.insertText(indentUnit);
+            }
+            cursor.endEditBlock();
+            setTextCursor(cursor);
+        } else {
+            cursor.insertText(indentUnit);
+            setTextCursor(cursor);
+        }
+        return;
+    }
+
+    QPlainTextEdit::keyPressEvent(event);
+
+    QTextCursor cursor = textCursor();
+    QTextBlock block = cursor.block();
+    QString text = block.text();
+
+    QString trimmed = text.trimmed();
+    if (isControlFlowBlockEnd(trimmed) || trimmed.compare("else", Qt::CaseInsensitive) == 0 ||
+        trimmed.compare("elseif", Qt::CaseInsensitive) == 0) {
+        QString ws = leadingWhitespace(text);
+        if (ws.length() >= indentSize) {
+            cursor.beginEditBlock();
+            cursor.movePosition(QTextCursor::StartOfBlock);
+            cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor, indentSize);
+            cursor.removeSelectedText();
+            cursor.endEditBlock();
+        }
+    }
 }
