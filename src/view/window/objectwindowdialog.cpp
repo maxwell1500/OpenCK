@@ -188,7 +188,7 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
 
     mContextMenu = new QMenu();
 
-    if (!index.isValid() || mModel->parent(index).isValid())
+    if (!index.isValid() || mModel->isRecord(index))
     {
         QList<QModelIndex> selectedIndices = getSelectedIndices();
         int count = selectedIndices.count();
@@ -248,7 +248,7 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
 void ObjectWindowDialog::editSelected()
 {
     QModelIndex index = mTreeView->currentIndex();
-    if (!index.isValid() || !mModel->parent(index).isValid())
+    if (!index.isValid() || !mModel->isRecord(index))
         return;
 
     int categoryId = mModel->getCategoryIndex(index);
@@ -675,7 +675,7 @@ void ObjectWindowDialog::editSelected()
 void ObjectWindowDialog::deleteSelected()
 {
     QModelIndex index = mTreeView->currentIndex();
-    if (!index.isValid() || !mModel->parent(index).isValid())
+    if (!index.isValid() || !mModel->isRecord(index))
         return;
 
     int categoryId = mModel->getCategoryIndex(index);
@@ -713,7 +713,7 @@ void ObjectWindowDialog::filterChanged(const QString& text)
 void ObjectWindowDialog::cloneSelected()
 {
     QModelIndex index = mTreeView->currentIndex();
-    if (!index.isValid() || !mModel->parent(index).isValid())
+    if (!index.isValid() || !mModel->isRecord(index))
         return;
 
     int categoryId = mModel->getCategoryIndex(index);
@@ -743,7 +743,7 @@ void ObjectWindowDialog::cloneSelected()
 
 void ObjectWindowDialog::onDoubleClick(const QModelIndex& index)
 {
-    if (!index.isValid() || mModel->parent(index).isValid())
+    if (!index.isValid() || mModel->isRecord(index))
     {
         editSelected();
     }
@@ -835,7 +835,7 @@ QString ObjectWindowDialog::getModelPathForRecord(int categoryId, int recordInde
 void ObjectWindowDialog::openInBlender()
 {
     QModelIndex index = mTreeView->currentIndex();
-    if (!index.isValid() || !mModel->parent(index).isValid())
+    if (!index.isValid() || !mModel->isRecord(index))
         return;
 
     int categoryId = mModel->getCategoryIndex(index);
@@ -879,7 +879,7 @@ void ObjectWindowDialog::openInBlender()
 void ObjectWindowDialog::previewNif()
 {
     QModelIndex index = mTreeView->currentIndex();
-    if (!index.isValid() || !mModel->parent(index).isValid())
+    if (!index.isValid() || !mModel->isRecord(index))
         return;
 
     int categoryId = mModel->getCategoryIndex(index);
@@ -914,7 +914,7 @@ void ObjectWindowDialog::previewNif()
 void ObjectWindowDialog::compareNifs()
 {
     QModelIndex index1 = mTreeView->currentIndex();
-    if (!index1.isValid() || !mModel->parent(index1).isValid())
+    if (!index1.isValid() || !mModel->isRecord(index1))
         return;
 
     int categoryId1 = mModel->getCategoryIndex(index1);
@@ -1000,7 +1000,7 @@ void ObjectWindowDialog::clearClipboardData()
 void ObjectWindowDialog::copyRecord()
 {
     QModelIndex index = mTreeView->currentIndex();
-    if (!index.isValid() || !mModel->parent(index).isValid())
+    if (!index.isValid() || !mModel->isRecord(index))
         return;
 
     int categoryId = mModel->getCategoryIndex(index);
@@ -1461,7 +1461,7 @@ void ObjectWindowDialog::cutRecord()
     if (sHasClipboardData)
     {
         QModelIndex index = mTreeView->currentIndex();
-        if (!index.isValid() || !mModel->parent(index).isValid())
+        if (!index.isValid() || !mModel->isRecord(index))
             return;
 
         int categoryId = mModel->getCategoryIndex(index);
@@ -2091,7 +2091,7 @@ QList<QModelIndex> ObjectWindowDialog::getSelectedIndices() const
     QModelIndexList selected = mTreeView->selectionModel()->selectedIndexes();
     for (const QModelIndex& idx : selected)
     {
-        if (idx.isValid() && mModel->parent(idx).isValid())
+        if (idx.isValid() && mModel->isRecord(idx))
         {
             indices.append(idx);
         }

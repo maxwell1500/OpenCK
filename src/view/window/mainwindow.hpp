@@ -6,6 +6,9 @@
 #include <QLabel>
 #include <QProgressBar>
 
+#include <DockManager.h>
+#include <DockWidget.h>
+
 class Data;
 class UndoStack;
 class NifViewportWidget;
@@ -27,6 +30,7 @@ class CellTransitionsEditor;
 class LandscapeEditor;
 class ObjectPalette;
 class BashedPatchDialog;
+class CellViewPanel;
 struct CellRecord;
 
 namespace Ui {
@@ -154,8 +158,11 @@ private:
     AssetBrowserWidget* assetBrowserWidget;
     ObjectWindowDialog* objectWindowDock;
     LandscapeEditor* landscapeEditor;
-    QDockWidget* landscapeDock;
+    ads::CDockWidget* landscapeDock;
     ObjectPalette* objectPalette;
+    CellViewPanel* mCellViewPanel;
+    ads::CDockWidget* mCellViewDock;
+    ads::CDockManager* mDockManager;
     QLabel* mStatusRecordCount;
     QLabel* mStatusPluginInfo;
     QProgressBar* mStatusProgressBar;

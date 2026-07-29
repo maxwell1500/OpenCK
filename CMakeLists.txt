@@ -219,6 +219,14 @@ foreach(_vorbis_target IN ITEMS vorbis vorbisenc vorbisfile)
     endif()
 endforeach()
 
+# ─── Vendored: Qt-Advanced-Docking-System (LGPL-2.1+) ─────────────────────
+# ADS provides the tear-off / tabbed / redockable window system that mirrors
+# the real Creation Kit. It is built as a SHARED library so the LGPL
+# dynamic-link clause is satisfied (end users may swap qtadvanceddocking-qt6.dll).
+# The wrapper at external/ads/CMakeLists.txt pins the version and disables
+# the upstream examples before adding the source tree.
+add_subdirectory(external/ads)
+
 # ─── Library: openck_files ─────────────────────────────────────────────────
 # NIF/BA2 parsing, data export/import, logging
 set(FILES_SOURCES
@@ -698,6 +706,7 @@ target_link_libraries(openck_view PUBLIC
     Qt6::3DExtras
     Qt6::3DInput
     Qt6::OpenGLWidgets
+    ads::qtadvanceddocking-qt6
 )
 
 if(WIN32)
@@ -762,6 +771,7 @@ target_link_libraries(openck
     Qt6::OpenGLWidgets
     Qt6::Xml
     OpenGL32
+    ads::qtadvanceddocking-qt6
 )
 
 # Copy settings file to build directory (multi-config safe)

@@ -101,12 +101,17 @@ MainWindow::MainWindow(QWidget *parent) :
       landscapeEditor(nullptr),
       landscapeDock(nullptr),
       objectPalette(nullptr),
+      mCellViewPanel(nullptr),
+      mCellViewDock(nullptr),
+      mDockManager(nullptr),
       mStatusRecordCount(nullptr),
       mStatusPluginInfo(nullptr),
       mStatusProgressBar(nullptr)
 {
     ui->setupUi(this);
-    
+
+    mDockManager = new ads::CDockManager(this);
+
     setupEditMenu();
     setupShortcuts();
     restoreUiState();
@@ -165,7 +170,9 @@ void MainWindow::setData(Data* data)
         if (!objectWindowDock)
         {
             objectWindowDock = new ObjectWindowDialog(mData, this);
-            addDockWidget(Qt::RightDockWidgetArea, objectWindowDock);
+            auto* objectDockWidget = new ads::CDockWidget("Object Window");
+            objectDockWidget->setWidget(objectWindowDock);
+            mDockManager->addDockWidget(ads::LeftDockWidgetArea, objectDockWidget);
         }
         
         // Create Landscape Editor dock widget
@@ -173,11 +180,10 @@ void MainWindow::setData(Data* data)
         {
             landscapeEditor = new LandscapeEditor(this);
             landscapeEditor->setData(mData);
-            landscapeDock = new QDockWidget(this);
+            landscapeDock = new ads::CDockWidget("Landscape Editor");
             landscapeDock->setWidget(landscapeEditor);
-            addDockWidget(Qt::BottomDockWidgetArea, landscapeDock);
-            landscapeDock->setWindowTitle("Landscape Editor");
-            connect(landscapeDock, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+            mDockManager->addDockWidget(ads::BottomDockWidgetArea, landscapeDock);
+            connect(landscapeDock, &ads::CDockWidget::visibilityChanged, this, [this](bool visible) {
                 if (!visible && landscapeEditor)
                 {
                     landscapeEditor->clear();
@@ -189,10 +195,9 @@ void MainWindow::setData(Data* data)
         if (!objectPalette)
         {
             objectPalette = new ObjectPalette(mData, this);
-            auto dockWidget = new QDockWidget(this);
-            dockWidget->setWidget(objectPalette);
-            addDockWidget(Qt::BottomDockWidgetArea, dockWidget);
-            dockWidget->setWindowTitle("Object Palette");
+            auto* paletteDockWidget = new ads::CDockWidget("Object Palette");
+            paletteDockWidget->setWidget(objectPalette);
+            mDockManager->addDockWidget(ads::BottomDockWidgetArea, paletteDockWidget);
         }
         else
         {
@@ -202,6 +207,8 @@ void MainWindow::setData(Data* data)
         }
 
         objectWindowDock->setVisible(true);
+
+        WindowLayout::applyDefaultLayout(this);
     }
     else
     {
@@ -945,19 +952,18 @@ void MainWindow::on_actionNifViewport_triggered()
     if (!nifViewportWidget)
     {
         nifViewportWidget = new NifViewportWidget(this);
-        auto* dock = new QDockWidget("3D Viewport", this);
-        dock->setWidget(nifViewportWidget);
-        dock->setObjectName("3D Viewport Dock");
-        addDockWidget(Qt::RightDockWidgetArea, dock);
+        auto* dockWidget = new ads::CDockWidget("3D Viewport");
+        dockWidget->setWidget(nifViewportWidget);
+        dockWidget->setObjectName("3D Viewport Dock");
+        mDockManager->addDockWidget(ads::RightDockWidgetArea, dockWidget);
         LOG_INFO("3D Viewport dock created");
     }
     else
     {
-        // Toggle visibility
-        auto* dock = findChild<QDockWidget*>("3D Viewport Dock");
+        auto* dock = mDockManager->findDockWidget("3D Viewport");
         if (dock)
         {
-            dock->setVisible(!dock->isVisible());
+            dock->toggleView(dock->isClosed());
         }
     }
 }
@@ -969,19 +975,18 @@ void MainWindow::on_actionScriptEditor_triggered()
     if (!scriptEditorWidget)
     {
         scriptEditorWidget = new ScriptEditorWidget(this);
-        auto* dock = new QDockWidget("Script Editor", this);
-        dock->setWidget(scriptEditorWidget);
-        dock->setObjectName("Script Editor Dock");
-        addDockWidget(Qt::RightDockWidgetArea, dock);
+        auto* dockWidget = new ads::CDockWidget("Script Editor");
+        dockWidget->setWidget(scriptEditorWidget);
+        dockWidget->setObjectName("Script Editor Dock");
+        mDockManager->addDockWidget(ads::RightDockWidgetArea, dockWidget);
         LOG_INFO("Script Editor dock created");
     }
     else
     {
-        // Toggle visibility
-        auto* dock = findChild<QDockWidget*>("Script Editor Dock");
+        auto* dock = mDockManager->findDockWidget("Script Editor");
         if (dock)
         {
-            dock->setVisible(!dock->isVisible());
+            dock->toggleView(dock->isClosed());
         }
     }
 }
@@ -993,19 +998,18 @@ void MainWindow::on_actionDialogueEditor_triggered()
     if (!dialogueEditorWidget)
     {
         dialogueEditorWidget = new DialogueEditorWidget(mData, this);
-        auto* dock = new QDockWidget("Dialogue Editor", this);
-        dock->setWidget(dialogueEditorWidget);
-        dock->setObjectName("Dialogue Editor Dock");
-        addDockWidget(Qt::RightDockWidgetArea, dock);
+        auto* dockWidget = new ads::CDockWidget("Dialogue Editor");
+        dockWidget->setWidget(dialogueEditorWidget);
+        dockWidget->setObjectName("Dialogue Editor Dock");
+        mDockManager->addDockWidget(ads::RightDockWidgetArea, dockWidget);
         LOG_INFO("Dialogue Editor dock created");
     }
     else
     {
-        // Toggle visibility
-        auto* dock = findChild<QDockWidget*>("Dialogue Editor Dock");
+        auto* dock = mDockManager->findDockWidget("Dialogue Editor");
         if (dock)
         {
-            dock->setVisible(!dock->isVisible());
+            dock->toggleView(dock->isClosed());
         }
     }
 }
@@ -1168,18 +1172,18 @@ void MainWindow::on_actionFormIdEditor_triggered()
     if (!formIdEditorWidget)
     {
         formIdEditorWidget = new FormIdEditorWidget(mData, this);
-        auto* dock = new QDockWidget("FormID Editor", this);
-        dock->setWidget(formIdEditorWidget);
-        dock->setObjectName("FormID Editor Dock");
-        addDockWidget(Qt::BottomDockWidgetArea, dock);
+        auto* dockWidget = new ads::CDockWidget("FormID Editor");
+        dockWidget->setWidget(formIdEditorWidget);
+        dockWidget->setObjectName("FormID Editor Dock");
+        mDockManager->addDockWidget(ads::BottomDockWidgetArea, dockWidget);
         LOG_INFO("FormID Editor dock created");
     }
     else
     {
-        auto* dock = findChild<QDockWidget*>("FormID Editor Dock");
+        auto* dock = mDockManager->findDockWidget("FormID Editor");
         if (dock)
         {
-            dock->setVisible(!dock->isVisible());
+            dock->toggleView(dock->isClosed());
         }
     }
 }
@@ -1194,18 +1198,18 @@ void MainWindow::on_actionAssetBrowser_triggered()
         if (mData && !mData->getPaths().dataDir.path().isEmpty()) {
             assetBrowserWidget->setDataDirectories({mData->getPaths().dataDir.absolutePath()});
         }
-        auto* dock = new QDockWidget(tr("Asset Browser"), this);
-        dock->setWidget(assetBrowserWidget);
-        dock->setObjectName("Asset Browser Dock");
-        addDockWidget(Qt::BottomDockWidgetArea, dock);
+        auto* dockWidget = new ads::CDockWidget(tr("Asset Browser"));
+        dockWidget->setWidget(assetBrowserWidget);
+        dockWidget->setObjectName("Asset Browser Dock");
+        mDockManager->addDockWidget(ads::BottomDockWidgetArea, dockWidget);
         LOG_INFO("Asset Browser dock created");
     }
     else
     {
-        auto* dock = findChild<QDockWidget*>("Asset Browser Dock");
+        auto* dock = mDockManager->findDockWidget("Asset Browser");
         if (dock)
         {
-            dock->setVisible(!dock->isVisible());
+            dock->toggleView(dock->isClosed());
         }
     }
 }
@@ -1306,14 +1310,22 @@ void MainWindow::on_actionWorldspaces_triggered()
 
 void MainWindow::on_actionCells_triggered()
 {
-    if (mData)
+    if (!mData)
     {
-        CellsDialog dialog(mData, this);
-        dialog.exec();
+        LOG_INFO("Cells: No data loaded");
+        return;
+    }
+
+    if (!mCellViewPanel)
+    {
+        mCellViewPanel = new CellViewPanel(mData, this);
+        mCellViewDock = new ads::CDockWidget(QStringLiteral("Cell View"));
+        mCellViewDock->setWidget(mCellViewPanel);
+        mDockManager->addDockWidget(ads::RightDockWidgetArea, mCellViewDock);
     }
     else
     {
-        LOG_INFO("Cells: No data loaded");
+        mCellViewDock->toggleView(mCellViewDock->isClosed());
     }
 }
 
@@ -1328,7 +1340,7 @@ void MainWindow::on_actionLandscapeEditing_triggered()
                 landscapeEditor->loadCell(cell);
             }
         }
-        landscapeDock->setVisible(true);
+        landscapeDock->toggleView(true);
         landscapeEditor->raise();
         landscapeEditor->activateWindow();
     }

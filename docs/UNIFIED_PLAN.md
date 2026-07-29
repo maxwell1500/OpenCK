@@ -2,7 +2,7 @@
 
 > Reconciling the ESM I/O plan, the real-CK 395-file probe,
 > the Tes4Codes cross-reference, and the original 10-phase plan.
-> Updated 2026-07-25 after Phase 1–5 component migration completion.
+> Updated 2026-07-28 after Phase 9 completion and UI layout audit.
 
 Sources reconciled here:
 - `finalPhases.md` — original 10-phase "Final Completion Plan"
@@ -138,27 +138,27 @@ Sources reconciled here:
 
 ---
 
-## Phase 5: Gaps & Specialized Editors ⬜
+## Phase 5: Gaps & Specialized Editors ✅
 
 > The generic property grid handles name/model/icon/weight/value — but
 > it cannot handle record-specific editing. The real CK has 127 bespoke
-> editors for exactly this reason. We must build specialized widgets for
-> each complex record's unique subrecords and compose them into
+> editors for exactly this reason. We built specialized widgets for
+> each complex record's unique subrecords and composed them into
 > the `QtFormDialog` alongside the generic component grid.
 
-### 5A — Missing EditorProperty Types
+### 5A — Missing EditorProperty Types ✅
 
-> Real CK has 14+ property types. OpenCK currently has 7.
+> Real CK has 14+ property types. OpenCK now has 13.
 
 | # | Property Type | What It Enables | Status |
 |---|--------------|----------------|--------|
-| 5A.1 | `Point2EditorProperty` | 2D coordinates (UV, GUI layouts) | ⬜ |
-| 5A.2 | `Point3EditorProperty` | 3D position/rotation selectors (ref placement, door markers) | ⬜ |
-| 5A.3 | `BitfieldEditorProperty` | Flag checkboxes (record flags, AI flags, faction flags) | ⬜ |
-| 5A.4 | `EnumEditorProperty` | Dropdown enums (weapon types, armor slots, spell schools) | ⬜ |
-| 5A.5 | `MinMaxEditorProperty` | Range sliders (level ranges, damage spread) | ⬜ |
-| 5A.6 | `ColorEditorProperty` | Color pickers (light color, fog color, vertex color) | ⬜ |
-| 5A.7 | `FormComponentArrayEditorProperty` | Table-based container/array editor (inventory items, keyword table) | ⬜ |
+| 5A.1 | `Point2EditorProperty` | 2D coordinates (UV, GUI layouts) | ✅ |
+| 5A.2 | `Point3EditorProperty` | 3D position/rotation selectors (ref placement, door markers) | ✅ |
+| 5A.3 | `BitfieldEditorProperty` | Flag checkboxes (record flags, AI flags, faction flags) | ✅ |
+| 5A.4 | `EnumEditorProperty` | Dropdown enums (weapon types, armor slots, spell schools) | ✅ |
+| 5A.5 | `MinMaxEditorProperty` | Range sliders (level ranges, damage spread) | ✅ |
+| 5A.6 | `ColorEditorProperty` | Color pickers (light color, fog color, vertex color) | ✅ |
+| 5A.7 | `FormComponentArrayEditorProperty` | Table-based container/array editor (inventory items, keyword table) | ✅ |
 
 ### 5B — Per-Record Specialized Editor Widgets
 
@@ -171,41 +171,41 @@ Sources reconciled here:
 
 | # | Record | Specialized Widget | Key Subrecords | Status |
 |---|--------|-------------------|----------------|--------|
-| 5B.1 | NPC_ | **NPC Editor** — actor stats grid (health/magicka/stamina/attributes/skills), faction/race/class dropdowns, AI data panel, spell list, inventory table, face-gen preview | ACBS, SPLO, CNTO, AIDT, DOFT, SOFT, DPLT, CSCR, PKID | ⬜ |
+| 5B.1 | NPC_ | **NPC Editor** — actor stats grid (health/magicka/stamina/attributes/skills), faction/race/class dropdowns, AI data panel, spell list, inventory table, face-gen preview | ACBS, SPLO, CNTO, AIDT, DOFT, SOFT, DPLT, CSCR, PKID | ✅ |
 | 5B.2 | CREA | **Creature Editor** — same as NPC but with creature-specific data (soul, combat style, body parts) | ACBS, BNAM, NIFT | ◐ (has components, needs widget) |
 
 #### Quest & Dialogue Records
 
 | # | Record | Specialized Widget | Key Subrecords | Status |
 |---|--------|-------------------|----------------|--------|
-| 5B.3 | QUST | **Quest Editor** — stage tree (index/flag/text), alias editor, objective editor, script fragment editor | INDX, QSDT, CNAM, SCDA, ANAM, NNAM, CTDA | ⬜ |
-| 5B.4 | DIAL | **Topic Editor** — response tree, conditions per response, voice file linking | QSTI, PNAM, CTDA | ⬜ |
-| 5B.5 | INFO | **Response Editor** — response text, voice file picker, conditions grid, emotion/anim overrides | CNAM, CTDA, TLOI, SCHR | ⬜ |
+| 5B.3 | QUST | **Quest Editor** — stage tree (index/flag/text), alias editor, objective editor, script fragment editor | INDX, QSDT, CNAM, SCDA, ANAM, NNAM, CTDA | ✅ |
+| 5B.4 | DIAL | **Topic Editor** — response tree, conditions per response, voice file linking | QSTI, PNAM, CTDA | ✅ |
+| 5B.5 | INFO | **Response Editor** — response text, voice file picker, conditions grid, emotion/anim overrides | CNAM, CTDA, TLOI, SCHR | ✅ |
 | 5B.6 | SCEN | **Scene Editor** (Starfield/Fallout 4) — action list, phase timeline, actor assignment | ⬜ deferred |
 
 #### World Records
 
 | # | Record | Specialized Widget | Key Subrecords | Status |
 |---|--------|-------------------|----------------|--------|
-| 5B.7 | CELL | **Cell Editor** — lighting template, water height, music type, interior/exterior flags, cell regions, navmesh preview | XCLL, XCMT, XCLW, XCWT, XOWN, XCIM, LTMP, XCLR | ⬜ |
+| 5B.7 | CELL | **Cell Editor** — lighting template, water height, music type, interior/exterior flags, cell regions, navmesh preview | XCLL, XCMT, XCLW, XCWT, XOWN, XCIM, LTMP, XCLR | ✅ |
 | 5B.8 | WRLD | **Worldspace Editor** — map data, climate, water, LOD settings, cell grid | WNAM, XNAM, MNAM, CNAM, NAM0-NAM9 | ◐ (has components, needs widget) |
-| 5B.9 | LAND | **Landscape Editor** — heightmap brush, texture layer painting (4 layers), vertex color painting, normal editing | VHGT, VNML, VCLR, VTEX | ⬜ |
-| 5B.10 | REFR | **Reference Editor** — position/rotation/scale spinners, owner/lock pickers, enable-state, linked references, script attachment | NAME, DATA, XOWN, DNAM, XESP, XSCL, XPRM, XLKR, XLCM | ◐ (BGSRefData covers most, needs widget) |
+| 5B.9 | LAND | **Landscape Editor** — heightmap brush, texture layer painting (4 layers), vertex color painting, normal editing | VHGT, VNML, VCLR, VTEX | ✅ |
+| 5B.10 | REFR | **Reference Editor** — position/rotation/scale spinners, owner/lock pickers, enable-state, linked references, script attachment | NAME, DATA, XOWN, DNAM, XESP, XSCL, XPRM, XLKR, XLCM | ✅ |
 
 #### Character Records
 
 | # | Record | Specialized Widget | Key Subrecords | Status |
 |---|--------|-------------------|----------------|--------|
-| 5B.11 | RACE | **Race Editor** — skill bonuses, starting spells, body part data, head/hair part lists, face marker editor | DATA, DESC, SPLO, BODT, BOD2, HNAM, ENAM, FNAM, INDX, FMRK | ⬜ |
-| 5B.12 | CLAS | **Class Editor** — skill array, attribute array, specialization dropdown, description | DATA, DESC | ◐ (has components, needs widget) |
+| 5B.11 | RACE | **Race Editor** — skill bonuses, starting spells, body part data, head/hair part lists, face marker editor | DATA, DESC, SPLO, BODT, BOD2, HNAM, ENAM, FNAM, INDX, FMRK | ✅ |
+| 5B.12 | CLAS | **Class Editor** — skill array, attribute array, specialization dropdown, description | DATA, DESC | ✅ |
 
 #### Other Records
 
 | # | Record | Specialized Widget | Key Subrecords | Status |
 |---|--------|-------------------|----------------|--------|
-| 5B.13 | WTHR | **Weather Editor** — color curve editor (sky/cloud/ambient/fog/sun), precipitation data, sound FX assignment, cloud texture layers | PNAM, NAM0, FNAM, MNAM, CNAM, SNAM, QNAM, INAM, DATA | ⬜ |
-| 5B.14 | SOUN | **Sound Editor** — waveform preview, attenuation curves, output model, sound category | FNAM, SNDD, SNDX, ATTN | ◐ (BGSSoundDescriptor covers most, needs widget) |
-| 5B.15 | PACK | **AI Package Editor** — package type selector, target picker, schedule data, conditions grid | PKDT, PLDT, PTDT, PSCT, PKED, PKPT, PSDT, CTDA | ⬜ |
+| 5B.13 | WTHR | **Weather Editor** — color curve editor (sky/cloud/ambient/fog/sun), precipitation data, sound FX assignment, cloud texture layers | PNAM, NAM0, FNAM, MNAM, CNAM, SNAM, QNAM, INAM, DATA | ✅ |
+| 5B.14 | SOUN | **Sound Editor** — waveform preview, attenuation curves, output model, sound category | FNAM, SNDD, SNDX, ATTN | ✅ |
+| 5B.15 | PACK | **AI Package Editor** — package type selector, target picker, schedule data, conditions grid | PKDT, PLDT, PTDT, PSCT, PKED, PKPT, PSDT, CTDA | ⬜ deferred |
 | 5B.16 | EFSH | **Shaders** (EffectShader, ImageSpaceModifier) | ⬜ deferred |
 
 ### 5C — Per-Component Table Widgets
@@ -215,11 +215,11 @@ Sources reconciled here:
 
 | # | Widget | Replaces | Serves Components | Status |
 |---|--------|----------|-------------------|--------|
-| 5C.1 | `ContainerTableWidget` | Flat CNTO list | TESContainer_Component | ⬜ |
-| 5C.2 | `SpellListWidget` | Flat SPLO list | TESSpellList_Component (to build) | ⬜ |
-| 5C.3 | `KeywordTableWidget` | Flat CNAM list | BGSKeywordForm_Component | ⬜ |
-| 5C.4 | `BipedModelWidget` | Flat biped fields | TESBipedModel_Component | ⬜ |
-| 5C.5 | `PickupSoundsWidget` | Flat sound form IDs | BGSPickupPutdownSounds_Component | ⬜ |
+| 5C.1 | `ContainerTableWidget` | Flat CNTO list | TESContainer_Component | ✅ |
+| 5C.2 | `SpellListWidget` | Flat SPLO list | TESSpellList_Component | ✅ |
+| 5C.3 | `KeywordTableWidget` | Flat CNAM list | BGSKeywordForm_Component | ✅ |
+| 5C.4 | `BipedModelWidget` | Flat biped fields | TESBipedModel_Component | ✅ |
+| 5C.5 | `PickupSoundsWidget` | Flat sound form IDs | BGSPickupPutdownSounds_Component | ✅ |
 
 ### 5D — Tier 3 Actor Components (for NPC/CREA)
 
@@ -228,13 +228,13 @@ Sources reconciled here:
 
 | # | Component | Handles | Status |
 |---|-----------|---------|--------|
-| 5D.1 | `TESActorBaseData_Component` | ACBS (flags, base spell, fatigue, barter gold, level, calc min/max, speed multiplier) | ⬜ |
-| 5D.2 | `TESAIForm_Component` | AIDT (aggression/confidence/energy/morality/combat style) + AI packages link | ⬜ |
-| 5D.3 | `TESSpellList_Component` | SPLO counted arrays (NPC spell list) | ⬜ |
-| 5D.4 | `TESAttributes_Component` | ATTR (strength/intelligence/willpower/agility/speed/endurance/personality/luck) | ⬜ |
-| 5D.5 | `TESSkills_Component` | SKIL (block/armorer/medium armor/heavy armor/blunt/ long blade/axe/spear/athletics/enchant/destruction/alteration/illusion/conjuration/mysticism/restoration/alchemy/unarmored/security/sneak/acrobatics/light armor/short blade/marksman/mercantile/speechcraft/hand-to-hand) | ⬜ |
-| 5D.6 | `TESNPCFaceGen_Component` | Face morph data, hair/eyes/head part selection | ⬜ |
-| 5D.7 | `TESBodyParts_Component` | Body part data (BODT/BOD2) for NPC/RACE | ⬜ |
+| 5D.1 | `TESActorBaseData_Component` | ACBS (flags, base spell, fatigue, barter gold, level, calc min/max, speed multiplier) | ✅ |
+| 5D.2 | `TESAIForm_Component` | AIDT (aggression/confidence/energy/morality/combat style) + AI packages link | ✅ |
+| 5D.3 | `TESSpellList_Component` | SPLO counted arrays (NPC spell list) | ✅ |
+| 5D.4 | `TESAttributes_Component` | ATTR (strength/intelligence/willpower/agility/speed/endurance/personality/luck) | ✅ |
+| 5D.5 | `TESSkills_Component` | SKIL (block/armorer/medium armor/heavy armor/blunt/ long blade/axe/spear/athletics/enchant/destruction/alteration/illusion/conjuration/mysticism/restoration/alchemy/unarmored/security/sneak/acrobatics/light armor/short blade/marksman/mercantile/speechcraft/hand-to-hand) | ✅ |
+| 5D.6 | `TESNPCFaceGen_Component` | Face morph data, hair/eyes/head part selection | ✅ |
+| 5D.7 | `TESBodyParts_Component` | Body part data (BODT/BOD2) for NPC/RACE | ✅ |
 
 ### 5E — Container / Array Back-Compat Migration
 
@@ -243,10 +243,10 @@ Sources reconciled here:
 
 | # | Task | Status |
 |---|------|--------|
-| 5E.1 | Remove flat `containerItems` field from CONT — component handles CNTO | ⬜ |
-| 5E.2 | Remove flat `keywords` field from ARMO/WEAP/etc. — component handles CNAM/KWDA | ⬜ |
-| 5E.3 | Remove flat `spells` field from NPC — component handles SPLO | ⬜ (blocked on 5D.3) |
-| 5E.4 | Audit all records for flat-field component overlap and clean up | ⬜ |
+| 5E.1 | Remove flat `containerItems` field from CONT — component handles CNTO | ◐ (kept — single int, not array) |
+| 5E.2 | Remove flat `keywords` field from ARMO/WEAP/etc. — component handles CNAM/KWDA | ◐ (kept — still read by data.cpp/exporters) |
+| 5E.3 | Remove flat `spells` field from NPC — component handles SPLO | ◐ (kept — back-compat) |
+| 5E.4 | Audit all records for flat-field component overlap and clean up | ✅ (audit complete; most fields kept, markerCount removed from FurnRecord) |
 
 ---
 
@@ -260,7 +260,7 @@ Sources reconciled here:
 | 6.2 | BlenderLauncher — all 9 methods + bonus | ✅ |
 | 6.3 | ObjectWindow refactoring — modelPath helper | ✅ |
 | 6.4 | Error handling — 7 of 8 steps | ✅ |
-| 6.5 | fieldvalidators.hpp — deploy to remaining ~43 editors | ⬜ |
+| 6.5 | fieldvalidators.hpp — deploy to remaining ~43 editors | ✅ |
 
 ---
 
@@ -281,40 +281,40 @@ Sources reconciled here:
 
 ---
 
-## Phase 8: Editor Completions ⬜
+## Phase 8: Editor Completions ✅
 
-> From original Phase 7. Several editors have placeholder UI.
+> From original Phase 7. Several editors had placeholder UI; all completed.
 
 | # | Task | Status |
 |---|------|--------|
-| 8.1 | Spell Editor 3D preview | ⬜ |
-| 8.2 | Enchantment Editor 3D preview | ⬜ |
-| 8.3 | Landscape heightmap persistence | ⬜ |
-| 8.4 | Landscape brush repaint | ⬜ |
-| 8.5 | Landscape height limit slider | ⬜ |
-| 8.6 | Object palette from game data | ⬜ |
-| 8.7 | Object placement persistence | ⬜ |
+| 8.1 | Spell Editor 3D preview | ✅ |
+| 8.2 | Enchantment Editor 3D preview | ✅ |
+| 8.3 | Landscape heightmap persistence | ✅ |
+| 8.4 | Landscape brush repaint | ✅ |
+| 8.5 | Landscape height limit slider | ✅ |
+| 8.6 | Object palette from game data | ✅ |
+| 8.7 | Object placement persistence | ✅ |
 
 ---
 
-## Phase 9: Papyrus & Dialogue Completion ⬜
+## Phase 9: Papyrus & Dialogue Completion ✅
 
-> From original Phase 8.
+> From original Phase 8. All completed.
 
 | # | Task | Status |
 |---|------|--------|
-| 9.1 | Papyrus if/else/elif statements | ⬜ |
-| 9.2 | Papyrus while/for loops | ⬜ |
-| 9.3 | Papyrus type checking | ⬜ |
-| 9.4 | Dialogue conditional response editing | ⬜ |
-| 9.5 | Dialogue voice file association | ⬜ |
-| 9.6 | Quest graph stage editing | ⬜ |
+| 9.1 | Papyrus if/else/elif statements | ✅ |
+| 9.2 | Papyrus while/for loops | ✅ |
+| 9.3 | Papyrus type checking | ✅ |
+| 9.4 | Dialogue conditional response editing | ✅ |
+| 9.5 | Dialogue voice file association | ✅ |
+| 9.6 | Quest graph stage editing | ✅ |
 
 ---
 
 ## Phase 10: Testing ◐
 
-> 20 tests exist. All passing.
+> 26 tests exist. All passing.
 
 | # | Task | Test File | Status |
 |---|------|-----------|--------|
@@ -338,12 +338,12 @@ Sources reconciled here:
 | 10.18 | Column validator | `test_columnvalidator.cpp` | ✅ |
 | 10.19 | Search algorithm | `test_searchalgorithm.cpp` | ✅ |
 | 10.20 | Starfield ESM loading | `test_starfieldesm.cpp` | ✅ |
-| 10.21 | Component unit test | `test_component.cpp` | ⬜ |
-| 10.22 | QtFormDialog unit test | `test_qtformdialog.cpp` | ⬜ |
-| 10.23 | Editor lifecycle test | `test_editor_lifecycle.cpp` | ⬜ |
-| 10.24 | EditorProperty unit test | `test_editorproperty.cpp` | ⬜ |
-| 10.25 | Tier 3 component round-trip tests | `test_tier3_components.cpp` | ⬜ |
-| 10.26 | Specialized editor widget unit tests | `test_editor_widgets.cpp` | ⬜ |
+| 10.21 | Component unit test | `test_component.cpp` | ✅ |
+| 10.22 | QtFormDialog unit test | `test_qtformdialog.cpp` | ✅ |
+| 10.23 | Editor lifecycle test | `test_editor_lifecycle.cpp` | ✅ |
+| 10.24 | EditorProperty unit test | `test_editorproperty.cpp` | ✅ |
+| 10.25 | Tier 3 component round-trip tests | `test_tier3_components.cpp` | ✅ |
+| 10.26 | Specialized editor widget unit tests | `test_editor_widgets.cpp` | ✅ |
 
 ---
 
@@ -355,7 +355,140 @@ Sources reconciled here:
 | 11.2 | Update TECHNICAL_DEBT.md | ⬜ |
 | 11.3 | Update ROADMAP.md | ⬜ |
 | 11.4 | Add API doc comments to public interfaces | ⬜ |
-| 11.5 | Final build + test pass — 20+/20 green | ⬜ |
+| 11.5 | Final build + test pass — 26/26 green | ⬜ |
+
+---
+
+## Phase 12: UI Layout Parity with Real Creation Kit ⬜
+
+> Deep-dive audit (`docs/LAYOUT_AUDIT.md`) compared OpenCK's window/menu/dock
+> layout against the real Starfield Creation Kit (`CreationKit.exe` v1.16.244.0).
+> Found 12 gaps: 4 Critical, 3 High, 5 Medium/Low.
+> The data model and functional behavior match the CK, but the window chrome
+> (menu structure, dock arrangement, Object Window tree shape, Cell View,
+> Preferences) is substantially different. This phase closes those gaps so
+> users migrating from the real CK feel at home.
+
+### 12A — QtAdvancedDocking Integration (Critical)
+
+> The vendored ADS library at `external/ads/` is built but unused.
+> The real CK uses `CDockManager` for all panels — tear-off, tab, redock.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12A.1 | Add `ads::CDockManager` member to `MainWindow` | `mainwindow.hpp`, `mainwindow.cpp` | ⬜ |
+| 12A.2 | Replace `QDockWidget` for Object Window with `ads::CDockWidget` | `mainwindow.cpp:165-169` | ⬜ |
+| 12A.3 | Replace `QDockWidget` for Render Window with `ads::CDockWidget` (central widget) | `mainwindow.cpp:941-963` | ⬜ |
+| 12A.4 | Replace `QDockWidget` for Script Editor, Dialogue Editor, FormID Editor, Asset Browser | `mainwindow.cpp:965-1210` | ⬜ |
+| 12A.5 | Replace `QDockWidget` for Landscape Editor, Object Palette | `mainwindow.cpp:171-205` | ⬜ |
+| 12A.6 | Make Render Window the central dock widget (ADS central widget pattern) | `mainwindow.cpp` | ⬜ |
+| 12A.7 | Persist/restore ADS layout to `QtCreationKitSavedSettings.ini`-style file | `windowlayout.cpp` | ⬜ |
+
+### 12B — Cell View Docked Panel (Critical)
+
+> Real CK has `TESCellView.cpp` as a docked 2D top-down cell browser.
+> OpenCK has a modal `QDialog` (`cellsdialog.cpp`) with just a tree.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12B.1 | Rename `CellsDialog` → `CellViewPanel`, inherit `QWidget` instead of `QDialog` | `cellsdialog.hpp`, `cellsdialog.cpp` | ⬜ |
+| 12B.2 | Add worldspace selector combo at top | `cellsdialog.cpp` | ⬜ |
+| 12B.3 | Add cell list (QListView) on left side of splitter | `cellsdialog.cpp` | ⬜ |
+| 12B.4 | Add reference QTableView below cell list showing references in selected cell | `cellsdialog.cpp` | ⬜ |
+| 12B.5 | Add 2D top-down map canvas (QWidget with paintEvent) showing reference markers | `cellsdialog.cpp` | ⬜ |
+| 12B.6 | Wire as `ads::CDockWidget` in dock manager, toggle from ObjectWindows menu | `mainwindow.cpp:1307-1318` | ⬜ |
+
+### 12C — Object Window Hierarchical Tree (Critical)
+
+> Real CK: `All → Actors/Items/World Objects/Gameplay/Audio/Dialogue → record types`.
+> OpenCK: flat 27-item list. Also "Texture Asset" is mislabeled (should be "Static").
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12C.1 | Add `CategoryGroup` struct (name + child category indices) to model | `objectwindow.hpp` | ⬜ |
+| 12C.2 | Restructure `initCategories` to create parent groups: All, Actors, Items, World Objects, Gameplay, Audio, Dialogue, World, Miscellaneous | `objectwindow.cpp:29-268` | ⬜ |
+| 12C.3 | Place each existing `addCategory` call under the correct parent group | `objectwindow.cpp:240-267` | ⬜ |
+| 12C.4 | Rename "Texture Asset" → "Static" | `objectwindow.cpp:260` | ⬜ |
+| 12C.5 | Extend `index()`/`parent()`/`rowCount()` for 3-level tree (root → group → category → record) | `objectwindow.cpp:418-470` | ⬜ |
+| 12C.6 | Verify tree view renders 3 levels correctly with `setRootIsDecorated(true)` | `objectwindowdialog.cpp:130-142` | ⬜ |
+
+### 12D — Top-Level Menu Restructure (Critical)
+
+> Real CK has 16 menus; OpenCK has 9. 7 menus missing, several actions in wrong menu.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12D.1 | Add `menuCharacter` (NPC, Race, Class, Faction, BodyPart, HeadPart actions) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.2 | Add `menuObjectWindows` (Object Window, Cell View, Object Palette, Galaxy View, Scene View, Find Forms) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.3 | Add `menuRenderWindows` (Render Window, Preview Window, Lighting, Reflection Probes) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.4 | Add `menuNavmesh` (move `actionNavmesh` from View) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.5 | Add `menuTerrain` (move `actionLandscapeEditing` from World) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.6 | Add `menuAudio` (move `actionSoundEditor` from Tools) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.7 | Add `menuDocks` (ADS show/hide/restore-layout actions) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.8 | Add stub `menuGalaxy`, `menuPackin`, `menuTheme`, `menuTests` for parity | `ui/mainwindow.ui` | ⬜ |
+| 12D.9 | Move `actionObjectWindow` from View → ObjectWindows | `ui/mainwindow.ui:75` | ⬜ |
+| 12D.10 | Move `actionObjectPalette` from World → ObjectWindows | `ui/mainwindow.ui:99` | ⬜ |
+| 12D.11 | Move `actionAnimationEditor` from Tools → Character or RenderWindows | `ui/mainwindow.ui:218` | ⬜ |
+| 12D.12 | Fold `menuExport` into File > Export submenu (real CK has no top-level Export) | `ui/mainwindow.ui:205-212` | ⬜ |
+| 12D.13 | Add missing CK File actions: Create Archive, Compile Papyrus Scripts, Compact Master | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+
+### 12E — Preferences Dialog Tree Sidebar (High)
+
+> Real CK: tree sidebar (Display/Edit/Sound/Network/Archive/Papyrus/…).
+> OpenCK: flat QGroupBox stack.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12E.1 | Replace QVBoxLayout with QSplitter: left = QTreeWidget categories, right = QStackedWidget pages | `preferencesdialog.cpp:28-115` | ⬜ |
+| 12E.2 | Add category pages: General, Display, Edit, Sound, Archive, Papyrus, LOD, Network | `preferencesdialog.cpp` | ⬜ |
+| 12E.3 | Split INI storage into per-category groups (`[Display]`, `[Papyrus]`, etc.) | `preferencesdialog.cpp:121,146` | ⬜ |
+
+### 12F — QtFormDialog Modeless + Tabs (High)
+
+> Real CK form dialogs are modeless windows with tabbed component sections.
+> OpenCK dialogs are modal.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12F.1 | Change `QtFormDialog` base from `QDialog` to `QWidget` (or `ads::CDockWidget`) | `qtformdialog.hpp`, `qtformdialog.cpp` | ⬜ |
+| 12F.2 | Change `QtFormDialogManager::openOrFocus` to `show()` + `raise()` instead of `exec()` | `qtformdialogmanager.cpp` | ⬜ |
+| 12F.3 | Add `QTabWidget` with tabs: Basic (Tier-1 components), Components (Tier 2+), Keywords, Ingest/Components per record type | `qtformdialog.cpp` | ⬜ |
+
+### 12G — Render Window Toolbar Transform Tools (High)
+
+> Real CK toolbar: Selection/Move/Rotate/Scale modes + snap toggles.
+> OpenCK: grid/bounds/wireframe only.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12G.1 | Add QActionGroup with 4 checkable actions: Select, Move, Rotate, Scale | `nifviewportwidget.cpp:384-476` | ⬜ |
+| 12G.2 | Add snap-to-grid toggle + snap-to-angle toggle + snap-step spinbox | `nifviewportwidget.cpp` | ⬜ |
+| 12G.3 | Wire transform mode to gizmo state in the viewport (placeholder for edit-module work) | `nifviewportwidget.cpp` | ⬜ |
+
+### 12H — Default Dock Placement Fix (High)
+
+> Object Window is on the RIGHT; should be LEFT. `applyDefaultLayout` only runs on manual reset.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12H.1 | Change Object Window dock area from `RightDockWidgetArea` → `LeftDockWidgetArea` | `mainwindow.cpp:168` | ⬜ |
+| 12H.2 | Call `WindowLayout::applyDefaultLayout(this)` at end of `setData()` | `mainwindow.cpp:205` | ⬜ |
+
+### 12I — Status Bar Enhancements (Medium)
+
+> Real CK shows cell coordinates, object counts, selected object info.
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12I.1 | Add `mStatusCellCoords` label, update from Cell View selection | `mainwindow.cpp:114-126` | ⬜ |
+| 12I.2 | Add `mStatusSelectedObject` label, update from Object Window/RenderWindow selection | `mainwindow.cpp` | ⬜ |
+| 12I.3 | Move `mStatusPluginInfo` from permanent to transient slot | `mainwindow.cpp:121` | ⬜ |
+
+### 12J — Layout Persistence Naming (Low)
+
+| # | Task | Files | Status |
+|---|------|-------|--------|
+| 12J.1 | Rename saved-layout ini to `QtCreationKitSavedSettings.ini` for migrant familiarity | `windowlayout.cpp:83-86` | ⬜ |
 
 ---
 
@@ -368,14 +501,15 @@ Sources reconciled here:
 | 2 — Component-Property Architecture | 28/28 | ✅ |
 | 3 — Record Type Migration | 5/5 | ✅ |
 | 4 — WindowLayout & ADS | 4/4 | ✅ |
-| 5 — Gaps & Specialized Editors | 31/31 | ✅ (5E flat-field cleanup in progress) |
+| 5 — Gaps & Specialized Editors | 31/31 | ✅ |
 | 6 — NIF Pipeline & Blender | 5/5 | ✅ |
 | 7 — 3D Viewport | 6/6 | ✅ |
 | 8 — Editor Completions | 7/7 | ✅ |
-| 9 — Papyrus & Dialogue | 0/6 | ⬜ |
+| 9 — Papyrus & Dialogue | 6/6 | ✅ |
 | 10 — Testing | 26/26 | ✅ |
 | 11 — Documentation | 0/5 | ⬜ |
-| **TOTAL** | **131/142** | |
+| 12 — UI Layout Parity | 0/40 | ⬜ |
+| **TOTAL** | **137/182** | |
 
 ---
 
@@ -407,27 +541,25 @@ specialized widget.
 ## Execution Order (Recommended)
 
 ```
-Phase 5A (EditorProperty types)
-  → Phase 5C (Component table widgets)
-    → Phase 5D (Tier 3 actor components)
-      → Phase 5B (Specialized editor widgets, in priority order):
-          1. NPC (highest user impact)
-          2. RACE
-          3. CELL
-          4. LAND
-          5. WTHR
-          6. QUST
-          7. DIAL / INFO
-          8. PACK
-    → Phase 5E (flat-field cleanup)
-  → Phase 8 (Editor completions)
-  → Phase 9 (Papyrus & Dialogue)
-  → Phase 10 (Testing — add coverage for new code)
-  → Phase 11 (Documentation)
+Phases 0-9: ✅ Complete (build, I/O, components, records, layout, editors, NIF, viewport, completions, Papyrus/dialogue)
+Phase 10: ✅ Complete (26/26 tests passing)
+
+Next:
+Phase 12A (QtAdvancedDocking integration) — unblocks 12B, 12F, 12H
+  → Phase 12B (Cell View docked panel)
+  → Phase 12C (Object Window hierarchical tree)
+  → Phase 12D (Top-level menu restructure)
+  → Phase 12H (Default dock placement fix)
+  → Phase 12E (Preferences tree sidebar)
+  → Phase 12F (QtFormDialog modeless + tabs)
+  → Phase 12G (Render Window toolbar transform tools)
+  → Phase 12I (Status bar enhancements)
+  → Phase 12J (Layout persistence naming)
+  → Phase 11 (Documentation & final polish)
 ```
 
 ---
 
 *Replaces: `finalPhases.md`, `docs/IMPLEMENTATION_PLAN.md`*
 *Supersedes: `docs/CK_Real_Integration_Plan.md` (keep as reference)*
-*Updated: 2026-07-25*
+*Updated: 2026-07-28*

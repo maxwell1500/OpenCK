@@ -32,6 +32,8 @@ public:
     const QString& getRecordEditorId(int categoryId, int recordIndex) const;
     const QString& getRecordFormId(int categoryId, int recordIndex) const;
 
+    bool isRecord(const QModelIndex& index) const;
+
 public slots:
     void applyFilter(const QString& text);
 
@@ -51,11 +53,27 @@ private:
         QVector<VisibleRecord> visibleRecords;
     };
 
+    struct CategoryGroup
+    {
+        QString name;
+        QVector<int> categoryIndices;
+    };
+
     void initCategories(Data* data);
     QString formatFormId(quint32 formId) const;
 
+    bool isGroupNode(const QModelIndex& index) const;
+    bool isCategoryNode(const QModelIndex& index) const;
+    bool isRecordNode(const QModelIndex& index) const;
+    int flatCategoryId(int groupRow, int categoryRow) const;
+    bool findCategoryLocation(int flatId, int& groupRow, int& categoryRow) const;
+
+    static constexpr quintptr kGroupInternalId = 0;
+    static constexpr quintptr kRecordBit = 0x80000000u;
+
     Data* mData;
     QVector<Category> mCategories;
+    QVector<CategoryGroup> mGroups;
     QString mFilter;
 };
 
