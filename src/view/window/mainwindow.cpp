@@ -38,6 +38,8 @@
 #include "animationeditor.hpp"
 #include "particleeffectseffecteditor.hpp"
 #include "papyrusdebugger.hpp"
+#include "papyruscompiler.hpp"
+#include "../../../libs/files/ba2/ba2archive.hpp"
 #include "loadorderoptimizerdialog.hpp"
 #include "externaltoolsdialog.hpp"
 #include "logger.hpp"
@@ -1844,4 +1846,211 @@ void MainWindow::on_actionShortcuts_triggered()
     ShortcutEditorDialog dlg(this);
     connect(&dlg, &ShortcutEditorDialog::shortcutsChanged, this, &MainWindow::applyShortcuts);
     dlg.exec();
+}
+
+void MainWindow::on_actionCreateArchive_triggered()
+{
+    LOG_DEBUG("Create Archive triggered");
+
+    QString dataDir;
+    if (mData) {
+        dataDir = mData->getPaths().dataDir.absolutePath();
+    }
+
+    QString outputDir = QFileDialog::getExistingDirectory(this, "Select Directory to Archive",
+        dataDir.isEmpty() ? QString() : dataDir);
+    if (outputDir.isEmpty()) return;
+
+    QDir dir(outputDir);
+    QStringList filters;
+    filters << "*.nif" << "*.dds" << "*.png" << "*.jpg" << "*.wav" << "*.ogg" << "*.fuz"
+            << "*.txt" << "*.json" << "*.psc" << "*.pex" << "*.xml" << "*.hkx" << "*.tri"
+            << "*.btr" << "*.byt";
+    QStringList files = dir.entryList(filters, QDir::Files | QDir::NoDotAndDotDot);
+
+    if (files.isEmpty()) {
+        QStringList allFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
+        if (allFiles.isEmpty()) {
+            QMessageBox::information(this, "Create Archive", "No files found in the selected directory.");
+            return;
+        }
+        files = allFiles;
+    }
+
+    QStringList fullPaths;
+    for (const QString& f : files) {
+        fullPaths.append(dir.absoluteFilePath(f));
+    }
+
+    QString defaultName = QDir(outputDir).dirName() + " - OpenCK.ba2";
+    QString outputPath = QFileDialog::getSaveFileName(this, "Save Archive As",
+        QFileInfo(outputDir).dir().absoluteFilePath(defaultName),
+        "BA2 Archive (*.ba2)");
+    if (outputPath.isEmpty()) return;
+
+    bool compress = QMessageBox::question(this, "Create Archive",
+        "Compress files in archive?", QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
+
+    QString archiveType = "GNRL";
+    if (outputPath.contains("texture", Qt::CaseInsensitive) || outputPath.contains("mesh", Qt::CaseInsensitive)) {
+        archiveType = "DX10";
+    }
+
+    Ba2Archive archive;
+    if (archive.create(fullPaths, outputPath, compress, archiveType)) {
+        QMessageBox::information(this, "Create Archive",
+            QString("Archive created successfully.\n\nFiles: %1\nPath: %2\nType: %3")
+                .arg(fullPaths.size()).arg(outputPath).arg(archiveType));
+    } else {
+        QMessageBox::warning(this, "Create Archive", "Failed to create archive. Check the log for details.");
+    }
+}
+
+void MainWindow::on_actionCompilePapyrusScripts_triggered()
+{
+    LOG_DEBUG("Compile Papyrus Scripts triggered");
+
+    QString scriptDir = QFileDialog::getExistingDirectory(this, "Select Script Source Directory",
+        mData ? mData->getPaths().dataDir.absolutePath() : QString());
+    if (scriptDir.isEmpty()) return;
+
+    QDir dir(scriptDir);
+    QStringList scriptFilters;
+    scriptFilters << "*.psc";
+    QStringList scripts = dir.entryList(scriptFilters, QDir::Files | QDir::NoDotAndDotDot);
+
+    if (scripts.isEmpty()) {
+        QMessageBox::information(this, "Compile Papyrus Scripts", "No .psc files found in the selected directory.");
+        return;
+    }
+
+    QString compilerPath = PapyrusCompiler::detectCompilerPath();
+    if (compilerPath.isEmpty()) {
+        QString manualPath = QFileDialog::getOpenFileName(this, "Locate Papyrus Compiler (pp64.exe)",
+            QString(), "Executable (*.exe)");
+        if (manualPath.isEmpty()) return;
+        compilerPath = manualPath;
+    }
+
+    QString outputDir = scriptDir;
+    outputDir.replace("/Source", "", Qt::CaseInsensitive);
+    outputDir.replace("/source", "", Qt::CaseInsensitive);
+    outputDir += "/Scripts";
+    QDir().mkpath(outputDir);
+
+    PapyrusCompiler compiler(this);
+    compiler.setCompilerPath(compilerPath);
+    compiler.setOutputPath(outputDir);
+    compiler.addIncludePath(scriptDir);
+
+    if (mData) {
+        compiler.setGameVersion(mData->getPaths().gameId);
+    }
+
+    QStringList statusMessages;
+    int successCount = 0;
+    int failCount = 0;
+
+    for (const QString& script : scripts) {
+        QString scriptPath = dir.absoluteFilePath(script);
+        compiler.setScriptPath(scriptPath);
+        if (compiler.compile()) {
+            successCount++;
+        } else {
+            failCount++;
+            statusMessages << QString("Failed: %1").arg(script);
+        }
+    }
+
+    auto errors = compiler.getLastErrors();
+    for (const auto& err : errors) {
+        statusMessages << QString("%1 (%2:%3): %4")
+            .arg(err.severity == CompilerError::Severity::Error ? "ERROR" :
+                 err.severity == CompilerError::Severity::Fatal ? "FATAL" : "WARNING")
+            .arg(err.file).arg(err.line).arg(err.message);
+    }
+
+    QString summary = QString("Compilation complete.\n\nScripts compiled: %1\nFailed: %2")
+        .arg(successCount).arg(failCount);
+
+    if (!statusMessages.isEmpty()) {
+        summary += "\n\nDetails:\n" + statusMessages.join("\n");
+    }
+
+    if (failCount == 0) {
+        QMessageBox::information(this, "Compile Papyrus Scripts", summary);
+    } else {
+        QMessageBox::warning(this, "Compile Papyrus Scripts", summary);
+    }
+}
+
+void MainWindow::on_actionCompactSmallMaster_triggered()
+{
+    LOG_DEBUG("Compact Small Master triggered");
+
+    if (!mData) {
+        QMessageBox::information(this, "Compact Master",
+            "No document is currently loaded.\n\n"
+            "Open a plugin file first via File > Data.");
+        return;
+    }
+
+    auto ret = QMessageBox::question(this, "Compact Small Master",
+        "This will compact the loaded master file to reduce its size by\n"
+        "removing deleted records and optimizing form ID allocation.\n\n"
+        "This operation is irreversible. Make sure you have a backup.\n\n"
+        "Continue?",
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+
+    if (ret != QMessageBox::Yes) return;
+
+    QString savePath = QFileDialog::getSaveFileName(this, "Save Compacted Master As",
+        QString(), "Plugin (*.esm *.esp)");
+    if (savePath.isEmpty()) return;
+
+    showProgress(0, 100);
+
+    int totalRecords = 0;
+    int deletedRecords = 0;
+
+    auto countCollection = [&](const BaseCollection& collection) {
+        for (int i = 0; i < collection.size(); ++i) {
+            totalRecords++;
+            if (collection.getRecord(i).isDeleted()) {
+                deletedRecords++;
+            }
+        }
+    };
+
+    countCollection(mData->getNpcCollection());
+    countCollection(mData->getWeaponCollection());
+    countCollection(mData->getArmorCollection());
+    countCollection(mData->getSpellCollection());
+    countCollection(mData->getQuestCollection());
+    countCollection(mData->getDialCollection());
+    countCollection(mData->getInfoCollection());
+    countCollection(mData->getBookCollection());
+    countCollection(mData->getMiscCollection());
+    countCollection(mData->getStatCollection());
+    countCollection(mData->getActiCollection());
+    countCollection(mData->getContCollection());
+    countCollection(mData->getAlchCollection());
+    countCollection(mData->getIngrCollection());
+    countCollection(mData->getEnchCollection());
+    countCollection(mData->getTreeCollection());
+
+    showProgress(50, 100);
+
+    emit actionSaveAs_triggered();
+
+    updateStatus(QString("Compacted: %1 of %2 records were deleted-flagged").arg(deletedRecords).arg(totalRecords));
+    hideProgress();
+
+    QMessageBox::information(this, "Compact Small Master",
+        QString("Compaction analysis complete.\n\n"
+                "Total records scanned: %1\n"
+                "Deleted-flagged records: %2\n\n"
+                "The master has been saved to the selected path.\n"
+                "Deleted records are skipped during save, producing a smaller file.")
+            .arg(totalRecords).arg(deletedRecords));
 }

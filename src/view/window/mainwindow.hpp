@@ -136,6 +136,9 @@ private slots:
     void on_actionExportTextures_triggered();
     void on_actionBatchExport_triggered();
     void on_actionShortcuts_triggered();
+    void on_actionCreateArchive_triggered();
+    void on_actionCompilePapyrusScripts_triggered();
+    void on_actionCompactSmallMaster_triggered();
     void runValidation();
 
 private:

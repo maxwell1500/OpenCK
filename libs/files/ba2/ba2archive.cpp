@@ -183,3 +183,165 @@ bool Ba2Archive::extract(quint32 index, const QString& outputPath) const
     LOG_INFO(QString("Extracted: %1 -> %2").arg(entry.relativePath).arg(outputPath));
     return true;
 }
+
+bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
+                         bool compress, const QString& archiveType)
+{
+    if (filePaths.isEmpty()) {
+        LOG_ERROR("BA2 create: no files to archive");
+        return false;
+    }
+
+    QFile outFile(outputPath);
+    if (!outFile.open(QIODevice::WriteOnly)) {
+        LOG_ERROR(QString("BA2 create: cannot open output file: %1").arg(outputPath));
+        return false;
+    }
+
+    QDataStream out(&outFile);
+    out.setByteOrder(QDataStream::LittleEndian);
+
+    // Determine a base directory for computing relative paths
+    QFileInfo outInfo(outputPath);
+    QString baseDir = outInfo.absolutePath();
+
+    // Collect file data and relative paths
+    struct InputFile {
+        QString relativePath;
+        QByteArray data;
+    };
+    QVector<InputFile> inputs;
+    inputs.reserve(filePaths.size());
+
+    for (const QString& filePath : filePaths) {
+        QFileInfo fi(filePath);
+        QString relPath = fi.fileName();
+
+        // Try to compute a relative path from the base dir
+        QString absPath = fi.absoluteFilePath();
+        if (absPath.startsWith(baseDir, Qt::CaseInsensitive)) {
+            relPath = absPath.mid(baseDir.length() + 1).replace('\\', '/');
+        }
+
+        QFile inFile(filePath);
+        if (!inFile.open(QIODevice::ReadOnly)) {
+            LOG_WARNING(QString("BA2 create: skipping unreadable file: %1").arg(filePath));
+            continue;
+        }
+
+        InputFile input;
+        input.relativePath = relPath;
+        input.data = inFile.readAll();
+        inFile.close();
+
+        if (input.data.isEmpty()) {
+            LOG_WARNING(QString("BA2 create: skipping empty file: %1").arg(filePath));
+            continue;
+        }
+
+        inputs.append(input);
+    }
+
+    if (inputs.isEmpty()) {
+        LOG_ERROR("BA2 create: no valid files to archive");
+        outFile.close();
+        return false;
+    }
+
+    // --- BA2 Header (24 bytes) ---
+    // Magic: 'BA2 ' (0x20424132 big-endian, but we write little-endian 0x20584142 is wrong)
+    // Actual BA2 magic is 0x42413220 ("BA2 " as bytes, little-endian read gives 0x20324142)
+    // The correct magic bytes are: 0x42 0x41 0x32 0x20 ("BA2 ")
+    out.writeRawData("BA2 ", 4);
+
+    // Version (4 bytes)
+    quint32 version = 1;
+    out << version;
+
+    // Archive type (4 bytes): "GNRL" or "DX10"
+    QByteArray typeBytes = archiveType.toLatin1().leftJustified(4, ' ', true);
+    out.writeRawData(typeBytes.data(), 4);
+
+    // --- File table ---
+    // For each file: nameLen(4) + name(nameLen) + compressedSize(4) + uncompressedSize(4) + flags(4) + offset(8)
+    // We write the file table first, then data after it.
+
+    quint32 fileCount = static_cast<quint32>(inputs.size());
+
+    // Calculate table size to know where file data starts
+    quint64 tableSize = 0;
+    for (const auto& input : inputs) {
+        tableSize += 4 + input.relativePath.length() + 4 + 4 + 4 + 8;
+    }
+
+    quint64 dataOffset = 24 + tableSize; // header (24) + table
+    quint64 currentDataOffset = dataOffset;
+
+    // Write file table entries and collect compressed data
+    struct TableEntry {
+        QString relativePath;
+        quint32 compressedSize;
+        quint32 uncompressedSize;
+        quint32 flags;
+        quint64 fileOffset;
+        QByteArray fileData;
+    };
+    QVector<TableEntry> tableEntries;
+
+    for (const auto& input : inputs) {
+        TableEntry entry;
+        entry.relativePath = input.relativePath;
+        entry.uncompressedSize = static_cast<quint32>(input.data.size());
+        entry.flags = compress ? 0x01 : 0x00;
+
+        if (compress) {
+            // Compress with zlib
+            QByteArray compressed;
+            compressed.resize(input.data.size() + input.data.size() / 100 + 600);
+            uLongf destLen = compressed.size();
+            int ret = compress2(reinterpret_cast<Bytef*>(compressed.data()), &destLen,
+                               reinterpret_cast<const Bytef*>(input.data.constData()),
+                               input.data.size(), Z_DEFAULT_COMPRESSION);
+            if (ret == Z_OK && destLen < static_cast<uLongf>(input.data.size())) {
+                compressed.resize(destLen);
+                entry.fileData = compressed;
+                entry.compressedSize = static_cast<quint32>(destLen);
+            } else {
+                // Compression failed or didn't help — store uncompressed
+                entry.fileData = input.data;
+                entry.compressedSize = entry.uncompressedSize;
+                entry.flags = 0x00;
+            }
+        } else {
+            entry.fileData = input.data;
+            entry.compressedSize = entry.uncompressedSize;
+        }
+
+        entry.fileOffset = currentDataOffset;
+        currentDataOffset += entry.compressedSize;
+        tableEntries.append(entry);
+    }
+
+    // Write file table
+    for (const auto& entry : tableEntries) {
+        QByteArray nameBytes = entry.relativePath.toLatin1();
+        quint32 nameLen = static_cast<quint32>(nameBytes.size());
+        out << nameLen;
+        out.writeRawData(nameBytes.data(), nameLen);
+        out << entry.compressedSize;
+        out << entry.uncompressedSize;
+        out << entry.flags;
+        out << entry.fileOffset;
+    }
+
+    // Write file data
+    for (const auto& entry : tableEntries) {
+        outFile.write(entry.fileData);
+    }
+
+    outFile.close();
+
+    LOG_INFO(QString("BA2 create: wrote %1 files to %2 (type=%3, compressed=%4)")
+                .arg(fileCount).arg(outputPath).arg(archiveType).arg(compress));
+    return true;
+}

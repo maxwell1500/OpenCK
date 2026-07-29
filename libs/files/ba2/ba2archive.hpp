@@ -15,6 +15,8 @@ struct Ba2FileEntry {
     bool compressed = false;
 };
 
+/// BA2 (Bethesda Archive 2) reader and writer. Handles both extraction
+/// and creation of BA2 archives used by Skyrim SE, Fallout 4, Starfield.
 class Ba2Archive {
 public:
     Ba2Archive();
@@ -25,7 +27,7 @@ public:
     Ba2Archive(Ba2Archive&&) = delete;
     Ba2Archive& operator=(Ba2Archive&&) = delete;
 
-    // Open a BA2 archive file. Returns true on success.
+    // Open a BA2 archive file for reading. Returns true on success.
     bool open(const QString& path);
 
     // Get all file entries in the archive.
@@ -40,6 +42,11 @@ public:
 
     // Number of files in the archive.
     quint32 fileCount() const { return static_cast<quint32>(mEntries.size()); }
+
+    // Create a new BA2 archive from a list of files. Returns true on success.
+    // archiveType: "GNRL" for general files, "DX10" for textures.
+    bool create(const QStringList& filePaths, const QString& outputPath,
+                bool compress = true, const QString& archiveType = "GNRL");
 
 private:
     QString mName;

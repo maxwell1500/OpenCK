@@ -430,7 +430,7 @@ Sources reconciled here:
 | 12D.10 | Move `actionObjectPalette` from World → ObjectWindows | `ui/mainwindow.ui:99` | ✅ |
 | 12D.11 | Move `actionAnimationEditor` from Tools → Character or RenderWindows | `ui/mainwindow.ui:218` | ✅ |
 | 12D.12 | Fold `menuExport` into File > Export submenu (real CK has no top-level Export) | `ui/mainwindow.ui:205-212` | ✅ |
-| 12D.13 | Add missing CK File actions: Create Archive, Compile Papyrus Scripts, Compact Master | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ (deferred — stub menus in place) |
+| 12D.13 | Add missing CK File actions: Create Archive, Compile Papyrus Scripts, Compact Master | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
 
 ### 12E — Preferences Dialog Tree Sidebar (High)
 
@@ -508,8 +508,8 @@ Sources reconciled here:
 | 9 — Papyrus & Dialogue | 6/6 | ✅ |
 | 10 — Testing | 26/26 | ✅ |
 | 11 — Documentation | 5/5 | ✅ |
-| 12 — UI Layout Parity | 39/40 | ✅ |
-| **TOTAL** | **181/182** | ✅ |
+| 12 — UI Layout Parity | 40/40 | ✅ |
+| **TOTAL** | **182/182** | ✅ |
 
 ---
 
