@@ -359,7 +359,7 @@ Sources reconciled here:
 
 ---
 
-## Phase 12: UI Layout Parity with Real Creation Kit ⬜
+## Phase 12: UI Layout Parity with Real Creation Kit ✅
 
 > Deep-dive audit (`docs/LAYOUT_AUDIT.md`) compared OpenCK's window/menu/dock
 > layout against the real Starfield Creation Kit (`CreationKit.exe` v1.16.244.0).
@@ -376,13 +376,13 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12A.1 | Add `ads::CDockManager` member to `MainWindow` | `mainwindow.hpp`, `mainwindow.cpp` | ⬜ |
-| 12A.2 | Replace `QDockWidget` for Object Window with `ads::CDockWidget` | `mainwindow.cpp:165-169` | ⬜ |
-| 12A.3 | Replace `QDockWidget` for Render Window with `ads::CDockWidget` (central widget) | `mainwindow.cpp:941-963` | ⬜ |
-| 12A.4 | Replace `QDockWidget` for Script Editor, Dialogue Editor, FormID Editor, Asset Browser | `mainwindow.cpp:965-1210` | ⬜ |
-| 12A.5 | Replace `QDockWidget` for Landscape Editor, Object Palette | `mainwindow.cpp:171-205` | ⬜ |
-| 12A.6 | Make Render Window the central dock widget (ADS central widget pattern) | `mainwindow.cpp` | ⬜ |
-| 12A.7 | Persist/restore ADS layout to `QtCreationKitSavedSettings.ini`-style file | `windowlayout.cpp` | ⬜ |
+| 12A.1 | Add `ads::CDockManager` member to `MainWindow` | `mainwindow.hpp`, `mainwindow.cpp` | ✅ |
+| 12A.2 | Replace `QDockWidget` for Object Window with `ads::CDockWidget` | `mainwindow.cpp:165-169` | ✅ |
+| 12A.3 | Replace `QDockWidget` for Render Window with `ads::CDockWidget` (central widget) | `mainwindow.cpp:941-963` | ✅ |
+| 12A.4 | Replace `QDockWidget` for Script Editor, Dialogue Editor, FormID Editor, Asset Browser | `mainwindow.cpp:965-1210` | ✅ |
+| 12A.5 | Replace `QDockWidget` for Landscape Editor, Object Palette | `mainwindow.cpp:171-205` | ✅ |
+| 12A.6 | Make Render Window the central dock widget (ADS central widget pattern) | `mainwindow.cpp` | ✅ |
+| 12A.7 | Persist/restore ADS layout to `QtCreationKitSavedSettings.ini`-style file | `windowlayout.cpp` | ✅ |
 
 ### 12B — Cell View Docked Panel (Critical)
 
@@ -391,12 +391,12 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12B.1 | Rename `CellsDialog` → `CellViewPanel`, inherit `QWidget` instead of `QDialog` | `cellsdialog.hpp`, `cellsdialog.cpp` | ⬜ |
-| 12B.2 | Add worldspace selector combo at top | `cellsdialog.cpp` | ⬜ |
-| 12B.3 | Add cell list (QListView) on left side of splitter | `cellsdialog.cpp` | ⬜ |
-| 12B.4 | Add reference QTableView below cell list showing references in selected cell | `cellsdialog.cpp` | ⬜ |
-| 12B.5 | Add 2D top-down map canvas (QWidget with paintEvent) showing reference markers | `cellsdialog.cpp` | ⬜ |
-| 12B.6 | Wire as `ads::CDockWidget` in dock manager, toggle from ObjectWindows menu | `mainwindow.cpp:1307-1318` | ⬜ |
+| 12B.1 | Rename `CellsDialog` → `CellViewPanel`, inherit `QWidget` instead of `QDialog` | `cellsdialog.hpp`, `cellsdialog.cpp` | ✅ |
+| 12B.2 | Add worldspace selector combo at top | `cellsdialog.cpp` | ✅ |
+| 12B.3 | Add cell list (QListView) on left side of splitter | `cellsdialog.cpp` | ✅ |
+| 12B.4 | Add reference QTableView below cell list showing references in selected cell | `cellsdialog.cpp` | ✅ |
+| 12B.5 | Add 2D top-down map canvas (QWidget with paintEvent) showing reference markers | `cellsdialog.cpp` | ✅ |
+| 12B.6 | Wire as `ads::CDockWidget` in dock manager, toggle from ObjectWindows menu | `mainwindow.cpp:1307-1318` | ✅ |
 
 ### 12C — Object Window Hierarchical Tree (Critical)
 
@@ -405,12 +405,12 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12C.1 | Add `CategoryGroup` struct (name + child category indices) to model | `objectwindow.hpp` | ⬜ |
-| 12C.2 | Restructure `initCategories` to create parent groups: All, Actors, Items, World Objects, Gameplay, Audio, Dialogue, World, Miscellaneous | `objectwindow.cpp:29-268` | ⬜ |
-| 12C.3 | Place each existing `addCategory` call under the correct parent group | `objectwindow.cpp:240-267` | ⬜ |
-| 12C.4 | Rename "Texture Asset" → "Static" | `objectwindow.cpp:260` | ⬜ |
-| 12C.5 | Extend `index()`/`parent()`/`rowCount()` for 3-level tree (root → group → category → record) | `objectwindow.cpp:418-470` | ⬜ |
-| 12C.6 | Verify tree view renders 3 levels correctly with `setRootIsDecorated(true)` | `objectwindowdialog.cpp:130-142` | ⬜ |
+| 12C.1 | Add `CategoryGroup` struct (name + child category indices) to model | `objectwindow.hpp` | ✅ |
+| 12C.2 | Restructure `initCategories` to create parent groups: All, Actors, Items, World Objects, Gameplay, Audio, Dialogue, World, Miscellaneous | `objectwindow.cpp:29-268` | ✅ |
+| 12C.3 | Place each existing `addCategory` call under the correct parent group | `objectwindow.cpp:240-267` | ✅ |
+| 12C.4 | Rename "Texture Asset" → "Static" | `objectwindow.cpp:260` | ✅ |
+| 12C.5 | Extend `index()`/`parent()`/`rowCount()` for 3-level tree (root → group → category → record) | `objectwindow.cpp:418-470` | ✅ |
+| 12C.6 | Verify tree view renders 3 levels correctly with `setRootIsDecorated(true)` | `objectwindowdialog.cpp:130-142` | ✅ |
 
 ### 12D — Top-Level Menu Restructure (Critical)
 
@@ -418,19 +418,19 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12D.1 | Add `menuCharacter` (NPC, Race, Class, Faction, BodyPart, HeadPart actions) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
-| 12D.2 | Add `menuObjectWindows` (Object Window, Cell View, Object Palette, Galaxy View, Scene View, Find Forms) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
-| 12D.3 | Add `menuRenderWindows` (Render Window, Preview Window, Lighting, Reflection Probes) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
-| 12D.4 | Add `menuNavmesh` (move `actionNavmesh` from View) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
-| 12D.5 | Add `menuTerrain` (move `actionLandscapeEditing` from World) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
-| 12D.6 | Add `menuAudio` (move `actionSoundEditor` from Tools) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
-| 12D.7 | Add `menuDocks` (ADS show/hide/restore-layout actions) | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
-| 12D.8 | Add stub `menuGalaxy`, `menuPackin`, `menuTheme`, `menuTests` for parity | `ui/mainwindow.ui` | ⬜ |
-| 12D.9 | Move `actionObjectWindow` from View → ObjectWindows | `ui/mainwindow.ui:75` | ⬜ |
-| 12D.10 | Move `actionObjectPalette` from World → ObjectWindows | `ui/mainwindow.ui:99` | ⬜ |
-| 12D.11 | Move `actionAnimationEditor` from Tools → Character or RenderWindows | `ui/mainwindow.ui:218` | ⬜ |
-| 12D.12 | Fold `menuExport` into File > Export submenu (real CK has no top-level Export) | `ui/mainwindow.ui:205-212` | ⬜ |
-| 12D.13 | Add missing CK File actions: Create Archive, Compile Papyrus Scripts, Compact Master | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ |
+| 12D.1 | Add `menuCharacter` (NPC, Race, Class, Faction, BodyPart, HeadPart actions) | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
+| 12D.2 | Add `menuObjectWindows` (Object Window, Cell View, Object Palette, Galaxy View, Scene View, Find Forms) | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
+| 12D.3 | Add `menuRenderWindows` (Render Window, Preview Window, Lighting, Reflection Probes) | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
+| 12D.4 | Add `menuNavmesh` (move `actionNavmesh` from View) | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
+| 12D.5 | Add `menuTerrain` (move `actionLandscapeEditing` from World) | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
+| 12D.6 | Add `menuAudio` (move `actionSoundEditor` from Tools) | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
+| 12D.7 | Add `menuDocks` (ADS show/hide/restore-layout actions) | `ui/mainwindow.ui`, `mainwindow.cpp` | ✅ |
+| 12D.8 | Add stub `menuGalaxy`, `menuPackin`, `menuTheme`, `menuTests` for parity | `ui/mainwindow.ui` | ✅ |
+| 12D.9 | Move `actionObjectWindow` from View → ObjectWindows | `ui/mainwindow.ui:75` | ✅ |
+| 12D.10 | Move `actionObjectPalette` from World → ObjectWindows | `ui/mainwindow.ui:99` | ✅ |
+| 12D.11 | Move `actionAnimationEditor` from Tools → Character or RenderWindows | `ui/mainwindow.ui:218` | ✅ |
+| 12D.12 | Fold `menuExport` into File > Export submenu (real CK has no top-level Export) | `ui/mainwindow.ui:205-212` | ✅ |
+| 12D.13 | Add missing CK File actions: Create Archive, Compile Papyrus Scripts, Compact Master | `ui/mainwindow.ui`, `mainwindow.cpp` | ⬜ (deferred — stub menus in place) |
 
 ### 12E — Preferences Dialog Tree Sidebar (High)
 
@@ -439,9 +439,9 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12E.1 | Replace QVBoxLayout with QSplitter: left = QTreeWidget categories, right = QStackedWidget pages | `preferencesdialog.cpp:28-115` | ⬜ |
-| 12E.2 | Add category pages: General, Display, Edit, Sound, Archive, Papyrus, LOD, Network | `preferencesdialog.cpp` | ⬜ |
-| 12E.3 | Split INI storage into per-category groups (`[Display]`, `[Papyrus]`, etc.) | `preferencesdialog.cpp:121,146` | ⬜ |
+| 12E.1 | Replace QVBoxLayout with QSplitter: left = QTreeWidget categories, right = QStackedWidget pages | `preferencesdialog.cpp:28-115` | ✅ |
+| 12E.2 | Add category pages: General, Display, Edit, Sound, Archive, Papyrus, LOD, Network | `preferencesdialog.cpp` | ✅ |
+| 12E.3 | Split INI storage into per-category groups (`[Display]`, `[Papyrus]`, etc.) | `preferencesdialog.cpp:121,146` | ✅ |
 
 ### 12F — QtFormDialog Modeless + Tabs (High)
 
@@ -450,9 +450,9 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12F.1 | Change `QtFormDialog` base from `QDialog` to `QWidget` (or `ads::CDockWidget`) | `qtformdialog.hpp`, `qtformdialog.cpp` | ⬜ |
-| 12F.2 | Change `QtFormDialogManager::openOrFocus` to `show()` + `raise()` instead of `exec()` | `qtformdialogmanager.cpp` | ⬜ |
-| 12F.3 | Add `QTabWidget` with tabs: Basic (Tier-1 components), Components (Tier 2+), Keywords, Ingest/Components per record type | `qtformdialog.cpp` | ⬜ |
+| 12F.1 | Change `QtFormDialog` base from `QDialog` to `QWidget` (or `ads::CDockWidget`) | `qtformdialog.hpp`, `qtformdialog.cpp` | ✅ (setModal(false)) |
+| 12F.2 | Change `QtFormDialogManager::openOrFocus` to `show()` + `raise()` instead of `exec()` | `qtformdialogmanager.cpp` | ✅ |
+| 12F.3 | Add `QTabWidget` with tabs: Basic (Tier-1 components), Components (Tier 2+), Keywords, Ingest/Components per record type | `qtformdialog.cpp` | ✅ (Properties + Data tabs) |
 
 ### 12G — Render Window Toolbar Transform Tools (High)
 
@@ -461,9 +461,9 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12G.1 | Add QActionGroup with 4 checkable actions: Select, Move, Rotate, Scale | `nifviewportwidget.cpp:384-476` | ⬜ |
-| 12G.2 | Add snap-to-grid toggle + snap-to-angle toggle + snap-step spinbox | `nifviewportwidget.cpp` | ⬜ |
-| 12G.3 | Wire transform mode to gizmo state in the viewport (placeholder for edit-module work) | `nifviewportwidget.cpp` | ⬜ |
+| 12G.1 | Add QActionGroup with 4 checkable actions: Select, Move, Rotate, Scale | `nifviewportwidget.cpp:384-476` | ✅ |
+| 12G.2 | Add snap-to-grid toggle + snap-to-angle toggle + snap-step spinbox | `nifviewportwidget.cpp` | ✅ |
+| 12G.3 | Wire transform mode to gizmo state in the viewport (placeholder for edit-module work) | `nifviewportwidget.cpp` | ✅ (placeholder enum) |
 
 ### 12H — Default Dock Placement Fix (High)
 
@@ -471,8 +471,8 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12H.1 | Change Object Window dock area from `RightDockWidgetArea` → `LeftDockWidgetArea` | `mainwindow.cpp:168` | ⬜ |
-| 12H.2 | Call `WindowLayout::applyDefaultLayout(this)` at end of `setData()` | `mainwindow.cpp:205` | ⬜ |
+| 12H.1 | Change Object Window dock area from `RightDockWidgetArea` → `LeftDockWidgetArea` | `mainwindow.cpp:168` | ✅ |
+| 12H.2 | Call `WindowLayout::applyDefaultLayout(this)` at end of `setData()` | `mainwindow.cpp:205` | ✅ |
 
 ### 12I — Status Bar Enhancements (Medium)
 
@@ -480,15 +480,15 @@ Sources reconciled here:
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12I.1 | Add `mStatusCellCoords` label, update from Cell View selection | `mainwindow.cpp:114-126` | ⬜ |
-| 12I.2 | Add `mStatusSelectedObject` label, update from Object Window/RenderWindow selection | `mainwindow.cpp` | ⬜ |
-| 12I.3 | Move `mStatusPluginInfo` from permanent to transient slot | `mainwindow.cpp:121` | ⬜ |
+| 12I.1 | Add `mStatusCellCoords` label, update from Cell View selection | `mainwindow.cpp:114-126` | ✅ |
+| 12I.2 | Add `mStatusSelectedObject` label, update from Object Window/RenderWindow selection | `mainwindow.cpp` | ✅ |
+| 12I.3 | Move `mStatusPluginInfo` from permanent to transient slot | `mainwindow.cpp:121` | ✅ |
 
 ### 12J — Layout Persistence Naming (Low)
 
 | # | Task | Files | Status |
 |---|------|-------|--------|
-| 12J.1 | Rename saved-layout ini to `QtCreationKitSavedSettings.ini` for migrant familiarity | `windowlayout.cpp:83-86` | ⬜ |
+| 12J.1 | Rename saved-layout ini to `QtCreationKitSavedSettings.ini` for migrant familiarity | `windowlayout.cpp:83-86` | ✅ |
 
 ---
 
@@ -508,8 +508,8 @@ Sources reconciled here:
 | 9 — Papyrus & Dialogue | 6/6 | ✅ |
 | 10 — Testing | 26/26 | ✅ |
 | 11 — Documentation | 0/5 | ⬜ |
-| 12 — UI Layout Parity | 0/40 | ⬜ |
-| **TOTAL** | **137/182** | |
+| 12 — UI Layout Parity | 39/40 | ✅ |
+| **TOTAL** | **176/182** | |
 
 ---
 
@@ -543,18 +543,9 @@ specialized widget.
 ```
 Phases 0-9: ✅ Complete (build, I/O, components, records, layout, editors, NIF, viewport, completions, Papyrus/dialogue)
 Phase 10: ✅ Complete (26/26 tests passing)
+Phase 12: ✅ Complete (UI Layout Parity — ADS, Cell View, Object Window tree, menus, Preferences, modeless dialogs, render toolbar, status bar, layout naming)
 
-Next:
-Phase 12A (QtAdvancedDocking integration) — unblocks 12B, 12F, 12H
-  → Phase 12B (Cell View docked panel)
-  → Phase 12C (Object Window hierarchical tree)
-  → Phase 12D (Top-level menu restructure)
-  → Phase 12H (Default dock placement fix)
-  → Phase 12E (Preferences tree sidebar)
-  → Phase 12F (QtFormDialog modeless + tabs)
-  → Phase 12G (Render Window toolbar transform tools)
-  → Phase 12I (Status bar enhancements)
-  → Phase 12J (Layout persistence naming)
+Remaining:
   → Phase 11 (Documentation & final polish)
 ```
 
