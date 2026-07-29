@@ -165,6 +165,8 @@ private:
     ads::CDockManager* mDockManager;
     QLabel* mStatusRecordCount;
     QLabel* mStatusPluginInfo;
+    QLabel* mStatusCellCoords;
+    QLabel* mStatusSelectedObject;
     QProgressBar* mStatusProgressBar;
 };
 

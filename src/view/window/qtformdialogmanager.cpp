@@ -57,6 +57,7 @@ void QtFormDialogManager::openOrFocus(const QString& formIdKey,
     }
 
     auto* dlg = new QtFormDialog(formIdKey, components, parent);
+    dlg->setModal(false);
 
     auto factoryIt = m_factories.find(recordType);
     if (factoryIt != m_factories.end() && factoryIt.value())

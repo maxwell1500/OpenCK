@@ -34,13 +34,15 @@
     <addaction name="actionData"/>
     <addaction name="actionSave"/>
     <addaction name="actionSaveAs"/>
-    <addaction name="actionClosePlugin"/>
-    <addaction name="separator"/>
-    <addaction name="actionPreferences"/>
-    <addaction name="actionValidate"/>
-    <addaction name="separator"/>
-    <addaction name="actionExit"/>
-   </widget>
+     <addaction name="actionClosePlugin"/>
+     <addaction name="separator"/>
+     <addaction name="menuExport"/>
+     <addaction name="separator"/>
+     <addaction name="actionPreferences"/>
+     <addaction name="actionValidate"/>
+     <addaction name="separator"/>
+     <addaction name="actionExit"/>
+    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
      <string>Edit</string>
@@ -72,32 +74,104 @@
     <property name="title">
      <string>View</string>
     </property>
-    <addaction name="actionObjectWindow"/>
-    <addaction name="action3DViewport"/>
-    <addaction name="actionScriptEditor"/>
-    <addaction name="actionDialogueEditor"/>
-    <addaction name="actionDialogueTree"/>
-    <addaction name="actionQuestGraph"/>
-    <addaction name="actionAIPackages"/>
-    <addaction name="actionWeatherLight"/>
-    <addaction name="actionNavmesh"/>
-    <addaction name="actionWater"/>
-    <addaction name="actionCellTransitions"/>
-    <addaction name="actionMaterialEditor"/>
-    <addaction name="actionPapyrusDebugger"/>
-    <addaction name="actionFormIdEditor"/>
-   </widget>
+     <addaction name="actionScriptEditor"/>
+     <addaction name="actionDialogueEditor"/>
+     <addaction name="actionDialogueTree"/>
+     <addaction name="actionQuestGraph"/>
+     <addaction name="actionAIPackages"/>
+     <addaction name="actionWeatherLight"/>
+     <addaction name="actionWater"/>
+     <addaction name="actionCellTransitions"/>
+     <addaction name="actionPapyrusDebugger"/>
+     <addaction name="actionFormIdEditor"/>
+    </widget>
    <widget class="QMenu" name="menuWorld">
     <property name="title">
      <string>World</string>
     </property>
-    <addaction name="actionWorldspaces"/>
-    <addaction name="actionCells"/>
-    <addaction name="separator"/>
-    <addaction name="actionLandscapeEditing"/>
-    <addaction name="actionWorldView"/>
-    <addaction name="actionObjectPalette"/>
-   </widget>
+     <addaction name="actionWorldspaces"/>
+     <addaction name="actionWorldView"/>
+    </widget>
+    <widget class="QMenu" name="menuCharacter">
+     <property name="title">
+      <string>Character</string>
+     </property>
+     <addaction name="actionAnimationEditor"/>
+     <addaction name="separator"/>
+     <addaction name="actionNpcEditor"/>
+     <addaction name="actionRaceEditor"/>
+     <addaction name="actionClassEditor"/>
+     <addaction name="actionFactionEditor"/>
+    </widget>
+    <widget class="QMenu" name="menuObjectWindows">
+     <property name="title">
+      <string>ObjectWindows</string>
+     </property>
+     <addaction name="actionObjectWindow"/>
+     <addaction name="actionCells"/>
+     <addaction name="actionObjectPalette"/>
+    </widget>
+    <widget class="QMenu" name="menuRenderWindows">
+     <property name="title">
+      <string>RenderWindows</string>
+     </property>
+     <addaction name="action3DViewport"/>
+     <addaction name="actionMaterialEditor"/>
+     <addaction name="separator"/>
+     <addaction name="actionPreviewWindow"/>
+     <addaction name="actionLighting"/>
+    </widget>
+    <widget class="QMenu" name="menuNavmesh">
+     <property name="title">
+      <string>Navmesh</string>
+     </property>
+     <addaction name="actionNavmesh"/>
+    </widget>
+    <widget class="QMenu" name="menuTerrain">
+     <property name="title">
+      <string>Terrain</string>
+     </property>
+     <addaction name="actionLandscapeEditing"/>
+    </widget>
+    <widget class="QMenu" name="menuAudio">
+     <property name="title">
+      <string>Audio</string>
+     </property>
+     <addaction name="actionSoundEditor"/>
+    </widget>
+    <widget class="QMenu" name="menuGalaxy">
+     <property name="title">
+      <string>Galaxy</string>
+     </property>
+     <addaction name="actionNotImplementedGalaxy"/>
+    </widget>
+    <widget class="QMenu" name="menuPackin">
+     <property name="title">
+      <string>Packin</string>
+     </property>
+     <addaction name="actionNotImplementedPackin"/>
+    </widget>
+    <widget class="QMenu" name="menuDocks">
+     <property name="title">
+      <string>Docks</string>
+     </property>
+     <addaction name="actionResetWindowLayout"/>
+     <addaction name="separator"/>
+     <addaction name="actionSaveLayout"/>
+     <addaction name="actionLoadLayout"/>
+    </widget>
+    <widget class="QMenu" name="menuTheme">
+     <property name="title">
+      <string>Theme</string>
+     </property>
+     <addaction name="actionNotImplementedTheme"/>
+    </widget>
+    <widget class="QMenu" name="menuTests">
+     <property name="title">
+      <string>Tests</string>
+     </property>
+     <addaction name="actionNotImplementedTests"/>
+    </widget>
    <widget class="QMenu" name="menuGameplay">
     <property name="title">
      <string>Gameplay</string>
@@ -123,15 +197,25 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
-     <addaction name="menuFile"/>
-     <addaction name="menuEdit"/>
-     <addaction name="menuView"/>
-     <addaction name="menuWorld"/>
-     <addaction name="menuPlugins"/>
-     <addaction name="menuExport"/>
-     <addaction name="menuTools"/>
-     <addaction name="menuGameplay"/>
-     <addaction name="menuHelp"/>
+      <addaction name="menuFile"/>
+      <addaction name="menuEdit"/>
+      <addaction name="menuView"/>
+      <addaction name="menuCharacter"/>
+      <addaction name="menuGameplay"/>
+      <addaction name="menuWorld"/>
+      <addaction name="menuObjectWindows"/>
+      <addaction name="menuRenderWindows"/>
+      <addaction name="menuNavmesh"/>
+      <addaction name="menuTerrain"/>
+      <addaction name="menuAudio"/>
+      <addaction name="menuGalaxy"/>
+      <addaction name="menuPackin"/>
+      <addaction name="menuDocks"/>
+      <addaction name="menuTheme"/>
+      <addaction name="menuTests"/>
+      <addaction name="menuHelp"/>
+      <addaction name="menuPlugins"/>
+      <addaction name="menuTools"/>
   </widget>
   <widget class="QToolBar" name="mainToolBar">
    <attribute name="toolBarArea">
@@ -198,28 +282,130 @@
     </property>
    </action>
    <action name="actionExit">
-   <property name="text">
-    <string>Exit</string>
-   </property>
-  </action>
-    <widget class="QMenu" name="menuExport">
-     <property name="title">
-      <string>Export</string>
-     </property>
-     <addaction name="actionExportDialogue"/>
-     <addaction name="actionExportScripts"/>
-     <addaction name="actionExportTextures"/>
-    </widget>
-    <widget class="QMenu" name="menuTools">
+    <property name="text">
+     <string>Exit</string>
+    </property>
+   </action>
+     <widget class="QMenu" name="menuExport">
+      <property name="title">
+       <string>Export</string>
+      </property>
+      <addaction name="actionExportDialogue"/>
+      <addaction name="actionExportScripts"/>
+      <addaction name="actionExportTextures"/>
+     </widget>
+     <widget class="QMenu" name="menuTools">
       <property name="title">
        <string>Tools</string>
       </property>
-      <addaction name="actionSoundEditor"/>
-      <addaction name="actionAnimationEditor"/>
       <addaction name="actionParticleEffectsEditor"/>
       <addaction name="separator"/>
       <addaction name="actionModManager"/>
-    </widget>
+     </widget>
+     <action name="actionPreviewWindow">
+      <property name="text">
+       <string>Preview Window...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionLighting">
+      <property name="text">
+       <string>Lighting...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionNpcEditor">
+      <property name="text">
+       <string>NPC Editor...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionRaceEditor">
+      <property name="text">
+       <string>Race Editor...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionClassEditor">
+      <property name="text">
+       <string>Class Editor...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionFactionEditor">
+      <property name="text">
+       <string>Faction Editor...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionNotImplementedGalaxy">
+      <property name="text">
+       <string>Not implemented</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionNotImplementedPackin">
+      <property name="text">
+       <string>Not implemented</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionNotImplementedTheme">
+      <property name="text">
+       <string>Not implemented</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionNotImplementedTests">
+      <property name="text">
+       <string>Not implemented</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionSaveLayout">
+      <property name="text">
+       <string>Save Layout...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionLoadLayout">
+      <property name="text">
+       <string>Load Layout...</string>
+      </property>
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </action>
+     <action name="actionResetWindowLayout">
+      <property name="text">
+       <string>Reset Window Layout</string>
+      </property>
+      <property name="statusTip">
+       <string>Reset dock window positions to the default layout</string>
+      </property>
+     </action>
 
     <action name="actionPreferences">
     <property name="text">
@@ -478,14 +664,14 @@
      <string>Ctrl+Shift+W</string>
     </property>
    </action>
-   <action name="actionCells">
-    <property name="text">
-     <string>Cells...</string>
-    </property>
-    <property name="shortcut">
-     <string>Ctrl+Shift+C</string>
-    </property>
-   </action>
+    <action name="actionCells">
+     <property name="text">
+      <string>Cell View...</string>
+     </property>
+     <property name="shortcut">
+      <string>Ctrl+Shift+C</string>
+     </property>
+    </action>
     <action name="actionLandscapeEditing">
      <property name="text">
       <string>Landscape Editing</string>

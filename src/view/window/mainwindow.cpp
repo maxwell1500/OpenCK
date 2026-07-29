@@ -106,6 +106,8 @@ MainWindow::MainWindow(QWidget *parent) :
       mDockManager(nullptr),
       mStatusRecordCount(nullptr),
       mStatusPluginInfo(nullptr),
+      mStatusCellCoords(nullptr),
+      mStatusSelectedObject(nullptr),
       mStatusProgressBar(nullptr)
 {
     ui->setupUi(this);
@@ -120,11 +122,19 @@ MainWindow::MainWindow(QWidget *parent) :
     mStatusRecordCount = new QLabel(ui->statusBar);
     mStatusRecordCount->setText("Records: 0");
     ui->statusBar->addWidget(mStatusRecordCount);
-    
+
+    mStatusCellCoords = new QLabel(ui->statusBar);
+    mStatusCellCoords->setText("Cell: -, -");
+    ui->statusBar->addWidget(mStatusCellCoords);
+
+    mStatusSelectedObject = new QLabel(ui->statusBar);
+    mStatusSelectedObject->setText("No selection");
+    ui->statusBar->addWidget(mStatusSelectedObject);
+
     mStatusPluginInfo = new QLabel(ui->statusBar);
     mStatusPluginInfo->setText("No plugin loaded");
-    ui->statusBar->addPermanentWidget(mStatusPluginInfo);
-    
+    ui->statusBar->addWidget(mStatusPluginInfo);
+
     mStatusProgressBar = new QProgressBar(ui->statusBar);
     mStatusProgressBar->setVisible(false);
     mStatusProgressBar->setRange(0, 100);
@@ -134,14 +144,11 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionUndoButton, &QAction::triggered, this, &MainWindow::on_actionUndo_triggered);
     connect(ui->actionRedoButton, &QAction::triggered, this, &MainWindow::on_actionRedo_triggered);
 
-    // Add Reset Window Layout action to View menu
-    QAction* resetLayoutAction = new QAction(tr("Reset Window Layout"), this);
-    resetLayoutAction->setStatusTip(tr("Reset dock window positions to the default layout"));
-    connect(resetLayoutAction, &QAction::triggered, this, [this]() {
+    // Reset Window Layout action lives in the Docks menu (defined in the UI file)
+    connect(ui->actionResetWindowLayout, &QAction::triggered, this, [this]() {
         WindowLayout::applyDefaultLayout(this);
         LOG_INFO("Window layout reset to default");
     });
-    ui->menuView->addAction(resetLayoutAction);
 }
 
 MainWindow::~MainWindow()
@@ -1787,7 +1794,8 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::saveUiState()
 {
-    QString configPath = FilePaths::configFilePath();
+    QString configPath = QCoreApplication::applicationDirPath()
+        + "/QtCreationKitSavedSettings.ini";
     QSettings conf(configPath, QSettings::IniFormat);
     conf.beginGroup("MainWindow");
 
@@ -1806,7 +1814,8 @@ void MainWindow::saveUiState()
 
 void MainWindow::restoreUiState()
 {
-    QString configPath = FilePaths::configFilePath();
+    QString configPath = QCoreApplication::applicationDirPath()
+        + "/QtCreationKitSavedSettings.ini";
     QSettings conf(configPath, QSettings::IniFormat);
     conf.beginGroup("MainWindow");
 

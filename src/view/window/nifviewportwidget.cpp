@@ -42,6 +42,9 @@
 #include <QDataStream>
 #include <QTreeWidget>
 #include <QSplitter>
+#include <QActionGroup>
+#include <QSpinBox>
+#include <QDoubleSpinBox>
 #include "mesheditordialog.hpp"
 
 #include <cmath>
@@ -383,6 +386,59 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
 
     auto* toolbar = new QToolBar(this);
     toolbar->setIconSize(QSize(16, 16));
+
+    mEditModeGroup = new QActionGroup(this);
+    mEditModeGroup->setExclusive(true);
+    mActionSelect = mEditModeGroup->addAction(tr("Select"));
+    mActionMove = mEditModeGroup->addAction(tr("Move"));
+    mActionRotate = mEditModeGroup->addAction(tr("Rotate"));
+    mActionScale = mEditModeGroup->addAction(tr("Scale"));
+    mActionSelect->setCheckable(true);
+    mActionMove->setCheckable(true);
+    mActionRotate->setCheckable(true);
+    mActionScale->setCheckable(true);
+    mActionSelect->setChecked(true);
+    toolbar->addAction(mActionSelect);
+    toolbar->addAction(mActionMove);
+    toolbar->addAction(mActionRotate);
+    toolbar->addAction(mActionScale);
+    connect(mEditModeGroup, &QActionGroup::triggered, this, [this](QAction* a) {
+        if (a == mActionSelect) mEditMode = EditMode::Select;
+        else if (a == mActionMove) mEditMode = EditMode::Move;
+        else if (a == mActionRotate) mEditMode = EditMode::Rotate;
+        else if (a == mActionScale) mEditMode = EditMode::Scale;
+    });
+
+    toolbar->addSeparator();
+    mActionSnapGrid = toolbar->addAction(tr("Snap to Grid"));
+    mActionSnapGrid->setCheckable(true);
+    connect(mActionSnapGrid, &QAction::toggled, this, [this](bool on) {
+        mSnapToGrid = on;
+    });
+    mActionSnapAngle = toolbar->addAction(tr("Snap to Angle"));
+    mActionSnapAngle->setCheckable(true);
+    connect(mActionSnapAngle, &QAction::toggled, this, [this](bool on) {
+        mSnapToAngle = on;
+    });
+
+    mSnapAngleSpin = new QSpinBox(toolbar);
+    mSnapAngleSpin->setRange(1, 180);
+    mSnapAngleSpin->setValue(mSnapAngleIncrement);
+    mSnapAngleSpin->setSuffix(QStringLiteral("\u00b0"));
+    toolbar->addWidget(mSnapAngleSpin);
+    connect(mSnapAngleSpin, QOverload<int>::of(&QSpinBox::valueChanged), this,
+        [this](int v) { mSnapAngleIncrement = v; });
+
+    mSnapGridSpin = new QDoubleSpinBox(toolbar);
+    mSnapGridSpin->setRange(0.01, 4096.0);
+    mSnapGridSpin->setDecimals(3);
+    mSnapGridSpin->setValue(mSnapGridSize);
+    toolbar->addWidget(mSnapGridSpin);
+    connect(mSnapGridSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+        [this](double v) { mSnapGridSize = v; });
+
+    toolbar->addSeparator();
+
     auto* exportAction = toolbar->addAction(tr("Export NIF..."));
     connect(exportAction, &QAction::triggered, this, &NifViewportWidget::exportNif);
 

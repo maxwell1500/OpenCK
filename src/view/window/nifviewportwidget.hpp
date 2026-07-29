@@ -22,6 +22,10 @@ class QComboBox;
 class QPushButton;
 class QTimer;
 class QKeyEvent;
+class QSpinBox;
+class QDoubleSpinBox;
+class QActionGroup;
+class QAction;
 
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
@@ -236,6 +240,22 @@ private:
     QPushButton* m_particlePlayBtn = nullptr;
     QPushButton* m_particleStopBtn = nullptr;
     QWidget* m_particleToolbar = nullptr;
+
+    enum class EditMode { Select, Move, Rotate, Scale };
+    EditMode mEditMode = EditMode::Select;
+    QActionGroup* mEditModeGroup = nullptr;
+    QAction* mActionSelect = nullptr;
+    QAction* mActionMove = nullptr;
+    QAction* mActionRotate = nullptr;
+    QAction* mActionScale = nullptr;
+    QAction* mActionSnapGrid = nullptr;
+    QAction* mActionSnapAngle = nullptr;
+    QSpinBox* mSnapAngleSpin = nullptr;
+    QDoubleSpinBox* mSnapGridSpin = nullptr;
+    bool mSnapToGrid = false;
+    bool mSnapToAngle = false;
+    int mSnapAngleIncrement = 15;
+    double mSnapGridSize = 1.0;
 };
 
 #endif // NIFVIEWPORTWIDGET_HPP

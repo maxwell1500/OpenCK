@@ -25,6 +25,7 @@
 class QFormLayout;
 class QVBoxLayout;
 class QPushButton;
+class QTabWidget;
 class QWidget;
 
 namespace openck {
@@ -54,7 +55,10 @@ private:
     QString m_formIdKey;
     FormComponents* m_components;
     QVBoxLayout* m_layout = nullptr;
+    QTabWidget* m_tabs = nullptr;
     EditorPropertyGrid* m_grid = nullptr;
+    QWidget* m_dataTab = nullptr;
+    QVBoxLayout* m_dataTabLayout = nullptr;
     QWidget* m_customWidget = nullptr;
 };
 
