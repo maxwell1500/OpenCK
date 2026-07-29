@@ -121,6 +121,24 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Ltex_:
             cat.totalRecords = data->getLtexCollection().size();
             break;
+        case CkId::Type_Cel_:
+            cat.totalRecords = data->getCellCollection().size();
+            break;
+        case CkId::Type_WRLD_:
+            cat.totalRecords = data->getWorldspaceCollection().size();
+            break;
+        case CkId::Type_LOCT_:
+            cat.totalRecords = data->getLocationCollection().size();
+            break;
+        case CkId::Type_Refr_:
+            cat.totalRecords = data->getRefrCollection().size();
+            break;
+        case CkId::Type_Material_:
+            cat.totalRecords = data->getMaterialCollection().size();
+            break;
+        case CkId::Type_Land_:
+            cat.totalRecords = data->getLandCollection().size();
+            break;
         default:
             break;
         }
@@ -247,6 +265,30 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getLtexCollection().getId(i);
                 formId = formatFormId(data->getLtexCollection().getRecord(i).get().formId);
                 break;
+            case CkId::Type_Cel_:
+                editorId = data->getCellCollection().getId(i);
+                formId = formatFormId(data->getCellCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_WRLD_:
+                editorId = data->getWorldspaceCollection().getId(i);
+                formId = formatFormId(data->getWorldspaceCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_LOCT_:
+                editorId = data->getLocationCollection().getId(i);
+                formId = formatFormId(data->getLocationCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Refr_:
+                editorId = data->getRefrCollection().getId(i);
+                formId = formatFormId(data->getRefrCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Material_:
+                editorId = data->getMaterialCollection().getId(i);
+                formId = formatFormId(data->getMaterialCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Land_:
+                editorId = data->getLandCollection().getId(i);
+                formId = formatFormId(data->getLandCollection().getRecord(i).get().formId);
+                break;
             default:
                 break;
             }
@@ -266,7 +308,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Alchemy", CkId::Type_Alch_);
     addCategory("Ingredient", CkId::Type_Ingr_);
     addCategory("Book", CkId::Type_Book_);
-    addCategory("Miscellaneous", CkId::Type_Misc_);
+    addCategory("Misc", CkId::Type_Misc_);
     addCategory("Container", CkId::Type_Cont_);
     addCategory("Enchantment", CkId::Type_Ench_);
     addCategory("Spell", CkId::Type_Spel_);
@@ -274,12 +316,12 @@ void ObjectWindowModel::initCategories(Data* data)
 
     addCategory("Static", CkId::Type_Stat_);
     addCategory("Activator", CkId::Type_Acti_);
-    addCategory("Tree Node", CkId::Type_Tree_);
+    addCategory("Tree", CkId::Type_Tree_);
 
     addCategory("Quest", CkId::Type_Quest_);
     addCategory("Package", CkId::Type_Pack_);
-    addCategory("Global Variable", CkId::Type_Glob_);
-    addCategory("Game Settings", CkId::Type_Gmst);
+    addCategory("Global", CkId::Type_Glob_);
+    addCategory("Game Setting", CkId::Type_Gmst);
     addCategory("Perk", CkId::Type_PerK_);
     addCategory("Class", CkId::Type_Class_);
     addCategory("Faction", CkId::Type_Fact_);
@@ -288,20 +330,87 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Sound", CkId::Type_Soun_);
 
     addCategory("Dialogue", CkId::Type_Dial_);
-    addCategory("Information", CkId::Type_Info_);
+    addCategory("Info", CkId::Type_Info_);
 
     addCategory("Weather", CkId::Type_Wthr_);
     addCategory("Land Texture", CkId::Type_Ltex_);
     addCategory("Location Reference Type", CkId::Type_Lcrt_);
+    addCategory("Cell", CkId::Type_Cel_);
+    addCategory("Worldspace", CkId::Type_WRLD_);
+    addCategory("Location", CkId::Type_LOCT_);
+    addCategory("Reference", CkId::Type_Refr_);
+    addCategory("Material", CkId::Type_Material_);
+    addCategory("Landscape", CkId::Type_Land_);
 
-    auto addGroup = [this](const QString& name, std::initializer_list<CkId::Type> types) {
+    addCategory("Creature", CkId::Type_None);
+    addCategory("Leveled Actor", CkId::Type_None);
+    addCategory("Leveled NPC", CkId::Type_None);
+    addCategory("Actor Values", CkId::Type_None);
+    addCategory("Voice Types", CkId::Type_None);
+
+    addCategory("Ammo", CkId::Type_None);
+    addCategory("Key", CkId::Type_None);
+    addCategory("Soul Gem", CkId::Type_None);
+    addCategory("Scroll", CkId::Type_None);
+    addCategory("Potion", CkId::Type_None);
+    addCategory("Leveled Item", CkId::Type_None);
+    addCategory("Constructible Object", CkId::Type_None);
+    addCategory("Outfit", CkId::Type_None);
+
+    addCategory("Movable Static", CkId::Type_None);
+    addCategory("Static Collection", CkId::Type_None);
+    addCategory("Door", CkId::Type_None);
+    addCategory("Furniture", CkId::Type_None);
+    addCategory("Flora", CkId::Type_None);
+    addCategory("Grass", CkId::Type_None);
+    addCategory("Debris", CkId::Type_None);
+    addCategory("Hazard", CkId::Type_None);
+    addCategory("Idle Marker", CkId::Type_None);
+    addCategory("Light", CkId::Type_None);
+    addCategory("Acoustic Space", CkId::Type_None);
+    addCategory("Image Space", CkId::Type_None);
+
+    addCategory("Combat Style", CkId::Type_None);
+    addCategory("Encounter Zone", CkId::Type_None);
+    addCategory("Body Part", CkId::Type_None);
+    addCategory("Head Part", CkId::Type_None);
+    addCategory("Keyword", CkId::Type_None);
+    addCategory("Camera Path", CkId::Type_None);
+    addCategory("Camera Shot", CkId::Type_None);
+    addCategory("Impact Data", CkId::Type_None);
+    addCategory("Lens Flare", CkId::Type_None);
+    addCategory("Speech Challenge", CkId::Type_None);
+
+    addCategory("Music Type", CkId::Type_None);
+    addCategory("Voice Type", CkId::Type_None);
+
+    addCategory("Topic", CkId::Type_None);
+    addCategory("Scene", CkId::Type_None);
+    addCategory("Message", CkId::Type_None);
+    addCategory("Note", CkId::Type_None);
+    addCategory("Terminal", CkId::Type_None);
+
+    addCategory("Navmesh", CkId::Type_None);
+    addCategory("Climate", CkId::Type_None);
+
+    addCategory("Effect Shader", CkId::Type_None);
+    addCategory("Art Object", CkId::Type_None);
+    addCategory("Water Shader", CkId::Type_None);
+    addCategory("Weather Shader", CkId::Type_None);
+    addCategory("Power", CkId::Type_None);
+    addCategory("Default Object", CkId::Type_None);
+    addCategory("Association Type", CkId::Type_None);
+    addCategory("Biome", CkId::Type_None);
+    addCategory("Snap Template", CkId::Type_None);
+
+    auto addGroupNamed = [this](const QString& name, std::initializer_list<QString> catNames) {
         CategoryGroup group;
         group.name = name;
-        for (CkId::Type t : types)
+        for (const QString& n : catNames)
         {
             for (int i = 0; i < mCategories.size(); i++)
             {
-                if (mCategories[i].typeId == static_cast<int>(t))
+                if (mCategories[i].name == n)
                 {
                     group.categoryIndices.append(i);
                     break;
@@ -311,16 +420,33 @@ void ObjectWindowModel::initCategories(Data* data)
         mGroups.append(group);
     };
 
-    addGroup("Actors", {CkId::Type_Npc_});
-    addGroup("Items", {CkId::Type_Armor_, CkId::Type_Weap_, CkId::Type_Alch_, CkId::Type_Ingr_,
-                       CkId::Type_Book_, CkId::Type_Misc_, CkId::Type_Cont_, CkId::Type_Ench_,
-                       CkId::Type_Spel_, CkId::Type_Magic_});
-    addGroup("World Objects", {CkId::Type_Stat_, CkId::Type_Acti_, CkId::Type_Tree_});
-    addGroup("Gameplay", {CkId::Type_Quest_, CkId::Type_Pack_, CkId::Type_Glob_, CkId::Type_Gmst,
-                          CkId::Type_PerK_, CkId::Type_Class_, CkId::Type_Fact_, CkId::Type_Race_});
-    addGroup("Audio", {CkId::Type_Soun_});
-    addGroup("Dialogue", {CkId::Type_Dial_, CkId::Type_Info_});
-    addGroup("World", {CkId::Type_Wthr_, CkId::Type_Ltex_, CkId::Type_Lcrt_});
+    // All Forms: flat list of every category
+    {
+        CategoryGroup allForms;
+        allForms.name = "All Forms";
+        for (int i = 0; i < mCategories.size(); i++)
+            allForms.categoryIndices.append(i);
+        mGroups.append(allForms);
+    }
+
+    addGroupNamed("Actors", {"NPC", "Creature", "Leveled Actor", "Leveled NPC", "Actor Values", "Voice Types"});
+    addGroupNamed("Items", {"Armor", "Weapon", "Alchemy", "Ingredient", "Book", "Misc", "Container",
+                            "Enchantment", "Spell", "Magic Effect", "Ammo", "Key", "Soul Gem", "Scroll",
+                            "Potion", "Leveled Item", "Constructible Object", "Outfit"});
+    addGroupNamed("World Objects", {"Static", "Activator", "Tree", "Movable Static", "Static Collection",
+                                    "Door", "Furniture", "Flora", "Grass", "Debris", "Hazard", "Idle Marker",
+                                    "Light", "Acoustic Space", "Image Space"});
+    addGroupNamed("Gameplay", {"Quest", "Package", "Global", "Game Setting", "Perk", "Class", "Faction",
+                               "Race", "Combat Style", "Encounter Zone", "Body Part", "Head Part", "Location",
+                               "Keyword", "Camera Path", "Camera Shot", "Impact Data", "Lens Flare",
+                               "Speech Challenge"});
+    addGroupNamed("Audio", {"Sound", "Music Type", "Voice Type"});
+    addGroupNamed("Dialogue", {"Dialogue", "Info", "Topic", "Scene", "Message", "Note", "Terminal"});
+    addGroupNamed("World", {"Cell", "Worldspace", "Navmesh", "Landscape", "Reference", "Weather",
+                            "Land Texture", "Climate"});
+    addGroupNamed("Miscellaneous", {"Location Reference Type", "Effect Shader", "Art Object", "Water Shader",
+                                    "Weather Shader", "Power", "Default Object", "Association Type",
+                                    "Biome", "Snap Template", "Material"});
 }
 
 QString ObjectWindowModel::formatFormId(quint32 formId) const
@@ -457,6 +583,30 @@ void ObjectWindowModel::applyFilter(const QString& text)
                 case CkId::Type_Ltex_:
                     rec.editorId = mData->getLtexCollection().getId(i);
                     rec.formId = formatFormId(mData->getLtexCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Cel_:
+                    rec.editorId = mData->getCellCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCellCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_WRLD_:
+                    rec.editorId = mData->getWorldspaceCollection().getId(i);
+                    rec.formId = formatFormId(mData->getWorldspaceCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_LOCT_:
+                    rec.editorId = mData->getLocationCollection().getId(i);
+                    rec.formId = formatFormId(mData->getLocationCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Refr_:
+                    rec.editorId = mData->getRefrCollection().getId(i);
+                    rec.formId = formatFormId(mData->getRefrCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Material_:
+                    rec.editorId = mData->getMaterialCollection().getId(i);
+                    rec.formId = formatFormId(mData->getMaterialCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Land_:
+                    rec.editorId = mData->getLandCollection().getId(i);
+                    rec.formId = formatFormId(mData->getLandCollection().getRecord(i).get().formId);
                     break;
                 default:
                     break;

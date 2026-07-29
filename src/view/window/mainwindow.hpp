@@ -139,6 +139,9 @@ private slots:
     void on_actionCreateArchive_triggered();
     void on_actionCompilePapyrusScripts_triggered();
     void on_actionCompactSmallMaster_triggered();
+    void on_actionSaveAllButton_triggered();
+    void on_actionCheckOut_triggered();
+    void on_actionCheckIn_triggered();
     void runValidation();
 
 private:
@@ -168,6 +171,7 @@ private:
     ObjectPalette* objectPalette;
     CellViewPanel* mCellViewPanel;
     ads::CDockWidget* mCellViewDock;
+    ads::CDockWidget* mWarningsDock;
     ads::CDockManager* mDockManager;
     QLabel* mStatusRecordCount;
     QLabel* mStatusPluginInfo;

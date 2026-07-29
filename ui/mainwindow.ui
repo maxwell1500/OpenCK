@@ -74,39 +74,43 @@
     <addaction name="actionExpandAll"/>
     <addaction name="actionCollapseAll"/>
    </widget>
-   <widget class="QMenu" name="menuView">
-    <property name="title">
-     <string>View</string>
-    </property>
-     <addaction name="actionScriptEditor"/>
-     <addaction name="actionDialogueEditor"/>
-     <addaction name="actionDialogueTree"/>
-     <addaction name="actionQuestGraph"/>
-     <addaction name="actionAIPackages"/>
-     <addaction name="actionWeatherLight"/>
-     <addaction name="actionWater"/>
-     <addaction name="actionCellTransitions"/>
-     <addaction name="actionPapyrusDebugger"/>
-     <addaction name="actionFormIdEditor"/>
-    </widget>
-   <widget class="QMenu" name="menuWorld">
-    <property name="title">
-     <string>World</string>
-    </property>
-     <addaction name="actionWorldspaces"/>
-     <addaction name="actionWorldView"/>
-    </widget>
-    <widget class="QMenu" name="menuCharacter">
+    <widget class="QMenu" name="menuView">
      <property name="title">
-      <string>Character</string>
+      <string>View</string>
      </property>
-     <addaction name="actionAnimationEditor"/>
-     <addaction name="separator"/>
-     <addaction name="actionNpcEditor"/>
-     <addaction name="actionRaceEditor"/>
-     <addaction name="actionClassEditor"/>
-     <addaction name="actionFactionEditor"/>
+      <addaction name="actionObjectWindow"/>
+      <addaction name="action3DViewport"/>
+      <addaction name="separator"/>
+      <addaction name="actionExpandAll"/>
+      <addaction name="actionCollapseAll"/>
     </widget>
+    <widget class="QMenu" name="menuWorld">
+     <property name="title">
+      <string>World</string>
+     </property>
+      <addaction name="actionWorldspaces"/>
+      <addaction name="actionWorldView"/>
+      <addaction name="separator"/>
+      <addaction name="actionWeatherLight"/>
+      <addaction name="actionWater"/>
+      <addaction name="actionCellTransitions"/>
+      <addaction name="separator"/>
+      <addaction name="actionLandscapeEditing"/>
+     </widget>
+     <widget class="QMenu" name="menuCharacter">
+      <property name="title">
+       <string>Character</string>
+      </property>
+      <addaction name="actionDialogueEditor"/>
+      <addaction name="actionDialogueTree"/>
+      <addaction name="separator"/>
+      <addaction name="actionAnimationEditor"/>
+      <addaction name="separator"/>
+      <addaction name="actionNpcEditor"/>
+      <addaction name="actionRaceEditor"/>
+      <addaction name="actionClassEditor"/>
+      <addaction name="actionFactionEditor"/>
+     </widget>
     <widget class="QMenu" name="menuObjectWindows">
      <property name="title">
       <string>ObjectWindows</string>
@@ -115,28 +119,28 @@
      <addaction name="actionCells"/>
      <addaction name="actionObjectPalette"/>
     </widget>
-    <widget class="QMenu" name="menuRenderWindows">
-     <property name="title">
-      <string>RenderWindows</string>
-     </property>
-     <addaction name="action3DViewport"/>
-     <addaction name="actionMaterialEditor"/>
-     <addaction name="separator"/>
-     <addaction name="actionPreviewWindow"/>
-     <addaction name="actionLighting"/>
-    </widget>
+     <widget class="QMenu" name="menuRenderWindows">
+      <property name="title">
+       <string>RenderWindows</string>
+      </property>
+      <addaction name="action3DViewport"/>
+      <addaction name="actionScriptEditor"/>
+      <addaction name="actionMaterialEditor"/>
+      <addaction name="separator"/>
+      <addaction name="actionPreviewWindow"/>
+      <addaction name="actionLighting"/>
+     </widget>
     <widget class="QMenu" name="menuNavmesh">
      <property name="title">
       <string>Navmesh</string>
      </property>
      <addaction name="actionNavmesh"/>
     </widget>
-    <widget class="QMenu" name="menuTerrain">
-     <property name="title">
-      <string>Terrain</string>
-     </property>
-     <addaction name="actionLandscapeEditing"/>
-    </widget>
+     <widget class="QMenu" name="menuTerrain">
+      <property name="title">
+       <string>Terrain</string>
+      </property>
+     </widget>
     <widget class="QMenu" name="menuAudio">
      <property name="title">
       <string>Audio</string>
@@ -164,12 +168,14 @@
      <addaction name="actionSaveLayout"/>
      <addaction name="actionLoadLayout"/>
     </widget>
-    <widget class="QMenu" name="menuTheme">
-     <property name="title">
-      <string>Theme</string>
-     </property>
-     <addaction name="actionNotImplementedTheme"/>
-    </widget>
+     <widget class="QMenu" name="menuTheme">
+      <property name="title">
+       <string>Theme</string>
+      </property>
+      <addaction name="actionThemeDefault"/>
+      <addaction name="actionThemeLight"/>
+      <addaction name="actionThemeDark"/>
+     </widget>
     <widget class="QMenu" name="menuTests">
      <property name="title">
       <string>Tests</string>
@@ -181,6 +187,9 @@
      <string>Gameplay</string>
     </property>
     <addaction name="actionSettings"/>
+    <addaction name="separator"/>
+    <addaction name="actionQuestGraph"/>
+    <addaction name="actionAIPackages"/>
    </widget>
    <widget class="QMenu" name="menuPlugins">
     <property name="title">
@@ -201,39 +210,44 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
-      <addaction name="menuFile"/>
-      <addaction name="menuEdit"/>
-      <addaction name="menuView"/>
-      <addaction name="menuCharacter"/>
-      <addaction name="menuGameplay"/>
-      <addaction name="menuWorld"/>
-      <addaction name="menuObjectWindows"/>
-      <addaction name="menuRenderWindows"/>
-      <addaction name="menuNavmesh"/>
-      <addaction name="menuTerrain"/>
-      <addaction name="menuAudio"/>
-      <addaction name="menuGalaxy"/>
-      <addaction name="menuPackin"/>
-      <addaction name="menuDocks"/>
-      <addaction name="menuTheme"/>
-      <addaction name="menuTests"/>
-      <addaction name="menuHelp"/>
-      <addaction name="menuPlugins"/>
-      <addaction name="menuTools"/>
+       <addaction name="menuFile"/>
+       <addaction name="menuEdit"/>
+       <addaction name="menuView"/>
+       <addaction name="menuCharacter"/>
+       <addaction name="menuGameplay"/>
+       <addaction name="menuWorld"/>
+       <addaction name="menuObjectWindows"/>
+       <addaction name="menuRenderWindows"/>
+       <addaction name="menuNavmesh"/>
+       <addaction name="menuTerrain"/>
+       <addaction name="menuAudio"/>
+       <addaction name="menuGalaxy"/>
+       <addaction name="menuPackin"/>
+       <addaction name="menuDocks"/>
+       <addaction name="menuTheme"/>
+       <addaction name="menuTests"/>
+       <addaction name="menuHelp"/>
+       <addaction name="menuTools"/>
+       <addaction name="menuPlugins"/>
   </widget>
-  <widget class="QToolBar" name="mainToolBar">
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-   <addaction name="actionOpenButton"/>
-   <addaction name="actionSaveButton"/>
-   <addaction name="separator"/>
-   <addaction name="actionUndoButton"/>
-   <addaction name="actionRedoButton"/>
-  </widget>
+   <widget class="QToolBar" name="mainToolBar">
+    <attribute name="toolBarArea">
+     <enum>TopToolBarArea</enum>
+    </attribute>
+    <attribute name="toolBarBreak">
+     <bool>false</bool>
+    </attribute>
+    <addaction name="actionNewPlugin"/>
+    <addaction name="actionOpenButton"/>
+    <addaction name="actionSaveButton"/>
+    <addaction name="actionSaveAllButton"/>
+    <addaction name="separator"/>
+    <addaction name="actionUndoButton"/>
+    <addaction name="actionRedoButton"/>
+    <addaction name="separator"/>
+    <addaction name="actionCheckOut"/>
+    <addaction name="actionCheckIn"/>
+   </widget>
    <widget class="QStatusBar" name="statusBar">
     <property name="sizePolicy">
      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
@@ -298,14 +312,17 @@
       <addaction name="actionExportScripts"/>
       <addaction name="actionExportTextures"/>
      </widget>
-     <widget class="QMenu" name="menuTools">
-      <property name="title">
-       <string>Tools</string>
-      </property>
-      <addaction name="actionParticleEffectsEditor"/>
-      <addaction name="separator"/>
-      <addaction name="actionModManager"/>
-     </widget>
+      <widget class="QMenu" name="menuTools">
+       <property name="title">
+        <string>Tools</string>
+       </property>
+       <addaction name="actionPapyrusDebugger"/>
+       <addaction name="actionFormIdEditor"/>
+       <addaction name="separator"/>
+       <addaction name="actionParticleEffectsEditor"/>
+       <addaction name="separator"/>
+       <addaction name="actionModManager"/>
+      </widget>
      <action name="actionPreviewWindow">
       <property name="text">
        <string>Preview Window...</string>
@@ -370,14 +387,21 @@
        <bool>false</bool>
       </property>
      </action>
-     <action name="actionNotImplementedTheme">
-      <property name="text">
-       <string>Not implemented</string>
-      </property>
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-     </action>
+      <action name="actionThemeDefault">
+       <property name="text">
+        <string>Default</string>
+       </property>
+      </action>
+      <action name="actionThemeLight">
+       <property name="text">
+        <string>Light</string>
+       </property>
+      </action>
+      <action name="actionThemeDark">
+       <property name="text">
+        <string>Dark</string>
+       </property>
+      </action>
       <action name="actionNotImplementedTests">
        <property name="text">
         <string>Not implemented</string>
@@ -617,14 +641,14 @@
      <string>F10</string>
     </property>
    </action>
-   <action name="actionAIPackages">
-    <property name="text">
-     <string>AI Packages Editor...</string>
-    </property>
-    <property name="shortcut">
-     <string>F10</string>
-    </property>
-   </action>
+    <action name="actionAIPackages">
+     <property name="text">
+      <string>AI Packages Editor...</string>
+     </property>
+     <property name="shortcut">
+      <string>Ctrl+Shift+A</string>
+     </property>
+    </action>
    <action name="actionWeatherLight">
     <property name="text">
      <string>Lighting &amp; Weather Editor...</string>
@@ -749,14 +773,38 @@
     <string>Undo (Ctrl+Z)</string>
    </property>
   </action>
-  <action name="actionRedoButton">
-   <property name="text">
-    <string>Redo</string>
-   </property>
-   <property name="toolTip">
-    <string>Redo (Ctrl+Y)</string>
-   </property>
-  </action>
+   <action name="actionRedoButton">
+    <property name="text">
+     <string>Redo</string>
+    </property>
+    <property name="toolTip">
+     <string>Redo (Ctrl+Y)</string>
+    </property>
+   </action>
+   <action name="actionSaveAllButton">
+    <property name="text">
+     <string>Save All</string>
+    </property>
+    <property name="toolTip">
+     <string>Save All Plugins</string>
+    </property>
+   </action>
+   <action name="actionCheckOut">
+    <property name="text">
+     <string>Check Out</string>
+    </property>
+    <property name="toolTip">
+     <string>Check Out Selected Records</string>
+    </property>
+   </action>
+   <action name="actionCheckIn">
+    <property name="text">
+     <string>Check In</string>
+    </property>
+    <property name="toolTip">
+     <string>Check In Selected Records</string>
+    </property>
+   </action>
   <action name="actionLoadOrder">
    <property name="text">
     <string>Load Order...</string>

@@ -60,6 +60,7 @@
 #include "../../model/world/shortcutmanager.hpp"
 #include "shortcuteditordialog.hpp"
 #include "toolbarcustomizationdialog.hpp"
+#include "thememanager.hpp"
 
 #include <QInputDialog>
 
@@ -105,6 +106,7 @@ MainWindow::MainWindow(QWidget *parent) :
       objectPalette(nullptr),
       mCellViewPanel(nullptr),
       mCellViewDock(nullptr),
+      mWarningsDock(nullptr),
       mDockManager(nullptr),
       mStatusRecordCount(nullptr),
       mStatusPluginInfo(nullptr),
@@ -119,6 +121,20 @@ MainWindow::MainWindow(QWidget *parent) :
     setupEditMenu();
     setupShortcuts();
     restoreUiState();
+
+    // Wire Theme menu actions to ThemeManager
+    connect(ui->actionThemeDefault, &QAction::triggered, this, []() {
+        auto* app = qobject_cast<QApplication*>(QCoreApplication::instance());
+        if (app) ThemeManager::setTheme(*app, ThemeManager::Theme::System);
+    });
+    connect(ui->actionThemeLight, &QAction::triggered, this, []() {
+        auto* app = qobject_cast<QApplication*>(QCoreApplication::instance());
+        if (app) ThemeManager::setTheme(*app, ThemeManager::Theme::Light);
+    });
+    connect(ui->actionThemeDark, &QAction::triggered, this, []() {
+        auto* app = qobject_cast<QApplication*>(QCoreApplication::instance());
+        if (app) ThemeManager::setTheme(*app, ThemeManager::Theme::Dark);
+    });
     
     // Initialize status bar widgets
     mStatusRecordCount = new QLabel(ui->statusBar);
@@ -145,6 +161,9 @@ MainWindow::MainWindow(QWidget *parent) :
     // Connect toolbar buttons
     connect(ui->actionUndoButton, &QAction::triggered, this, &MainWindow::on_actionUndo_triggered);
     connect(ui->actionRedoButton, &QAction::triggered, this, &MainWindow::on_actionRedo_triggered);
+    connect(ui->actionSaveAllButton, &QAction::triggered, this, &MainWindow::on_actionSaveAllButton_triggered);
+    connect(ui->actionCheckOut, &QAction::triggered, this, &MainWindow::on_actionCheckOut_triggered);
+    connect(ui->actionCheckIn, &QAction::triggered, this, &MainWindow::on_actionCheckIn_triggered);
 
     // Reset Window Layout action lives in the Docks menu (defined in the UI file)
     connect(ui->actionResetWindowLayout, &QAction::triggered, this, [this]() {
@@ -175,6 +194,13 @@ void MainWindow::setData(Data* data)
         updateUndoRedoActions();
         updateStatus("Data loaded");
         
+        // Create the 3D Viewport as the central widget (matches real CK layout)
+        if (!nifViewportWidget)
+        {
+            nifViewportWidget = new NifViewportWidget(this);
+            setCentralWidget(nifViewportWidget);
+        }
+        
         // Create Object Window dock widget
         if (!objectWindowDock)
         {
@@ -182,6 +208,33 @@ void MainWindow::setData(Data* data)
             auto* objectDockWidget = new ads::CDockWidget("Object Window");
             objectDockWidget->setWidget(objectWindowDock);
             mDockManager->addDockWidget(ads::LeftDockWidgetArea, objectDockWidget);
+        }
+        
+        // Create Cell View on application load (not on-demand)
+        if (!mCellViewPanel)
+        {
+            mCellViewPanel = new CellViewPanel(mData, this);
+            mCellViewDock = new ads::CDockWidget(QStringLiteral("Cell View"));
+            mCellViewDock->setWidget(mCellViewPanel);
+            mDockManager->addDockWidget(ads::RightDockWidgetArea, mCellViewDock);
+        }
+
+        // Create Warnings dock widget
+        if (!mWarningsDock)
+        {
+            auto* warningsWidget = new QWidget(this);
+            auto* warningsLayout = new QVBoxLayout(warningsWidget);
+            warningsLayout->setContentsMargins(4, 4, 4, 4);
+            auto* warningsList = new QTableWidget(warningsWidget);
+            warningsList->setColumnCount(3);
+            warningsList->setHorizontalHeaderLabels({"Level", "Message", "Record"});
+            warningsList->horizontalHeader()->setStretchLastSection(true);
+            warningsList->setSelectionBehavior(QAbstractItemView::SelectRows);
+            warningsList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+            warningsLayout->addWidget(warningsList);
+            mWarningsDock = new ads::CDockWidget("Warnings");
+            mWarningsDock->setWidget(warningsWidget);
+            mDockManager->addDockWidget(ads::BottomDockWidgetArea, mWarningsDock);
         }
         
         // Create Landscape Editor dock widget
@@ -210,12 +263,12 @@ void MainWindow::setData(Data* data)
         }
         else
         {
-            // Data is being replaced (e.g. after a fresh load); refresh the
-            // object list so newly parsed records show up in the palette.
             objectPalette->populateObjectList();
         }
 
         objectWindowDock->setVisible(true);
+
+        updateStatus("Data loaded");
 
         WindowLayout::applyDefaultLayout(this);
     }
@@ -961,19 +1014,12 @@ void MainWindow::on_actionNifViewport_triggered()
     if (!nifViewportWidget)
     {
         nifViewportWidget = new NifViewportWidget(this);
-        auto* dockWidget = new ads::CDockWidget("3D Viewport");
-        dockWidget->setWidget(nifViewportWidget);
-        dockWidget->setObjectName("3D Viewport Dock");
-        mDockManager->addDockWidget(ads::RightDockWidgetArea, dockWidget);
-        LOG_INFO("3D Viewport dock created");
+        setCentralWidget(nifViewportWidget);
+        LOG_INFO("3D Viewport created as central widget");
     }
     else
     {
-        auto* dock = mDockManager->findDockWidget("3D Viewport");
-        if (dock)
-        {
-            dock->toggleView(dock->isClosed());
-        }
+        nifViewportWidget->setVisible(!nifViewportWidget->isVisible());
     }
 }
 
@@ -2053,4 +2099,38 @@ void MainWindow::on_actionCompactSmallMaster_triggered()
                 "The master has been saved to the selected path.\n"
                 "Deleted records are skipped during save, producing a smaller file.")
             .arg(totalRecords).arg(deletedRecords));
+}
+
+void MainWindow::on_actionSaveAllButton_triggered()
+{
+    if (!mData) return;
+    emit actionSave_triggered();
+}
+
+void MainWindow::on_actionCheckOut_triggered()
+{
+    if (!mData)
+    {
+        QMessageBox::information(this, "Check Out",
+            "No document is currently loaded.\n\n"
+            "Open a plugin file first via File > Data.");
+        return;
+    }
+    QMessageBox::information(this, "Check Out",
+        "Check Out is a version-control operation.\n"
+        "Select records in the Object Window to check out.");
+}
+
+void MainWindow::on_actionCheckIn_triggered()
+{
+    if (!mData)
+    {
+        QMessageBox::information(this, "Check In",
+            "No document is currently loaded.\n\n"
+            "Open a plugin file first via File > Data.");
+        return;
+    }
+    QMessageBox::information(this, "Check In",
+        "Check In is a version-control operation.\n"
+        "Select checked-out records in the Object Window to check in.");
 }
