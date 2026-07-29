@@ -30,6 +30,7 @@ namespace tescomponents {
 // subrecords; OpenCK's existing record format collapses the
 // per-gender split into maleWorldPath/femaleWorldPath for simplicity.
 // ---------------------------------------------------------------------------
+/// Armor/clothing biped slots and per-gender world model paths.
 class TESBipedModel_Component : public Component
 {
 public:
@@ -136,6 +137,7 @@ public:
 // ---------------------------------------------------------------------------
 // TESEnchantableForm_Component — attached enchantment + max charge.
 // ---------------------------------------------------------------------------
+/// Attached enchantment form ID and maximum charge.
 class TESEnchantableForm_Component : public Component
 {
 public:
@@ -212,6 +214,7 @@ public:
 // pickup/putdown. Starfield uses YNAM/ZNAM (legacy) or the
 // starfield-specific PICK/PUT subrecords.
 // ---------------------------------------------------------------------------
+/// Pickup and putdown sound form IDs (YNAM/ZNAM/PICK/PUTD subrecords).
 class BGSPickupPutdownSounds_Component : public Component
 {
 public:
@@ -298,6 +301,7 @@ public:
 // (e.g. an apple from an apple crate is "Apple" with no Editor ID).
 // Stored as a small set of subrecords; we just preserve the bytes.
 // ---------------------------------------------------------------------------
+/// Starfield instance naming rules, preserved as raw subrecord bytes.
 class BGSInstanceNamingRulesForm_Component : public Component
 {
 public:

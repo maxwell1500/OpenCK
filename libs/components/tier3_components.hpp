@@ -22,6 +22,7 @@ namespace tescomponents {
 // Used by RACE, DIAL, LOCATION, PACKAGE, SOUN, WTHR, LAND, and others.
 // Starfield writes FNAM; older games write FLAG. We accept both.
 // ---------------------------------------------------------------------------
+/// Generic uint32 flags bitfield (FNAM/FLAG subrecord) for a record.
 class TESFlags_Component : public Component
 {
 public:
@@ -100,6 +101,7 @@ public:
 // BGSSoundDescriptor_Component — sound descriptor for SOUN records.
 // Handles FNAM (sound file path) and SNDD/SNDX (flags).
 // ---------------------------------------------------------------------------
+/// Sound file path and flags (FNAM/SNDD/SNDX subrecords) for SOUN records.
 class BGSSoundDescriptor_Component : public Component
 {
 public:
@@ -181,8 +183,9 @@ public:
 
 // ---------------------------------------------------------------------------
 // TESWeatherData_Component — weather data for WTHR records.
-// Handles SNAM (sun texture path) and FNAM/FLAG (flags).
+// Handles SNAM (sun texture) and FNAM/FLAG (flags).
 // ---------------------------------------------------------------------------
+/// Weather sun texture and flags (SNAM/FNAM/FLAG subrecords) for WTHR records.
 class TESWeatherData_Component : public Component
 {
 public:
@@ -267,6 +270,7 @@ public:
 // Handles NAME (baseId), DATA (pos/rot/scale), XOWN (owner), DNAM (lock),
 // XESP (initially disabled), SCRI (scripts).
 // ---------------------------------------------------------------------------
+/// Reference placement, owner, lock, and script data for REFR records.
 class BGSRefData_Component : public Component
 {
 public:
@@ -435,6 +439,7 @@ public:
 // subrecord. Handles flags, base spell, fatigue, barter gold, level,
 // calc min/max, and speed multiplier.
 // ---------------------------------------------------------------------------
+/// NPC/creature base stats (ACBS subrecord): flags, level, spells, gold.
 class TESActorBaseData_Component : public Component
 {
 public:
@@ -545,6 +550,7 @@ public:
 // form IDs of spells known by an NPC or actor. Used by NPC_ and CREA
 // records.
 // ---------------------------------------------------------------------------
+/// List of spell form IDs (SPLO subrecord) known by an NPC or creature.
 class TESSpellList_Component : public Component
 {
 public:
@@ -617,6 +623,7 @@ public:
 // BODT is the legacy format (12 bytes: partType + flags). BOD2 is the newer
 // format (12 bytes: partType + flags + partCount).
 // ---------------------------------------------------------------------------
+/// Body part type, flags, and count (BODT/BOD2 subrecords) for RACE records.
 class TESBodyParts_Component : public Component
 {
 public:
@@ -704,6 +711,7 @@ public:
 // TESAIForm_Component — AI data (AIDT subrecord) for NPC_ and CREA records.
 // Stores aggression, confidence, energy, morality, mood, and disposition.
 // ---------------------------------------------------------------------------
+/// AI personality data (AIDT subrecord): aggression, confidence, morality.
 class TESAIForm_Component : public Component
 {
 public:
@@ -814,6 +822,7 @@ public:
     void mergeWith(const Component* other) override { copyFrom(other); }
 };
 
+/// Per-skill value array (SKIL subrecords) for NPC_ and RACE records.
 class TESSkills_Component : public Component
 {
 public:
@@ -901,6 +910,7 @@ public:
 // Fallout 4: SPECIAL (7 attributes) via ATTR.
 // Starfield: ATTR subrecord.
 // ---------------------------------------------------------------------------
+/// Actor attribute array (ATTR/BYDT subrecords), format varies by game.
 class TESAttributes_Component : public Component
 {
 public:
@@ -989,6 +999,7 @@ public:
 // face morph values) in Skyrim. Game-specific subrecords (FGGS, FGGA,
 // FGTR, NIFT, ...) are preserved verbatim in rawSub.
 // ---------------------------------------------------------------------------
+/// NPC face generation data: hair, eyes, head parts, and face morphs.
 class TESNPCFaceGen_Component : public Component
 {
 public:

@@ -46,6 +46,7 @@
 
 class Component;
 
+/// Abstract base for a single editable property rendered in the property grid.
 class EditorProperty
 {
 public:
@@ -81,6 +82,7 @@ public:
 // Concrete property types.
 // =============================================================================
 
+/// Boolean property editor bound to a bool field.
 class BoolEditorProperty : public EditorProperty
 {
 public:
@@ -99,6 +101,7 @@ private:
     bool* m_storage;
 };
 
+/// Signed 32-bit integer property editor bound to a qint32 field.
 class IntEditorProperty : public EditorProperty
 {
 public:
@@ -117,6 +120,7 @@ private:
     qint32* m_storage;
 };
 
+/// Unsigned 32-bit integer property editor bound to a quint32 field.
 class UIntEditorProperty : public EditorProperty
 {
 public:
@@ -135,6 +139,7 @@ private:
     quint32* m_storage;
 };
 
+/// Single-precision float property editor bound to a float field.
 class FloatEditorProperty : public EditorProperty
 {
 public:
@@ -153,6 +158,7 @@ private:
     float* m_storage;
 };
 
+/// String property editor bound to a QString field.
 class StringEditorProperty : public EditorProperty
 {
 public:
@@ -171,9 +177,7 @@ private:
     QString* m_storage;
 };
 
-// A form-ID picker property. We store a 32-bit form ID and let the
-// property grid host a specialized picker widget when it knows how
-// to render one; otherwise it falls back to a QSpinBox.
+/// Form-ID picker property bound to a quint32 form ID field.
 class FormEditorProperty : public EditorProperty
 {
 public:
@@ -192,9 +196,7 @@ private:
     quint32* m_storage;
 };
 
-// An array of form IDs (e.g. the list of keywords a form carries).
-// The grid renders this as a table of form pickers with add/remove
-// buttons.
+/// Array-of-form-IDs property bound to a QVector<quint32>.
 class FormArrayEditorProperty : public EditorProperty
 {
 public:
@@ -233,6 +235,7 @@ struct BitfieldDef {
     quint32 mask;
 };
 
+/// Bitmask property rendered as a group of checkboxes, one per bit.
 class BitfieldEditorProperty : public EditorProperty
 {
 public:
@@ -256,7 +259,7 @@ private:
     std::vector<BitfieldDef> m_bits;
 };
 
-// An enum dropdown property. Maps integer values to display strings.
+/// Enum dropdown property mapping integer values to display strings.
 class EnumEditorProperty : public EditorProperty
 {
 public:
@@ -282,7 +285,7 @@ private:
     std::vector<Entry> m_entries;
 };
 
-// A color picker property. Stores RGBA as four floats.
+/// Color picker property storing RGBA as four floats.
 class ColorEditorProperty : public EditorProperty
 {
 public:
@@ -315,6 +318,7 @@ private:
     float* m_a;
 };
 
+/// 2D point property bound to two float fields (x, y).
 class Point2EditorProperty : public EditorProperty
 {
 public:
@@ -341,6 +345,7 @@ private:
     float* m_y;
 };
 
+/// 3D point property bound to three float fields (x, y, z).
 class Point3EditorProperty : public EditorProperty
 {
 public:
@@ -369,6 +374,7 @@ private:
     float* m_z;
 };
 
+/// Min/max range property bound to two float fields.
 class MinMaxEditorProperty : public EditorProperty
 {
 public:

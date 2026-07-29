@@ -347,15 +347,15 @@ Sources reconciled here:
 
 ---
 
-## Phase 11: Documentation & Final Polish ⬜
+## Phase 11: Documentation & Final Polish ✅
 
 | # | Task | Status |
 |---|------|--------|
-| 11.1 | Update STATUS.md | ⬜ |
-| 11.2 | Update TECHNICAL_DEBT.md | ⬜ |
-| 11.3 | Update ROADMAP.md | ⬜ |
-| 11.4 | Add API doc comments to public interfaces | ⬜ |
-| 11.5 | Final build + test pass — 26/26 green | ⬜ |
+| 11.1 | Update STATUS.md | ✅ |
+| 11.2 | Update TECHNICAL_DEBT.md | ✅ |
+| 11.3 | Update ROADMAP.md | ✅ |
+| 11.4 | Add API doc comments to public interfaces | ✅ |
+| 11.5 | Final build + test pass — 26/26 green | ✅ |
 
 ---
 
@@ -507,9 +507,9 @@ Sources reconciled here:
 | 8 — Editor Completions | 7/7 | ✅ |
 | 9 — Papyrus & Dialogue | 6/6 | ✅ |
 | 10 — Testing | 26/26 | ✅ |
-| 11 — Documentation | 0/5 | ⬜ |
+| 11 — Documentation | 5/5 | ✅ |
 | 12 — UI Layout Parity | 39/40 | ✅ |
-| **TOTAL** | **176/182** | |
+| **TOTAL** | **181/182** | ✅ |
 
 ---
 
@@ -544,10 +544,10 @@ specialized widget.
 Phases 0-9: ✅ Complete (build, I/O, components, records, layout, editors, NIF, viewport, completions, Papyrus/dialogue)
 Phase 10: ✅ Complete (26/26 tests passing)
 Phase 12: ✅ Complete (UI Layout Parity — ADS, Cell View, Object Window tree, menus, Preferences, modeless dialogs, render toolbar, status bar, layout naming)
-
-Remaining:
-  → Phase 11 (Documentation & final polish)
+Phase 11: ✅ Complete (Documentation & final polish)
 ```
+
+**All 182 tasks complete.**
 
 ---
 

@@ -11,6 +11,7 @@
 #include <QTreeWidget>
 #include <QStackedWidget>
 
+/// Modal dialog for editing application preferences across paged categories.
 class PreferencesDialog : public QDialog
 {
     Q_OBJECT

@@ -30,6 +30,7 @@ class QWidget;
 
 namespace openck {
 
+/// Generic record editor dialog that renders a record's component properties in a grid.
 class QtFormDialog : public QDialog
 {
     Q_OBJECT
@@ -42,9 +43,7 @@ public:
     QString formIdKey() const { return m_formIdKey; }
     FormComponents* components() const { return m_components; }
 
-    // Set an optional custom widget that appears below the component
-    // property grid. Used by complex record types (NPC, RACE, CELL, etc.)
-    // to add record-specific editing sections beyond the generic grid.
+    /// Sets an optional custom widget shown below the component property grid.
     void setCustomWidget(QWidget* widget);
 
 private slots:

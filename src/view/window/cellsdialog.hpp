@@ -12,6 +12,7 @@ class CellMapCanvas;
 class CellListModel;
 class RefrTableModel;
 
+/// Panel listing worldspaces, cells, and a cell's references on a map.
 class CellViewPanel : public QWidget
 {
     Q_OBJECT

@@ -23,6 +23,7 @@ struct RawSubRecord;
 
 namespace tescomponents {
 
+/// Localized display name (FULL subrecord) carried by every named form.
 class TESFullName_Component : public Component
 {
 public:

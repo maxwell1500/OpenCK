@@ -37,6 +37,7 @@ namespace Ui {
 class mainwindow;
 }
 
+/// Main application window hosting dockable editor panels and menus.
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -45,7 +46,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+    /// Sets the active Data model backing the editor windows.
     void setData(Data* data);
+    /// Updates the status bar with a transient message.
     void updateStatus(const QString& message);
     void updateRecordCount(int count);
     void updatePluginInfo(const QString& pluginName);

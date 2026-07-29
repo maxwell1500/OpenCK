@@ -35,6 +35,7 @@ namespace tescomponents {
 // (legacy) or MODT/MOD3 (Starfield-specific) depending on the form.
 // We accept both.
 // ---------------------------------------------------------------------------
+/// Model and LOD model paths (MODL/MNAM subrecords) for a record.
 class TESModel_Component : public Component
 {
 public:
@@ -117,6 +118,7 @@ public:
 // TESTexture_Component — inventory icon. Starfield uses ICON (legacy)
 // or ITM2 (OpenCK's chosen tag) and ICO2 (small icon).
 // ---------------------------------------------------------------------------
+/// Inventory icon paths (ICON/ICO2 subrecords) for a record.
 class TESTexture_Component : public Component
 {
 public:
@@ -199,6 +201,7 @@ public:
 // TESHealth_Component — health value. Type varies between games
 // (float in Morrowind, int in later games).
 // ---------------------------------------------------------------------------
+/// Health value (HLTH/DATA subrecord), type varies by game.
 class TESHealth_Component : public Component
 {
 public:
@@ -285,6 +288,7 @@ public:
 // ---------------------------------------------------------------------------
 // TESValue_Component — gold value (DATA subrecord, integer).
 // ---------------------------------------------------------------------------
+/// Gold value (integer DATA subrecord) of a record.
 class TESValue_Component : public Component
 {
 public:
@@ -340,6 +344,7 @@ public:
 // ---------------------------------------------------------------------------
 // TESWeight_Component — weight (DATA subrecord, float).
 // ---------------------------------------------------------------------------
+/// Weight value (float DATA subrecord) of a record.
 class TESWeight_Component : public Component
 {
 public:
@@ -392,6 +397,7 @@ public:
 // ---------------------------------------------------------------------------
 // TESDescription_Component — long-form description text (DESC).
 // ---------------------------------------------------------------------------
+/// Long-form description text (DESC subrecord) for a record.
 class TESDescription_Component : public Component
 {
 public:
@@ -460,6 +466,7 @@ public:
 // containing a FormID list; older games use a per-keyword
 // structure.
 // ---------------------------------------------------------------------------
+/// List of keyword form IDs (CNAM/KWDA subrecords) attached to a record.
 class BGSKeywordForm_Component : public Component
 {
 public:
@@ -559,6 +566,7 @@ inline bool operator==(const TypedFormValuePair& l, const TypedFormValuePair& r)
 // TESContainer_Component — container inventory items. Handles the CNTO
 // subrecord (array of TypedFormValuePair) used by CONT, NPC_, LVLI, etc.
 // ---------------------------------------------------------------------------
+/// Container inventory item list (CNTO subrecord) of form-ID/count pairs.
 class TESContainer_Component : public Component
 {
 public:

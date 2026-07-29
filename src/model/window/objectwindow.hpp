@@ -8,6 +8,7 @@
 
 class Data;
 
+/// Tree model presenting records grouped by category for the Object Window.
 class ObjectWindowModel : public QAbstractItemModel
 {
     Q_OBJECT
@@ -45,6 +46,7 @@ private:
         QString formId;
     };
 
+    /// A record category (e.g. "Weapons", "Armor") holding its visible records.
     struct Category
     {
         QString name;
@@ -53,6 +55,7 @@ private:
         QVector<VisibleRecord> visibleRecords;
     };
 
+    /// A top-level group of related categories in the Object Window tree.
     struct CategoryGroup
     {
         QString name;

@@ -33,6 +33,7 @@ class QtFormDialog;
 // and the parent widget for the dialog.
 using FormDataWidgetFactory = std::function<QWidget*(FormComponents*, void* recordPtr, QWidget*)>;
 
+/// Singleton registry of open QtFormDialogs, deduplicating by form ID.
 class QtFormDialogManager : public QObject
 {
     Q_OBJECT
@@ -40,10 +41,7 @@ class QtFormDialogManager : public QObject
 public:
     static QtFormDialogManager& instance();
 
-    // Open (or focus) a dialog for the given record. The formIdKey
-    // is the deduplication key, typically the string form of the
-    // record's form ID. The components pointer is non-owning and
-    // must outlive the dialog.
+    /// Opens a dialog for the record, or focuses it if already open.
     void openOrFocus(const QString& formIdKey, FormComponents* components,
                      QWidget* parent = nullptr);
 
@@ -54,8 +52,7 @@ public:
                      FormComponents* components, void* recordPtr = nullptr,
                      QWidget* parent = nullptr);
 
-    // Register a factory that creates custom data widgets for a
-    // specific record type (e.g. "NPC_", "RACE", "CELL").
+    /// Registers a factory that builds a custom data widget for a record type.
     void registerFactory(const QString& recordType,
                          FormDataWidgetFactory factory);
 
