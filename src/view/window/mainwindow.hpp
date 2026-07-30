@@ -31,6 +31,7 @@ class LandscapeEditor;
 class ObjectPalette;
 class BashedPatchDialog;
 class CellViewPanel;
+class InspectorWidget;
 struct CellRecord;
 
 namespace Ui {
@@ -172,6 +173,8 @@ private:
     CellViewPanel* mCellViewPanel;
     ads::CDockWidget* mCellViewDock;
     ads::CDockWidget* mWarningsDock;
+    InspectorWidget* mInspectorWidget;
+    ads::CDockWidget* mInspectorDock;
     ads::CDockManager* mDockManager;
     QLabel* mStatusRecordCount;
     QLabel* mStatusPluginInfo;

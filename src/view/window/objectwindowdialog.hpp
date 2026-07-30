@@ -15,6 +15,8 @@ class ObjectWindowModel;
 class Data;
 struct CellRecord;
 
+namespace openck { class FormComponents; }
+
 class ObjectWindowDialog : public QDockWidget
 {
     Q_OBJECT
@@ -37,6 +39,9 @@ public:
     static void setClipboardData(const ClipboardRecord& record);
     static void clearClipboardData();
 
+signals:
+    void recordSelected(int categoryId, int recordIndex, const QString& editorId);
+
 public slots:
     void filterChanged(const QString& text);
     void editSelected();
@@ -51,6 +56,13 @@ public:
     QTreeView* getTreeView() const { return mTreeView; }
     QLineEdit* getFilterEdit() const { return mFilterEdit; }
     CellRecord* getSelectedCell() const;
+
+    struct RecordLookupResult {
+        openck::FormComponents* components = nullptr;
+        void* recordPtr = nullptr;
+        QString recordType;
+    };
+    RecordLookupResult getFormComponentsForIndex(int categoryId, int recordIndex) const;
 
     // Batch Editing (Step 2) - Multi-select support for ObjectWindowDialog
     void enableMultiSelect(bool enabled = true);

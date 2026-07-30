@@ -168,6 +168,15 @@ void ObjectWindowDialog::setupUI()
     connect(mDeleteButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSelected);
     connect(mCloneButton, &QPushButton::clicked, this, &ObjectWindowDialog::cloneSelected);
     connect(mTreeView, &QTreeView::doubleClicked, this, &ObjectWindowDialog::onDoubleClick);
+    connect(mTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
+        [this](const QModelIndex& current, const QModelIndex&) {
+            if (current.isValid() && mModel->isRecord(current)) {
+                int cat = mModel->getCategoryIndex(current);
+                int rec = mModel->getRecordIndex(current);
+                QString eid = mModel->getRecordEditorId(cat, rec);
+                emit recordSelected(cat, rec, eid);
+            }
+        });
     connect(mTreeView, &QTreeView::customContextMenuRequested, this, [this](const QPoint& pos) {
         QModelIndex index = mTreeView->indexAt(pos);
         updateContextMenu(index);
@@ -2191,4 +2200,61 @@ CellRecord* ObjectWindowDialog::getSelectedCell() const
         }
     }
     return nullptr;
+}
+
+ObjectWindowDialog::RecordLookupResult ObjectWindowDialog::getFormComponentsForIndex(
+    int categoryId, int recordIndex) const
+{
+    RecordLookupResult result;
+    CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
+
+    switch (type)
+    {
+#define CASE_RECORD(ctype, getter, recType) \
+    case ctype: { \
+        auto& coll = mData->getter(); \
+        if (recordIndex >= 0 && recordIndex < coll.size()) { \
+            auto& rec = coll.getRecord(recordIndex).get(); \
+            result.components = &rec.components; \
+            result.recordPtr = &rec; \
+            result.recordType = #ctype; \
+        } \
+        break; \
+    }
+    CASE_RECORD(CkId::Type_Npc_, getNpcCollection, NpcRecord)
+    CASE_RECORD(CkId::Type_Weap_, getWeaponCollection, WeaponRecord)
+    CASE_RECORD(CkId::Type_Armor_, getArmorCollection, ArmorRecord)
+    CASE_RECORD(CkId::Type_Spel_, getSpellCollection, SpellRecord)
+    CASE_RECORD(CkId::Type_Magic_, getMagicCollection, MagicRecord)
+    CASE_RECORD(CkId::Type_Quest_, getQuestCollection, QuestRecord)
+    CASE_RECORD(CkId::Type_Dial_, getDialCollection, DialRecord)
+    CASE_RECORD(CkId::Type_Info_, getInfoCollection, InfoRecord)
+    CASE_RECORD(CkId::Type_Tree_, getTreeCollection, TreeRecord)
+    CASE_RECORD(CkId::Type_Alch_, getAlchCollection, AlchRecord)
+    CASE_RECORD(CkId::Type_Ingr_, getIngrCollection, IngrRecord)
+    CASE_RECORD(CkId::Type_Book_, getBookCollection, BookRecord)
+    CASE_RECORD(CkId::Type_Misc_, getMiscCollection, MiscRecord)
+    CASE_RECORD(CkId::Type_Cont_, getContCollection, ContRecord)
+    CASE_RECORD(CkId::Type_Ench_, getEnchCollection, EnchRecord)
+    CASE_RECORD(CkId::Type_Acti_, getActiCollection, ActiRecord)
+    CASE_RECORD(CkId::Type_Stat_, getStatCollection, StatRecord)
+    CASE_RECORD(CkId::Type_Race_, getRaceCollection, RaceRecord)
+    CASE_RECORD(CkId::Type_Class_, getClassCollection, ClassRecord)
+    CASE_RECORD(CkId::Type_Fact_, getFactCollection, FactRecord)
+    CASE_RECORD(CkId::Type_PerK_, getPerkCollection, PerkRecord)
+    CASE_RECORD(CkId::Type_Soun_, getSounCollection, SounRecord)
+    CASE_RECORD(CkId::Type_Wthr_, getWthrCollection, WthrRecord)
+    CASE_RECORD(CkId::Type_Ltex_, getLtexCollection, LtexRecord)
+    CASE_RECORD(CkId::Type_Cel_, getCellCollection, CellRecord)
+    CASE_RECORD(CkId::Type_WRLD_, getWorldspaceCollection, WorldspaceRecord)
+    CASE_RECORD(CkId::Type_LOCT_, getLocationCollection, LocationRecord)
+    CASE_RECORD(CkId::Type_Refr_, getRefrCollection, RefrRecord)
+    CASE_RECORD(CkId::Type_Land_, getLandCollection, LandRecord)
+    CASE_RECORD(CkId::Type_Pack_, getPackCollection, PackRecord)
+    CASE_RECORD(CkId::Type_Material_, getMaterialCollection, MaterialRecord)
+#undef CASE_RECORD
+    default:
+        break;
+    }
+    return result;
 }

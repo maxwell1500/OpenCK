@@ -485,6 +485,8 @@ set(VIEW_SOURCES
     src/view/window/papyrusdebugger.cpp
     src/view/window/papyrusdebugger.hpp
     src/view/window/mainwindow.cpp
+    src/view/window/inspectorwidget.cpp
+    src/view/window/inspectorwidget.hpp
     src/view/window/objectwindowdialog.cpp
     src/view/window/weaponeditor.cpp
     src/view/window/armor_editor.cpp

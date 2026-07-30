@@ -53,6 +53,7 @@
 #include "bashedpatchdialog.hpp"
 #include "modmanagerdialog.hpp"
 #include "validationreportdialog.hpp"
+#include "inspectorwidget.hpp"
 #include "../../model/tools/assetvalidator.hpp"
 #include "../../model/tools/assetdependencyscanner.hpp"
 #include "../../model/tools/batchtools.hpp"
@@ -107,6 +108,8 @@ MainWindow::MainWindow(QWidget *parent) :
       mCellViewPanel(nullptr),
       mCellViewDock(nullptr),
       mWarningsDock(nullptr),
+      mInspectorWidget(nullptr),
+      mInspectorDock(nullptr),
       mDockManager(nullptr),
       mStatusRecordCount(nullptr),
       mStatusPluginInfo(nullptr),
@@ -235,6 +238,27 @@ void MainWindow::setData(Data* data)
             mWarningsDock = new ads::CDockWidget("Warnings");
             mWarningsDock->setWidget(warningsWidget);
             mDockManager->addDockWidget(ads::BottomDockWidgetArea, mWarningsDock);
+        }
+
+        // Create Inspector dock widget
+        if (!mInspectorWidget)
+        {
+            mInspectorWidget = new InspectorWidget(this);
+            mInspectorDock = new ads::CDockWidget("Inspector");
+            mInspectorDock->setWidget(mInspectorWidget);
+            mDockManager->addDockWidget(ads::RightDockWidgetArea, mInspectorDock);
+            connect(objectWindowDock, &ObjectWindowDialog::recordSelected,
+                    this, [this](int cat, int rec, const QString& eid) {
+                auto lookup = objectWindowDock->getFormComponentsForIndex(cat, rec);
+                if (lookup.components) {
+                    QString title = QString("%1 (%2)")
+                        .arg(lookup.recordType)
+                        .arg(eid);
+                    mInspectorWidget->showComponents(lookup.components, title);
+                } else {
+                    mInspectorWidget->clear();
+                }
+            });
         }
         
         // Create Landscape Editor dock widget
