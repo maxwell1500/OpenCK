@@ -341,6 +341,7 @@ set(FILES_SOURCES
     external/stb_vorbis.c
     libs/files/audio/wavencoder.cpp
     libs/files/audio/oggencoder.cpp
+    libs/files/audio/fuzparser.cpp
 )
 
 set(FILES_HEADERS
@@ -362,6 +363,7 @@ set(FILES_HEADERS
     libs/files/audio/oggdecoder.hpp
     libs/files/audio/wavencoder.hpp
     libs/files/audio/oggencoder.hpp
+    libs/files/audio/fuzparser.hpp
 )
 
 add_library(openck_files STATIC

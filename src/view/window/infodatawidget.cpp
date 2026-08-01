@@ -1,11 +1,13 @@
 #include "infodatawidget.hpp"
 #include "../libs/files/esm/inforecord.hpp"
+#include "../libs/files/audio/fuzparser.hpp"
 #include "../libs/components/formcomponents.hpp"
 #include "papyruscompiler.hpp"
 #include "logger.hpp"
 
 #include <QComboBox>
 #include <QDir>
+#include <QDateTime>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -342,8 +344,32 @@ void InfoDataWidget::onPlayVoiceFile()
     }
 
 #ifdef _WIN32
+    QString playPath = path;
+    QString tempFuzWav;
+
+    // .fuz containers embed the audio in an "XWAV" chunk. If that chunk is
+    // a plain WAV (RIFF), extract it to a temp file for playback.
+    if (path.endsWith(QStringLiteral(".fuz"), Qt::CaseInsensitive))
+    {
+        FuzParser fuz;
+        if (FuzParser::loadFile(path, fuz) && fuz.hasAudio()
+            && fuz.audioData.startsWith("RIFF"))
+        {
+            tempFuzWav = QDir::tempPath() + QStringLiteral("/openck_voice_")
+                + QString::number(QDateTime::currentMSecsSinceEpoch())
+                + QStringLiteral(".wav");
+            QFile wavFile(tempFuzWav);
+            if (wavFile.open(QIODevice::WriteOnly))
+            {
+                wavFile.write(fuz.audioData);
+                wavFile.close();
+                playPath = tempFuzWav;
+            }
+        }
+    }
+
     // Win32 PlaySound is async (SND_ASYNC) and supports .wav directly.
-    std::wstring w = path.toStdWString();
+    std::wstring w = playPath.toStdWString();
     BOOL ok = PlaySoundW(w.c_str(), nullptr, SND_FILENAME | SND_ASYNC);
     if (!ok)
     {

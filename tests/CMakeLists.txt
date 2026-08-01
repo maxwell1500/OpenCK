@@ -359,6 +359,12 @@ target_link_libraries(test_texturelayer PRIVATE openck_view openck_model test_st
 target_include_directories(test_texturelayer PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_texturelayer)
 
+# .fuz voice-over container parser (LIPF + audio chunks)
+add_executable(test_fuzparser test_fuzparser.cpp)
+target_link_libraries(test_fuzparser PRIVATE openck_files test_stubs Qt6::Test)
+target_include_directories(test_fuzparser PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_fuzparser)
+
 # Helper that writes a minimal test plugin for manual CLI verification
 add_executable(make_testplugin make_testplugin.cpp)
 target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)

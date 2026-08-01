@@ -636,7 +636,7 @@ Sources reconciled here:
 | # | Task | Notes |
 |---|------|-------|
 | 18.1 | Audio playback engine (QMediaPlayer / QSoundEffect) for voice preview + waveform playback | ✅ `WavePlayer` (`src/view/window/waveplayer.hpp/.cpp`): Win32 `waveOut` streaming engine (16-bit PCM from float samples, queued fixed-size buffers, play-from-offset/pause/resume/stop, WOM_DONE position tracking, `winmm.lib`); `WaveformWidget::play()` now feeds it, so SoundEditor + waveform Play emits real audio |
-| 18.2 | XWM decode + .fuz (lip+audio) handling | Voice file format |
+| 18.2 | XWM decode + .fuz (lip+audio) handling | ✅ `FuzParser` (`libs/files/audio/fuzparser.hpp/.cpp`): parses `.fuz` containers (FUZE magic, FourCC+size chunks), extracts LIPF lip data + XWAV/XWM audio; InfoDataWidget's Play button extracts a RIFF WAV chunk to a temp file for playback; `test_fuzparser`. XWM/xWMA decode itself remains pending (no codec) |
 | 18.3 | LipGenerator integration: .lip generation from WAV (Fonix phoneme analysis) | `Tools\LipGenerator\LipGenerator.exe` + `FonixData.cdf` |
 | 18.4 | FaceFX compiler wrapper (`ffxc.exe` + `.facefx` actors) | `Tools\FaceFX\` |
 | 18.5 | Wwise soundbank integration — Build Soundbank action, `[Wwise]` settings, external codec | CK `[Wwise] iDefaultExternalCodecID=4` |
@@ -749,14 +749,14 @@ Sources reconciled here:
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 6/9 | ◐ |
-| 18 — Audio Pipeline | 1/7 | ◐ |
+| 18 — Audio Pipeline | 2/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 1/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
 | 21 — Scripting Completion | 3/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **266/310** | ◐ |
+| **TOTAL** | **267/310** | ◐ |
 
 ---
 
@@ -803,7 +803,7 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (material painting with slope influence done; alpha masks, overlay masks, autopaint, BTD pending)
-Phase 18: Audio pipeline (WavePlayer waveOut streaming playback engine done; XWM/FUZ, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
+Phase 18: Audio pipeline (.fuz container + WavePlayer playback engine done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode done; BSMaterial graph, rule templates, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)
 Phase 21: Scripting completion (.ppj projects, .flg flags, structured diagnostic parsing done; Script Manager, spell-check, LSP, remote debugger, type-checker completion pending)
