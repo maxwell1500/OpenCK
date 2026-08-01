@@ -89,6 +89,15 @@ Create a fully functional, multi-game Creation Kit replacement that supports edi
 
 ## Remaining Work
 
+### Phase 14: Render Window Gizmos + Interactive Cell View (active)
+
+- **14A — Gizmo system**: ray picking, translate/rotate/scale manipulators
+  rendered via OverlayVBO, axis-handle drag, snap, undoable writes to REFR
+  via EditRecordCommand. 13 tasks. See `docs/UNIFIED_PLAN.md`.
+- **14B — Interactive Cell View**: pan/zoom view transform, click-select
+  markers, hover highlight, marquee multi-select, sync with reference table
+  + Inspector + Render Window. 10 tasks. See `docs/UNIFIED_PLAN.md`.
+
 ### High Priority
 
 **P5-08: Landscape undo/redo**
@@ -173,11 +182,12 @@ Contributions are welcome! Focus areas:
 OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
 
 ---
-*Last updated: July 13, 2026*
+*Last updated: August 1, 2026*
 
 ## Recent Changes (July 2026)
 - **Phase 7 complete**: Landscape heightmap persistence, ObjectPalette REFR format
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 53/67 steps complete (79%)
+- **Progress**: 196/310 steps complete (63%) — Phase 14 in progress (0/23); Phases 15–24 planned after second CK audit
+- **Phase 13 complete**: Editor Workspace Parity (docked Inspector, Warnings dock, menu bar reorder, toolbar expansion) — committed `a767b0c`

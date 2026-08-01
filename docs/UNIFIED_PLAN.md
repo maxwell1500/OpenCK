@@ -2,7 +2,9 @@
 
 > Reconciling the ESM I/O plan, the real-CK 395-file probe,
 > the Tes4Codes cross-reference, and the original 10-phase plan.
-> Updated 2026-07-28 after Phase 9 completion and UI layout audit.
+> Updated 2026-08-01 after Phase 13 completion, Phase 14 start,
+> and a second deep-dive audit of the commercial Starfield Creation Kit
+> (v1.16.244.0) + the Morrowind→Starfield conversion project.
 
 Sources reconciled here:
 - `finalPhases.md` — original 10-phase "Final Completion Plan"
@@ -492,6 +494,231 @@ Sources reconciled here:
 
 ---
 
+## Phase 13: Editor Workspace Parity ✅
+
+> Completed 2026-07-31. Closed the remaining UI layout gaps flagged in
+> `docs/LAYOUT_AUDIT.md` and the real-CK parity review.
+
+| # | Task | Status |
+|---|------|--------|
+| 13.1 | Make NifViewportWidget the central widget (real CK Render Window layout) | ✅ |
+| 13.2 | Add docked Inspector panel (replaces modal popups; shows selected record's components) | ✅ |
+| 13.3 | Add Warnings dock panel for validation results | ✅ |
+| 13.4 | Cell View created on application load (not on-demand) | ✅ |
+| 13.5 | Verify Object Window category groups (~80 categories, 9 groups) | ✅ |
+| 13.6 | Reorder menu bar to match real CK (File, Edit, View, Character, Gameplay, World, ...) | ✅ |
+| 13.7 | Verify Render Window snap/axis-lock toolbar | ✅ |
+| 13.8 | Wire Theme menu to ThemeManager (Default, Light, Dark) | ✅ |
+| 13.9 | Expand main toolbar: New, Save All, Check Out/In | ✅ |
+| 13.10 | Fix F10 shortcut conflict (AIPackages → Ctrl+Shift+A) | ✅ |
+| 13.11 | Wire status bar updates in setData() | ✅ |
+| 13.12 | Move editor launchers to correct menus (Dialogue→Character, Quest Graph→Gameplay, Weather→World) | ✅ |
+| 13.13 | Clean up dock titles | ✅ |
+| 13.14 | Build clean, 26/26 tests pass, commit & push | ✅ |
+
+---
+
+## Phase 14: Render Window Gizmos + Interactive Cell View ◐
+
+> Target: parity with the real CK's core *editing* loop — click a placed
+> reference in the Cell View, then move/rotate/scale it directly in the
+> 3D Render Window. The toolbar (Select/Move/Rotate/Scale, snap toggles)
+> already exists as a placeholder (12G.1–12G.3); the gizmo rendering and
+> picking math are not implemented yet.
+>
+> Real CK reference: `BGSRenderWindowEditModule` (manipulator widget on
+> canvas, ray-cast picking, axis-handle drag). Cell View reference:
+> `TESCellView` (2D top-down canvas, click-select, zoom/pan).
+
+### 14A — Render Window Gizmo System
+
+> Files: `src/view/window/nifviewportwidget.hpp/.cpp`
+> (gizmo VBOs reuse the existing `OverlayVBO` infrastructure, lines 190-199).
+
+| # | Task | Notes |
+|---|------|-------|
+| 14A.1 | Implement ray picking: unproject mouse → world ray, intersect mesh shape bounds / cell reference markers | Needs `selectedShape`→`ViewportCellRef` mapping so clicks select placed references |
+| 14A.2 | Render translate gizmo (3 axis arrows) at selection origin via OverlayVBO | Draw only when `mEditMode == EditMode::Move` |
+| 14A.3 | Render rotate gizmo (3 rings) | Draw only when `mEditMode == EditMode::Rotate` |
+| 14A.4 | Render scale gizmo (3 axis handles + center cube) | Draw only when `mEditMode == EditMode::Scale` |
+| 14A.5 | Gizmo hit-testing on mouse press: pick axis handle before fallback to viewport orbit | Store `mActiveGizmoAxis`; cursor feedback (Q-Cross/SizeVer/SizeHor) |
+| 14A.6 | Mouse drag → world-space delta: project screen delta onto gizmo axis; rotate via arc-ball around selection pivot | Per-axis math in a testable helper |
+| 14A.7 | Apply snap-to-grid (position, `mSnapGridSize`) and snap-to-angle (rotation, `mSnapAngleIncrement`) during drag | Existing toolbar actions (12G.2) feed these values |
+| 14A.8 | Write transforms back to REFR record fields via `EditRecordCommand` (undoable) | Reuse `EditRecordCommand`; position/rotation/scale + XSCL |
+| 14A.9 | Selection highlight: outline/brighten picked reference in viewport | Reuse `m_highlightTriVBO` pattern or a new selection VBO |
+| 14A.10 | Hover highlight for gizmo handles (hovered axis = accent color) | Match real CK feedback |
+| 14A.11 | Keyboard shortcuts: W/E/R for Move/Rotate/Scale, Q for Select | Bind via existing `ShortcutManager` (respect `12D` menu parity) |
+| 14A.12 | Status bar readout of selection position/rotation/scale during drag | Wire to existing status-bar labels (12I) |
+| 14A.13 | Unit tests: axis projection, screen→world delta, snap math, gizmo handle picking | New `test_gizmomath.cpp` (pure math, no GL) |
+
+### 14B — Interactive Cell View 2D Map
+
+> Files: `src/view/window/cellsdialog.cpp` (`CellMapCanvas`, lines 32-118).
+> The canvas currently paints markers only — no input handling, no view transform.
+
+| # | Task | Notes |
+|---|------|-------|
+| 14B.1 | Add view transform (pan offset + zoom scale) to `CellMapCanvas` | `setViewport(offset, zoom)`; all painting goes through it |
+| 14B.2 | Mouse wheel zoom (anchored at cursor) + middle/right-drag pan | `wheelEvent`, `mouseMoveEvent` |
+| 14B.3 | Click-select reference markers: inverse-map screen → cell coordinates, hit-test within radius | Emit `referenceClicked(recordIndex)` |
+| 14B.4 | Hover highlight for reference markers | `mouseMoveEvent` without button, nearest marker within radius |
+| 14B.5 | Rubber-band marquee selection for multi-select | Shift+left-drag; track `QVector<qint32> mSelectedRefs` |
+| 14B.6 | Sync canvas selection ↔ reference table (`RefrTableModel`) | Highlight rows; keep both in lockstep |
+| 14B.7 | Emit `referenceSelected` from `CellViewPanel` → MainWindow → Inspector + Render Window | Route through existing `recordSelected`/Inspector wiring from 13.2 |
+| 14B.8 | Cross-highlight with Render Window: select marker → focus/camera-jump to reference in viewport | `setCellReferences` + new `focusOnReference()` |
+| 14B.9 | Status bar: live cell-coordinate readout on mouse move | Reuse `mStatusCellCoords` label (12I.1) |
+| 14B.10 | Unit tests: screen↔world transform round-trip, marker hit-testing, zoom anchoring | New `test_cellviewcanvas.cpp` (pure math, no widgets) |
+
+---
+
+## Phase 15: Record Coverage & Object Window Completion ⬜
+
+> Parity goal: real CK Object Window shows ~127 record types. OpenCK shows
+> 88 categories, but only ~36 are backed by `CkId::Type` collections; ~52 are
+> `Type_None` shells (`src/view/window/objectwindow.cpp:304-404`).
+> Source of truth for the real list: CK's 127 `_Editor.cpp` files + the
+> `.filter` files in `Data\DataViews\ObjectWindow\_common\`.
+
+| # | Task | Notes |
+|---|------|-------|
+| 15.1 | Back the ~52 `Type_None` Object Window categories with real collections + `Data::continueLoading` routing | STAT/CELL/WRLD work; add LCTN, PNDT, CCT, NAVM, FLST, LVLI, LVLC, LVSP, KEYM, CLAS, OUTFT, SCRL, SOUN, WATR, IDLE, IMGS, GRAS, TREE, etc. |
+| 15.2 | Add remaining record structs + parsers to `libs/files/esm/` for types that only have headers | Follow `Statrecord.cpp`/`Miscrecord.cpp` pattern |
+| 15.3 | Data-driven `.filter` file support: read real CK Object Window filters (`DataViews\ObjectWindow\_common\*.filter` JSON schema) | `{ExactValue, FilterType, IsConcatenatedOr, IsNegative, MaxValue, MinValue, ParameterName}` — keyword-based filtering |
+| 15.4 | CREA specialized editor widget (soul, combat style, body parts) | 5B.2 from Phase 5 |
+| 15.5 | Wire `recordSelected` → status bar (`mStatusSelectedObject`, `mainwindow.cpp:151`) | Label exists, never updated |
+| 15.6 | Populate Warnings dock from validators; expand validators beyond NPC/Weapon/Quest | Dock exists (`mainwindow.cpp:226`), nothing writes to it |
+| 15.7 | Replace modal `QMessageBox` validation with docked Warnings + actionable suggestions | Real CK: `EditorWarnings.txt` log + warnings window |
+
+## Phase 16: Specialized Editor Completion ⬜
+
+| # | Task | Notes |
+|---|------|-------|
+| 16.1 | Scene (SCEN) timeline editor — action list, phase timeline, actor assignment | `BGSSceneView` pattern |
+| 16.2 | EffectShader / ImageSpaceModifier (EFSH/IMGS) editor | Shader parameter panels, image-space curves |
+| 16.3 | AI Package (PACK) editor completion — conditions grid, schedule data, package data | `aipackageeditor` exists as tree + read-only pane |
+| 16.4 | Worldspace editor completion — map data, climate, water, LOD settings, cell grid | `worldspace_editor.cpp` exists, partial |
+| 16.5 | Location (LCTN) editor — linked references, LocRefTypes, references list | Real CK exports `<LCTN:EditorID>|<LCTN:References.Import=...>` |
+| 16.6 | Planet (PNDT) editor (Starfield) — star system, biomes, traits, day length, resources | Real CK snippet: `<PNDT:Biomes>...<PNDT:Resources.Count>` |
+| 16.7 | CCT creature editor (Starfield attach points) — ap_CCT_Attack/Defense/Faction/Diet/Size/Skin/Speed/Temperament | Attach-point-driven mod system |
+| 16.8 | NavMesh editor completion — connect interiors/worldspace, clean splines, finalize cell navmeshes, check navmeshes | Real CK menu actions; current editor has triangle tables only |
+
+## Phase 17: Terrain & Landscape Completion ⬜
+
+> Real CK landscape editor is a full sculpt/paint system driven by JSON
+> brushes (`.lbr`), brush-alphas (`.dds`), and terrain overlay masks (`.tif`).
+
+| # | Task | Notes |
+|---|------|-------|
+| 17.1 | JSON `.lbr` brush system: Sculpt/Flatten/Smooth/Stamp/BuildUp/Subtractive | Landscape brushes: `CropRows, DefaultBrush, GrassSpray, MeadowNoise, OrganicFlatten, Oval01, ProcGenMask, RiverBrush, Square` |
+| 17.2 | Brush alpha textures (19 `.dds` in `Data\Textures\BrushAlphas\`) | Circle, CloudSpray, Clumpiness, Road, Splatter, Square, BillowyNoise... |
+| 17.3 | Material painting with `MaxMaterialOpacity`, slope influence (`ApplySlopeInfluence`, falloff/threshold/invert) | |
+| 17.4 | Terrain overlay masks (463 `.tif` in `Source\TGATextures\Terrain\OverlayMasks\`) | POI biome masks, settlement masks |
+| 17.5 | Heightmap import (R32) + autopaint + export between cells | Root debt P5-12; Morrowind project uses `.npy` → heightmap |
+| 17.6 | Terrain blocks + landscape cutting + save landscape menu actions | Terrain menu is currently empty (`ui/mainwindow.ui:139-143`) |
+| 17.7 | Landscape undo/redo via EditRecordCommand | Root debt P5-08 — terrain edits currently non-undoable |
+| 17.8 | BTD land-texture files | Morrowind project reverse-engineered `generate_btd*.py` |
+| 17.9 | Water planes (XCLW semantics) + water editor completion | |
+
+## Phase 18: Audio Pipeline ⬜
+
+> Real CK: LipGenerator (Fonix phoneme→viseme) + FaceFX compiler + Wwise
+> project integration + RoboVoicer TTS. OpenCK has OGG/WAV encode only,
+> no playback engine.
+
+| # | Task | Notes |
+|---|------|-------|
+| 18.1 | Audio playback engine (QMediaPlayer / QSoundEffect) for voice preview + waveform playback | `WaveformWidget::play()` is visual-only (`waveformwidget.cpp:637`); only Win32 `PlaySoundW` used today |
+| 18.2 | XWM decode + .fuz (lip+audio) handling | Voice file format |
+| 18.3 | LipGenerator integration: .lip generation from WAV (Fonix phoneme analysis) | `Tools\LipGenerator\LipGenerator.exe` + `FonixData.cdf` |
+| 18.4 | FaceFX compiler wrapper (`ffxc.exe` + `.facefx` actors) | `Tools\FaceFX\` |
+| 18.5 | Wwise soundbank integration — Build Soundbank action, `[Wwise]` settings, external codec | CK `[Wwise] iDefaultExternalCodecID=4` |
+| 18.6 | RoboVoicer TTS integration for automated voice-over | `Tools\RoboVoicer.exe` |
+| 18.7 | Sound editor completion: process local voice WAVs, reload Wwise data | |
+
+## Phase 19: Material Editor & Asset Pipeline ⬜
+
+> Real CK: 64 material rule templates (`BSMaterial::LayeredMaterialID` ops:
+> Add/Remove/Move/MakeConst), texture-set property graph, FBX→NIF via
+> AssetWatcher, texture conversion via xtexconv, mesh-LOD via Simplygon,
+> physics-LOD collision generation.
+
+| # | Task | Notes |
+|---|------|-------|
+| 19.1 | Material editor: BSMaterial property graph (TextureSet slots: Albedo/Normal/Roughness/Metalness/AO/Curvature/Height/Emissive/Flow/Frost; Blenders 1-5; SSS; translucency) | From `RuleTemplates\ShaderModels\*.json` |
+| 19.2 | Material rule templates: 1LayerStandard → 4LayerStandard, Terrain, Skin, Hair, Eye, Water, Vegetation | Add/Remove/Move/MakeConst ops |
+| 19.3 | DDS texture *import/decode* for UI (BC1/BC3/BC7) | QImage can't load DDS; encoder exists, decoder is NIF-baking-only |
+| 19.4 | Texture conversion pipeline: BC7/BC4/R8/R8G8B8A8, mipmaps, physically-based mipmaps, distance fields, gamma handling | `xtexconv` rules in `Textures_Settings*.json` |
+| 19.5 | Mesh LOD generation (Simplygon-style `GenerationConfig.json` pipeline) | `-GenerateMeshLODAssociations` mode |
+| 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | Morrowind project wrote custom hknp encoders — reference |
+| 19.7 | FBX→NIF import (AssetWatcher pattern) | WeldSkin, bones, editor markers, physics LOD settings |
+
+## Phase 20: Particle Editor & Icon Generation ⬜
+
+| # | Task | Notes |
+|---|------|-------|
+| 20.1 | Particle editor: JSON `.pofx` bundle-node system (Age & Lifetime, AlphaByCurve, Velocity, Gravity, Drag, Rotation, Ribbon, UVScroll, Attractors, Turbulence, FlipBook) | `EditorFiles\Bundles\*.pofx` + `RuleTemplates\Bundles\` |
+| 20.2 | Particle LOD presets (`ParticlesLODPresets.json` budgets per category × Near/Middle/Far) | |
+| 20.3 | Projectile variable bindings (BeamLength, BeamLifeTime, HasHit) | `EmitterProjectileVars.pofx` |
+| 20.4 | NIF preview primitives (cube/cylinder/plane/sphere) | `EditorFiles\Primitives\` |
+| 20.5 | Icon generation renderer: 3-light rig (warm/cool/key), cubemap background, per-context sizes (inventory 128, workshop/shipbuilder 512) | `CreationKitCustom_*.ini` `[Preview]`/`[IconGenerator]` |
+
+## Phase 21: Scripting Completion ⬜
+
+| # | Task | Notes |
+|---|------|-------|
+| 21.1 | Papyrus project files (.ppj): Imports, Folders (NoRecurse), Scripts, Output, Flags, Asm (None/Keep/Only/Discard), Optimize, Release, Final | `PapyrusProject.xsd` |
+| 21.2 | Papyrus Script Manager dialog | Real CK File menu |
+| 21.3 | Script property flags (`.flg`): Hidden/Conditional/Default/CollapsedOnRef/CollapsedOnBase/Mandatory with target validation | `Starfield_Papyrus_Flags.flg` |
+| 21.4 | Spell-checker in dialogue/script editors | Real CK ships Sentry SSCE with 5 dictionaries |
+| 21.5 | Papyrus language server (LSP protocol) integration | `vscodepapyrus` includes Antlr4 language server |
+| 21.6 | Remote debugger protocol (port 20548 pattern): breakpoints, locals, watch, step | `PapyrusRemoteDebugger.exe` |
+| 21.7 | Papyrus type checker completion: struct members, array types, property access | `papyrustypechecker.cpp` partial |
+| 21.8 | Papyrus error parsing from heuristic regexes to structured grammar | `papyruscompiler.cpp:297-471` |
+
+## Phase 22: Behavior / Animation Graph Editor ⬜
+
+> Real CK uses FlowChartX; `EditorColors.xml` defines the full node palette.
+
+| # | Task | Notes |
+|---|------|-------|
+| 22.1 | Node-graph editor canvas (pan/zoom, node add/connect, edge routing) | FlowChartX pattern; reuses viewport code paths |
+| 22.2 | Node palette: State_Machine, Blend_Tree, Blend, Merge, Switch, Animation, Locomotion_Blend, Random_Animation, Timer_Event, Two_Bone_IK, Look_At, Direct_At, Foot_IK, Momentum_Animation, Ragdoll_Get_Up, ... (43+ types) | `EditorColors.xml` |
+| 22.3 | Animation event validation (SyncRightFoot on Run/Walk/Jog, WeaponFire on FireSingle/FireAuto, HitFrame on MeleeAttack, etc.) | Cross-check event names against expected sets |
+| 22.4 | Variable assignment nodes (Assign_Variable, State_Variable_Control, Dampen_Variable, Linear_Variable, Rotation_Variable) | |
+| 22.5 | Blend tree editing with blend weights | |
+
+## Phase 23: Data Workflows & Plugin Utilities ⬜
+
+| # | Task | Notes |
+|---|------|-------|
+| 23.1 | CSV Snippets system: column-based import/export with nested `.Import=file.txt` templates and form-field accessors `<Type:Field.SubField.Count>` | `Snippets\*.txt` — real CK bulk workflows |
+| 23.2 | OPAL procedural placement lists (.opl) | `Clutter_*.opl` — outpost/interior clutter placement |
+| 23.3 | Find Forms by condition dialog | |
+| 23.4 | Real plugin compaction: form-ID renumbering + reference re-pointing (not count-and-save) | `mainwindow.cpp:2057` currently superficial |
+| 23.5 | Master file management (MMS): master update source, free-ID allocation control | CK `[MMS]` section |
+| 23.6 | Plugin upload to Bethesda.net (login/logout, upload) | CK BNet logs present in Morrowind project |
+| 23.7 | xEdit-style validation/analysis export | |
+| 23.8 | Reference batch action window | Real CK ObjectWindows menu |
+| 23.9 | Object Window layouts (saved filter/layout presets) | |
+
+## Phase 24: Infrastructure & Ecosystem ⬜
+
+| # | Task | Notes |
+|---|------|-------|
+| 24.1 | Localization/i18n: QTranslator + .qm build step + .ts files | `tr()` used everywhere, no translator installed |
+| 24.2 | Version control integration (Perforce + Git): commit, branch, diff, check-in/out, sync, revert | Preferences Network page + Check In/Out are stubs (`preferencesdialog.cpp:335`, `mainwindow.cpp:2134`) |
+| 24.3 | CI/CD pipeline (GitHub Actions: build + all 26 tests on Windows) | TD L5 |
+| 24.4 | Distributable installer packages (NSIS/WiX), CMake install target | TD L3; ADS DLL auto-deploy (TD L4) |
+| 24.5 | Headless/scriptable API — Python-generated plugins pattern | Morrowind project proves the workflow; CLI record import/export |
+| 24.6 | Shortcut expansion (~30 wired vs 524 in real CK) + make ShortcutEditorDialog reachable | `LAYOUT_AUDIT_V2.md` §10; two live conflicts: F10 QuestGraph/AIPackages, Ctrl+Shift+W Worldspaces/WorldView |
+| 24.7 | Layout save/load actions (enable `actionSaveLayout`/`actionLoadLayout`) | Disabled in `ui/mainwindow.ui` |
+| 24.8 | Crash/diagnostics bundle: EditorWarnings.txt + prefs + saved settings zipped on crash | CK `[Debug] sExceptionAdditionalFilesForZip` |
+| 24.9 | Object Window keyword filter UI (user-created filters, saved) | Data-driven from 15.3 |
+| 24.10 | Wire Galaxy/Packin stub menus or remove | `actionNotImplementedGalaxy/Packin` |
+| 24.11 | Empty Terrain menu → real actions from Phase 17 | `ui/mainwindow.ui:139-143` |
+
+---
+
 ## Progress Tracker
 
 | Phase | Steps | Status |
@@ -509,7 +736,19 @@ Sources reconciled here:
 | 10 — Testing | 26/26 | ✅ |
 | 11 — Documentation | 5/5 | ✅ |
 | 12 — UI Layout Parity | 40/40 | ✅ |
-| **TOTAL** | **182/182** | ✅ |
+| 13 — Editor Workspace Parity | 14/14 | ✅ |
+| 14 — Render Gizmos + Cell View | 0/23 | ◐ |
+| 15 — Record Coverage & Object Window | 0/7 | ⬜ |
+| 16 — Specialized Editor Completion | 0/8 | ⬜ |
+| 17 — Terrain & Landscape Completion | 0/9 | ⬜ |
+| 18 — Audio Pipeline | 0/7 | ⬜ |
+| 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
+| 20 — Particle Editor & Icon Generation | 0/5 | ⬜ |
+| 21 — Scripting Completion | 0/8 | ⬜ |
+| 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
+| 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
+| 24 — Infrastructure & Ecosystem | 0/11 | ⬜ |
+| **TOTAL** | **196/310** | ◐ |
 
 ---
 
@@ -545,12 +784,27 @@ Phases 0-9: ✅ Complete (build, I/O, components, records, layout, editors, NIF,
 Phase 10: ✅ Complete (26/26 tests passing)
 Phase 12: ✅ Complete (UI Layout Parity — ADS, Cell View, Object Window tree, menus, Preferences, modeless dialogs, render toolbar, status bar, layout naming)
 Phase 11: ✅ Complete (Documentation & final polish)
+Phase 13: ✅ Complete (Editor Workspace Parity — central render widget, docked Inspector, Warnings dock, menu bar reorder, toolbar expansion, shortcut fixes)
+Phase 14: ◐ IN PROGRESS (Render Window gizmos 14A + Interactive Cell View 14B — unblocks the core editing loop)
 ```
 
-**All 182 tasks complete.**
+**Subsequent phases (after 14):**
+
+```
+Phase 15: Record coverage & Object Window completion (back the ~52 dead categories, .filter files, CREA editor, warnings dock)
+Phase 16: Specialized editor completion (SCEN, EFSH, PACK, WRLD, LCTN, PNDT, CCT, NavMesh tools)
+Phase 17: Terrain & landscape completion (.lbr brushes, overlay masks, heightmap import, undo/redo, BTD)
+Phase 18: Audio pipeline (playback engine, XWM/FUZ, LipGenerator, FaceFX, Wwise soundbanks, RoboVoicer)
+Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)
+Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light icon renderer)
+Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
+Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
+Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, real compaction, MMS, BNet upload)
+Phase 24: Infrastructure & ecosystem (i18n, VCS, CI/CD, packaging, headless API, shortcuts, diagnostics)
+```
 
 ---
 
 *Replaces: `finalPhases.md`, `docs/IMPLEMENTATION_PLAN.md`*
 *Supersedes: `docs/CK_Real_Integration_Plan.md` (keep as reference)*
-*Updated: 2026-07-28*
+*Updated: 2026-08-01*
