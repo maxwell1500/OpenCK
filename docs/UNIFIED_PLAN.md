@@ -641,7 +641,7 @@ Sources reconciled here:
 | 18.4 | FaceFX compiler wrapper (`ffxc.exe` + `.facefx` actors) | `Tools\FaceFX\` |
 | 18.5 | Wwise soundbank integration — Build Soundbank action, `[Wwise]` settings, external codec | CK `[Wwise] iDefaultExternalCodecID=4` |
 | 18.6 | RoboVoicer TTS integration for automated voice-over | `Tools\RoboVoicer.exe` |
-| 18.7 | Sound editor completion: process local voice WAVs, reload Wwise data | |
+| 18.7 | Sound editor completion: process local voice WAVs, reload Wwise data | ✅ SoundEditor gained "Load Local WAV..." — loads a standalone .wav voice file into the waveform for editing (trim/fade/volume/save), independent of BA2 extraction; reports duration/samples/rate |
 
 ## Phase 19: Material Editor & Asset Pipeline ◐
 
@@ -749,14 +749,14 @@ Sources reconciled here:
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 6/9 | ◐ |
-| 18 — Audio Pipeline | 2/7 | ◐ |
+| 18 — Audio Pipeline | 3/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 2/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
 | 21 — Scripting Completion | 5/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **271/310** | ◐ |
+| **TOTAL** | **272/310** | ◐ |
 
 ---
 
@@ -803,7 +803,7 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (material painting with slope influence done; alpha masks, overlay masks, autopaint, BTD pending)
-Phase 18: Audio pipeline (.fuz container + WavePlayer playback engine done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
+Phase 18: Audio pipeline (.fuz container, local WAV processing, WavePlayer done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode + rule templates done; BSMaterial graph, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)
 Phase 21: Scripting completion (Script Manager, .ppj, .flg, structured diagnostics, type-checker property access done; spell-check, LSP, remote debugger pending)

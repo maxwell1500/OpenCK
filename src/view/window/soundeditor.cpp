@@ -83,9 +83,13 @@ void SoundEditor::setupUi()
 
     // Playback + editing toolbar
     auto* toolLayout = new QHBoxLayout();
+    mLoadLocalBtn = new QPushButton(tr("Load Local WAV..."));
+    mLoadLocalBtn->setToolTip(tr("Load a standalone .wav voice file for editing"));
     mPlayBtn = new QPushButton(tr("Play"));
     mPauseBtn = new QPushButton(tr("Pause"));
     mStopBtn = new QPushButton(tr("Stop"));
+    toolLayout->addWidget(mLoadLocalBtn);
+    toolLayout->addSpacing(16);
     toolLayout->addWidget(mPlayBtn);
     toolLayout->addWidget(mPauseBtn);
     toolLayout->addWidget(mStopBtn);
@@ -160,6 +164,7 @@ void SoundEditor::setupUi()
     connect(mPauseBtn, &QPushButton::clicked, this, &SoundEditor::onPause);
     connect(mStopBtn, &QPushButton::clicked, this, &SoundEditor::onStop);
     connect(mTrimBtn, &QPushButton::clicked, this, &SoundEditor::onTrimSelection);
+    connect(mLoadLocalBtn, &QPushButton::clicked, this, &SoundEditor::loadLocalWav);
     connect(mVolumeBtn, &QPushButton::clicked, this, &SoundEditor::onSetVolume);
     connect(mFadeInBtn, &QPushButton::clicked, this, &SoundEditor::onFadeIn);
     connect(mFadeOutBtn, &QPushButton::clicked, this, &SoundEditor::onFadeOut);
@@ -203,6 +208,28 @@ void SoundEditor::loadArchive(const QString& path)
         QMessageBox::critical(this, tr("Error"),
                               tr("Failed to open BA2 archive:\n%1").arg(path));
     }
+}
+
+void SoundEditor::loadLocalWav()
+{
+    const QString path = QFileDialog::getOpenFileName(this, tr("Load Local WAV"),
+        QString(), tr("WAV Files (*.wav);;All Files (*)"));
+    if (path.isEmpty()) return;
+
+    if (!mWaveform->loadAudio(path))
+    {
+        QMessageBox::warning(this, tr("Load Local WAV"),
+            tr("Could not load the audio file (unsupported or corrupt):\n%1").arg(path));
+        return;
+    }
+
+    mSelectedIndex = -1;
+    mNameEdit->setText(QFileInfo(path).fileName());
+    mSelectionLabel->setText(tr("Duration: %1s | %2 samples @ %3 Hz")
+        .arg(mWaveform->durationSeconds(), 0, 'f', 2)
+        .arg(mWaveform->totalSamples())
+        .arg(mWaveform->sampleRate()));
+    LOG_INFO(QString("SoundEditor: loaded local WAV %1").arg(path));
 }
 
 void SoundEditor::onFileSelected(int index)

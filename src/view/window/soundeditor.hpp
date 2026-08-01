@@ -26,6 +26,7 @@ private slots:
     void onFileSelected(int index);
     void extractSelected();
     void extractAll();
+    void loadLocalWav();
     void onPlay();
     void onPause();
     void onStop();
@@ -51,6 +52,7 @@ private:
     QPushButton* mPlayBtn;
     QPushButton* mPauseBtn;
     QPushButton* mStopBtn;
+    QPushButton* mLoadLocalBtn;
     QPushButton* mTrimBtn;
     QPushButton* mVolumeBtn;
     QPushButton* mFadeInBtn;
