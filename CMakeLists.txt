@@ -697,6 +697,7 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/textureeditordialog.cpp
     src/view/window/soundeditor.cpp
     src/view/window/waveformwidget.cpp
+    src/view/window/scenetimelinewidget.cpp
     src/view/window/waveplayer.cpp
     src/view/window/animationeditor.cpp
     src/view/window/timeline.cpp
@@ -804,6 +805,7 @@ set(VIEW_HEADERS
     src/view/window/textureeditordialog.hpp
     src/view/window/soundeditor.hpp
     src/view/window/waveformwidget.hpp
+    src/view/window/scenetimelinewidget.hpp
     src/view/window/animationeditor.hpp
     src/view/window/timeline.hpp
     src/view/window/particleeffectseffecteditor.hpp

@@ -23,6 +23,7 @@
 #include "packdatawidget.hpp"
 #include "worldspacedatawidget.hpp"
 #include "locationdatawidget.hpp"
+#include "scenetimelinewidget.hpp"
 #include "navmesheditordialog.hpp"
 #include "rawsubrecordwidget.hpp"
 #include "../../../libs/files/esm/effectshaderrecord.hpp"
@@ -309,6 +310,19 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("LCTN"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new LocationDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("SCEN"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                Q_UNUSED(comps);
+                // Scene timeline: phases live in the record's raw PHDA
+                // subrecords until validated against real data, so expose a
+                // phase list owned by the widget (edit-in-memory for now).
+                auto* phases = new QVector<ScenePhase>();
+                Q_UNUSED(recPtr);
+                auto* w = new SceneTimelineWidget(phases, parent);
+                w->setOwnedPhases(phases);
+                return w;
             });
         QtFormDialogManager::instance().registerFactory(
             QStringLiteral("EFSH"),

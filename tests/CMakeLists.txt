@@ -353,6 +353,12 @@ target_link_libraries(test_audiopipelinetools PRIVATE openck_model test_stubs Qt
 target_include_directories(test_audiopipelinetools PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_audiopipelinetools)
 
+# Scene timeline phase-model editing semantics
+add_executable(test_scenetimeline test_scenetimeline.cpp)
+target_link_libraries(test_scenetimeline PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_scenetimeline PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_scenetimeline)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

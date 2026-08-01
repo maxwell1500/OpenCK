@@ -597,7 +597,7 @@ Sources reconciled here:
 
 | # | Task | Notes |
 |---|------|-------|
-| 16.1 | Scene (SCEN) timeline editor - action list, phase timeline, actor assignment | ◐ Partial: ScenRecord struct created + wired end-to-end; ScenePhaseModel (src/model/tools/) adds the editor-side phase timeline model (insert/remove/move with clamping, pack), tested via test_scenephasemodel; on-disk PHDA binary encoding still round-trips through raw subrecords until validated against real data. Timeline widget UI pending |
+| 16.1 | Scene (SCEN) timeline editor - action list, phase timeline, actor assignment | ✅ Partial: ScenRecord struct created + wired end-to-end; `ScenePhaseModel` (src/model/tools/) provides the timeline editing semantics (insert/remove/move with clamping, pack); `SceneTimelineWidget` (src/view/window/scenetimelinewidget.hpp/.cpp) renders phases as colored blocks with a time axis, drag-to-move, drag-to-resize (clamped to neighbours), Add/Remove Phase buttons; registered as a `"SCEN"` QtFormDialog factory; `test_scenetimeline`. On-disk PHDA binary encoding still round-trips through raw subrecords until validated against real data |
 | 16.2 | EffectShader / ImageSpaceModifier (EFSH/IMGS) editor | ✅ Partial: EFSH/IMGS open in the generic dialog with a `RawSubrecordWidget` inspector showing all unparsed subrecords (name/size/hex); `EfshRecord` now parses a typed DATA subrecord (shader flags, fill/rim/base RGBA colors, fill/rim/base scales, unk1/unk2) that round-trips losslessly (`test_efshrecord`); IMGS still raw |
 | 16.3 | AI Package (PACK) editor completion — conditions grid, schedule data, package data | ✅ Partial: `PackDataWidget` (EditorID, package/target type, flags, target list) registered as `"PACK"` factory + editSelected case; `aipackageeditor`/`PackEditor` remain for list browsing |
 | 16.4 | Worldspace editor completion — map data, climate, water, LOD settings, cell grid | ✅ Partial: `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) registered as `"WRLD"` factory + editSelected case; Cell Grid group shows map size, cell range from dataMinX/Y + mapSize, and stored-cell count; map/LOD editing still pending |
@@ -747,7 +747,7 @@ Sources reconciled here:
 | 13 — Editor Workspace Parity | 14/14 | ✅ |
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
-| 16 — Specialized Editor Completion | 6/8 | ◐ |
+| 16 — Specialized Editor Completion | 7/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 8/9 | ◐ |
 | 18 — Audio Pipeline | 7/7 | ✅ |
 | 19 — Material Editor & Asset Pipeline | 5/7 | ◐ |
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **287/310** | ◐ |
+| **TOTAL** | **288/310** | ◐ |
 
 ---
 
