@@ -100,6 +100,50 @@ set(ESM_SOURCES
     libs/files/esm/sounrecord.cpp
     libs/files/esm/wthrrecord.cpp
     libs/files/esm/ltexrecord.cpp
+    libs/files/esm/actorvalueinforecord.cpp
+    libs/files/esm/ammorecord.cpp
+    libs/files/esm/apparatusrecord.cpp
+    libs/files/esm/birthsignrecord.cpp
+    libs/files/esm/climaterecord.cpp
+    libs/files/esm/clothrecord.cpp
+    libs/files/esm/combatstylerecord.cpp
+    libs/files/esm/constructibleobjectrecord.cpp
+    libs/files/esm/creaturerecord.cpp
+    libs/files/esm/doorrecord.cpp
+    libs/files/esm/effectshaderrecord.cpp
+    libs/files/esm/explosionrecord.cpp
+    libs/files/esm/eyesrecord.cpp
+    libs/files/esm/florrecord.cpp
+    libs/files/esm/formlistrecord.cpp
+    libs/files/esm/furnrecord.cpp
+    libs/files/esm/grassrecord.cpp
+    libs/files/esm/hairrecord.cpp
+    libs/files/esm/idleanimationrecord.cpp
+    libs/files/esm/idlemarkerrecord.cpp
+    libs/files/esm/imagespacerecord.cpp
+    libs/files/esm/keymrecord.cpp
+    libs/files/esm/keywordrecord.cpp
+    libs/files/esm/lighrecord.cpp
+    libs/files/esm/loadscreenrecord.cpp
+    libs/files/esm/lvlcreaturerecord.cpp
+    libs/files/esm/lvlistrecord.cpp
+    libs/files/esm/lvspellrecord.cpp
+    libs/files/esm/messagerecord.cpp
+    libs/files/esm/msttrecord.cpp
+    libs/files/esm/navmrecord.cpp
+    libs/files/esm/noterecord.cpp
+    libs/files/esm/outfitrecord.cpp
+    libs/files/esm/projectilerecord.cpp
+    libs/files/esm/regionrecord.cpp
+    libs/files/esm/roadrecord.cpp
+    libs/files/esm/scriptrecord.cpp
+    libs/files/esm/scrollrecord.cpp
+    libs/files/esm/shaderparticlerecord.cpp
+    libs/files/esm/slgmrecord.cpp
+    libs/files/esm/soundmarkerrecord.cpp
+    libs/files/esm/staticcollectionrecord.cpp
+    libs/files/esm/texturesetrecord.cpp
+    libs/files/esm/waterecord.cpp
     libs/files/data/strings.cpp
 )
 
@@ -156,6 +200,50 @@ set(ESM_HEADERS
     libs/files/esm/sounrecord.hpp
     libs/files/esm/wthrrecord.hpp
     libs/files/esm/ltexrecord.hpp
+    libs/files/esm/actorvalueinforecord.hpp
+    libs/files/esm/ammorecord.hpp
+    libs/files/esm/apparatusrecord.hpp
+    libs/files/esm/birthsignrecord.hpp
+    libs/files/esm/climaterecord.hpp
+    libs/files/esm/clothrecord.hpp
+    libs/files/esm/combatstylerecord.hpp
+    libs/files/esm/constructibleobjectrecord.hpp
+    libs/files/esm/creaturerecord.hpp
+    libs/files/esm/doorrecord.hpp
+    libs/files/esm/effectshaderrecord.hpp
+    libs/files/esm/explosionrecord.hpp
+    libs/files/esm/eyesrecord.hpp
+    libs/files/esm/florrecord.hpp
+    libs/files/esm/formlistrecord.hpp
+    libs/files/esm/furnrecord.hpp
+    libs/files/esm/grassrecord.hpp
+    libs/files/esm/hairrecord.hpp
+    libs/files/esm/idleanimationrecord.hpp
+    libs/files/esm/idlemarkerrecord.hpp
+    libs/files/esm/imagespacerecord.hpp
+    libs/files/esm/keymrecord.hpp
+    libs/files/esm/keywordrecord.hpp
+    libs/files/esm/lighrecord.hpp
+    libs/files/esm/loadscreenrecord.hpp
+    libs/files/esm/lvlcreaturerecord.hpp
+    libs/files/esm/lvlistrecord.hpp
+    libs/files/esm/lvspellrecord.hpp
+    libs/files/esm/messagerecord.hpp
+    libs/files/esm/msttrecord.hpp
+    libs/files/esm/navmrecord.hpp
+    libs/files/esm/noterecord.hpp
+    libs/files/esm/outfitrecord.hpp
+    libs/files/esm/projectilerecord.hpp
+    libs/files/esm/regionrecord.hpp
+    libs/files/esm/roadrecord.hpp
+    libs/files/esm/scriptrecord.hpp
+    libs/files/esm/scrollrecord.hpp
+    libs/files/esm/shaderparticlerecord.hpp
+    libs/files/esm/slgmrecord.hpp
+    libs/files/esm/soundmarkerrecord.hpp
+    libs/files/esm/staticcollectionrecord.hpp
+    libs/files/esm/texturesetrecord.hpp
+    libs/files/esm/waterecord.hpp
     libs/components/component.hpp
     libs/components/editorproperty.hpp
     libs/components/formcomponents.hpp
@@ -530,6 +618,7 @@ set(VIEW_SOURCES
     src/view/window/infodatawidget.cpp
     src/view/window/celldatawidget.cpp
     src/view/window/questdatawidget.cpp
+    src/view/window/creatureeditor.cpp
     src/view/window/searchdialog.cpp
     src/view/world/enumdelegate.cpp
     src/view/world/genericdelegate.cpp
@@ -628,6 +717,7 @@ set(VIEW_HEADERS
     src/view/window/infodatawidget.hpp
     src/view/window/celldatawidget.hpp
     src/view/window/questdatawidget.hpp
+    src/view/window/creatureeditor.hpp
     src/view/window/searchdialog.hpp
     src/view/world/delegatefactory.hpp
     src/view/world/enumdelegate.hpp

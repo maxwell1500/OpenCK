@@ -1,4 +1,4 @@
-#include "document.hpp"
+﻿#include "document.hpp"
 
 #include "../doc/messages.hpp"
 #include "../world/metadata.hpp"
@@ -100,7 +100,51 @@ void Document::save(const QString& savePath)
             {&data->getLandCollection(), 'LAND'},
             {&data->getSounCollection(), 'SOUN'},
             {&data->getWthrCollection(), 'WTHR'},
-            {&data->getLtexCollection(), 'LTEX'}
+            {&data->getLtexCollection(), 'LTEX'},
+            {&data->getAmmoCollection(), 'AMMO'},
+            {&data->getAppaCollection(), 'APPA'},
+            {&data->getAvifCollection(), 'AVIF'},
+            {&data->getBsgnCollection(), 'BSGN'},
+            {&data->getClmtCollection(), 'CLMT'},
+            {&data->getClotCollection(), 'CLOT'},
+            {&data->getCobjCollection(), 'COBJ'},
+            {&data->getCreatureCollection(), 'CREA'},
+            {&data->getCstyCollection(), 'CSTY'},
+            {&data->getDoorCollection(), 'DOOR'},
+            {&data->getEfshCollection(), 'EFSH'},
+            {&data->getExplCollection(), 'EXPL'},
+            {&data->getEyesCollection(), 'EYES'},
+            {&data->getFlorCollection(), 'FLOR'},
+            {&data->getFlstCollection(), 'FLST'},
+            {&data->getFurnCollection(), 'FURN'},
+            {&data->getGrassCollection(), 'GRAS'},
+            {&data->getHairCollection(), 'HAIR'},
+            {&data->getIdleCollection(), 'IDLE'},
+            {&data->getIdlmCollection(), 'IDLM'},
+            {&data->getImgsCollection(), 'IMGS'},
+            {&data->getKeymCollection(), 'KEYM'},
+            {&data->getKywdCollection(), 'KYWD'},
+            {&data->getLighCollection(), 'LIGH'},
+            {&data->getLscrCollection(), 'LSCR'},
+            {&data->getLvlcCollection(), 'LVLC'},
+            {&data->getLvliCollection(), 'LVLI'},
+            {&data->getLvspCollection(), 'LVSP'},
+            {&data->getMesgCollection(), 'MESG'},
+            {&data->getMsttCollection(), 'MSTT'},
+            {&data->getNavmCollection(), 'NAVM'},
+            {&data->getNoteCollection(), 'NOTE'},
+            {&data->getOtftCollection(), 'OTFT'},
+            {&data->getProjCollection(), 'PROJ'},
+            {&data->getRegnCollection(), 'REGN'},
+            {&data->getRoadCollection(), 'ROAD'},
+            {&data->getScptCollection(), 'SCPT'},
+            {&data->getScrlCollection(), 'SCRL'},
+            {&data->getSlgmCollection(), 'SLGM'},
+            {&data->getSmqnCollection(), 'SMQN'},
+            {&data->getSpgdCollection(), 'SPGD'},
+            {&data->getScolCollection(), 'SCOL'},
+            {&data->getTxstCollection(), 'TXST'},
+            {&data->getWateCollection(), 'WATR'},
         };
 
         for (const auto& entry : saveableCollections)

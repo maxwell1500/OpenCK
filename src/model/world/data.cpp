@@ -272,6 +272,270 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     ltexCollection.addColumn(new IntColumn<LtexRecord>("Havok Material", &LtexRecord::havokMaterial));
     addModel(new IdTable(&ltexCollection), CkId::Type_Ltex_);
 
+    // AMMO - Ammo_s
+    ammoCollection.addColumn(new StringIdColumn<AmmoRecord>());
+    ammoCollection.addColumn(new RecordStateColumn<AmmoRecord>());
+    ammoCollection.addColumn(new StringColumn<AmmoRecord>("Name", &AmmoRecord::editorId));
+    addModel(new IdTable(&ammoCollection), CkId::Type_Ammo_);
+
+    // APPA - Appa_s
+    appaCollection.addColumn(new StringIdColumn<AppaRecord>());
+    appaCollection.addColumn(new RecordStateColumn<AppaRecord>());
+    appaCollection.addColumn(new StringColumn<AppaRecord>("Name", &AppaRecord::editorId));
+    addModel(new IdTable(&appaCollection), CkId::Type_Appa_);
+
+    // AVIF - Avif_s
+    avifCollection.addColumn(new StringIdColumn<ActorValueInfoRecord>());
+    avifCollection.addColumn(new RecordStateColumn<ActorValueInfoRecord>());
+    avifCollection.addColumn(new StringColumn<ActorValueInfoRecord>("Name", &ActorValueInfoRecord::editorId));
+    addModel(new IdTable(&avifCollection), CkId::Type_Avif_);
+
+    // BSGN - Bsgn_s
+    bsgnCollection.addColumn(new StringIdColumn<BsgnRecord>());
+    bsgnCollection.addColumn(new RecordStateColumn<BsgnRecord>());
+    bsgnCollection.addColumn(new StringColumn<BsgnRecord>("Name", &BsgnRecord::editorId));
+    addModel(new IdTable(&bsgnCollection), CkId::Type_Bsgn_);
+
+    // CLMT - Clmt_s
+    clmtCollection.addColumn(new StringIdColumn<ClimateRecord>());
+    clmtCollection.addColumn(new RecordStateColumn<ClimateRecord>());
+    clmtCollection.addColumn(new StringColumn<ClimateRecord>("Name", &ClimateRecord::editorId));
+    addModel(new IdTable(&clmtCollection), CkId::Type_Clmt_);
+
+    // CLOT - Clot_s
+    clotCollection.addColumn(new StringIdColumn<ClotRecord>());
+    clotCollection.addColumn(new RecordStateColumn<ClotRecord>());
+    clotCollection.addColumn(new StringColumn<ClotRecord>("Name", &ClotRecord::editorId));
+    addModel(new IdTable(&clotCollection), CkId::Type_Clot_);
+
+    // COBJ - Cobj_s
+    cobjCollection.addColumn(new StringIdColumn<CobjRecord>());
+    cobjCollection.addColumn(new RecordStateColumn<CobjRecord>());
+    cobjCollection.addColumn(new StringColumn<CobjRecord>("Name", &CobjRecord::editorId));
+    addModel(new IdTable(&cobjCollection), CkId::Type_Cobj_);
+
+    // CREA - Crea_s
+    creatureCollection.addColumn(new StringIdColumn<CreatureRecord>());
+    creatureCollection.addColumn(new RecordStateColumn<CreatureRecord>());
+    creatureCollection.addColumn(new StringColumn<CreatureRecord>("Name", &CreatureRecord::editorId));
+    addModel(new IdTable(&creatureCollection), CkId::Type_Crea_);
+
+    // CSTY - Csty_s
+    cstyCollection.addColumn(new StringIdColumn<CstyRecord>());
+    cstyCollection.addColumn(new RecordStateColumn<CstyRecord>());
+    cstyCollection.addColumn(new StringColumn<CstyRecord>("Name", &CstyRecord::editorId));
+    addModel(new IdTable(&cstyCollection), CkId::Type_Csty_);
+
+    // DOOR - Door_s
+    doorCollection.addColumn(new StringIdColumn<DoorRecord>());
+    doorCollection.addColumn(new RecordStateColumn<DoorRecord>());
+    doorCollection.addColumn(new StringColumn<DoorRecord>("Name", &DoorRecord::editorId));
+    addModel(new IdTable(&doorCollection), CkId::Type_Door_);
+
+    // EFSH - Efsh_s
+    efshCollection.addColumn(new StringIdColumn<EfshRecord>());
+    efshCollection.addColumn(new RecordStateColumn<EfshRecord>());
+    efshCollection.addColumn(new StringColumn<EfshRecord>("Name", &EfshRecord::editorId));
+    addModel(new IdTable(&efshCollection), CkId::Type_Efsh_);
+
+    // EXPL - Expl_s
+    explCollection.addColumn(new StringIdColumn<ExplRecord>());
+    explCollection.addColumn(new RecordStateColumn<ExplRecord>());
+    explCollection.addColumn(new StringColumn<ExplRecord>("Name", &ExplRecord::editorId));
+    addModel(new IdTable(&explCollection), CkId::Type_Expl_);
+
+    // EYES - Eyes_s
+    eyesCollection.addColumn(new StringIdColumn<EyesRecord>());
+    eyesCollection.addColumn(new RecordStateColumn<EyesRecord>());
+    eyesCollection.addColumn(new StringColumn<EyesRecord>("Name", &EyesRecord::editorId));
+    addModel(new IdTable(&eyesCollection), CkId::Type_Eyes_);
+
+    // FLOR - Flor_s
+    florCollection.addColumn(new StringIdColumn<FlorRecord>());
+    florCollection.addColumn(new RecordStateColumn<FlorRecord>());
+    florCollection.addColumn(new StringColumn<FlorRecord>("Name", &FlorRecord::editorId));
+    addModel(new IdTable(&florCollection), CkId::Type_Flor_);
+
+    // FLST - Flst_s
+    flstCollection.addColumn(new StringIdColumn<FormListRecord>());
+    flstCollection.addColumn(new RecordStateColumn<FormListRecord>());
+    flstCollection.addColumn(new StringColumn<FormListRecord>("Name", &FormListRecord::editorId));
+    addModel(new IdTable(&flstCollection), CkId::Type_Flst_);
+
+    // FURN - Furn_s
+    furnCollection.addColumn(new StringIdColumn<FurnRecord>());
+    furnCollection.addColumn(new RecordStateColumn<FurnRecord>());
+    furnCollection.addColumn(new StringColumn<FurnRecord>("Name", &FurnRecord::editorId));
+    addModel(new IdTable(&furnCollection), CkId::Type_Furn_);
+
+    // GRAS - Grass_s
+    grassCollection.addColumn(new StringIdColumn<GrassRecord>());
+    grassCollection.addColumn(new RecordStateColumn<GrassRecord>());
+    grassCollection.addColumn(new StringColumn<GrassRecord>("Name", &GrassRecord::editorId));
+    addModel(new IdTable(&grassCollection), CkId::Type_Grass_);
+
+    // HAIR - Hair_s
+    hairCollection.addColumn(new StringIdColumn<HairRecord>());
+    hairCollection.addColumn(new RecordStateColumn<HairRecord>());
+    hairCollection.addColumn(new StringColumn<HairRecord>("Name", &HairRecord::editorId));
+    addModel(new IdTable(&hairCollection), CkId::Type_Hair_);
+
+    // IDLE - Idle_s
+    idleCollection.addColumn(new StringIdColumn<IdleAnimationRecord>());
+    idleCollection.addColumn(new RecordStateColumn<IdleAnimationRecord>());
+    idleCollection.addColumn(new StringColumn<IdleAnimationRecord>("Name", &IdleAnimationRecord::editorId));
+    addModel(new IdTable(&idleCollection), CkId::Type_Idle_);
+
+    // IDLM - Idlm_s
+    idlmCollection.addColumn(new StringIdColumn<IdleMarkerRecord>());
+    idlmCollection.addColumn(new RecordStateColumn<IdleMarkerRecord>());
+    idlmCollection.addColumn(new StringColumn<IdleMarkerRecord>("Name", &IdleMarkerRecord::editorId));
+    addModel(new IdTable(&idlmCollection), CkId::Type_Idlm_);
+
+    // IMGS - Imgs_s
+    imgsCollection.addColumn(new StringIdColumn<ImgsRecord>());
+    imgsCollection.addColumn(new RecordStateColumn<ImgsRecord>());
+    imgsCollection.addColumn(new StringColumn<ImgsRecord>("Name", &ImgsRecord::editorId));
+    addModel(new IdTable(&imgsCollection), CkId::Type_Imgs_);
+
+    // KEYM - Keym_s
+    keymCollection.addColumn(new StringIdColumn<KeymRecord>());
+    keymCollection.addColumn(new RecordStateColumn<KeymRecord>());
+    keymCollection.addColumn(new StringColumn<KeymRecord>("Name", &KeymRecord::editorId));
+    addModel(new IdTable(&keymCollection), CkId::Type_Keym_);
+
+    // KYWD - Kywd_s
+    kywdCollection.addColumn(new StringIdColumn<KeywordRecord>());
+    kywdCollection.addColumn(new RecordStateColumn<KeywordRecord>());
+    kywdCollection.addColumn(new StringColumn<KeywordRecord>("Name", &KeywordRecord::editorId));
+    addModel(new IdTable(&kywdCollection), CkId::Type_Kywd_);
+
+    // LIGH - Ligh_s
+    lighCollection.addColumn(new StringIdColumn<LighRecord>());
+    lighCollection.addColumn(new RecordStateColumn<LighRecord>());
+    lighCollection.addColumn(new StringColumn<LighRecord>("Name", &LighRecord::editorId));
+    addModel(new IdTable(&lighCollection), CkId::Type_Ligh_);
+
+    // LSCR - Lscr_s
+    lscrCollection.addColumn(new StringIdColumn<LoadScreenRecord>());
+    lscrCollection.addColumn(new RecordStateColumn<LoadScreenRecord>());
+    lscrCollection.addColumn(new StringColumn<LoadScreenRecord>("Name", &LoadScreenRecord::editorId));
+    addModel(new IdTable(&lscrCollection), CkId::Type_Lscr_);
+
+    // LVLC - Lvlc_s
+    lvlcCollection.addColumn(new StringIdColumn<LvlcRecord>());
+    lvlcCollection.addColumn(new RecordStateColumn<LvlcRecord>());
+    lvlcCollection.addColumn(new StringColumn<LvlcRecord>("Name", &LvlcRecord::editorId));
+    addModel(new IdTable(&lvlcCollection), CkId::Type_Lvlc_);
+
+    // LVLI - Lvli_s
+    lvliCollection.addColumn(new StringIdColumn<LvliRecord>());
+    lvliCollection.addColumn(new RecordStateColumn<LvliRecord>());
+    lvliCollection.addColumn(new StringColumn<LvliRecord>("Name", &LvliRecord::editorId));
+    addModel(new IdTable(&lvliCollection), CkId::Type_Lvli_);
+
+    // LVSP - Lvsp_s
+    lvspCollection.addColumn(new StringIdColumn<LvspRecord>());
+    lvspCollection.addColumn(new RecordStateColumn<LvspRecord>());
+    lvspCollection.addColumn(new StringColumn<LvspRecord>("Name", &LvspRecord::editorId));
+    addModel(new IdTable(&lvspCollection), CkId::Type_Lvsp_);
+
+    // MESG - Mesg_s
+    mesgCollection.addColumn(new StringIdColumn<MesgRecord>());
+    mesgCollection.addColumn(new RecordStateColumn<MesgRecord>());
+    mesgCollection.addColumn(new StringColumn<MesgRecord>("Name", &MesgRecord::editorId));
+    addModel(new IdTable(&mesgCollection), CkId::Type_Mesg_);
+
+    // MSTT - Mstt_s
+    msttCollection.addColumn(new StringIdColumn<MsttRecord>());
+    msttCollection.addColumn(new RecordStateColumn<MsttRecord>());
+    msttCollection.addColumn(new StringColumn<MsttRecord>("Name", &MsttRecord::editorId));
+    addModel(new IdTable(&msttCollection), CkId::Type_Mstt_);
+
+    // NAVM - Navm_s
+    navmCollection.addColumn(new StringIdColumn<NavmRecord>());
+    navmCollection.addColumn(new RecordStateColumn<NavmRecord>());
+    navmCollection.addColumn(new StringColumn<NavmRecord>("Name", &NavmRecord::editorId));
+    addModel(new IdTable(&navmCollection), CkId::Type_Navm_);
+
+    // NOTE - Note_s
+    noteCollection.addColumn(new StringIdColumn<NoteRecord>());
+    noteCollection.addColumn(new RecordStateColumn<NoteRecord>());
+    noteCollection.addColumn(new StringColumn<NoteRecord>("Name", &NoteRecord::editorId));
+    addModel(new IdTable(&noteCollection), CkId::Type_Note_);
+
+    // OTFT - Otft_s
+    otftCollection.addColumn(new StringIdColumn<OutfitRecord>());
+    otftCollection.addColumn(new RecordStateColumn<OutfitRecord>());
+    otftCollection.addColumn(new StringColumn<OutfitRecord>("Name", &OutfitRecord::editorId));
+    addModel(new IdTable(&otftCollection), CkId::Type_Otft_);
+
+    // PROJ - Proj_s
+    projCollection.addColumn(new StringIdColumn<ProjRecord>());
+    projCollection.addColumn(new RecordStateColumn<ProjRecord>());
+    projCollection.addColumn(new StringColumn<ProjRecord>("Name", &ProjRecord::editorId));
+    addModel(new IdTable(&projCollection), CkId::Type_Proj_);
+
+    // REGN - Regn_s
+    regnCollection.addColumn(new StringIdColumn<RegionRecord>());
+    regnCollection.addColumn(new RecordStateColumn<RegionRecord>());
+    regnCollection.addColumn(new StringColumn<RegionRecord>("Name", &RegionRecord::editorId));
+    addModel(new IdTable(&regnCollection), CkId::Type_Regn_);
+
+    // ROAD - Road_s
+    roadCollection.addColumn(new StringIdColumn<RoadRecord>());
+    roadCollection.addColumn(new RecordStateColumn<RoadRecord>());
+    roadCollection.addColumn(new StringColumn<RoadRecord>("Name", &RoadRecord::editorId));
+    addModel(new IdTable(&roadCollection), CkId::Type_Road_);
+
+    // SCPT - Scpt_s
+    scptCollection.addColumn(new StringIdColumn<ScriptRecord>());
+    scptCollection.addColumn(new RecordStateColumn<ScriptRecord>());
+    scptCollection.addColumn(new StringColumn<ScriptRecord>("Name", &ScriptRecord::editorId));
+    addModel(new IdTable(&scptCollection), CkId::Type_Scpt_);
+
+    // SCRL - Scrl_s
+    scrlCollection.addColumn(new StringIdColumn<ScrRecord>());
+    scrlCollection.addColumn(new RecordStateColumn<ScrRecord>());
+    scrlCollection.addColumn(new StringColumn<ScrRecord>("Name", &ScrRecord::editorId));
+    addModel(new IdTable(&scrlCollection), CkId::Type_Scrl_);
+
+    // SLGM - Slgm_s
+    slgmCollection.addColumn(new StringIdColumn<SlgmRecord>());
+    slgmCollection.addColumn(new RecordStateColumn<SlgmRecord>());
+    slgmCollection.addColumn(new StringColumn<SlgmRecord>("Name", &SlgmRecord::editorId));
+    addModel(new IdTable(&slgmCollection), CkId::Type_Slgm_);
+
+    // SMQN - Smqn_s
+    smqnCollection.addColumn(new StringIdColumn<SmqnRecord>());
+    smqnCollection.addColumn(new RecordStateColumn<SmqnRecord>());
+    smqnCollection.addColumn(new StringColumn<SmqnRecord>("Name", &SmqnRecord::editorId));
+    addModel(new IdTable(&smqnCollection), CkId::Type_Smqn_);
+
+    // SPGD - Spgd_s
+    spgdCollection.addColumn(new StringIdColumn<SpgdRecord>());
+    spgdCollection.addColumn(new RecordStateColumn<SpgdRecord>());
+    spgdCollection.addColumn(new StringColumn<SpgdRecord>("Name", &SpgdRecord::editorId));
+    addModel(new IdTable(&spgdCollection), CkId::Type_Spgd_);
+
+    // SCOL - Scol_s
+    scolCollection.addColumn(new StringIdColumn<StaticCollectionRecord>());
+    scolCollection.addColumn(new RecordStateColumn<StaticCollectionRecord>());
+    scolCollection.addColumn(new StringColumn<StaticCollectionRecord>("Name", &StaticCollectionRecord::editorId));
+    addModel(new IdTable(&scolCollection), CkId::Type_Scol_);
+
+    // TXST - Txst_s
+    txstCollection.addColumn(new StringIdColumn<TextureSetRecord>());
+    txstCollection.addColumn(new RecordStateColumn<TextureSetRecord>());
+    txstCollection.addColumn(new StringColumn<TextureSetRecord>("Name", &TextureSetRecord::editorId));
+    addModel(new IdTable(&txstCollection), CkId::Type_Txst_);
+
+    // WATR - Wate_s
+    wateCollection.addColumn(new StringIdColumn<WateRecord>());
+    wateCollection.addColumn(new RecordStateColumn<WateRecord>());
+    wateCollection.addColumn(new StringColumn<WateRecord>("Name", &WateRecord::editorId));
+    addModel(new IdTable(&wateCollection), CkId::Type_Wate_);
+
     // Loading Log (metadata)
     metaData.addColumn(new StringIdColumn<MetaData>());
     metaData.addColumn(new RecordStateColumn<MetaData>());
@@ -399,6 +663,50 @@ bool Data::continueLoading(Messages& messages)
             case 'SOUN': sounCollection.load(*reader, base); break;
             case 'WTHR': wthrCollection.load(*reader, base); break;
             case 'LTEX': ltexCollection.load(*reader, base); break;
+            case 'AMMO': ammoCollection.load(*reader, base); break;
+            case 'APPA': appaCollection.load(*reader, base); break;
+            case 'AVIF': avifCollection.load(*reader, base); break;
+            case 'BSGN': bsgnCollection.load(*reader, base); break;
+            case 'CLMT': clmtCollection.load(*reader, base); break;
+            case 'CLOT': clotCollection.load(*reader, base); break;
+            case 'COBJ': cobjCollection.load(*reader, base); break;
+            case 'CREA': creatureCollection.load(*reader, base); break;
+            case 'CSTY': cstyCollection.load(*reader, base); break;
+            case 'DOOR': doorCollection.load(*reader, base); break;
+            case 'EFSH': efshCollection.load(*reader, base); break;
+            case 'EXPL': explCollection.load(*reader, base); break;
+            case 'EYES': eyesCollection.load(*reader, base); break;
+            case 'FLOR': florCollection.load(*reader, base); break;
+            case 'FLST': flstCollection.load(*reader, base); break;
+            case 'FURN': furnCollection.load(*reader, base); break;
+            case 'GRAS': grassCollection.load(*reader, base); break;
+            case 'HAIR': hairCollection.load(*reader, base); break;
+            case 'IDLE': idleCollection.load(*reader, base); break;
+            case 'IDLM': idlmCollection.load(*reader, base); break;
+            case 'IMGS': imgsCollection.load(*reader, base); break;
+            case 'KEYM': keymCollection.load(*reader, base); break;
+            case 'KYWD': kywdCollection.load(*reader, base); break;
+            case 'LIGH': lighCollection.load(*reader, base); break;
+            case 'LSCR': lscrCollection.load(*reader, base); break;
+            case 'LVLC': lvlcCollection.load(*reader, base); break;
+            case 'LVLI': lvliCollection.load(*reader, base); break;
+            case 'LVSP': lvspCollection.load(*reader, base); break;
+            case 'MESG': mesgCollection.load(*reader, base); break;
+            case 'MSTT': msttCollection.load(*reader, base); break;
+            case 'NAVM': navmCollection.load(*reader, base); break;
+            case 'NOTE': noteCollection.load(*reader, base); break;
+            case 'OTFT': otftCollection.load(*reader, base); break;
+            case 'PROJ': projCollection.load(*reader, base); break;
+            case 'REGN': regnCollection.load(*reader, base); break;
+            case 'ROAD': roadCollection.load(*reader, base); break;
+            case 'SCPT': scptCollection.load(*reader, base); break;
+            case 'SCRL': scrlCollection.load(*reader, base); break;
+            case 'SLGM': slgmCollection.load(*reader, base); break;
+            case 'SMQN': smqnCollection.load(*reader, base); break;
+            case 'SPGD': spgdCollection.load(*reader, base); break;
+            case 'SCOL': scolCollection.load(*reader, base); break;
+            case 'TXST': txstCollection.load(*reader, base); break;
+            case 'WATR': wateCollection.load(*reader, base); break;
             default:
             {
                 if (name == 0)
@@ -621,6 +929,50 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Soun_:     return &sounCollection;
     case CkId::Type_Wthr_:     return &wthrCollection;
     case CkId::Type_Ltex_:     return &ltexCollection;
+    case CkId::Type_Ammo_:    return &ammoCollection;
+    case CkId::Type_Appa_:    return &appaCollection;
+    case CkId::Type_Avif_:    return &avifCollection;
+    case CkId::Type_Bsgn_:    return &bsgnCollection;
+    case CkId::Type_Clmt_:    return &clmtCollection;
+    case CkId::Type_Clot_:    return &clotCollection;
+    case CkId::Type_Cobj_:    return &cobjCollection;
+    case CkId::Type_Crea_:    return &creatureCollection;
+    case CkId::Type_Csty_:    return &cstyCollection;
+    case CkId::Type_Door_:    return &doorCollection;
+    case CkId::Type_Efsh_:    return &efshCollection;
+    case CkId::Type_Expl_:    return &explCollection;
+    case CkId::Type_Eyes_:    return &eyesCollection;
+    case CkId::Type_Flor_:    return &florCollection;
+    case CkId::Type_Flst_:    return &flstCollection;
+    case CkId::Type_Furn_:    return &furnCollection;
+    case CkId::Type_Grass_:    return &grassCollection;
+    case CkId::Type_Hair_:    return &hairCollection;
+    case CkId::Type_Idle_:    return &idleCollection;
+    case CkId::Type_Idlm_:    return &idlmCollection;
+    case CkId::Type_Imgs_:    return &imgsCollection;
+    case CkId::Type_Keym_:    return &keymCollection;
+    case CkId::Type_Kywd_:    return &kywdCollection;
+    case CkId::Type_Ligh_:    return &lighCollection;
+    case CkId::Type_Lscr_:    return &lscrCollection;
+    case CkId::Type_Lvlc_:    return &lvlcCollection;
+    case CkId::Type_Lvli_:    return &lvliCollection;
+    case CkId::Type_Lvsp_:    return &lvspCollection;
+    case CkId::Type_Mesg_:    return &mesgCollection;
+    case CkId::Type_Mstt_:    return &msttCollection;
+    case CkId::Type_Navm_:    return &navmCollection;
+    case CkId::Type_Note_:    return &noteCollection;
+    case CkId::Type_Otft_:    return &otftCollection;
+    case CkId::Type_Proj_:    return &projCollection;
+    case CkId::Type_Regn_:    return &regnCollection;
+    case CkId::Type_Road_:    return &roadCollection;
+    case CkId::Type_Scpt_:    return &scptCollection;
+    case CkId::Type_Scrl_:    return &scrlCollection;
+    case CkId::Type_Slgm_:    return &slgmCollection;
+    case CkId::Type_Smqn_:    return &smqnCollection;
+    case CkId::Type_Spgd_:    return &spgdCollection;
+    case CkId::Type_Scol_:    return &scolCollection;
+    case CkId::Type_Txst_:    return &txstCollection;
+    case CkId::Type_Wate_:    return &wateCollection;
     default:                  return nullptr;
     }
 }
@@ -663,6 +1015,50 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Soun_:     return &sounCollection;
     case CkId::Type_Wthr_:     return &wthrCollection;
     case CkId::Type_Ltex_:     return &ltexCollection;
+    case CkId::Type_Ammo_:    return &ammoCollection;
+    case CkId::Type_Appa_:    return &appaCollection;
+    case CkId::Type_Avif_:    return &avifCollection;
+    case CkId::Type_Bsgn_:    return &bsgnCollection;
+    case CkId::Type_Clmt_:    return &clmtCollection;
+    case CkId::Type_Clot_:    return &clotCollection;
+    case CkId::Type_Cobj_:    return &cobjCollection;
+    case CkId::Type_Crea_:    return &creatureCollection;
+    case CkId::Type_Csty_:    return &cstyCollection;
+    case CkId::Type_Door_:    return &doorCollection;
+    case CkId::Type_Efsh_:    return &efshCollection;
+    case CkId::Type_Expl_:    return &explCollection;
+    case CkId::Type_Eyes_:    return &eyesCollection;
+    case CkId::Type_Flor_:    return &florCollection;
+    case CkId::Type_Flst_:    return &flstCollection;
+    case CkId::Type_Furn_:    return &furnCollection;
+    case CkId::Type_Grass_:    return &grassCollection;
+    case CkId::Type_Hair_:    return &hairCollection;
+    case CkId::Type_Idle_:    return &idleCollection;
+    case CkId::Type_Idlm_:    return &idlmCollection;
+    case CkId::Type_Imgs_:    return &imgsCollection;
+    case CkId::Type_Keym_:    return &keymCollection;
+    case CkId::Type_Kywd_:    return &kywdCollection;
+    case CkId::Type_Ligh_:    return &lighCollection;
+    case CkId::Type_Lscr_:    return &lscrCollection;
+    case CkId::Type_Lvlc_:    return &lvlcCollection;
+    case CkId::Type_Lvli_:    return &lvliCollection;
+    case CkId::Type_Lvsp_:    return &lvspCollection;
+    case CkId::Type_Mesg_:    return &mesgCollection;
+    case CkId::Type_Mstt_:    return &msttCollection;
+    case CkId::Type_Navm_:    return &navmCollection;
+    case CkId::Type_Note_:    return &noteCollection;
+    case CkId::Type_Otft_:    return &otftCollection;
+    case CkId::Type_Proj_:    return &projCollection;
+    case CkId::Type_Regn_:    return &regnCollection;
+    case CkId::Type_Road_:    return &roadCollection;
+    case CkId::Type_Scpt_:    return &scptCollection;
+    case CkId::Type_Scrl_:    return &scrlCollection;
+    case CkId::Type_Slgm_:    return &slgmCollection;
+    case CkId::Type_Smqn_:    return &smqnCollection;
+    case CkId::Type_Spgd_:    return &spgdCollection;
+    case CkId::Type_Scol_:    return &scolCollection;
+    case CkId::Type_Txst_:    return &txstCollection;
+    case CkId::Type_Wate_:    return &wateCollection;
     default:                  return nullptr;
     }
 }
@@ -704,6 +1100,50 @@ IdCollection<LandRecord>& Data::getLandCollection() { return landCollection; }
 IdCollection<SounRecord>& Data::getSounCollection() { return sounCollection; }
 IdCollection<WthrRecord>& Data::getWthrCollection() { return wthrCollection; }
 IdCollection<LtexRecord>& Data::getLtexCollection() { return ltexCollection; }
+IdCollection<AmmoRecord>& Data::getAmmoCollection() { return ammoCollection; }
+IdCollection<AppaRecord>& Data::getAppaCollection() { return appaCollection; }
+IdCollection<ActorValueInfoRecord>& Data::getAvifCollection() { return avifCollection; }
+IdCollection<BsgnRecord>& Data::getBsgnCollection() { return bsgnCollection; }
+IdCollection<ClimateRecord>& Data::getClmtCollection() { return clmtCollection; }
+IdCollection<ClotRecord>& Data::getClotCollection() { return clotCollection; }
+IdCollection<CobjRecord>& Data::getCobjCollection() { return cobjCollection; }
+IdCollection<CreatureRecord>& Data::getCreatureCollection() { return creatureCollection; }
+IdCollection<CstyRecord>& Data::getCstyCollection() { return cstyCollection; }
+IdCollection<DoorRecord>& Data::getDoorCollection() { return doorCollection; }
+IdCollection<EfshRecord>& Data::getEfshCollection() { return efshCollection; }
+IdCollection<ExplRecord>& Data::getExplCollection() { return explCollection; }
+IdCollection<EyesRecord>& Data::getEyesCollection() { return eyesCollection; }
+IdCollection<FlorRecord>& Data::getFlorCollection() { return florCollection; }
+IdCollection<FormListRecord>& Data::getFlstCollection() { return flstCollection; }
+IdCollection<FurnRecord>& Data::getFurnCollection() { return furnCollection; }
+IdCollection<GrassRecord>& Data::getGrassCollection() { return grassCollection; }
+IdCollection<HairRecord>& Data::getHairCollection() { return hairCollection; }
+IdCollection<IdleAnimationRecord>& Data::getIdleCollection() { return idleCollection; }
+IdCollection<IdleMarkerRecord>& Data::getIdlmCollection() { return idlmCollection; }
+IdCollection<ImgsRecord>& Data::getImgsCollection() { return imgsCollection; }
+IdCollection<KeymRecord>& Data::getKeymCollection() { return keymCollection; }
+IdCollection<KeywordRecord>& Data::getKywdCollection() { return kywdCollection; }
+IdCollection<LighRecord>& Data::getLighCollection() { return lighCollection; }
+IdCollection<LoadScreenRecord>& Data::getLscrCollection() { return lscrCollection; }
+IdCollection<LvlcRecord>& Data::getLvlcCollection() { return lvlcCollection; }
+IdCollection<LvliRecord>& Data::getLvliCollection() { return lvliCollection; }
+IdCollection<LvspRecord>& Data::getLvspCollection() { return lvspCollection; }
+IdCollection<MesgRecord>& Data::getMesgCollection() { return mesgCollection; }
+IdCollection<MsttRecord>& Data::getMsttCollection() { return msttCollection; }
+IdCollection<NavmRecord>& Data::getNavmCollection() { return navmCollection; }
+IdCollection<NoteRecord>& Data::getNoteCollection() { return noteCollection; }
+IdCollection<OutfitRecord>& Data::getOtftCollection() { return otftCollection; }
+IdCollection<ProjRecord>& Data::getProjCollection() { return projCollection; }
+IdCollection<RegionRecord>& Data::getRegnCollection() { return regnCollection; }
+IdCollection<RoadRecord>& Data::getRoadCollection() { return roadCollection; }
+IdCollection<ScriptRecord>& Data::getScptCollection() { return scptCollection; }
+IdCollection<ScrRecord>& Data::getScrlCollection() { return scrlCollection; }
+IdCollection<SlgmRecord>& Data::getSlgmCollection() { return slgmCollection; }
+IdCollection<SmqnRecord>& Data::getSmqnCollection() { return smqnCollection; }
+IdCollection<SpgdRecord>& Data::getSpgdCollection() { return spgdCollection; }
+IdCollection<StaticCollectionRecord>& Data::getScolCollection() { return scolCollection; }
+IdCollection<TextureSetRecord>& Data::getTxstCollection() { return txstCollection; }
+IdCollection<WateRecord>& Data::getWateCollection() { return wateCollection; }
 
 QVector<IRecordCollection*> Data::allCollections()
 {
@@ -738,7 +1178,54 @@ QVector<IRecordCollection*> Data::allCollections()
         &locationCollection,
         &refrCollection,
         &materialCollection,
-        &landCollection
+        &landCollection,
+        &sounCollection,
+        &wthrCollection,
+        &ltexCollection,
+        &ammoCollection,
+        &appaCollection,
+        &avifCollection,
+        &bsgnCollection,
+        &clmtCollection,
+        &clotCollection,
+        &cobjCollection,
+        &creatureCollection,
+        &cstyCollection,
+        &doorCollection,
+        &efshCollection,
+        &explCollection,
+        &eyesCollection,
+        &florCollection,
+        &flstCollection,
+        &furnCollection,
+        &grassCollection,
+        &hairCollection,
+        &idleCollection,
+        &idlmCollection,
+        &imgsCollection,
+        &keymCollection,
+        &kywdCollection,
+        &lighCollection,
+        &lscrCollection,
+        &lvlcCollection,
+        &lvliCollection,
+        &lvspCollection,
+        &mesgCollection,
+        &msttCollection,
+        &navmCollection,
+        &noteCollection,
+        &otftCollection,
+        &projCollection,
+        &regnCollection,
+        &roadCollection,
+        &scptCollection,
+        &scrlCollection,
+        &slgmCollection,
+        &smqnCollection,
+        &spgdCollection,
+        &scolCollection,
+        &txstCollection,
+        &wateCollection,
     };
 }
 
@@ -778,7 +1265,51 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&landCollection,    CkId::Type_Land_},
         {&sounCollection,    CkId::Type_Soun_},
         {&wthrCollection,    CkId::Type_Wthr_},
-        {&ltexCollection,    CkId::Type_Ltex_}
+        {&ltexCollection,    CkId::Type_Ltex_},
+        {&ammoCollection,    CkId::Type_Ammo_},
+        {&appaCollection,    CkId::Type_Appa_},
+        {&avifCollection,    CkId::Type_Avif_},
+        {&bsgnCollection,    CkId::Type_Bsgn_},
+        {&clmtCollection,    CkId::Type_Clmt_},
+        {&clotCollection,    CkId::Type_Clot_},
+        {&cobjCollection,    CkId::Type_Cobj_},
+        {&creatureCollection,    CkId::Type_Crea_},
+        {&cstyCollection,    CkId::Type_Csty_},
+        {&doorCollection,    CkId::Type_Door_},
+        {&efshCollection,    CkId::Type_Efsh_},
+        {&explCollection,    CkId::Type_Expl_},
+        {&eyesCollection,    CkId::Type_Eyes_},
+        {&florCollection,    CkId::Type_Flor_},
+        {&flstCollection,    CkId::Type_Flst_},
+        {&furnCollection,    CkId::Type_Furn_},
+        {&grassCollection,    CkId::Type_Grass_},
+        {&hairCollection,    CkId::Type_Hair_},
+        {&idleCollection,    CkId::Type_Idle_},
+        {&idlmCollection,    CkId::Type_Idlm_},
+        {&imgsCollection,    CkId::Type_Imgs_},
+        {&keymCollection,    CkId::Type_Keym_},
+        {&kywdCollection,    CkId::Type_Kywd_},
+        {&lighCollection,    CkId::Type_Ligh_},
+        {&lscrCollection,    CkId::Type_Lscr_},
+        {&lvlcCollection,    CkId::Type_Lvlc_},
+        {&lvliCollection,    CkId::Type_Lvli_},
+        {&lvspCollection,    CkId::Type_Lvsp_},
+        {&mesgCollection,    CkId::Type_Mesg_},
+        {&msttCollection,    CkId::Type_Mstt_},
+        {&navmCollection,    CkId::Type_Navm_},
+        {&noteCollection,    CkId::Type_Note_},
+        {&otftCollection,    CkId::Type_Otft_},
+        {&projCollection,    CkId::Type_Proj_},
+        {&regnCollection,    CkId::Type_Regn_},
+        {&roadCollection,    CkId::Type_Road_},
+        {&scptCollection,    CkId::Type_Scpt_},
+        {&scrlCollection,    CkId::Type_Scrl_},
+        {&slgmCollection,    CkId::Type_Slgm_},
+        {&smqnCollection,    CkId::Type_Smqn_},
+        {&spgdCollection,    CkId::Type_Spgd_},
+        {&scolCollection,    CkId::Type_Scol_},
+        {&txstCollection,    CkId::Type_Txst_},
+        {&wateCollection,    CkId::Type_Wate_},
     };
 }
 
@@ -1122,6 +1653,226 @@ const IdCollection<WthrRecord>& Data::getWthrCollection() const
 const IdCollection<LtexRecord>& Data::getLtexCollection() const
 {
     return ltexCollection;
+}
+
+const IdCollection<AmmoRecord>& Data::getAmmoCollection() const
+{
+    return ammoCollection;
+}
+
+const IdCollection<AppaRecord>& Data::getAppaCollection() const
+{
+    return appaCollection;
+}
+
+const IdCollection<ActorValueInfoRecord>& Data::getAvifCollection() const
+{
+    return avifCollection;
+}
+
+const IdCollection<BsgnRecord>& Data::getBsgnCollection() const
+{
+    return bsgnCollection;
+}
+
+const IdCollection<ClimateRecord>& Data::getClmtCollection() const
+{
+    return clmtCollection;
+}
+
+const IdCollection<ClotRecord>& Data::getClotCollection() const
+{
+    return clotCollection;
+}
+
+const IdCollection<CobjRecord>& Data::getCobjCollection() const
+{
+    return cobjCollection;
+}
+
+const IdCollection<CreatureRecord>& Data::getCreatureCollection() const
+{
+    return creatureCollection;
+}
+
+const IdCollection<CstyRecord>& Data::getCstyCollection() const
+{
+    return cstyCollection;
+}
+
+const IdCollection<DoorRecord>& Data::getDoorCollection() const
+{
+    return doorCollection;
+}
+
+const IdCollection<EfshRecord>& Data::getEfshCollection() const
+{
+    return efshCollection;
+}
+
+const IdCollection<ExplRecord>& Data::getExplCollection() const
+{
+    return explCollection;
+}
+
+const IdCollection<EyesRecord>& Data::getEyesCollection() const
+{
+    return eyesCollection;
+}
+
+const IdCollection<FlorRecord>& Data::getFlorCollection() const
+{
+    return florCollection;
+}
+
+const IdCollection<FormListRecord>& Data::getFlstCollection() const
+{
+    return flstCollection;
+}
+
+const IdCollection<FurnRecord>& Data::getFurnCollection() const
+{
+    return furnCollection;
+}
+
+const IdCollection<GrassRecord>& Data::getGrassCollection() const
+{
+    return grassCollection;
+}
+
+const IdCollection<HairRecord>& Data::getHairCollection() const
+{
+    return hairCollection;
+}
+
+const IdCollection<IdleAnimationRecord>& Data::getIdleCollection() const
+{
+    return idleCollection;
+}
+
+const IdCollection<IdleMarkerRecord>& Data::getIdlmCollection() const
+{
+    return idlmCollection;
+}
+
+const IdCollection<ImgsRecord>& Data::getImgsCollection() const
+{
+    return imgsCollection;
+}
+
+const IdCollection<KeymRecord>& Data::getKeymCollection() const
+{
+    return keymCollection;
+}
+
+const IdCollection<KeywordRecord>& Data::getKywdCollection() const
+{
+    return kywdCollection;
+}
+
+const IdCollection<LighRecord>& Data::getLighCollection() const
+{
+    return lighCollection;
+}
+
+const IdCollection<LoadScreenRecord>& Data::getLscrCollection() const
+{
+    return lscrCollection;
+}
+
+const IdCollection<LvlcRecord>& Data::getLvlcCollection() const
+{
+    return lvlcCollection;
+}
+
+const IdCollection<LvliRecord>& Data::getLvliCollection() const
+{
+    return lvliCollection;
+}
+
+const IdCollection<LvspRecord>& Data::getLvspCollection() const
+{
+    return lvspCollection;
+}
+
+const IdCollection<MesgRecord>& Data::getMesgCollection() const
+{
+    return mesgCollection;
+}
+
+const IdCollection<MsttRecord>& Data::getMsttCollection() const
+{
+    return msttCollection;
+}
+
+const IdCollection<NavmRecord>& Data::getNavmCollection() const
+{
+    return navmCollection;
+}
+
+const IdCollection<NoteRecord>& Data::getNoteCollection() const
+{
+    return noteCollection;
+}
+
+const IdCollection<OutfitRecord>& Data::getOtftCollection() const
+{
+    return otftCollection;
+}
+
+const IdCollection<ProjRecord>& Data::getProjCollection() const
+{
+    return projCollection;
+}
+
+const IdCollection<RegionRecord>& Data::getRegnCollection() const
+{
+    return regnCollection;
+}
+
+const IdCollection<RoadRecord>& Data::getRoadCollection() const
+{
+    return roadCollection;
+}
+
+const IdCollection<ScriptRecord>& Data::getScptCollection() const
+{
+    return scptCollection;
+}
+
+const IdCollection<ScrRecord>& Data::getScrlCollection() const
+{
+    return scrlCollection;
+}
+
+const IdCollection<SlgmRecord>& Data::getSlgmCollection() const
+{
+    return slgmCollection;
+}
+
+const IdCollection<SmqnRecord>& Data::getSmqnCollection() const
+{
+    return smqnCollection;
+}
+
+const IdCollection<SpgdRecord>& Data::getSpgdCollection() const
+{
+    return spgdCollection;
+}
+
+const IdCollection<StaticCollectionRecord>& Data::getScolCollection() const
+{
+    return scolCollection;
+}
+
+const IdCollection<TextureSetRecord>& Data::getTxstCollection() const
+{
+    return txstCollection;
+}
+
+const IdCollection<WateRecord>& Data::getWateCollection() const
+{
+    return wateCollection;
 }
 
 bool Data::addMaterial(MaterialRecord& record)

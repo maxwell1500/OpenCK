@@ -18,6 +18,7 @@
 #include "infodatawidget.hpp"
 #include "questdatawidget.hpp"
 #include "globvar_editor.hpp"
+#include "creatureeditor.hpp"
 #include "lcrteditor.hpp"
 #include "logger.hpp"
 #include "../../model/tools/blenderlauncher.hpp"
@@ -35,6 +36,70 @@
 #include "../../../libs/files/esm/sounrecord.hpp"
 #include "../../../libs/files/esm/wthrrecord.hpp"
 #include "../../../libs/files/esm/materialrecord.hpp"
+#include "../../../libs/files/esm/creaturerecord.hpp"
+#include "../../../libs/files/esm/npcrecord.hpp"
+#include "../../../libs/files/esm/weaprecord.hpp"
+#include "../../../libs/files/esm/armorrecord.hpp"
+#include "../../../libs/files/esm/spellrecord.hpp"
+#include "../../../libs/files/esm/magicrecord.hpp"
+#include "../../../libs/files/esm/questrecord.hpp"
+#include "../../../libs/files/esm/dialrecord.hpp"
+#include "../../../libs/files/esm/inforecord.hpp"
+#include "../../../libs/files/esm/treerecord.hpp"
+#include "../../../libs/files/esm/alchrecord.hpp"
+#include "../../../libs/files/esm/ingrrecord.hpp"
+#include "../../../libs/files/esm/bookrecord.hpp"
+#include "../../../libs/files/esm/miscrecord.hpp"
+#include "../../../libs/files/esm/contrecord.hpp"
+#include "../../../libs/files/esm/enchrecord.hpp"
+#include "../../../libs/files/esm/actirecord.hpp"
+#include "../../../libs/files/esm/statrecord.hpp"
+#include "../../../libs/files/esm/racerecord.hpp"
+#include "../../../libs/files/esm/ltexrecord.hpp"
+#include "../../../libs/files/esm/landrecord.hpp"
+#include "../../../libs/files/esm/ammorecord.hpp"
+#include "../../../libs/files/esm/aniorecord.hpp"
+#include "../../../libs/files/esm/apparatusrecord.hpp"
+#include "../../../libs/files/esm/actorvalueinforecord.hpp"#include "../../../libs/files/esm/birthsignrecord.hpp"
+#include "../../../libs/files/esm/climaterecord.hpp"
+#include "../../../libs/files/esm/clothrecord.hpp"
+#include "../../../libs/files/esm/constructibleobjectrecord.hpp"
+#include "../../../libs/files/esm/combatstylerecord.hpp"
+#include "../../../libs/files/esm/doorrecord.hpp"
+#include "../../../libs/files/esm/effectshaderrecord.hpp"
+#include "../../../libs/files/esm/explosionrecord.hpp"
+#include "../../../libs/files/esm/eyesrecord.hpp"
+#include "../../../libs/files/esm/florrecord.hpp"
+#include "../../../libs/files/esm/formlistrecord.hpp"
+#include "../../../libs/files/esm/furnrecord.hpp"
+#include "../../../libs/files/esm/grassrecord.hpp"
+#include "../../../libs/files/esm/hairrecord.hpp"
+#include "../../../libs/files/esm/idleanimationrecord.hpp"
+#include "../../../libs/files/esm/idlemarkerrecord.hpp"
+#include "../../../libs/files/esm/imagespacerecord.hpp"
+#include "../../../libs/files/esm/keymrecord.hpp"
+#include "../../../libs/files/esm/keywordrecord.hpp"
+#include "../../../libs/files/esm/lighrecord.hpp"
+#include "../../../libs/files/esm/loadscreenrecord.hpp"
+#include "../../../libs/files/esm/lvlcreaturerecord.hpp"
+#include "../../../libs/files/esm/lvlistrecord.hpp"
+#include "../../../libs/files/esm/lvspellrecord.hpp"
+#include "../../../libs/files/esm/messagerecord.hpp"
+#include "../../../libs/files/esm/msttrecord.hpp"
+#include "../../../libs/files/esm/navmrecord.hpp"
+#include "../../../libs/files/esm/noterecord.hpp"
+#include "../../../libs/files/esm/outfitrecord.hpp"
+#include "../../../libs/files/esm/projectilerecord.hpp"
+#include "../../../libs/files/esm/regionrecord.hpp"
+#include "../../../libs/files/esm/roadrecord.hpp"
+#include "../../../libs/files/esm/scriptrecord.hpp"
+#include "../../../libs/files/esm/scrollrecord.hpp"
+#include "../../../libs/files/esm/shaderparticlerecord.hpp"
+#include "../../../libs/files/esm/slgmrecord.hpp"
+#include "../../../libs/files/esm/soundmarkerrecord.hpp"
+#include "../../../libs/files/esm/staticcollectionrecord.hpp"
+#include "../../../libs/files/esm/texturesetrecord.hpp"
+#include "../../../libs/files/esm/waterecord.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -44,6 +109,112 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QFileDialog>
+
+namespace {
+template <typename T>
+bool tryResolveComponents(BaseCollection* coll, int recordIndex,
+                          openck::FormComponents*& components, void*& recordPtr)
+{
+    auto* typed = dynamic_cast<Collection<T>*>(coll);
+    if (!typed)
+        return false;
+    if (recordIndex < 0 || recordIndex >= typed->size())
+        return false;
+    auto& record = typed->getRecord(recordIndex).get();
+    components = &record.components;
+    recordPtr = &record;
+    return true;
+}
+
+#define FOR_EACH_COMPONENT_RECORD_TYPE(MACRO) \
+    MACRO(ActiRecord) \
+    MACRO(ActorValueInfoRecord) \
+    MACRO(AlchRecord) \
+    MACRO(AmmoRecord) \
+    MACRO(AnioRecord) \
+    MACRO(AppaRecord) \
+    MACRO(ArmorRecord) \
+    MACRO(BookRecord) \
+    MACRO(BsgnRecord) \
+    MACRO(CellRecord) \
+    MACRO(ClassRecord) \
+    MACRO(ClimateRecord) \
+    MACRO(ClotRecord) \
+    MACRO(CobjRecord) \
+    MACRO(ContRecord) \
+    MACRO(CreatureRecord) \
+    MACRO(CstyRecord) \
+    MACRO(DialRecord) \
+    MACRO(DoorRecord) \
+    MACRO(EfshRecord) \
+    MACRO(EnchRecord) \
+    MACRO(ExplRecord) \
+    MACRO(EyesRecord) \
+    MACRO(FactRecord) \
+    MACRO(FlorRecord) \
+    MACRO(FormListRecord) \
+    MACRO(FurnRecord) \
+    MACRO(GrassRecord) \
+    MACRO(HairRecord) \
+    MACRO(IdleAnimationRecord) \
+    MACRO(IdleMarkerRecord) \
+    MACRO(ImgsRecord) \
+    MACRO(InfoRecord) \
+    MACRO(IngrRecord) \
+    MACRO(KeymRecord) \
+    MACRO(KeywordRecord) \
+    MACRO(LandRecord) \
+    MACRO(LighRecord) \
+    MACRO(LoadScreenRecord) \
+    MACRO(LocationRecord) \
+    MACRO(LtexRecord) \
+    MACRO(LvlcRecord) \
+    MACRO(LvliRecord) \
+    MACRO(LvspRecord) \
+    MACRO(MagicRecord) \
+    MACRO(MaterialRecord) \
+    MACRO(MesgRecord) \
+    MACRO(MiscRecord) \
+    MACRO(MsttRecord) \
+    MACRO(NavmRecord) \
+    MACRO(NpcRecord) \
+    MACRO(NoteRecord) \
+    MACRO(OutfitRecord) \
+    MACRO(PackageRecord) \
+    MACRO(PerkRecord) \
+    MACRO(ProjRecord) \
+    MACRO(QuestRecord) \
+    MACRO(RaceRecord) \
+    MACRO(RefrRecord) \
+    MACRO(RegionRecord) \
+    MACRO(RoadRecord) \
+    MACRO(ScriptRecord) \
+    MACRO(ScrRecord) \
+    MACRO(SlgmRecord) \
+    MACRO(SmqnRecord) \
+    MACRO(SounRecord) \
+    MACRO(SpellRecord) \
+    MACRO(SpgdRecord) \
+    MACRO(StaticCollectionRecord) \
+    MACRO(StatRecord) \
+    MACRO(TextureSetRecord) \
+    MACRO(TreeRecord) \
+    MACRO(WateRecord) \
+    MACRO(WeaponRecord) \
+    MACRO(WorldspaceRecord) \
+    MACRO(WthrRecord)
+
+bool resolveComponents(BaseCollection* coll, int recordIndex,
+                       openck::FormComponents*& components, void*& recordPtr)
+{
+#define RESOLVE_RECORD_TYPE(recType) \
+    if (tryResolveComponents<recType>(coll, recordIndex, components, recordPtr)) return true;
+    FOR_EACH_COMPONENT_RECORD_TYPE(RESOLVE_RECORD_TYPE)
+#undef RESOLVE_RECORD_TYPE
+#undef FOR_EACH_COMPONENT_RECORD_TYPE
+    return false;
+}
+} // namespace
 
 ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
     : QDockWidget(parent),
@@ -104,6 +275,11 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("QUST"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new QuestDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("CREA"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new CreatureDataWidget(recPtr, comps, parent);
             });
     }
 }
@@ -277,6 +453,19 @@ void ObjectWindowDialog::editSelected()
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
             openck::QtFormDialogManager::instance().openOrFocus(
                 formIdKey, QStringLiteral("NPC_"), &rec.components, &rec, this);
+        }
+        break;
+    }
+    case CkId::Type_Crea_:
+    {
+        auto& collection = mData->getCreatureCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            CreatureRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("CREA"), &rec.components, &rec, this);
         }
         break;
     }
@@ -672,11 +861,27 @@ void ObjectWindowDialog::editSelected()
     }
     default:
     {
+        if (type != CkId::Type_None)
+        {
+            BaseCollection* coll = mData->getCollectionByType(type);
+            if (coll && recordIndex >= 0 && recordIndex < coll->size())
+            {
+                openck::FormComponents* comps = nullptr;
+                void* recPtr = nullptr;
+                if (resolveComponents(coll, recordIndex, comps, recPtr) && comps)
+                {
+                    quint32 formId = coll->getFormId(recordIndex);
+                    QString formIdKey = formId != 0
+                        ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
+                        : QStringLiteral("%1|%2").arg(editorId, QStringLiteral("0"));
+                    openck::QtFormDialogManager::instance().openOrFocus(formIdKey, comps, this);
+                    break;
+                }
+            }
+        }
         QMessageBox::information(this, "Edit Record",
-            QString("Editing %1 record '%2'\n\n"
-                    "This record type is not yet editable.\n"
-                    "Supported types: NPC_, WEAP_, ARMOR_, SPEL_, QUEST_, GLOB_, TREE_, STAT_, ACTI_, MISC_, ALCH_, INGR_, BOOK_, ENCH_, CONT_, RACE_, PERK_, MAGIC_, PACK_, LCRT_, CLASS_, CELL_, WRLD_, LOCT_, REFR_, DIAL_, INFO_, FACT_, MATE_")
-                .arg(CkId(type).getTypeName(), editorId));
+            QString("Record '%1' cannot be opened for editing because its data is not available.")
+                .arg(editorId));
         break;
     }
     }
@@ -2254,7 +2459,22 @@ ObjectWindowDialog::RecordLookupResult ObjectWindowDialog::getFormComponentsForI
     CASE_RECORD(CkId::Type_Material_, getMaterialCollection, MaterialRecord)
 #undef CASE_RECORD
     default:
+    {
+        if (type == CkId::Type_None)
+            break;
+        BaseCollection* coll = mData->getCollectionByType(type);
+        if (!coll || recordIndex < 0 || recordIndex >= coll->size())
+            break;
+        openck::FormComponents* comps = nullptr;
+        void* recPtr = nullptr;
+        if (resolveComponents(coll, recordIndex, comps, recPtr) && comps)
+        {
+            result.components = comps;
+            result.recordPtr = recPtr;
+            result.recordType = CkId(type).getTypeName();
+        }
         break;
+    }
     }
     return result;
 }

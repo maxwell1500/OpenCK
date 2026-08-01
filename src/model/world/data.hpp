@@ -1,4 +1,4 @@
-#ifndef WORLDDATA_H
+﻿#ifndef WORLDDATA_H
 #define WORLDDATA_H
 
 #include "idcollection.hpp"
@@ -40,6 +40,50 @@
 #include "../../../libs/files/esm/sounrecord.hpp"
 #include "../../../libs/files/esm/wthrrecord.hpp"
 #include "../../../libs/files/esm/ltexrecord.hpp"
+#include "../../../libs/files/esm/ammorecord.hpp"
+#include "../../../libs/files/esm/apparatusrecord.hpp"
+#include "../../../libs/files/esm/actorvalueinforecord.hpp"
+#include "../../../libs/files/esm/birthsignrecord.hpp"
+#include "../../../libs/files/esm/climaterecord.hpp"
+#include "../../../libs/files/esm/clothrecord.hpp"
+#include "../../../libs/files/esm/constructibleobjectrecord.hpp"
+#include "../../../libs/files/esm/creaturerecord.hpp"
+#include "../../../libs/files/esm/combatstylerecord.hpp"
+#include "../../../libs/files/esm/doorrecord.hpp"
+#include "../../../libs/files/esm/effectshaderrecord.hpp"
+#include "../../../libs/files/esm/explosionrecord.hpp"
+#include "../../../libs/files/esm/eyesrecord.hpp"
+#include "../../../libs/files/esm/florrecord.hpp"
+#include "../../../libs/files/esm/formlistrecord.hpp"
+#include "../../../libs/files/esm/furnrecord.hpp"
+#include "../../../libs/files/esm/grassrecord.hpp"
+#include "../../../libs/files/esm/hairrecord.hpp"
+#include "../../../libs/files/esm/idleanimationrecord.hpp"
+#include "../../../libs/files/esm/idlemarkerrecord.hpp"
+#include "../../../libs/files/esm/imagespacerecord.hpp"
+#include "../../../libs/files/esm/keymrecord.hpp"
+#include "../../../libs/files/esm/keywordrecord.hpp"
+#include "../../../libs/files/esm/lighrecord.hpp"
+#include "../../../libs/files/esm/loadscreenrecord.hpp"
+#include "../../../libs/files/esm/lvlcreaturerecord.hpp"
+#include "../../../libs/files/esm/lvlistrecord.hpp"
+#include "../../../libs/files/esm/lvspellrecord.hpp"
+#include "../../../libs/files/esm/messagerecord.hpp"
+#include "../../../libs/files/esm/msttrecord.hpp"
+#include "../../../libs/files/esm/navmrecord.hpp"
+#include "../../../libs/files/esm/noterecord.hpp"
+#include "../../../libs/files/esm/outfitrecord.hpp"
+#include "../../../libs/files/esm/projectilerecord.hpp"
+#include "../../../libs/files/esm/regionrecord.hpp"
+#include "../../../libs/files/esm/roadrecord.hpp"
+#include "../../../libs/files/esm/scriptrecord.hpp"
+#include "../../../libs/files/esm/scrollrecord.hpp"
+#include "../../../libs/files/esm/slgmrecord.hpp"
+#include "../../../libs/files/esm/soundmarkerrecord.hpp"
+#include "../../../libs/files/esm/shaderparticlerecord.hpp"
+#include "../../../libs/files/esm/staticcollectionrecord.hpp"
+#include "../../../libs/files/esm/texturesetrecord.hpp"
+#include "../../../libs/files/esm/waterecord.hpp"
 
 #include <QObject>
 #include <QStringList>
@@ -229,6 +273,138 @@ public:
     /// \brief Get land texture collection (LTEX records)
     /// \return Const reference to the land texture record collection
     const IdCollection<LtexRecord>& getLtexCollection() const;
+    /// \brief Get AMMO collection
+    /// \return Const reference to the AMMO record collection
+    const IdCollection<AmmoRecord>& getAmmoCollection() const;
+    /// \brief Get APPA collection
+    /// \return Const reference to the APPA record collection
+    const IdCollection<AppaRecord>& getAppaCollection() const;
+    /// \brief Get AVIF collection
+    /// \return Const reference to the AVIF record collection
+    const IdCollection<ActorValueInfoRecord>& getAvifCollection() const;
+    /// \brief Get BSGN collection
+    /// \return Const reference to the BSGN record collection
+    const IdCollection<BsgnRecord>& getBsgnCollection() const;
+    /// \brief Get CLMT collection
+    /// \return Const reference to the CLMT record collection
+    const IdCollection<ClimateRecord>& getClmtCollection() const;
+    /// \brief Get CLOT collection
+    /// \return Const reference to the CLOT record collection
+    const IdCollection<ClotRecord>& getClotCollection() const;
+    /// \brief Get COBJ collection
+    /// \return Const reference to the COBJ record collection
+    const IdCollection<CobjRecord>& getCobjCollection() const;
+    /// \brief Get CREA collection
+    /// \return Const reference to the CREA record collection
+    const IdCollection<CreatureRecord>& getCreatureCollection() const;
+    /// \brief Get CSTY collection
+    /// \return Const reference to the CSTY record collection
+    const IdCollection<CstyRecord>& getCstyCollection() const;
+    /// \brief Get DOOR collection
+    /// \return Const reference to the DOOR record collection
+    const IdCollection<DoorRecord>& getDoorCollection() const;
+    /// \brief Get EFSH collection
+    /// \return Const reference to the EFSH record collection
+    const IdCollection<EfshRecord>& getEfshCollection() const;
+    /// \brief Get EXPL collection
+    /// \return Const reference to the EXPL record collection
+    const IdCollection<ExplRecord>& getExplCollection() const;
+    /// \brief Get EYES collection
+    /// \return Const reference to the EYES record collection
+    const IdCollection<EyesRecord>& getEyesCollection() const;
+    /// \brief Get FLOR collection
+    /// \return Const reference to the FLOR record collection
+    const IdCollection<FlorRecord>& getFlorCollection() const;
+    /// \brief Get FLST collection
+    /// \return Const reference to the FLST record collection
+    const IdCollection<FormListRecord>& getFlstCollection() const;
+    /// \brief Get FURN collection
+    /// \return Const reference to the FURN record collection
+    const IdCollection<FurnRecord>& getFurnCollection() const;
+    /// \brief Get GRAS collection
+    /// \return Const reference to the GRAS record collection
+    const IdCollection<GrassRecord>& getGrassCollection() const;
+    /// \brief Get HAIR collection
+    /// \return Const reference to the HAIR record collection
+    const IdCollection<HairRecord>& getHairCollection() const;
+    /// \brief Get IDLE collection
+    /// \return Const reference to the IDLE record collection
+    const IdCollection<IdleAnimationRecord>& getIdleCollection() const;
+    /// \brief Get IDLM collection
+    /// \return Const reference to the IDLM record collection
+    const IdCollection<IdleMarkerRecord>& getIdlmCollection() const;
+    /// \brief Get IMGS collection
+    /// \return Const reference to the IMGS record collection
+    const IdCollection<ImgsRecord>& getImgsCollection() const;
+    /// \brief Get KEYM collection
+    /// \return Const reference to the KEYM record collection
+    const IdCollection<KeymRecord>& getKeymCollection() const;
+    /// \brief Get KYWD collection
+    /// \return Const reference to the KYWD record collection
+    const IdCollection<KeywordRecord>& getKywdCollection() const;
+    /// \brief Get LIGH collection
+    /// \return Const reference to the LIGH record collection
+    const IdCollection<LighRecord>& getLighCollection() const;
+    /// \brief Get LSCR collection
+    /// \return Const reference to the LSCR record collection
+    const IdCollection<LoadScreenRecord>& getLscrCollection() const;
+    /// \brief Get LVLC collection
+    /// \return Const reference to the LVLC record collection
+    const IdCollection<LvlcRecord>& getLvlcCollection() const;
+    /// \brief Get LVLI collection
+    /// \return Const reference to the LVLI record collection
+    const IdCollection<LvliRecord>& getLvliCollection() const;
+    /// \brief Get LVSP collection
+    /// \return Const reference to the LVSP record collection
+    const IdCollection<LvspRecord>& getLvspCollection() const;
+    /// \brief Get MESG collection
+    /// \return Const reference to the MESG record collection
+    const IdCollection<MesgRecord>& getMesgCollection() const;
+    /// \brief Get MSTT collection
+    /// \return Const reference to the MSTT record collection
+    const IdCollection<MsttRecord>& getMsttCollection() const;
+    /// \brief Get NAVM collection
+    /// \return Const reference to the NAVM record collection
+    const IdCollection<NavmRecord>& getNavmCollection() const;
+    /// \brief Get NOTE collection
+    /// \return Const reference to the NOTE record collection
+    const IdCollection<NoteRecord>& getNoteCollection() const;
+    /// \brief Get OTFT collection
+    /// \return Const reference to the OTFT record collection
+    const IdCollection<OutfitRecord>& getOtftCollection() const;
+    /// \brief Get PROJ collection
+    /// \return Const reference to the PROJ record collection
+    const IdCollection<ProjRecord>& getProjCollection() const;
+    /// \brief Get REGN collection
+    /// \return Const reference to the REGN record collection
+    const IdCollection<RegionRecord>& getRegnCollection() const;
+    /// \brief Get ROAD collection
+    /// \return Const reference to the ROAD record collection
+    const IdCollection<RoadRecord>& getRoadCollection() const;
+    /// \brief Get SCPT collection
+    /// \return Const reference to the SCPT record collection
+    const IdCollection<ScriptRecord>& getScptCollection() const;
+    /// \brief Get SCRL collection
+    /// \return Const reference to the SCRL record collection
+    const IdCollection<ScrRecord>& getScrlCollection() const;
+    /// \brief Get SLGM collection
+    /// \return Const reference to the SLGM record collection
+    const IdCollection<SlgmRecord>& getSlgmCollection() const;
+    /// \brief Get SMQN collection
+    /// \return Const reference to the SMQN record collection
+    const IdCollection<SmqnRecord>& getSmqnCollection() const;
+    /// \brief Get SPGD collection
+    /// \return Const reference to the SPGD record collection
+    const IdCollection<SpgdRecord>& getSpgdCollection() const;
+    /// \brief Get SCOL collection
+    /// \return Const reference to the SCOL record collection
+    const IdCollection<StaticCollectionRecord>& getScolCollection() const;
+    /// \brief Get TXST collection
+    /// \return Const reference to the TXST record collection
+    const IdCollection<TextureSetRecord>& getTxstCollection() const;
+    /// \brief Get WATR collection
+    /// \return Const reference to the WATR record collection
+    const IdCollection<WateRecord>& getWateCollection() const;
 
     // --- Non-const overloads for mutation ---
 
@@ -337,6 +513,138 @@ public:
     /// \brief Get land texture collection (mutable)
     /// \return Reference to the land texture record collection for modification
     IdCollection<LtexRecord>& getLtexCollection();
+    /// \brief Get AMMO collection (mutable)
+    /// \return Reference to the AMMO record collection for modification
+    IdCollection<AmmoRecord>& getAmmoCollection();
+    /// \brief Get APPA collection (mutable)
+    /// \return Reference to the APPA record collection for modification
+    IdCollection<AppaRecord>& getAppaCollection();
+    /// \brief Get AVIF collection (mutable)
+    /// \return Reference to the AVIF record collection for modification
+    IdCollection<ActorValueInfoRecord>& getAvifCollection();
+    /// \brief Get BSGN collection (mutable)
+    /// \return Reference to the BSGN record collection for modification
+    IdCollection<BsgnRecord>& getBsgnCollection();
+    /// \brief Get CLMT collection (mutable)
+    /// \return Reference to the CLMT record collection for modification
+    IdCollection<ClimateRecord>& getClmtCollection();
+    /// \brief Get CLOT collection (mutable)
+    /// \return Reference to the CLOT record collection for modification
+    IdCollection<ClotRecord>& getClotCollection();
+    /// \brief Get COBJ collection (mutable)
+    /// \return Reference to the COBJ record collection for modification
+    IdCollection<CobjRecord>& getCobjCollection();
+    /// \brief Get CREA collection (mutable)
+    /// \return Reference to the CREA record collection for modification
+    IdCollection<CreatureRecord>& getCreatureCollection();
+    /// \brief Get CSTY collection (mutable)
+    /// \return Reference to the CSTY record collection for modification
+    IdCollection<CstyRecord>& getCstyCollection();
+    /// \brief Get DOOR collection (mutable)
+    /// \return Reference to the DOOR record collection for modification
+    IdCollection<DoorRecord>& getDoorCollection();
+    /// \brief Get EFSH collection (mutable)
+    /// \return Reference to the EFSH record collection for modification
+    IdCollection<EfshRecord>& getEfshCollection();
+    /// \brief Get EXPL collection (mutable)
+    /// \return Reference to the EXPL record collection for modification
+    IdCollection<ExplRecord>& getExplCollection();
+    /// \brief Get EYES collection (mutable)
+    /// \return Reference to the EYES record collection for modification
+    IdCollection<EyesRecord>& getEyesCollection();
+    /// \brief Get FLOR collection (mutable)
+    /// \return Reference to the FLOR record collection for modification
+    IdCollection<FlorRecord>& getFlorCollection();
+    /// \brief Get FLST collection (mutable)
+    /// \return Reference to the FLST record collection for modification
+    IdCollection<FormListRecord>& getFlstCollection();
+    /// \brief Get FURN collection (mutable)
+    /// \return Reference to the FURN record collection for modification
+    IdCollection<FurnRecord>& getFurnCollection();
+    /// \brief Get GRAS collection (mutable)
+    /// \return Reference to the GRAS record collection for modification
+    IdCollection<GrassRecord>& getGrassCollection();
+    /// \brief Get HAIR collection (mutable)
+    /// \return Reference to the HAIR record collection for modification
+    IdCollection<HairRecord>& getHairCollection();
+    /// \brief Get IDLE collection (mutable)
+    /// \return Reference to the IDLE record collection for modification
+    IdCollection<IdleAnimationRecord>& getIdleCollection();
+    /// \brief Get IDLM collection (mutable)
+    /// \return Reference to the IDLM record collection for modification
+    IdCollection<IdleMarkerRecord>& getIdlmCollection();
+    /// \brief Get IMGS collection (mutable)
+    /// \return Reference to the IMGS record collection for modification
+    IdCollection<ImgsRecord>& getImgsCollection();
+    /// \brief Get KEYM collection (mutable)
+    /// \return Reference to the KEYM record collection for modification
+    IdCollection<KeymRecord>& getKeymCollection();
+    /// \brief Get KYWD collection (mutable)
+    /// \return Reference to the KYWD record collection for modification
+    IdCollection<KeywordRecord>& getKywdCollection();
+    /// \brief Get LIGH collection (mutable)
+    /// \return Reference to the LIGH record collection for modification
+    IdCollection<LighRecord>& getLighCollection();
+    /// \brief Get LSCR collection (mutable)
+    /// \return Reference to the LSCR record collection for modification
+    IdCollection<LoadScreenRecord>& getLscrCollection();
+    /// \brief Get LVLC collection (mutable)
+    /// \return Reference to the LVLC record collection for modification
+    IdCollection<LvlcRecord>& getLvlcCollection();
+    /// \brief Get LVLI collection (mutable)
+    /// \return Reference to the LVLI record collection for modification
+    IdCollection<LvliRecord>& getLvliCollection();
+    /// \brief Get LVSP collection (mutable)
+    /// \return Reference to the LVSP record collection for modification
+    IdCollection<LvspRecord>& getLvspCollection();
+    /// \brief Get MESG collection (mutable)
+    /// \return Reference to the MESG record collection for modification
+    IdCollection<MesgRecord>& getMesgCollection();
+    /// \brief Get MSTT collection (mutable)
+    /// \return Reference to the MSTT record collection for modification
+    IdCollection<MsttRecord>& getMsttCollection();
+    /// \brief Get NAVM collection (mutable)
+    /// \return Reference to the NAVM record collection for modification
+    IdCollection<NavmRecord>& getNavmCollection();
+    /// \brief Get NOTE collection (mutable)
+    /// \return Reference to the NOTE record collection for modification
+    IdCollection<NoteRecord>& getNoteCollection();
+    /// \brief Get OTFT collection (mutable)
+    /// \return Reference to the OTFT record collection for modification
+    IdCollection<OutfitRecord>& getOtftCollection();
+    /// \brief Get PROJ collection (mutable)
+    /// \return Reference to the PROJ record collection for modification
+    IdCollection<ProjRecord>& getProjCollection();
+    /// \brief Get REGN collection (mutable)
+    /// \return Reference to the REGN record collection for modification
+    IdCollection<RegionRecord>& getRegnCollection();
+    /// \brief Get ROAD collection (mutable)
+    /// \return Reference to the ROAD record collection for modification
+    IdCollection<RoadRecord>& getRoadCollection();
+    /// \brief Get SCPT collection (mutable)
+    /// \return Reference to the SCPT record collection for modification
+    IdCollection<ScriptRecord>& getScptCollection();
+    /// \brief Get SCRL collection (mutable)
+    /// \return Reference to the SCRL record collection for modification
+    IdCollection<ScrRecord>& getScrlCollection();
+    /// \brief Get SLGM collection (mutable)
+    /// \return Reference to the SLGM record collection for modification
+    IdCollection<SlgmRecord>& getSlgmCollection();
+    /// \brief Get SMQN collection (mutable)
+    /// \return Reference to the SMQN record collection for modification
+    IdCollection<SmqnRecord>& getSmqnCollection();
+    /// \brief Get SPGD collection (mutable)
+    /// \return Reference to the SPGD record collection for modification
+    IdCollection<SpgdRecord>& getSpgdCollection();
+    /// \brief Get SCOL collection (mutable)
+    /// \return Reference to the SCOL record collection for modification
+    IdCollection<StaticCollectionRecord>& getScolCollection();
+    /// \brief Get TXST collection (mutable)
+    /// \return Reference to the TXST record collection for modification
+    IdCollection<TextureSetRecord>& getTxstCollection();
+    /// \brief Get WATR collection (mutable)
+    /// \return Reference to the WATR record collection for modification
+    IdCollection<WateRecord>& getWateCollection();
 
     /// \brief Get collection by record type (const version)
     /// \param type Record type identifier
@@ -610,6 +918,50 @@ private:
     IdCollection<SounRecord> sounCollection;
     IdCollection<WthrRecord> wthrCollection;
     IdCollection<LtexRecord> ltexCollection;
+    IdCollection<AmmoRecord> ammoCollection;
+    IdCollection<AppaRecord> appaCollection;
+    IdCollection<ActorValueInfoRecord> avifCollection;
+    IdCollection<BsgnRecord> bsgnCollection;
+    IdCollection<ClimateRecord> clmtCollection;
+    IdCollection<ClotRecord> clotCollection;
+    IdCollection<CobjRecord> cobjCollection;
+    IdCollection<CreatureRecord> creatureCollection;
+    IdCollection<CstyRecord> cstyCollection;
+    IdCollection<DoorRecord> doorCollection;
+    IdCollection<EfshRecord> efshCollection;
+    IdCollection<ExplRecord> explCollection;
+    IdCollection<EyesRecord> eyesCollection;
+    IdCollection<FlorRecord> florCollection;
+    IdCollection<FormListRecord> flstCollection;
+    IdCollection<FurnRecord> furnCollection;
+    IdCollection<GrassRecord> grassCollection;
+    IdCollection<HairRecord> hairCollection;
+    IdCollection<IdleAnimationRecord> idleCollection;
+    IdCollection<IdleMarkerRecord> idlmCollection;
+    IdCollection<ImgsRecord> imgsCollection;
+    IdCollection<KeymRecord> keymCollection;
+    IdCollection<KeywordRecord> kywdCollection;
+    IdCollection<LighRecord> lighCollection;
+    IdCollection<LoadScreenRecord> lscrCollection;
+    IdCollection<LvlcRecord> lvlcCollection;
+    IdCollection<LvliRecord> lvliCollection;
+    IdCollection<LvspRecord> lvspCollection;
+    IdCollection<MesgRecord> mesgCollection;
+    IdCollection<MsttRecord> msttCollection;
+    IdCollection<NavmRecord> navmCollection;
+    IdCollection<NoteRecord> noteCollection;
+    IdCollection<OutfitRecord> otftCollection;
+    IdCollection<ProjRecord> projCollection;
+    IdCollection<RegionRecord> regnCollection;
+    IdCollection<RoadRecord> roadCollection;
+    IdCollection<ScriptRecord> scptCollection;
+    IdCollection<ScrRecord> scrlCollection;
+    IdCollection<SlgmRecord> slgmCollection;
+    IdCollection<SmqnRecord> smqnCollection;
+    IdCollection<SpgdRecord> spgdCollection;
+    IdCollection<StaticCollectionRecord> scolCollection;
+    IdCollection<TextureSetRecord> txstCollection;
+    IdCollection<WateRecord> wateCollection;
 
     QVector<QAbstractItemModel*> models;
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;

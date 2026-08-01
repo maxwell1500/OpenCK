@@ -215,6 +215,12 @@ target_link_libraries(test_editor_widgets PRIVATE openck_view openck_model test_
 target_include_directories(test_editor_widgets PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_editor_widgets)
 
+# CREA editor widget + QtFormDialogManager factory tests
+add_executable(test_creatureeditor test_creatureeditor.cpp)
+target_link_libraries(test_creatureeditor PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_creatureeditor PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_creatureeditor)
+
 # CellMapView math tests
 add_executable(test_cellviewcanvas test_cellviewcanvas.cpp)
 target_link_libraries(test_cellviewcanvas PRIVATE openck_view Qt6::Test)
