@@ -495,6 +495,30 @@ void LandscapeEditor::applyHeightmap()
         .arg(currentLand->formId, 8, 16, QChar('0')));
 }
 
+LandRecord* LandscapeEditor::saveLandscapeToRecord()
+{
+    if (!currentLand && currentCell && mData)
+    {
+        LandRecord newLand;
+        newLand.blank();
+        newLand.editorId = QString("LAND_%1_%2").arg(currentCell->cellX).arg(currentCell->cellY);
+        newLand.cellX = static_cast<qint32>(currentCell->cellX);
+        newLand.cellY = static_cast<qint32>(currentCell->cellY);
+        saveHeightmap(newLand);
+        mData->addLand(newLand);
+        currentLand = &mData->getLandCollection().getRecord(newLand.editorId).get();
+    }
+    if (!currentLand)
+    {
+        statusLabel->setText("No cell loaded");
+        return nullptr;
+    }
+    saveHeightmap(*currentLand);
+    statusLabel->setText(QString("Saved landscape to LandRecord 0x%1")
+        .arg(currentLand->formId, 8, 16, QChar('0')));
+    return currentLand;
+}
+
 void LandscapeEditor::loadHeightmap()
 {
     if (!currentCell) {

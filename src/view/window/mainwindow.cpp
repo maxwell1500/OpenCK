@@ -129,6 +129,7 @@ MainWindow::MainWindow(QWidget *parent) :
     mDockManager = new ads::CDockManager(this);
 
     setupEditMenu();
+    setupTerrainMenu();
     setupShortcuts();
     restoreUiState();
 
@@ -644,6 +645,40 @@ void MainWindow::setupEditMenu()
             QString("LOD generation complete.\n\nFiles processed: %1").arg(processed));
     });
     ui->menuTools->addAction(lodGenAction);
+}
+
+void MainWindow::setupTerrainMenu()
+{
+    QAction* saveLandscapeAction = new QAction(tr("Save Landscape"), this);
+    saveLandscapeAction->setToolTip(tr("Save the current heightmap into the Land record of the selected cell"));
+    connect(saveLandscapeAction, &QAction::triggered, this, [this]() {
+        if (!landscapeEditor)
+        {
+            QMessageBox::information(this, "Save Landscape",
+                "No landscape editor is available.\n\nOpen the Landscape Editor first.");
+            return;
+        }
+        landscapeEditor->saveLandscapeToRecord();
+    });
+    ui->menuTerrain->addAction(saveLandscapeAction);
+
+    QAction* generateLandscapeAction = new QAction(tr("Generate Landscape..."), this);
+    connect(generateLandscapeAction, &QAction::triggered, this, [this]() {
+        if (!landscapeEditor)
+        {
+            QMessageBox::information(this, "Generate Landscape",
+                "No landscape editor is available.\n\nOpen the Landscape Editor first.");
+            return;
+        }
+        landscapeDock->toggleView(true);
+        landscapeEditor->raise();
+        landscapeEditor->activateWindow();
+    });
+    ui->menuTerrain->addAction(generateLandscapeAction);
+
+    QAction* openLandscapeEditorAction = new QAction(tr("Landscape Editor..."), this);
+    connect(openLandscapeEditorAction, &QAction::triggered, this, &MainWindow::on_actionLandscapeEditing_triggered);
+    ui->menuTerrain->addAction(openLandscapeEditorAction);
 }
 
 void MainWindow::setupShortcuts()

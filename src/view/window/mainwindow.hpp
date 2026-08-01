@@ -147,7 +147,8 @@ private slots:
     void runValidation();
 
 private:
-    void setupEditMenu();
+void setupEditMenu();
+void setupTerrainMenu();
     void setupShortcuts();
     void applyShortcuts();
     void updateUndoRedoActions();

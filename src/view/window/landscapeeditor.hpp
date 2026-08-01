@@ -56,6 +56,11 @@ public:
     void saveHeightmap(LandRecord& rec);
     void applyHeightmap();
 
+    // Saves the current edited heightmap into the loaded LandRecord
+    // (creating one for the current cell if none exists). Returns the
+    // LandRecord that was written, or nullptr if no cell is loaded.
+    LandRecord* saveLandscapeToRecord();
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;

@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 234/310 steps complete (75%) — Phase 14 + 15 complete; Phase 16 in progress (6/8)
-- **Phase 16 (partial)**: PACK/WRLD/LCTN specialized factory widgets + NAVM record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct wired. Build clean, 33/33 tests.
+- **Progress**: 235/310 steps complete (76%) — Phase 14 + 15 complete; Phase 16 in progress (6/8); Phase 17 started (1/9)
+- **Phase 17 (partial)**: Terrain menu wired (Save Landscape / Generate Landscape / Landscape Editor → `saveLandscapeToRecord`); landscape undo/redo confirmed via `LandscapeEditCommand`. Build clean, 33/33 tests.
