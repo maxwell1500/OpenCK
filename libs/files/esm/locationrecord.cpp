@@ -26,6 +26,28 @@ void LocationRecord::load(ESMReader& esm, bool)
         case 'EDID': editorId = esm.readZString(); break;
         case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
         case 'PNAM': parentId = esm.readType<quint32>(); break;
+        case 'XNAM':
+        {
+            // Start a new linked-reference group keyed by a ref-type form ID.
+            LinkedRef group;
+            group.refTypeId = esm.readType<quint32>();
+            linkedRefs.append(group);
+            break;
+        }
+        case 'LNAM':
+        {
+            // Append the linked location form ID to the current group.
+            if (!linkedRefs.isEmpty())
+                linkedRefs.last().linkedIds.append(esm.readType<quint32>());
+            else
+            {
+                RawSubRecord raw;
+                raw.name = sub;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
+            }
+            break;
+        }
         case 'DATA':
         {
             x = esm.readType<quint32>();
@@ -57,6 +79,17 @@ void LocationRecord::save(ESMWriter& esm) const
     components.saveAll(esm);
     esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint32>('PNAM', parentId);
+
+    // Linked-reference groups: XNAM starts a group, LNAM appends links.
+    for (const LinkedRef& group : linkedRefs)
+    {
+        if (group.refTypeId == 0)
+            continue;
+        esm.writeSubData<quint32>('XNAM', group.refTypeId);
+        for (quint32 linkedId : group.linkedIds)
+            esm.writeSubData<quint32>('LNAM', linkedId);
+    }
+
     esm.startSubRecord('DATA');
     esm.writeType<quint32>(x);
     esm.writeType<quint32>(y);
@@ -81,6 +114,7 @@ void LocationRecord::blank()
     x = 0;
     y = 0;
     z = 0;
+    linkedRefs.clear();
     rawSubRecords.clear();
     initComponents();
 }

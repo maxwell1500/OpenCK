@@ -317,6 +317,12 @@ target_link_libraries(test_materialpropertygraph PRIVATE openck_model test_stubs
 target_include_directories(test_materialpropertygraph PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_materialpropertygraph)
 
+# LCTN location record linked-reference round-trip (XNAM/LNAM)
+add_executable(test_locationrecord test_locationrecord.cpp)
+target_link_libraries(test_locationrecord PRIVATE openck_esm test_stubs Qt6::Test)
+target_include_directories(test_locationrecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_locationrecord)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

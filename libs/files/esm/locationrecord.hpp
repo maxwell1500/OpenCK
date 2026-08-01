@@ -24,11 +24,25 @@ struct LocationRecord
     quint32 z;
     QVector<RawSubRecord> rawSubRecords;
 
+    // One linked-reference group (Skyrim LCTN): an XNAM subrecord holds the
+    // LocationRefType (LCRT) form ID, followed by one LNAM subrecord per
+    // linked location form ID.
+    struct LinkedRef
+    {
+        quint32 refTypeId = 0;
+        QVector<quint32> linkedIds;
+    };
+    QVector<LinkedRef> linkedRefs;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
     void initComponents();
 };
+
+inline bool operator==(const LocationRecord::LinkedRef& l, const LocationRecord::LinkedRef& r)
+{
+    return l.refTypeId == r.refTypeId && l.linkedIds == r.linkedIds;
+}
 
 inline bool operator==(const LocationRecord& l, const LocationRecord& r)
 {
@@ -36,6 +50,7 @@ inline bool operator==(const LocationRecord& l, const LocationRecord& r)
         && l.locationName == r.locationName && l.parentId == r.parentId
         && l.x == r.x && l.y == r.y && l.z == r.z
         && l.components == r.components
+        && l.linkedRefs == r.linkedRefs
         && l.rawSubRecords == r.rawSubRecords;
 }
 

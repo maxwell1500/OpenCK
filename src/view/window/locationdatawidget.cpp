@@ -8,6 +8,7 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QPlainTextEdit>
 
 LocationDataWidget::LocationDataWidget(void* recordPtr,
                                        openck::FormComponents*,
@@ -45,6 +46,16 @@ LocationDataWidget::LocationDataWidget(void* recordPtr,
     infoForm->addRow(QStringLiteral("Z:"), zSpin);
     mainLayout->addWidget(infoGroup);
 
+    // Linked references (XNAM groups + LNAM targets), read-only listing.
+    auto* linksGroup = new QGroupBox(QStringLiteral("Linked References"), this);
+    auto* linksLayout = new QVBoxLayout(linksGroup);
+    auto* linksView = new QPlainTextEdit(linksGroup);
+    linksView->setObjectName(QStringLiteral("linkedRefs"));
+    linksView->setReadOnly(true);
+    linksView->setMaximumHeight(120);
+    linksLayout->addWidget(linksView);
+    mainLayout->addWidget(linksGroup);
+
     if (m_recordPtr)
     {
         auto* rec = static_cast<LocationRecord*>(m_recordPtr);
@@ -54,6 +65,19 @@ LocationDataWidget::LocationDataWidget(void* recordPtr,
         xSpin->setValue(static_cast<int>(rec->x));
         ySpin->setValue(static_cast<int>(rec->y));
         zSpin->setValue(static_cast<int>(rec->z));
+
+        QString text;
+        for (const LocationRecord::LinkedRef& group : rec->linkedRefs)
+        {
+            if (!text.isEmpty())
+                text += QStringLiteral("\n");
+            text += QStringLiteral("RefType %1:").arg(group.refTypeId, 8, 16, QLatin1Char('0'));
+            for (quint32 linkedId : group.linkedIds)
+                text += QStringLiteral(" %1").arg(linkedId, 8, 16, QLatin1Char('0'));
+        }
+        if (text.isEmpty())
+            text = QStringLiteral("(none)");
+        linksView->setPlainText(text);
     }
 }
 
