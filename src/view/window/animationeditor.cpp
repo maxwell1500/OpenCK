@@ -25,6 +25,7 @@
 #include "../../model/tools/removekeyframecommand.hpp"
 #include "../../model/tools/commandundoadapter.hpp"
 #include "timeline.hpp"
+#include "nodegraphwidget.hpp"
 #include "logger.hpp"
 
 namespace {
@@ -134,6 +135,7 @@ AnimationEditor::AnimationEditor(QWidget* parent)
     , mPlaying(false)
     , mCurrentFrame(0)
     , mSelectedTime(0.0f)
+    , mGraphWidget(nullptr)
 {
     setWindowTitle(tr("Animation Editor"));
     setMinimumSize(900, 600);
@@ -284,6 +286,39 @@ AnimationEditor::AnimationEditor(QWidget* parent)
     topSplitter->setStretchFactor(2, 0);
 
     mainLayout->addWidget(topSplitter, 1);
+
+    // --- Behavior graph tab (Phase 22): node-graph canvas ---
+    auto* graphTab = new QWidget();
+    auto* graphLayout = new QVBoxLayout(graphTab);
+    mGraphWidget = new NodeGraphWidget();
+    mGraphWidget->setGraph(&mNodeGraph);
+
+    auto* graphButtonRow = new QHBoxLayout();
+    auto* addNodeBtn = new QPushButton(tr("Add Node..."));
+    graphButtonRow->addWidget(addNodeBtn);
+    graphButtonRow->addStretch();
+    graphLayout->addLayout(graphButtonRow);
+    graphLayout->addWidget(mGraphWidget, 1);
+
+    connect(addNodeBtn, &QPushButton::clicked, this, [this]() {
+        if (!mGraphWidget)
+            return;
+        bool ok = false;
+        const QString type = QInputDialog::getItem(this, tr("Add Node"),
+            tr("Node type:"), NodeGraphWidget::paletteTypes(), 0, false, &ok);
+        if (!ok || type.isEmpty())
+            return;
+        const QString label = QInputDialog::getText(this, tr("Add Node"),
+            tr("Label:"), QLineEdit::Normal, type, &ok);
+        if (!ok)
+            return;
+        mGraphWidget->addNode(type, label.isEmpty() ? type : label,
+            QPointF(mGraphWidget->width() / 2.0, mGraphWidget->height() / 2.0));
+    });
+
+    auto* tabWidget = new QTabWidget();
+    tabWidget->addTab(graphTab, tr("Behavior Graph"));
+    mainLayout->addWidget(tabWidget, 0);
 
     // Connect property spinboxes
     connect(mPropTxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),

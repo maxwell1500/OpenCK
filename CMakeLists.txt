@@ -463,6 +463,7 @@ set(MODEL_SOURCES
     src/model/tools/papyruslanguageserver.cpp
     src/model/tools/papyrusremotedebugger.cpp
     src/model/tools/audiopipelinetools.cpp
+    src/model/tools/nodegraph.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
     src/model/tools/pluginsignature.cpp
@@ -527,6 +528,7 @@ set(MODEL_HEADERS
     src/model/tools/papyruslanguageserver.hpp
     src/model/tools/papyrusremotedebugger.hpp
     src/model/tools/audiopipelinetools.hpp
+    src/model/tools/nodegraph.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
     src/model/tools/pluginsignature.hpp
@@ -698,6 +700,7 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/soundeditor.cpp
     src/view/window/waveformwidget.cpp
     src/view/window/scenetimelinewidget.cpp
+    src/view/window/nodegraphwidget.cpp
     src/view/window/waveplayer.cpp
     src/view/window/animationeditor.cpp
     src/view/window/timeline.cpp
@@ -806,6 +809,7 @@ set(VIEW_HEADERS
     src/view/window/soundeditor.hpp
     src/view/window/waveformwidget.hpp
     src/view/window/scenetimelinewidget.hpp
+    src/view/window/nodegraphwidget.hpp
     src/view/window/animationeditor.hpp
     src/view/window/timeline.hpp
     src/view/window/particleeffectseffecteditor.hpp

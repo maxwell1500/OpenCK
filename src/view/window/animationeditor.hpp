@@ -7,8 +7,11 @@
 #include <QDoubleSpinBox>
 #include <QUndoStack>
 
+#include "../../../model/tools/nodegraph.hpp"
+
 class NifAnimation;
 class TimelineWidget;
+class NodeGraphWidget;
 
 class AnimationEditor : public QDialog
 {
@@ -71,4 +74,8 @@ private:
 
     QString mSelectedBone;
     float mSelectedTime;
+
+    // Behavior graph (Phase 22)
+    NodeGraph mNodeGraph;
+    NodeGraphWidget* mGraphWidget;
 };
