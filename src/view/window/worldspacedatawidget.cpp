@@ -8,6 +8,7 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QLabel>
 
 WorldspaceDataWidget::WorldspaceDataWidget(void* recordPtr,
                                            openck::FormComponents*,
@@ -48,6 +49,17 @@ WorldspaceDataWidget::WorldspaceDataWidget(void* recordPtr,
     infoForm->addRow(QStringLiteral("Terrain:"), terrainSpin);
     mainLayout->addWidget(infoGroup);
 
+    // Cell grid summary: the worldspace spans a grid of interior/exterior
+    // cells bounded by (dataMinX, dataMinY) .. (dataMinX + mapSize - 1,
+    // dataMinY + mapSize - 1).
+    auto* gridGroup = new QGroupBox(QStringLiteral("Cell Grid"), this);
+    auto* gridLayout = new QVBoxLayout(gridGroup);
+    auto* gridLabel = new QLabel(gridGroup);
+    gridLabel->setObjectName(QStringLiteral("cellGrid"));
+    gridLabel->setWordWrap(true);
+    gridLayout->addWidget(gridLabel);
+    mainLayout->addWidget(gridGroup);
+
     if (m_recordPtr)
     {
         auto* rec = static_cast<WorldspaceRecord*>(m_recordPtr);
@@ -58,6 +70,19 @@ WorldspaceDataWidget::WorldspaceDataWidget(void* recordPtr,
         lightingSpin->setValue(static_cast<int>(rec->lightingId));
         musicSpin->setValue(static_cast<int>(rec->music));
         terrainSpin->setValue(static_cast<int>(rec->terrain));
+
+        const int size = static_cast<int>(rec->mapSize);
+        const int minX = rec->dataMinX;
+        const int minY = rec->dataMinY;
+        const int maxX = minX + size - 1;
+        const int maxY = minY + size - 1;
+        gridLabel->setText(QStringLiteral(
+            "Map size: %1 x %1\n"
+            "Cell range: (%2, %3) .. (%4, %5)\n"
+            "Stored cells: %6\n"
+            "Cell coordinates use the exterior cell grid origin at (0,0).")
+            .arg(size).arg(minX).arg(minY).arg(maxX).arg(maxY)
+            .arg(rec->cellIds.size()));
     }
 }
 
