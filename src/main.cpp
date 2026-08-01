@@ -10,6 +10,8 @@
 #include <QDateTime>
 #include <QSettings>
 #include <QCoreApplication>
+#include <QTranslator>
+#include <QLocale>
 
 int main(int argc, char *argv[])
 {
@@ -31,7 +33,23 @@ int main(int argc, char *argv[])
         QSettings conf(configPath, QSettings::IniFormat);
         conf.beginGroup("OpenCK");
         QString themeName = conf.value("Theme", "Dark").toString();
+        QString language = conf.value("Language", QString()).toString();
         conf.endGroup();
+
+        // Load the UI translation if one is available. The language code is
+        // taken from settings (e.g. "fr"), falling back to the system locale.
+        if (language.isEmpty()) {
+            language = QLocale::system().name();
+        }
+        QString qmPath = QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath()
+            + QStringLiteral("/OpenCK_") + language + QStringLiteral(".qm");
+        if (language != QLatin1String("en") && language != QLatin1String("en_US")
+            && QFileInfo::exists(qmPath)) {
+            auto* translator = new QTranslator(&a);
+            if (translator->load(qmPath)) {
+                a.installTranslator(translator);
+            }
+        }
 
         ThemeManager::Theme theme = ThemeManager::themeFromName(themeName);
         ThemeManager::applyTheme(a, theme);

@@ -993,3 +993,6 @@ if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# Localization: lupdate/lrelease .ts -> .qm build steps (optional)
+include(cmake/i18n.cmake)

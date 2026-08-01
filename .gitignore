@@ -87,3 +87,8 @@ ipch/
 
 # Editor log
 *.log
+
+# Generated translation sources (regenerate via openck_i18n_update target)
+translations/*.ts
+translations/*.qm
+!translations/.gitkeep

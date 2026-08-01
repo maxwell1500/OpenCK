@@ -1,0 +1,10 @@
+# Translation sources live here as OpenCK_<lang>.ts files.
+#
+# Generate the English template (and refresh sources) with:
+#   cmake --build build --config Debug --target openck_i18n_update
+#
+# Enable a language by adding its code to OPENCK_TRANSLATION_LANGS in
+# cmake/i18n.cmake, running lupdate to create OpenCK_<lang>.ts, translating
+# it in Qt Linguist, then building openck_i18n_<lang> to produce the .qm
+# which is deployed next to openck.exe. The runtime loads OpenCK_<lang>.qm
+# based on the Language setting (or system locale) in main.cpp.
