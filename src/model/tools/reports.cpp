@@ -1,5 +1,7 @@
 #include "reports.hpp"
 
+#include <QFile>
+
 #include <sstream>
 
 ReportModel::ReportModel(QObject* parent, bool fieldColumn, bool levelColumn) :
@@ -191,3 +193,54 @@ int ReportModel::countErrors() const
 
     return count;
 }
+
+namespace ReportExport {
+
+static QString sanitizeField(const QString& value)
+{
+    // Replace tabs/newlines so the TSV structure stays intact.
+    QString v = value;
+    v.replace('\t', ' ');
+    v.replace('\r', ' ');
+    v.replace('\n', ' ');
+    return v;
+}
+
+QString messagesToText(const QVector<Message>& messages)
+{
+    QString out;
+    out += QStringLiteral("Level\tType\tID\tMessage\tHint\n");
+    for (const Message& m : messages)
+    {
+        out += Message::toString(m.level);
+        out += '\t';
+        out += m.id.getTypeName();
+        out += '\t';
+        out += m.id.getArgumentType() == CkId::ArgumentType_Id ? m.id.getId() : QStringLiteral("-");
+        out += '\t';
+        out += sanitizeField(m.message);
+        out += '\t';
+        out += sanitizeField(m.hint);
+        out += '\n';
+    }
+    if (!out.endsWith('\n'))
+    {
+        out += '\n';
+    }
+    return out;
+}
+
+bool exportMessages(const QString& filePath, const QVector<Message>& messages)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+        return false;
+    }
+    const QByteArray data = messagesToText(messages).toUtf8();
+    file.write(data);
+    file.close();
+    return true;
+}
+
+} // namespace ReportExport

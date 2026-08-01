@@ -44,4 +44,17 @@ private:
     int columnLevel;
 };
 
+// xEdit-style analysis report export. Writes the message list as a
+// tab-separated report (Level / Type / ID / Message / Hint) so users can
+// open it in a spreadsheet or diff it across plugin versions.
+namespace ReportExport
+{
+    // Serializes the given messages to a tab-separated text block
+    // (one record per line, no trailing newline).
+    QString messagesToText(const QVector<Message>& messages);
+
+    // Writes messages to the given file path. Returns true on success.
+    bool exportMessages(const QString& filePath, const QVector<Message>& messages);
+}
+
 #endif // REPORTS_H

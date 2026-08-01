@@ -6,7 +6,8 @@
 #include <QVector>
 
 class QTableWidget;
-class Message;
+class QPushButton;
+struct Message;
 class Messages;
 
 class WarningsDockWidget : public QWidget
@@ -21,8 +22,14 @@ public:
     void clear();
     int count() const;
 
+private slots:
+    void onExport();
+
 private:
+    void setupUI();
     QTableWidget* mTable;
+    QPushButton* mExportButton;
+    QVector<Message> mStoredMessages;
 };
 
 #endif // WARNINGSDOCKWIDGET_HPP

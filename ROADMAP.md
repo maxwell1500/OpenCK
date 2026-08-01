@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 249/310 steps complete (80%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 24 (9/11) in progress
-- **Phase 24 (partial)**: saved Object Window filters, i18n pipeline, CI (Qt 6.5.3 + ctest + NSIS), CPack packaging, crash ZIP bundle, layout save/load, Shortcuts dialog, Galaxy/Packin menus removed. Build clean, 36/36 tests.
+- **Progress**: 251/310 steps complete (81%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 23 (2/9), 24 (9/11) in progress
+- **Phase 23 (partial)**: xEdit-style validation report export (Warnings dock Export Report button + TSV writer), Find Forms by condition confirmed via SearchDialog. Build clean, 37/37 tests.

@@ -701,11 +701,11 @@ Sources reconciled here:
 |---|------|-------|
 | 23.1 | CSV Snippets system: column-based import/export with nested `.Import=file.txt` templates and form-field accessors `<Type:Field.SubField.Count>` | `Snippets\*.txt` — real CK bulk workflows |
 | 23.2 | OPAL procedural placement lists (.opl) | `Clutter_*.opl` — outpost/interior clutter placement |
-| 23.3 | Find Forms by condition dialog | |
+| 23.3 | Find Forms by condition dialog | ✅ SearchDialog already provides Find-by-condition: multi-criteria rows with AND/OR logic, per-type filter, EditorID/FormID/Name fields, match modes (contains/starts/ends/exact/regex), saved searches + history |
 | 23.4 | Real plugin compaction: form-ID renumbering + reference re-pointing (not count-and-save) | `mainwindow.cpp:2057` currently superficial |
 | 23.5 | Master file management (MMS): master update source, free-ID allocation control | CK `[MMS]` section |
 | 23.6 | Plugin upload to Bethesda.net (login/logout, upload) | CK BNet logs present in Morrowind project |
-| 23.7 | xEdit-style validation/analysis export | |
+| 23.7 | xEdit-style validation/analysis export | ✅ `ReportExport` (`reports.hpp/.cpp`): `messagesToText`/`exportMessages` write a Level/Type/ID/Message/Hint TSV report; Warnings dock has an "Export Report..." button writing the last validation run to a file; `test_reportexport` covers format/file/empty/sanitization |
 | 23.8 | Reference batch action window | Real CK ObjectWindows menu |
 | 23.9 | Object Window layouts (saved filter/layout presets) | |
 
@@ -754,9 +754,9 @@ Sources reconciled here:
 | 20 — Particle Editor & Icon Generation | 0/5 | ⬜ |
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
-| 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
+| 23 — Data Workflows & Plugin Utilities | 2/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 9/11 | ◐ |
-| **TOTAL** | **249/310** | ◐ |
+| **TOTAL** | **251/310** | ◐ |
 
 ---
 
@@ -808,7 +808,7 @@ Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, textur
 Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light icon renderer)
 Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
-Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, real compaction, MMS, BNet upload)
+Phase 23: Data workflows & plugin utilities (Find Forms by condition + xEdit-style report export done; CSV Snippets, OPAL, compaction, MMS, BNet, batch refs pending)
 Phase 24: Infrastructure & ecosystem (i18n, VCS, CI/CD, packaging, headless API, shortcuts, diagnostics, layout save/load done)
 ```
 
