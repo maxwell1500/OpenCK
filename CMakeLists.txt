@@ -326,6 +326,7 @@ set(FILES_SOURCES
     libs/files/data/csvsnippet.cpp
     libs/files/nif/nifparser.cpp
     libs/files/nif/ddsencoder.cpp
+    libs/files/nif/ddsdecoder.cpp
     libs/files/nif/tgaencoder.cpp
     libs/files/ba2/ba2archive.cpp
     libs/files/nifanim/nifanimationexporter.cpp
@@ -350,6 +351,7 @@ set(FILES_HEADERS
     libs/files/log/logger.hpp
     libs/files/nif/nifparser.hpp
     libs/files/nif/ddsencoder.hpp
+    libs/files/nif/ddsdecoder.hpp
     libs/files/nif/tgaencoder.hpp
     libs/files/ba2/ba2archive.hpp
     libs/files/nifanim/nifanimation.hpp

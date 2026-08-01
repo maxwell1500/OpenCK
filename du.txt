@@ -1,0 +1,10 @@
+********* Start testing of TestDdsDecoder *********
+Config: Using QtTest library 6.5.3, Qt 6.5.3 (x86_64-little_endian-llp64 shared (dynamic) debug build; by MSVC 2019), windows 11
+PASS   : TestDdsDecoder::initTestCase()
+FAIL!  : TestDdsDecoder::testUncompressed() Compared values are not the same
+   Actual   (decoded.pixel(3, 3))    : 4282126320
+   Expected (qRgba(12, 207, 48, 255)): 4279029552
+C:\Users\max\Projects\OpenCK\openck\tests\test_ddsdecoder.cpp(124) : failure location
+PASS   : TestDdsDecoder::cleanupTestCase()
+Totals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 2ms
+********* Finished testing of TestDdsDecoder *********

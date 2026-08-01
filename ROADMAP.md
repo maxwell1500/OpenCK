@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 260/310 steps complete (84%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 20 (2/5), 21 (2/8), 23 (6/9), 24 (10/11) in progress
-- **Phase 23 (partial)**: OPAL `.opl` parser added (with CSV Snippets, Find Forms, report export, column layouts, reference batch actions). Build clean, 45/45 tests.
+- **Progress**: 261/310 steps complete (84%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 19 (1/7), 20 (2/5), 21 (2/8), 23 (6/9), 24 (10/11) in progress
+- **Phase 19 (partial)**: reusable DDS texture decoder (BC1-5 + uncompressed) with viewport integration, fixing a header-offset crash + R/B swap in the old loader. Build clean, 46/46 tests.

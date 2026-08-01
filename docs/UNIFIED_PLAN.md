@@ -643,7 +643,7 @@ Sources reconciled here:
 | 18.6 | RoboVoicer TTS integration for automated voice-over | `Tools\RoboVoicer.exe` |
 | 18.7 | Sound editor completion: process local voice WAVs, reload Wwise data | |
 
-## Phase 19: Material Editor & Asset Pipeline ⬜
+## Phase 19: Material Editor & Asset Pipeline ◐
 
 > Real CK: 64 material rule templates (`BSMaterial::LayeredMaterialID` ops:
 > Add/Remove/Move/MakeConst), texture-set property graph, FBX→NIF via
@@ -654,7 +654,7 @@ Sources reconciled here:
 |---|------|-------|
 | 19.1 | Material editor: BSMaterial property graph (TextureSet slots: Albedo/Normal/Roughness/Metalness/AO/Curvature/Height/Emissive/Flow/Frost; Blenders 1-5; SSS; translucency) | From `RuleTemplates\ShaderModels\*.json` |
 | 19.2 | Material rule templates: 1LayerStandard → 4LayerStandard, Terrain, Skin, Hair, Eye, Water, Vegetation | Add/Remove/Move/MakeConst ops |
-| 19.3 | DDS texture *import/decode* for UI (BC1/BC3/BC7) | QImage can't load DDS; encoder exists, decoder is NIF-baking-only |
+| 19.3 | DDS texture *import/decode* for UI (BC1/BC3/BC7) | ✅ `DdsDecoder` (`libs/files/nif/ddsdecoder.hpp/.cpp`): decodes BC1/DXT1, BC2/DXT3, BC3/DXT5, BC4, BC5, and uncompressed RGB(A) into ARGB32 QImage (BC7 returns null); the viewport's inline DDS loader replaced by this shared decoder (fixes a header-offset crash and an R/B channel-swap bug it inherited); `test_ddsdecoder` round-trips DXT1/DXT5 through the encoder + decodes a crafted uncompressed DDS |
 | 19.4 | Texture conversion pipeline: BC7/BC4/R8/R8G8B8A8, mipmaps, physically-based mipmaps, distance fields, gamma handling | `xtexconv` rules in `Textures_Settings*.json` |
 | 19.5 | Mesh LOD generation (Simplygon-style `GenerationConfig.json` pipeline) | `-GenerateMeshLODAssociations` mode |
 | 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | Morrowind project wrote custom hknp encoders — reference |
@@ -750,13 +750,13 @@ Sources reconciled here:
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 5/9 | ◐ |
 | 18 — Audio Pipeline | 1/7 | ◐ |
-| 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
+| 19 — Material Editor & Asset Pipeline | 1/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 2/5 | ◐ |
 | 21 — Scripting Completion | 2/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
-| **TOTAL** | **260/310** | ◐ |
+| **TOTAL** | **261/310** | ◐ |
 
 ---
 
@@ -804,7 +804,7 @@ Phase 15: Record coverage & Object Window completion (44 record types wired, 44 
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (.lbr JSON brush system, R32 heightmap import/export, XCLW water planes done; alpha masks, overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (WavePlayer waveOut streaming playback engine done; XWM/FUZ, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
-Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)
+Phase 19: Material editor & asset pipeline (DDS import/decode done; BSMaterial graph, rule templates, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (NIF preview primitives + projectile variable bindings done; .pofx bundle editor, LOD presets, icon renderer pending)
 Phase 21: Scripting completion (.ppj projects + .flg flags done; Script Manager, spell-check, LSP, remote debugger, type-checker/error-parser completion pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)

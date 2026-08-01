@@ -78,11 +78,15 @@ void encodeDxtBlock(const quint8* pixels, int width, int y0, int x0,
         for (int bx = 0; bx < 4; ++bx) {
             int px = x0 + bx, py = y0 + by;
             if (px >= 0 && py >= 0 && px < width && py < static_cast<int>(width)) {
-                QRgb rgb = pixels[py * width * 4 + px * 4];
-                colors[by * 4 + bx][0] = qRed(rgb) / 255.0f;
-                colors[by * 4 + bx][1] = qGreen(rgb) / 255.0f;
-                colors[by * 4 + bx][2] = qBlue(rgb) / 255.0f;
-                alphas[by * 4 + bx] = qAlpha(rgb) / 255.0f;
+                const int offset = (py * width + px) * 4;
+                const quint8 b = pixels[offset];
+                const quint8 g = pixels[offset + 1];
+                const quint8 r = pixels[offset + 2];
+                const quint8 a = pixels[offset + 3];
+                colors[by * 4 + bx][0] = r / 255.0f;
+                colors[by * 4 + bx][1] = g / 255.0f;
+                colors[by * 4 + bx][2] = b / 255.0f;
+                alphas[by * 4 + bx] = a / 255.0f;
             } else {
                 colors[by * 4 + bx][0] = 0;
                 colors[by * 4 + bx][1] = 0;

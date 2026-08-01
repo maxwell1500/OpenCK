@@ -1,4 +1,4 @@
-﻿#include "nifviewportwidget.hpp"
+#include "nifviewportwidget.hpp"
 
 #include "gizmomath.hpp"
 
@@ -15,6 +15,7 @@
 #include <QFont>
 
 #include "../../libs/files/nif/nifparser.hpp"
+#include "../../libs/files/nif/ddsdecoder.hpp"
 #include "../../libs/files/nifanim/nifanimation.hpp"
 #include "../../libs/files/nif/particle/particleeffects.hpp"
 #include "model/tools/nifanimationstate.hpp"
@@ -129,161 +130,6 @@ QImage loadTga(const QString& path)
     return img;
 }
 
-static int ctz(quint32 mask)
-{
-    if (mask == 0) return 0;
-    int n = 0;
-    while ((mask & 1) == 0) { mask >>= 1; ++n; }
-    return n;
-}
-
-// Decompress one DXT1/DXT5 4x4 block. block points at 8 (DXT1) or 16 (DXT5) bytes.
-void decodeDxtBlock(const quint8* block, quint32* outRGBA, bool dxt5)
-{
-    auto expand565 = [](quint16 c) -> quint32 {
-        const quint32 r = (c >> 11) & 0x1F;
-        const quint32 g = (c >> 5) & 0x3F;
-        const quint32 b = c & 0x1F;
-        const quint32 rr = (r << 3) | (r >> 2);
-        const quint32 gg = (g << 2) | (g >> 4);
-        const quint32 bb = (b << 3) | (b >> 2);
-        return (0xFFu << 24) | (bb << 16) | (gg << 8) | rr;
-    };
-
-    const quint16 c0 = *reinterpret_cast<const quint16*>(block);
-    const quint16 c1 = *reinterpret_cast<const quint16*>(block + 2);
-    quint32 colors[4];
-    colors[0] = expand565(c0);
-    colors[1] = expand565(c1);
-    if (c0 > c1) {
-        // 4-color
-        const quint32 r0 = (colors[0] & 0xFF), g0 = (colors[0] >> 8) & 0xFF, b0 = (colors[0] >> 16) & 0xFF;
-        const quint32 r1 = (colors[1] & 0xFF), g1 = (colors[1] >> 8) & 0xFF, b1 = (colors[1] >> 16) & 0xFF;
-        colors[2] = (0xFFu << 24) |
-                    (((b0 + b1) >> 1) << 16) |
-                    (((g0 + g1) >> 1) << 8) |
-                    ((r0 + r1) >> 1);
-        colors[3] = (0x00u << 24) |
-                    (((b0 * 2 + b1) / 3) << 16) |
-                    (((g0 * 2 + g1) / 3) << 8) |
-                    ((r0 * 2 + r1) / 3);
-    } else {
-        const quint32 r0 = (colors[0] & 0xFF), g0 = (colors[0] >> 8) & 0xFF, b0 = (colors[0] >> 16) & 0xFF;
-        const quint32 r1 = (colors[1] & 0xFF), g1 = (colors[1] >> 8) & 0xFF, b1 = (colors[1] >> 16) & 0xFF;
-        colors[2] = (0xFFu << 24) |
-                    (((b0 + b1) >> 1) << 16) |
-                    (((g0 + g1) >> 1) << 8) |
-                    ((r0 + r1) >> 1);
-        colors[3] = 0x00000000u; // transparent
-    }
-
-    const quint32 indices = *reinterpret_cast<const quint32*>(block + 4);
-    quint8 alpha[16];
-    if (dxt5) {
-        const quint8 a0 = block[8];
-        const quint8 a1 = block[9];
-        quint8 a[8];
-        a[0] = a0; a[1] = a1;
-        if (a0 > a1) {
-            for (int i = 0; i < 6; ++i)
-                a[2 + i] = static_cast<quint8>(((6 - i) * a0 + (1 + i) * a1) / 7);
-        } else {
-            for (int i = 0; i < 4; ++i)
-                a[2 + i] = static_cast<quint8>(((4 - i) * a0 + (1 + i) * a1) / 5);
-            a[6] = 0; a[7] = 255;
-        }
-        // 48-bit alpha index stream starting at block[10]
-        quint64 bits = 0;
-        for (int i = 0; i < 6; ++i)
-            bits |= static_cast<quint64>(block[10 + i]) << (8 * i);
-        for (int i = 0; i < 16; ++i) {
-            const int idx = static_cast<int>((bits >> (3 * i)) & 0x7);
-            alpha[i] = a[idx];
-        }
-    } else {
-        for (int i = 0; i < 16; ++i) alpha[i] = 255;
-    }
-
-    for (int i = 0; i < 16; ++i) {
-        const int ci = (indices >> (2 * i)) & 0x3;
-        outRGBA[i] = (static_cast<quint32>(alpha[i]) << 24) | (colors[ci] & 0x00FFFFFF);
-    }
-}
-
-// Minimal DDS loader: uncompressed RGB and DXT1/DXT5.
-QImage loadDds(const QString& path)
-{
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) return QImage();
-
-    QByteArray data = file.readAll();
-    file.close();
-    if (data.size() < 128) return QImage();
-    if (data.mid(0, 4) != QByteArray("DDS ", 4)) return QImage();
-
-    const quint32* h = reinterpret_cast<const quint32*>(data.constData() + 4);
-    const quint32 height = h[1];
-    const quint32 width = h[2];
-    const quint32 depthOrPitch = h[3];
-    Q_UNUSED(depthOrPitch);
-    const quint32 mipMapCount = h[4];
-    Q_UNUSED(mipMapCount);
-    const quint32* pf = reinterpret_cast<const quint32*>(data.constData() + 4 + 19 * 4);
-    const quint32 pfFlags = pf[0];
-    const quint8* fourCC = reinterpret_cast<const quint8*>(&pf[1]);
-    const quint32 rgbBitCount = pf[2];
-    Q_UNUSED(rgbBitCount);
-
-    if (width == 0 || height == 0 || width > 16384 || height > 16384) return QImage();
-
-    const quint8* pixels = reinterpret_cast<const quint8*>(data.constData()) + 128;
-
-    if (pfFlags & 0x4) { // FOURCC
-        const bool dxt5 = (fourCC[0] == 'D' && fourCC[1] == 'X' && fourCC[2] == 'T' && fourCC[3] == '5');
-        const bool dxt1 = (fourCC[0] == 'D' && fourCC[1] == 'X' && fourCC[2] == 'T' && fourCC[3] == '1');
-        if (!dxt1 && !dxt5) return QImage();
-
-        QImage img(width, height, QImage::Format_ARGB32);
-        const int blockSize = dxt5 ? 16 : 8;
-        for (quint32 y = 0; y < height; y += 4) {
-            for (quint32 x = 0; x < width; x += 4) {
-                const quint32* rgba = reinterpret_cast<const quint32*>(
-                    pixels + ((y / 4) * (width / 4) + (x / 4)) * blockSize);
-                quint32 block[16];
-                decodeDxtBlock(reinterpret_cast<const quint8*>(rgba), block, dxt5);
-                for (int by = 0; by < 4; ++by) {
-                    for (int bx = 0; bx < 4; ++bx) {
-                        const int px = x + bx;
-                        const int py = y + by;
-                        if (px < static_cast<int>(width) && py < static_cast<int>(height)) {
-                            img.setPixel(px, py, block[by * 4 + bx]);
-                        }
-                    }
-                }
-            }
-        }
-        return img;
-    } else {
-        // Uncompressed RGB(A)
-        const quint32 rMask = pf[3], gMask = pf[4], bMask = pf[5], aMask = pf[6];
-        const bool hasAlpha = (aMask != 0);
-        QImage img(width, height, QImage::Format_ARGB32);
-        const int bpp = (rgbBitCount + 7) / 8;
-        for (quint32 y = 0; y < height; ++y) {
-            for (quint32 x = 0; x < width; ++x) {
-                const quint8* p = pixels + (y * width + x) * bpp;
-                quint32 val = 0;
-                for (int i = 0; i < bpp; ++i) val |= static_cast<quint32>(p[i]) << (8 * i);
-                const quint8 r = static_cast<quint8>(((val & rMask) >> ctz(rMask)) & 0xFF);
-                const quint8 g = static_cast<quint8>(((val & gMask) >> ctz(gMask)) & 0xFF);
-                const quint8 b = static_cast<quint8>(((val & bMask) >> ctz(bMask)) & 0xFF);
-                const quint8 a = hasAlpha ? static_cast<quint8>(((val & aMask) >> ctz(aMask)) & 0xFF) : 255;
-                img.setPixel(x, y, qRgba(r, g, b, a));
-            }
-        }
-        return img;
-    }
-}
 
 static const char* overlayVertexShaderSrc = R"(
     #version 330 core
@@ -346,7 +192,7 @@ QImage NifViewportWidget::loadTextureImage(const QString& path)
     if (!img.isNull()) return img;
     img = loadTga(path);
     if (!img.isNull()) return img;
-    img = loadDds(path);
+    img = DdsDecoder::decodeFile(path);
     return img;
 }
 
@@ -1233,7 +1079,7 @@ void NifViewportWidget::ensureTexture(int index, const QString& path)
         img = loadTga(resolvedPath);
     }
     if (img.isNull()) {
-        img = loadDds(resolvedPath);
+        img = DdsDecoder::decodeFile(resolvedPath);
     }
     if (img.isNull()) {
         LOG_WARNING(QString("Failed to load texture: %1").arg(path));

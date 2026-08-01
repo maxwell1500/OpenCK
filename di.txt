@@ -1,0 +1,7 @@
+********* Start testing of TestDdsDecoder *********
+Config: Using QtTest library 6.5.3, Qt 6.5.3 (x86_64-little_endian-llp64 shared (dynamic) debug build; by MSVC 2019), windows 11
+PASS   : TestDdsDecoder::initTestCase()
+PASS   : TestDdsDecoder::testInvalidFile()
+PASS   : TestDdsDecoder::cleanupTestCase()
+Totals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 13ms
+********* Finished testing of TestDdsDecoder *********
