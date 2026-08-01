@@ -117,6 +117,12 @@ target_link_libraries(test_thememanager PRIVATE openck_view Qt6::Test)
 target_include_directories(test_thememanager PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_thememanager)
 
+# Gizmo picking/dragging math tests
+add_executable(test_gizmomath test_gizmomath.cpp)
+target_link_libraries(test_gizmomath PRIVATE openck_view Qt6::Test)
+target_include_directories(test_gizmomath PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_gizmomath)
+
 # NifPyFileWrapper tests
 add_executable(test_nifpyfilewrapper test_nifpyfilewrapper.cpp)
 target_link_libraries(test_nifpyfilewrapper PRIVATE openck_model test_stubs Qt6::Test)
@@ -208,3 +214,9 @@ add_executable(test_editor_widgets test_editor_widgets.cpp)
 target_link_libraries(test_editor_widgets PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
 target_include_directories(test_editor_widgets PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_editor_widgets)
+
+# CellMapView math tests
+add_executable(test_cellviewcanvas test_cellviewcanvas.cpp)
+target_link_libraries(test_cellviewcanvas PRIVATE openck_view Qt6::Test)
+target_include_directories(test_cellviewcanvas PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_cellviewcanvas)

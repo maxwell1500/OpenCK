@@ -1,8 +1,11 @@
 #ifndef CELLS_DIALOG_HPP
 #define CELLS_DIALOG_HPP
 
+#include <QPointF>
+#include <QVector>
 #include <QWidget>
 
+struct RefrRecord;
 class Data;
 class QComboBox;
 class QListView;
@@ -20,11 +23,19 @@ class CellViewPanel : public QWidget
 public:
     explicit CellViewPanel(Data* data, QWidget* parent = nullptr);
 
+signals:
+    void refSelected(const RefrRecord* record);   // may be nullptr
+    void cursorWorldPos(const QPointF& worldPos);
+    void viewChanged();
+
 private slots:
     void onWorldspaceChanged(int index);
     void onCellSelected(const QModelIndex& index);
+    void onRefrTableSelectionChanged(const QModelIndex& current, const QModelIndex&);
 
 private:
+    void syncTableToCanvas(int canvasRow);
+
     Data* mData;
     QComboBox* mWorldspaceCombo;
     QListView* mCellList;

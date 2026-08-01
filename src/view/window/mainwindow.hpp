@@ -181,6 +181,8 @@ private:
     QLabel* mStatusCellCoords;
     QLabel* mStatusSelectedObject;
     QProgressBar* mStatusProgressBar;
+    bool mViewportRefsConnected = false;
+    bool mCellViewConnected = false;
 };
 
 #endif //MAINWINDOW_H

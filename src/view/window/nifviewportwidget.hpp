@@ -7,6 +7,8 @@
 #include <QMatrix4x4>
 #include <QVector3D>
 
+#include "gizmomath.hpp"
+
 class QOpenGLWidget;
 class QOpenGLFunctions;
 class QOpenGLShaderProgram;
@@ -40,6 +42,9 @@ class ParticleRenderer;
 struct ViewportCellRef {
     QVector3D position;
     bool enabled = true;
+    int dataIndex = -1;                              // index into Data refrCollection, -1 if not backed
+    float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;     // radians (matches RefrRecord on-disk)
+    float scale = 1.0f;
 };
 
 namespace Nif {
@@ -86,11 +91,26 @@ public:
     int vertexCount() const;
     QString currentFile() const { return currentNifFile; }
 
+signals:
+    void refSelected(int dataIndex);
+    void refHovered(int dataIndex);
+    void refTransformPreview(int dataIndex, const QVector3D& position,
+                             const QVector3D& rotation, float scale);
+    void refTransformCommitted(int dataIndex, const QVector3D& position,
+                               const QVector3D& rotation, float scale);
+
+public:
+    void setSelectedRefIndex(int index);
+    void setSelectedRefByDataIndex(int dataIndex);
+    int selectedRefIndex() const { return mSelectedRefIndex; }
+    void focusOnReference(const QVector3D& gameUnitsPos);
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
@@ -256,6 +276,30 @@ private:
     bool mSnapToAngle = false;
     int mSnapAngleIncrement = 15;
     double mSnapGridSize = 1.0;
+
+    int mSelectedRefIndex = -1;
+    int mHoverRefIndex = -1;
+    bool mGizmoDragging = false;
+    int mGizmoAxis = -1;                 // 0=X, 1=Y, 2=Z, -1=none
+    int mHoverAxis = -1;
+    QPoint mGizmoStartScreen;
+    QPointF mGizmoStartValue;            // per-axis float at drag start
+    QVector3D mGizmoStartPos;            // world-space ref position at drag start
+    float mGizmoStartRotRad[3] = {0,0,0};
+    float mGizmoStartScale = 1.0f;
+    OverlayVBO m_translateGizmoVBO;
+    OverlayVBO m_rotateGizmoVBO;
+    OverlayVBO m_scaleGizmoVBO;
+
+    void setEditMode(EditMode mode);
+    void buildTranslateGizmo(float len, const QVector3D& origin, int highlightAxis);
+    void buildRotateGizmo(float len, const QVector3D& origin, int highlightAxis);
+    void buildScaleGizmo(float len, const QVector3D& origin, int highlightAxis);
+    int pickGizmoAxis(const QPoint& pos, const gizmo::ViewTransform& t);
+    int pickRefMarker(const QPoint& pos, const gizmo::ViewTransform& t);
+    void applyGizmoDrag(const QPoint& currentPos);
+    void commitGizmoDrag();
+    gizmo::ViewTransform currentViewTransform() const;
 };
 
 #endif // NIFVIEWPORTWIDGET_HPP

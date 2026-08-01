@@ -87,6 +87,10 @@
 #include <QSettings>
 #include <QCloseEvent>
 #include <QRegularExpression>
+#include <cmath>
+#include <QVector3D>
+
+#include "../../../libs/files/esm/refrecord.hpp"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -203,6 +207,81 @@ void MainWindow::setData(Data* data)
             nifViewportWidget = new NifViewportWidget(this);
             setCentralWidget(nifViewportWidget);
         }
+
+        // Populate the viewport's cell references from the loaded document
+        if (nifViewportWidget && mData)
+        {
+            QVector<ViewportCellRef> refs;
+            const auto& coll = mData->getRefrCollection();
+            for (int i = 0; i < coll.size(); ++i)
+            {
+                const auto& rec = coll.getRecord(i).get();
+                if (coll.getRecord(i).isDeleted()) continue;
+                ViewportCellRef r;
+                r.position = QVector3D(rec.posX, rec.posY, rec.posZ);
+                r.enabled = !rec.initiallyDisabled;
+                r.dataIndex = i;
+                r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
+                r.scale = rec.scale;
+                refs.append(r);
+            }
+            nifViewportWidget->setCellReferences(refs);
+        }
+
+        if (!mViewportRefsConnected)
+        {
+            // Render window selection -> status bar + Inspector
+            connect(nifViewportWidget, &NifViewportWidget::refSelected,
+                    this, [this](int dataIndex) {
+                if (dataIndex < 0 || !mData)
+                {
+                    if (mStatusSelectedObject) mStatusSelectedObject->setText(QStringLiteral("No selection"));
+                    if (mInspectorWidget) mInspectorWidget->clear();
+                    return;
+                }
+                auto& coll = mData->getRefrCollection();
+                if (dataIndex >= coll.size()) return;
+                RefrRecord& rec = coll.getRecord(dataIndex).get();
+                const QString id = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+                if (mStatusSelectedObject) mStatusSelectedObject->setText(QStringLiteral("REFR %1").arg(id));
+                if (mInspectorWidget) mInspectorWidget->showComponents(&rec.components, QStringLiteral("Reference %1").arg(id));
+            });
+
+            // Live transform readout in the status bar while dragging
+            connect(nifViewportWidget, &NifViewportWidget::refTransformPreview,
+                    this, [this](int, const QVector3D& pos, const QVector3D& rot, float scale) {
+                if (mStatusSelectedObject)
+                    mStatusSelectedObject->setText(
+                        QStringLiteral("X %1  Y %2  Z %3  RX %4  RY %5  RZ %6  S %7")
+                            .arg(pos.x(), 0, 'f', 1).arg(pos.y(), 0, 'f', 1).arg(pos.z(), 0, 'f', 1)
+                            .arg(rot.x() * 57.2957795f, 0, 'f', 1).arg(rot.y() * 57.2957795f, 0, 'f', 1)
+                            .arg(rot.z() * 57.2957795f, 0, 'f', 1).arg(scale, 0, 'f', 2));
+            });
+
+            // Undoable write-back on drag end
+            connect(nifViewportWidget, &NifViewportWidget::refTransformCommitted,
+                    this, [this](int dataIndex, const QVector3D& pos, const QVector3D& rot, float scale) {
+                if (dataIndex < 0 || !mData) return;
+                auto& coll = mData->getRefrCollection();
+                if (dataIndex >= coll.size()) return;
+                RefrRecord original = coll.getRecord(dataIndex).get();
+                RefrRecord edited = original;
+                edited.posX = pos.x(); edited.posY = pos.y(); edited.posZ = pos.z();
+                edited.rotX = rot.x(); edited.rotY = rot.y(); edited.rotZ = rot.z();
+                edited.scale = scale;
+                auto* cmd = new EditRecordCommand<RefrRecord>(
+                    &coll, dataIndex, original, edited,
+                    QStringLiteral("Transform Reference 0x%1").arg(edited.formId, 8, 16, QChar('0')));
+                if (mUndoStack && cmd->hasChanged())
+                    mUndoStack->push(cmd);
+                else
+                    delete cmd;
+                if (mStatusSelectedObject)
+                    mStatusSelectedObject->setText(QStringLiteral("X %1  Y %2  Z %3")
+                        .arg(pos.x(), 0, 'f', 1).arg(pos.y(), 0, 'f', 1).arg(pos.z(), 0, 'f', 1));
+            });
+            mViewportRefsConnected = true;
+        }
         
         // Create Object Window dock widget
         if (!objectWindowDock)
@@ -222,6 +301,39 @@ void MainWindow::setData(Data* data)
             mDockManager->addDockWidget(ads::RightDockWidgetArea, mCellViewDock);
         }
 
+        if (!mCellViewConnected)
+        {
+            // Cell View selection -> status bar + Inspector + Render Window focus
+            connect(mCellViewPanel, &CellViewPanel::refSelected,
+                    this, [this](const RefrRecord* rec) {
+                if (!rec || !mData)
+                {
+                    if (mStatusSelectedObject) mStatusSelectedObject->setText(QStringLiteral("No selection"));
+                    return;
+                }
+                const int idx = mData->getRefrCollection().searchId(rec->editorId);
+                const QString id = QStringLiteral("0x%1").arg(rec->formId, 8, 16, QChar('0'));
+                if (mStatusSelectedObject) mStatusSelectedObject->setText(QStringLiteral("REFR %1").arg(id));
+                if (idx >= 0)
+                {
+                    RefrRecord& fullRec = mData->getRefrCollection().getRecord(idx).get();
+                    if (mInspectorWidget) mInspectorWidget->showComponents(&fullRec.components, QStringLiteral("Reference %1").arg(id));
+                    if (nifViewportWidget) nifViewportWidget->setSelectedRefByDataIndex(idx);
+                }
+            });
+
+            // Cell View cursor position -> status bar cell coords
+            connect(mCellViewPanel, &CellViewPanel::cursorWorldPos,
+                    this, [this](const QPointF& wp) {
+                if (!mStatusCellCoords) return;
+                const int gx = static_cast<int>(std::floor(wp.x() / 4096.0));
+                const int gy = static_cast<int>(std::floor(wp.y() / 4096.0));
+                mStatusCellCoords->setText(QStringLiteral("Cell (%1, %2)  X %3  Y %4")
+                    .arg(gx).arg(gy).arg(wp.x(), 0, 'f', 1).arg(wp.y(), 0, 'f', 1));
+            });
+            mCellViewConnected = true;
+        }
+        
         // Create Warnings dock widget
         if (!mWarningsDock)
         {

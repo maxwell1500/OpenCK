@@ -518,7 +518,7 @@ Sources reconciled here:
 
 ---
 
-## Phase 14: Render Window Gizmos + Interactive Cell View ◐
+## Phase 14: Render Window Gizmos + Interactive Cell View ✅
 
 > Target: parity with the real CK's core *editing* loop — click a placed
 > reference in the Cell View, then move/rotate/scale it directly in the
@@ -529,45 +529,46 @@ Sources reconciled here:
 > Real CK reference: `BGSRenderWindowEditModule` (manipulator widget on
 > canvas, ray-cast picking, axis-handle drag). Cell View reference:
 > `TESCellView` (2D top-down canvas, click-select, zoom/pan).
+> Completed 2026-08-01. Build clean, 28/28 tests (2 new).
 
-### 14A — Render Window Gizmo System
+### 14A — Render Window Gizmo System ✅
 
-> Files: `src/view/window/nifviewportwidget.hpp/.cpp`
-> (gizmo VBOs reuse the existing `OverlayVBO` infrastructure, lines 190-199).
-
-| # | Task | Notes |
-|---|------|-------|
-| 14A.1 | Implement ray picking: unproject mouse → world ray, intersect mesh shape bounds / cell reference markers | Needs `selectedShape`→`ViewportCellRef` mapping so clicks select placed references |
-| 14A.2 | Render translate gizmo (3 axis arrows) at selection origin via OverlayVBO | Draw only when `mEditMode == EditMode::Move` |
-| 14A.3 | Render rotate gizmo (3 rings) | Draw only when `mEditMode == EditMode::Rotate` |
-| 14A.4 | Render scale gizmo (3 axis handles + center cube) | Draw only when `mEditMode == EditMode::Scale` |
-| 14A.5 | Gizmo hit-testing on mouse press: pick axis handle before fallback to viewport orbit | Store `mActiveGizmoAxis`; cursor feedback (Q-Cross/SizeVer/SizeHor) |
-| 14A.6 | Mouse drag → world-space delta: project screen delta onto gizmo axis; rotate via arc-ball around selection pivot | Per-axis math in a testable helper |
-| 14A.7 | Apply snap-to-grid (position, `mSnapGridSize`) and snap-to-angle (rotation, `mSnapAngleIncrement`) during drag | Existing toolbar actions (12G.2) feed these values |
-| 14A.8 | Write transforms back to REFR record fields via `EditRecordCommand` (undoable) | Reuse `EditRecordCommand`; position/rotation/scale + XSCL |
-| 14A.9 | Selection highlight: outline/brighten picked reference in viewport | Reuse `m_highlightTriVBO` pattern or a new selection VBO |
-| 14A.10 | Hover highlight for gizmo handles (hovered axis = accent color) | Match real CK feedback |
-| 14A.11 | Keyboard shortcuts: W/E/R for Move/Rotate/Scale, Q for Select | Bind via existing `ShortcutManager` (respect `12D` menu parity) |
-| 14A.12 | Status bar readout of selection position/rotation/scale during drag | Wire to existing status-bar labels (12I) |
-| 14A.13 | Unit tests: axis projection, screen→world delta, snap math, gizmo handle picking | New `test_gizmomath.cpp` (pure math, no GL) |
-
-### 14B — Interactive Cell View 2D Map
-
-> Files: `src/view/window/cellsdialog.cpp` (`CellMapCanvas`, lines 32-118).
-> The canvas currently paints markers only — no input handling, no view transform.
+> Files: `src/view/window/nifviewportwidget.hpp/.cpp`, `gizmomath.hpp/.cpp`
+> (new pure-math helpers), `tests/test_gizmomath.cpp` (new, 34 checks).
 
 | # | Task | Notes |
 |---|------|-------|
-| 14B.1 | Add view transform (pan offset + zoom scale) to `CellMapCanvas` | `setViewport(offset, zoom)`; all painting goes through it |
-| 14B.2 | Mouse wheel zoom (anchored at cursor) + middle/right-drag pan | `wheelEvent`, `mouseMoveEvent` |
-| 14B.3 | Click-select reference markers: inverse-map screen → cell coordinates, hit-test within radius | Emit `referenceClicked(recordIndex)` |
-| 14B.4 | Hover highlight for reference markers | `mouseMoveEvent` without button, nearest marker within radius |
-| 14B.5 | Rubber-band marquee selection for multi-select | Shift+left-drag; track `QVector<qint32> mSelectedRefs` |
-| 14B.6 | Sync canvas selection ↔ reference table (`RefrTableModel`) | Highlight rows; keep both in lockstep |
-| 14B.7 | Emit `referenceSelected` from `CellViewPanel` → MainWindow → Inspector + Render Window | Route through existing `recordSelected`/Inspector wiring from 13.2 |
-| 14B.8 | Cross-highlight with Render Window: select marker → focus/camera-jump to reference in viewport | `setCellReferences` + new `focusOnReference()` |
-| 14B.9 | Status bar: live cell-coordinate readout on mouse move | Reuse `mStatusCellCoords` label (12I.1) |
-| 14B.10 | Unit tests: screen↔world transform round-trip, marker hit-testing, zoom anchoring | New `test_cellviewcanvas.cpp` (pure math, no widgets) |
+| 14A.1 | Ray picking: mouse → world via `gizmo::screenToWorld`, cell reference marker hit-testing | ✅ `pickRefMarker()` — projects markers, picks nearest within 10 px |
+| 14A.2 | Translate gizmo (3 axis lines + arrowheads) rendered via OverlayVBO | ✅ `buildTranslateGizmo()`, drawn only in `EditMode::Move` |
+| 14A.3 | Rotate gizmo (3 perpendicular rings) | ✅ `buildRotateGizmo()` — 48-segment circles per axis |
+| 14A.4 | Scale gizmo (3 axis handles + end cubes) | ✅ `buildScaleGizmo()` |
+| 14A.5 | Gizmo hit-testing on mouse press (≤14 px), axis-handle drag before orbit fallback | ✅ `pickGizmoAxis()` + `mousePressEvent` rewrite; `mouseReleaseEvent` added (was missing) |
+| 14A.6 | Mouse drag → world-space delta via `gizmo::dragDeltaAlongAxis`; rotate via `gizmo::arcballRotation` | ✅ `applyGizmoDrag()` |
+| 14A.7 | Snap-to-grid (position) and snap-to-angle (rotation) from existing toolbar values | ✅ `snapToStep` / `snapDegrees` consume `mSnapToGrid`/`mSnapToAngle` |
+| 14A.8 | Undoable REFR writes via `EditRecordCommand` on drag end | ✅ `refTransformCommitted` → MainWindow pushes command with memento |
+| 14A.9 | Selection highlight: selected ref marker yellow + larger; hovered white | ✅ baked into `m_cellRefVBO` build |
+| 14A.10 | Hover highlight for gizmo handles (hovered axis white, cursor feedback) | ✅ `mHoverAxis` + `Qt::SizeAllCursor` |
+| 14A.11 | Keyboard: Q/W/E/R for Select/Move/Rotate/Scale when a ref is selected (W still flies camera when nothing selected) | ✅ in `keyPressEvent` |
+| 14A.12 | Status bar readout of live transform while dragging | ✅ `refTransformPreview` → `mStatusSelectedObject` (rad→deg) |
+| 14A.13 | Unit tests: `test_gizmomath` — screen↔world round-trip, axis pick, drag delta, arcball, snap | ✅ 34 checks |
+
+### 14B — Interactive Cell View 2D Map ✅
+
+> Files: `src/view/window/cellsdialog.cpp/.hpp`, `cellmapview.hpp/.cpp`
+> (new pure-math view model), `tests/test_cellviewcanvas.cpp` (new, 21 checks).
+
+| # | Task | Notes |
+|---|------|-------|
+| 14B.1 | View transform (pan offset + zoom scale) via `CellMapView` | ✅ `worldToScreen`/`screenToWorld`/`panByPixels`/`zoomAt` |
+| 14B.2 | Mouse wheel zoom at cursor + middle/right-drag pan | ✅ |
+| 14B.3 | Click-select reference markers (inverse-map hit test) | ✅ `markerClicked` + `selectionChanged` emitted |
+| 14B.4 | Hover highlight for reference markers | ✅ `hoverChanged` + white ring |
+| 14B.5 | Rubber-band marquee multi-select (Shift/Ctrl variants) | ✅ live marquee selection |
+| 14B.6 | Sync canvas selection ↔ reference table (`RefrTableModel`) | ✅ `syncTableToCanvas` / `onRefrTableSelectionChanged` |
+| 14B.7 | `refSelected` from CellViewPanel → MainWindow → Inspector + Render Window | ✅ mirror of ObjectWindow `recordSelected` flow |
+| 14B.8 | Cross-highlight: select marker → viewport `setSelectedRefByDataIndex` + `focusOnReference` camera jump | ✅ |
+| 14B.9 | Status bar: live cell-coordinate readout on mouse move | ✅ `cursorWorldPos` → `mStatusCellCoords` "Cell (gx, gy) X Y" |
+| 14B.10 | Unit tests: `test_cellviewcanvas` — world↔screen, fitCell, zoom anchor, pan, hitTest, clamps | ✅ 21 checks |
 
 ---
 
@@ -737,7 +738,7 @@ Sources reconciled here:
 | 11 — Documentation | 5/5 | ✅ |
 | 12 — UI Layout Parity | 40/40 | ✅ |
 | 13 — Editor Workspace Parity | 14/14 | ✅ |
-| 14 — Render Gizmos + Cell View | 0/23 | ◐ |
+| 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 0/7 | ⬜ |
 | 16 — Specialized Editor Completion | 0/8 | ⬜ |
 | 17 — Terrain & Landscape Completion | 0/9 | ⬜ |
@@ -748,7 +749,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
 | 24 — Infrastructure & Ecosystem | 0/11 | ⬜ |
-| **TOTAL** | **196/310** | ◐ |
+| **TOTAL** | **219/310** | ◐ |
 
 ---
 
@@ -785,7 +786,8 @@ Phase 10: ✅ Complete (26/26 tests passing)
 Phase 12: ✅ Complete (UI Layout Parity — ADS, Cell View, Object Window tree, menus, Preferences, modeless dialogs, render toolbar, status bar, layout naming)
 Phase 11: ✅ Complete (Documentation & final polish)
 Phase 13: ✅ Complete (Editor Workspace Parity — central render widget, docked Inspector, Warnings dock, menu bar reorder, toolbar expansion, shortcut fixes)
-Phase 14: ◐ IN PROGRESS (Render Window gizmos 14A + Interactive Cell View 14B — unblocks the core editing loop)
+Phase 14: ✅ Complete (Render Window gizmos 14A — translate/rotate/scale manipulators with snap, undoable REFR write-back, Q/W/E/R keys, selection highlight; Interactive Cell View 14B — pan/zoom/select/marquee canvas, table sync, Inspector + Render Window cross-wiring, status bar coords)
+Phase 15: ◐ NEXT (Record coverage & Object Window completion — back the ~52 dead categories, .filter files, CREA editor, warnings dock)
 ```
 
 **Subsequent phases (after 14):**

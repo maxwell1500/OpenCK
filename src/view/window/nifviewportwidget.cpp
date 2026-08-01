@@ -1,5 +1,7 @@
 ﻿#include "nifviewportwidget.hpp"
 
+#include "gizmomath.hpp"
+
 #include <QtOpenGLWidgets/QOpenGLWidget>
 #include <QOpenGLFunctions>
 #include <QMouseEvent>
@@ -403,10 +405,10 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     toolbar->addAction(mActionRotate);
     toolbar->addAction(mActionScale);
     connect(mEditModeGroup, &QActionGroup::triggered, this, [this](QAction* a) {
-        if (a == mActionSelect) mEditMode = EditMode::Select;
-        else if (a == mActionMove) mEditMode = EditMode::Move;
-        else if (a == mActionRotate) mEditMode = EditMode::Rotate;
-        else if (a == mActionScale) mEditMode = EditMode::Scale;
+        if (a == mActionSelect) setEditMode(EditMode::Select);
+        else if (a == mActionMove) setEditMode(EditMode::Move);
+        else if (a == mActionRotate) setEditMode(EditMode::Rotate);
+        else if (a == mActionScale) setEditMode(EditMode::Scale);
     });
 
     toolbar->addSeparator();
@@ -611,6 +613,9 @@ NifViewportWidget::~NifViewportWidget()
     m_nodeAxisVBO_R.clear();
     m_nodeAxisVBO_G.clear();
     m_nodeAxisVBO_B.clear();
+    m_translateGizmoVBO.clear();
+    m_rotateGizmoVBO.clear();
+    m_scaleGizmoVBO.clear();
     clearTextures();
         if (defaultTexture) { delete defaultTexture; defaultTexture = nullptr; }
 
@@ -742,9 +747,48 @@ void NifViewportWidget::highlightNavmeshTriangle(int index)
 void NifViewportWidget::setCellReferences(const QVector<ViewportCellRef>& refs)
 {
     cellReferences = refs;
+    if (mSelectedRefIndex >= cellReferences.size()) {
+        mSelectedRefIndex = -1;
+    }
     m_cellRefVBO.dirty = true;
     m_cellGridVBO.dirty = true;
     glWidget->update();
+}
+
+void NifViewportWidget::setSelectedRefIndex(int index)
+{
+    if (index < -1 || index >= cellReferences.size()) {
+        index = -1;
+    }
+    if (mSelectedRefIndex == index) {
+        glWidget->update();
+        return;
+    }
+    mSelectedRefIndex = index;
+    mHoverAxis = -1;
+    mHoverRefIndex = -1;
+    m_cellRefVBO.dirty = true;
+    glWidget->update();
+}
+
+void NifViewportWidget::focusOnReference(const QVector3D& gameUnitsPos)
+{
+    cameraPos = gameUnitsPos * 0.01f;  // cameraPos lives in view space where model scales 0.01
+    updateCamera();
+}
+
+void NifViewportWidget::setSelectedRefByDataIndex(int dataIndex)
+{
+    for (int i = 0; i < cellReferences.size(); ++i)
+    {
+        if (cellReferences[i].dataIndex == dataIndex)
+        {
+            setSelectedRefIndex(i);
+            focusOnReference(cellReferences[i].position);
+            return;
+        }
+    }
+    setSelectedRefIndex(-1);
 }
 
 void NifViewportWidget::updateParticleSystem(const ParticleSystemData* data)
@@ -776,6 +820,11 @@ void NifViewportWidget::clear()
     navmeshTriangles.clear();
     pathWaypoints.clear();
     cellReferences.clear();
+    mSelectedRefIndex = -1;
+    mHoverRefIndex = -1;
+    mGizmoDragging = false;
+    mGizmoAxis = -1;
+    mHoverAxis = -1;
     cellGridEnabled = false;
     collisionEnabled = false;
     meshBuilt = false;
@@ -795,6 +844,9 @@ void NifViewportWidget::clear()
         m_nodeAxisVBO_R.clear();
         m_nodeAxisVBO_G.clear();
         m_nodeAxisVBO_B.clear();
+        m_translateGizmoVBO.clear();
+        m_rotateGizmoVBO.clear();
+        m_scaleGizmoVBO.clear();
         clearTextures();
 
     hierarchyTree->clear();
@@ -1733,28 +1785,36 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
     if (!cellReferences.isEmpty()) {
         if (m_cellRefVBO.dirty) {
             QVector<OverlayVertex> verts;
-            const float armLen = 32.0f;
             const QVector3D refColor(0.0f, 1.0f, 0.0f);
-            for (const auto& ref : cellReferences) {
+            for (int i = 0; i < cellReferences.size(); ++i) {
+                const ViewportCellRef& ref = cellReferences[i];
                 QVector3D pos = ref.position;
+                float armLen = 32.0f;
+                QVector3D color = refColor;
+                if (i == mSelectedRefIndex) {
+                    color = QVector3D(1.0f, 0.85f, 0.1f);
+                    armLen = 48.0f;
+                } else if (i == mHoverRefIndex) {
+                    color = QVector3D(1.0f, 1.0f, 1.0f);
+                }
                 if (ref.enabled) {
                     QVector3D h1 = pos - QVector3D(armLen, 0, 0);
                     QVector3D h2 = pos + QVector3D(armLen, 0, 0);
                     QVector3D v1 = pos - QVector3D(0, 0, armLen);
                     QVector3D v2 = pos + QVector3D(0, 0, armLen);
-                    verts.append({h1, refColor});
-                    verts.append({h2, refColor});
-                    verts.append({v1, refColor});
-                    verts.append({v2, refColor});
+                    verts.append({h1, color});
+                    verts.append({h2, color});
+                    verts.append({v1, color});
+                    verts.append({v2, color});
                 } else {
                     QVector3D d1a = pos + QVector3D(-armLen, 0, -armLen);
                     QVector3D d1b = pos + QVector3D(armLen, 0, armLen);
                     QVector3D d2a = pos + QVector3D(armLen, 0, -armLen);
                     QVector3D d2b = pos + QVector3D(-armLen, 0, armLen);
-                    verts.append({d1a, refColor});
-                    verts.append({d1b, refColor});
-                    verts.append({d2a, refColor});
-                    verts.append({d2b, refColor});
+                    verts.append({d1a, color});
+                    verts.append({d1b, color});
+                    verts.append({d2a, color});
+                    verts.append({d2b, color});
                 }
             }
             m_cellRefVBO.build(verts, GL_LINES);
@@ -1764,6 +1824,22 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 
         m_cellRefVBO.draw(m_overlayShader, modelView);
 
+        glEnable(GL_DEPTH_TEST);
+    }
+
+    // Transform gizmo for the selected reference
+    if (mSelectedRefIndex >= 0 && mSelectedRefIndex < cellReferences.size()
+        && mEditMode != EditMode::Select)
+    {
+        const ViewportCellRef& ref = cellReferences[mSelectedRefIndex];
+        const gizmo::ViewTransform t{ view, model, proj, glWidget->size() };
+        const float len = gizmo::worldSizeForPixels(t, 90.0f);
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(2.5f);
+        if (mEditMode == EditMode::Move)      { buildTranslateGizmo(len, ref.position, mHoverAxis); m_translateGizmoVBO.draw(m_overlayShader, modelView); }
+        else if (mEditMode == EditMode::Rotate){ buildRotateGizmo(len, ref.position, mHoverAxis);   m_rotateGizmoVBO.draw(m_overlayShader, modelView); }
+        else if (mEditMode == EditMode::Scale){ buildScaleGizmo(len, ref.position, mHoverAxis);     m_scaleGizmoVBO.draw(m_overlayShader, modelView); }
+        glLineWidth(1.0f);
         glEnable(GL_DEPTH_TEST);
     }
 
@@ -1804,9 +1880,284 @@ void NifViewportWidget::resizeEvent(QResizeEvent* event)
     updateCamera();
 }
 
+void NifViewportWidget::setEditMode(EditMode mode)
+{
+    mEditMode = mode;
+    if (mActionSelect) mActionSelect->setChecked(mode == EditMode::Select);
+    if (mActionMove) mActionMove->setChecked(mode == EditMode::Move);
+    if (mActionRotate) mActionRotate->setChecked(mode == EditMode::Rotate);
+    if (mActionScale) mActionScale->setChecked(mode == EditMode::Scale);
+    mHoverAxis = -1;
+    glWidget->update();
+}
+
+gizmo::ViewTransform NifViewportWidget::currentViewTransform() const
+{
+    QMatrix4x4 model;
+    model.scale(0.01f);
+    float rotXRad = rotationX * 3.14159265f / 180.0f;
+    float rotYRad = rotationY * 3.14159265f / 180.0f;
+    QMatrix4x4 rotXMatrix;
+    rotXMatrix.rotate(rotXRad, 1.0f, 0.0f, 0.0f);
+    QMatrix4x4 rotYMatrix;
+    rotYMatrix.rotate(rotYRad, 0.0f, 1.0f, 0.0f);
+    QMatrix4x4 view = rotYMatrix * rotXMatrix;
+    view.scale(zoom);
+    view.translate(-cameraPos);
+    QMatrix4x4 proj;
+    return { view, model, proj, glWidget ? glWidget->size() : QSize() };
+}
+
+void NifViewportWidget::buildTranslateGizmo(float len, const QVector3D& origin, int highlightAxis)
+{
+    static const QVector3D axisDirs[3] = {
+        QVector3D(1.0f, 0.0f, 0.0f), QVector3D(0.0f, 1.0f, 0.0f), QVector3D(0.0f, 0.0f, 1.0f)
+    };
+    static const QVector3D perpU[3] = {
+        QVector3D(0.0f, 1.0f, 0.0f), QVector3D(1.0f, 0.0f, 0.0f), QVector3D(1.0f, 0.0f, 0.0f)
+    };
+    static const QVector3D perpV[3] = {
+        QVector3D(0.0f, 0.0f, 1.0f), QVector3D(0.0f, 0.0f, 1.0f), QVector3D(0.0f, 1.0f, 0.0f)
+    };
+    static const QVector3D axisColors[3] = {
+        QVector3D(0.9f, 0.2f, 0.2f), QVector3D(0.2f, 0.9f, 0.2f), QVector3D(0.3f, 0.3f, 0.9f)
+    };
+
+    QVector<OverlayVertex> verts;
+    verts.reserve(13 * 3);
+    const float halfWidth = len * 0.014f;
+    for (int i = 0; i < 3; ++i) {
+        const bool hl = (i == highlightAxis);
+        const float effLen = hl ? len * 1.15f : len;
+        const QVector3D color = hl ? QVector3D(1.0f, 1.0f, 1.0f) : axisColors[i];
+        const QVector3D tip = origin + axisDirs[i] * effLen;
+        const QVector3D side = perpU[i] * halfWidth;
+        verts.append({origin - side, color});
+        verts.append({origin + side, color});
+        verts.append({tip + side, color});
+        verts.append({origin - side, color});
+        verts.append({tip + side, color});
+        verts.append({tip - side, color});
+        const float baseR = len * 0.12f;
+        const QVector3D baseCenter = tip - axisDirs[i] * baseR;
+        QVector3D ring[3];
+        for (int k = 0; k < 3; ++k) {
+            const float a = k * 2.0f * 3.14159265f / 3.0f;
+            ring[k] = baseCenter + (perpU[i] * std::cos(a) + perpV[i] * std::sin(a)) * baseR;
+        }
+        verts.append({tip, color});
+        verts.append({ring[0], color});
+        verts.append({ring[1], color});
+        verts.append({tip, color});
+        verts.append({ring[1], color});
+        verts.append({ring[2], color});
+        verts.append({tip, color});
+        verts.append({ring[2], color});
+        verts.append({ring[0], color});
+    }
+    m_translateGizmoVBO.build(verts, GL_TRIANGLES);
+}
+
+void NifViewportWidget::buildRotateGizmo(float len, const QVector3D& origin, int highlightAxis)
+{
+    static const QVector3D perpU[3] = {
+        QVector3D(0.0f, 1.0f, 0.0f), QVector3D(1.0f, 0.0f, 0.0f), QVector3D(1.0f, 0.0f, 0.0f)
+    };
+    static const QVector3D perpV[3] = {
+        QVector3D(0.0f, 0.0f, 1.0f), QVector3D(0.0f, 0.0f, 1.0f), QVector3D(0.0f, 1.0f, 0.0f)
+    };
+    static const QVector3D axisColors[3] = {
+        QVector3D(0.9f, 0.2f, 0.2f), QVector3D(0.2f, 0.9f, 0.2f), QVector3D(0.3f, 0.3f, 0.9f)
+    };
+
+    const int segments = 48;
+    QVector<OverlayVertex> verts;
+    verts.reserve(3 * segments * 2);
+    for (int i = 0; i < 3; ++i) {
+        const QVector3D color = (i == highlightAxis) ? QVector3D(1.0f, 1.0f, 1.0f) : axisColors[i];
+        for (int s = 0; s < segments; ++s) {
+            const float a0 = static_cast<float>(s) / segments * 2.0f * 3.14159265f;
+            const float a1 = static_cast<float>(s + 1) / segments * 2.0f * 3.14159265f;
+            const QVector3D p0 = origin + (perpU[i] * std::cos(a0) + perpV[i] * std::sin(a0)) * len;
+            const QVector3D p1 = origin + (perpU[i] * std::cos(a1) + perpV[i] * std::sin(a1)) * len;
+            verts.append({p0, color});
+            verts.append({p1, color});
+        }
+    }
+    m_rotateGizmoVBO.build(verts, GL_LINES);
+}
+
+void NifViewportWidget::buildScaleGizmo(float len, const QVector3D& origin, int highlightAxis)
+{
+    static const QVector3D axisDirs[3] = {
+        QVector3D(1.0f, 0.0f, 0.0f), QVector3D(0.0f, 1.0f, 0.0f), QVector3D(0.0f, 0.0f, 1.0f)
+    };
+    static const QVector3D perpU[3] = {
+        QVector3D(0.0f, 1.0f, 0.0f), QVector3D(1.0f, 0.0f, 0.0f), QVector3D(1.0f, 0.0f, 0.0f)
+    };
+    static const QVector3D axisColors[3] = {
+        QVector3D(0.9f, 0.2f, 0.2f), QVector3D(0.2f, 0.9f, 0.2f), QVector3D(0.3f, 0.3f, 0.9f)
+    };
+    static const int cubeFaces[36] = {
+        0,1,2, 0,2,3,
+        5,4,7, 5,7,6,
+        4,0,3, 4,3,7,
+        1,5,6, 1,6,2,
+        3,2,6, 3,6,7,
+        4,5,1, 4,1,0
+    };
+
+    QVector<OverlayVertex> verts;
+    verts.reserve(12 * 3);
+    const float halfWidth = len * 0.014f;
+    for (int i = 0; i < 3; ++i) {
+        const bool hl = (i == highlightAxis);
+        const QVector3D color = hl ? QVector3D(1.0f, 1.0f, 1.0f) : axisColors[i];
+        const QVector3D tip = origin + axisDirs[i] * len;
+        const QVector3D side = perpU[i] * halfWidth;
+        verts.append({origin - side, color});
+        verts.append({origin + side, color});
+        verts.append({tip + side, color});
+        verts.append({origin - side, color});
+        verts.append({tip + side, color});
+        verts.append({tip - side, color});
+        const float h = len * 0.10f;
+        const QVector3D corners[8] = {
+            tip + QVector3D(-h, -h, -h),
+            tip + QVector3D( h, -h, -h),
+            tip + QVector3D( h,  h, -h),
+            tip + QVector3D(-h,  h, -h),
+            tip + QVector3D(-h, -h,  h),
+            tip + QVector3D( h, -h,  h),
+            tip + QVector3D( h,  h,  h),
+            tip + QVector3D(-h,  h,  h)
+        };
+        for (int f = 0; f < 36; ++f) {
+            verts.append({corners[cubeFaces[f]], color});
+        }
+    }
+    m_scaleGizmoVBO.build(verts, GL_TRIANGLES);
+}
+
+int NifViewportWidget::pickGizmoAxis(const QPoint& pos, const gizmo::ViewTransform& t)
+{
+    if (mSelectedRefIndex < 0 || mSelectedRefIndex >= cellReferences.size()) return -1;
+    const QVector3D origin = cellReferences[mSelectedRefIndex].position;
+    const float len = gizmo::worldSizeForPixels(t, 90.0f);
+    const QVector3D axisDirs[3] = {
+        QVector3D(1.0f, 0.0f, 0.0f), QVector3D(0.0f, 1.0f, 0.0f), QVector3D(0.0f, 0.0f, 1.0f)
+    };
+    for (int i = 0; i < 3; ++i) {
+        const float d = gizmo::axisPickDistance(t, QPointF(pos), origin, axisDirs[i], len);
+        if (d >= 0.0f && d <= 14.0f) return i;
+    }
+    return -1;
+}
+
+int NifViewportWidget::pickRefMarker(const QPoint& pos, const gizmo::ViewTransform& t)
+{
+    int best = -1;
+    float bestDist = 11.0f;
+    const QPointF p(pos);
+    for (int i = 0; i < cellReferences.size(); ++i) {
+        const QVector3D s = gizmo::worldToScreen(t, cellReferences[i].position);
+        const float dx = s.x() - p.x();
+        const float dy = s.y() - p.y();
+        const float dist = std::sqrt(dx * dx + dy * dy);
+        if (dist < bestDist) {
+            bestDist = dist;
+            best = i;
+        }
+    }
+    return best;
+}
+
+void NifViewportWidget::applyGizmoDrag(const QPoint& currentPos)
+{
+    if (mSelectedRefIndex < 0 || mSelectedRefIndex >= cellReferences.size()) return;
+    ViewportCellRef& ref = cellReferences[mSelectedRefIndex];
+    const gizmo::ViewTransform t = currentViewTransform();
+    const QVector3D axisDir = mGizmoAxis == 0 ? QVector3D(1,0,0) : mGizmoAxis == 1 ? QVector3D(0,1,0) : QVector3D(0,0,1);
+    const QPointF delta = QPointF(currentPos) - QPointF(mGizmoStartScreen);
+    switch (mEditMode)
+    {
+    case EditMode::Move:
+    {
+        const float d = gizmo::dragDeltaAlongAxis(t, mGizmoStartPos, axisDir, delta);
+        float v = mGizmoStartPos[mGizmoAxis] + d;
+        if (mSnapToGrid) v = gizmo::snapToStep(v, mSnapGridSize);
+        QVector3D newPos = mGizmoStartPos;
+        newPos[mGizmoAxis] = v;
+        ref.position = newPos;
+        break;
+    }
+    case EditMode::Rotate:
+    {
+        const float angle = gizmo::arcballRotation(t, mGizmoStartPos, QPointF(mGizmoStartScreen), QPointF(currentPos));
+        float snapped = mSnapToAngle ? gizmo::snapDegrees(angle, mSnapAngleIncrement) : angle;
+        ref.rotX = mGizmoStartRotRad[0];
+        ref.rotY = mGizmoStartRotRad[1];
+        ref.rotZ = mGizmoStartRotRad[2];
+        float& target = mGizmoAxis == 0 ? ref.rotX : mGizmoAxis == 1 ? ref.rotY : ref.rotZ;
+        target = mGizmoStartRotRad[mGizmoAxis] + snapped * 3.14159265f / 180.0f;
+        break;
+    }
+    case EditMode::Scale:
+    {
+        const float d = gizmo::dragDeltaAlongAxis(t, mGizmoStartPos, axisDir, delta);
+        const float worldLen = gizmo::worldSizeForPixels(t, 90.0f);
+        float s = mGizmoStartScale * (1.0f + d / worldLen);
+        ref.scale = qBound(0.01f, s, 100.0f);
+        break;
+    }
+    case EditMode::Select: break;
+    }
+    emit refTransformPreview(cellReferences[mSelectedRefIndex].dataIndex,
+                             ref.position, QVector3D(ref.rotX, ref.rotY, ref.rotZ), ref.scale);
+    m_cellRefVBO.dirty = true;
+    glWidget->update();
+}
+
+void NifViewportWidget::commitGizmoDrag()
+{
+    mGizmoDragging = false;
+    if (mSelectedRefIndex >= 0 && mSelectedRefIndex < cellReferences.size()) {
+        const ViewportCellRef& ref = cellReferences[mSelectedRefIndex];
+        emit refTransformCommitted(ref.dataIndex, ref.position,
+                                   QVector3D(ref.rotX, ref.rotY, ref.rotZ), ref.scale);
+    }
+    mGizmoAxis = -1;
+    mHoverAxis = -1;
+    glWidget->update();
+}
+
 void NifViewportWidget::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
+        const gizmo::ViewTransform t = currentViewTransform();
+        if (mSelectedRefIndex >= 0 && mSelectedRefIndex < cellReferences.size()
+            && mEditMode != EditMode::Select)
+        {
+            const int axis = pickGizmoAxis(event->pos(), t);
+            if (axis >= 0) {
+                mGizmoDragging = true;
+                mGizmoAxis = axis;
+                mHoverAxis = axis;
+                mGizmoStartScreen = event->pos();
+                const ViewportCellRef& ref = cellReferences[mSelectedRefIndex];
+                mGizmoStartPos = ref.position;
+                mGizmoStartRotRad[0] = ref.rotX; mGizmoStartRotRad[1] = ref.rotY; mGizmoStartRotRad[2] = ref.rotZ;
+                mGizmoStartScale = ref.scale;
+                setCursor(Qt::SizeAllCursor);
+                return; // don't orbit
+            }
+        }
+        const int refIdx = pickRefMarker(event->pos(), t);
+        if (refIdx >= 0) {
+            setSelectedRefIndex(refIdx);
+            emit refSelected(cellReferences[refIdx].dataIndex);
+            return; // don't orbit
+        }
         dragging = true;
         lastMousePos = event->pos();
         setCursor(Qt::ClosedHandCursor);
@@ -1823,13 +2174,57 @@ void NifViewportWidget::mousePressEvent(QMouseEvent* event)
 
 void NifViewportWidget::mouseMoveEvent(QMouseEvent* event)
 {
+    if (mGizmoDragging && mGizmoAxis >= 0) {
+        applyGizmoDrag(event->pos());
+        return;
+    }
+
     if (dragging) {
         QPoint delta = event->pos() - lastMousePos;
         rotationX += delta.y() * 0.5f;
         rotationY += delta.x() * 0.5f;
         lastMousePos = event->pos();
         updateCamera();
+        return;
     }
+
+    const gizmo::ViewTransform t = currentViewTransform();
+    if (mSelectedRefIndex >= 0 && mSelectedRefIndex < cellReferences.size()
+        && mEditMode != EditMode::Select)
+    {
+        const int axis = pickGizmoAxis(event->pos(), t);
+        if (axis != mHoverAxis) {
+            mHoverAxis = axis;
+            glWidget->update();
+        }
+        if (axis >= 0) {
+            setCursor(Qt::SizeAllCursor);
+        } else {
+            unsetCursor();
+        }
+    } else {
+        const int refIdx = pickRefMarker(event->pos(), t);
+        if (refIdx != mHoverRefIndex) {
+            mHoverRefIndex = refIdx;
+            m_cellRefVBO.dirty = true;
+            glWidget->update();
+        }
+        if (refIdx >= 0) {
+            emit refHovered(cellReferences[refIdx].dataIndex);
+        }
+    }
+}
+
+void NifViewportWidget::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        if (mGizmoDragging) {
+            commitGizmoDrag();
+        }
+        dragging = false;
+        unsetCursor();
+    }
+    QWidget::mouseReleaseEvent(event);
 }
 
 void NifViewportWidget::wheelEvent(QWheelEvent* event)
@@ -1851,9 +2246,34 @@ void NifViewportWidget::keyPressEvent(QKeyEvent* event)
     QVector3D right(cosf(rotYRad), 0.0f, -sinf(rotYRad));
 
     switch (event->key()) {
+    case Qt::Key_Q:
+        if (mSelectedRefIndex >= 0) {
+            setEditMode(EditMode::Select);
+            break;
+        }
+        QWidget::keyPressEvent(event);
+        return;
     case Qt::Key_W:
+        if (mSelectedRefIndex >= 0) {
+            setEditMode(EditMode::Move);
+            break;
+        }
         cameraPos += forward * moveSpeed;
         break;
+    case Qt::Key_E:
+        if (mSelectedRefIndex >= 0) {
+            setEditMode(EditMode::Rotate);
+            break;
+        }
+        QWidget::keyPressEvent(event);
+        return;
+    case Qt::Key_R:
+        if (mSelectedRefIndex >= 0) {
+            setEditMode(EditMode::Scale);
+            break;
+        }
+        QWidget::keyPressEvent(event);
+        return;
     case Qt::Key_S:
         cameraPos -= forward * moveSpeed;
         break;
@@ -1908,7 +2328,9 @@ bool NifViewportWidget::eventFilter(QObject* obj, QEvent* event)
         if (ke->key() == Qt::Key_W || ke->key() == Qt::Key_A ||
             ke->key() == Qt::Key_S || ke->key() == Qt::Key_D ||
             ke->key() == Qt::Key_Home || ke->key() == Qt::Key_T ||
-            ke->key() == Qt::Key_Y || ke->key() == Qt::Key_M) {
+            ke->key() == Qt::Key_Y || ke->key() == Qt::Key_M ||
+            ke->key() == Qt::Key_Q || ke->key() == Qt::Key_E ||
+            ke->key() == Qt::Key_R) {
             keyPressEvent(ke);
             return true;
         }

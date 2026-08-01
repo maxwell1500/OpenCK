@@ -89,14 +89,18 @@ Create a fully functional, multi-game Creation Kit replacement that supports edi
 
 ## Remaining Work
 
-### Phase 14: Render Window Gizmos + Interactive Cell View (active)
+### Phase 14: Render Window Gizmos + Interactive Cell View (complete)
 
-- **14A — Gizmo system**: ray picking, translate/rotate/scale manipulators
-  rendered via OverlayVBO, axis-handle drag, snap, undoable writes to REFR
-  via EditRecordCommand. 13 tasks. See `docs/UNIFIED_PLAN.md`.
-- **14B — Interactive Cell View**: pan/zoom view transform, click-select
-  markers, hover highlight, marquee multi-select, sync with reference table
-  + Inspector + Render Window. 10 tasks. See `docs/UNIFIED_PLAN.md`.
+- **14A — Gizmo system**: translate/rotate/scale manipulators via OverlayVBO, axis-handle pick + drag, snap-to-grid/angle, undoable REFR writes via EditRecordCommand, Q/W/E/R keys, selection highlight. 13/13 tasks.
+- **14B — Interactive Cell View**: pan/zoom view transform, click-select + hover + marquee, table sync, Inspector + Render Window cross-wiring, status bar coords. 10/10 tasks.
+- **New**: `gizmomath.hpp/.cpp`, `cellmapview.hpp/.cpp`, `test_gizmomath` (34 checks), `test_cellviewcanvas` (21 checks).
+
+### Phase 15: Record Coverage & Object Window Completion (next)
+
+- **15A**: Back ~52 dead `Type_None` categories with real collections
+- **15B**: Data-driven `.filter` file support
+- **15C**: CREA specialized editor
+- **15D**: Warnings dock population + status bar + validator expansion
 
 ### High Priority
 
@@ -189,5 +193,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 196/310 steps complete (63%) — Phase 14 in progress (0/23); Phases 15–24 planned after second CK audit
-- **Phase 13 complete**: Editor Workspace Parity (docked Inspector, Warnings dock, menu bar reorder, toolbar expansion) — committed `a767b0c`
+- **Progress**: 219/310 steps complete (71%) — Phase 14 complete; Phase 15 next
+- **Phase 14 complete**: Render Window gizmos (translate/rotate/scale with snap + undoable REFR write-back) + interactive Cell View (pan/zoom/select/marquee, Inspector + Render Window sync) — 28/28 tests

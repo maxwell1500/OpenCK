@@ -2,6 +2,7 @@
 
 #include "logger.hpp"
 
+#include "cellmapview.hpp"
 #include "model/world/data.hpp"
 #include "model/world/collection.hpp"
 #include "model/world/record.hpp"
@@ -20,7 +21,12 @@
 #include <QPainter>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMouseEvent>
+#include <QWheelEvent>
+#include <QRect>
+#include <QSet>
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -38,11 +44,14 @@ public:
         : QWidget(parent)
     {
         setMinimumSize(200, 200);
+        setMouseTracking(true);
+        mView.setWidgetSize(size());
     }
 
-    void setReferences(const QVector<QPair<float, float>>& pts)
+    void setReferences(const QVector<QPointF>& pts)
     {
         mPoints = pts;
+        clearSelection();
         update();
     }
 
@@ -50,60 +59,93 @@ public:
     {
         mCellX = x;
         mCellY = y;
+        mView.setWidgetSize(size());
+        mView.fitCell(x, y, size());
         update();
     }
+
+    QVector<int> selectedRows() const { return mSelectedRows; }
+
+    void setSelectedRows(const QVector<int>& rows)
+    {
+        QSet<int> unique;
+        for (int r : rows)
+            unique.insert(r);
+        mSelectedRows = unique.values();
+        std::sort(mSelectedRows.begin(), mSelectedRows.end());
+        update();
+    }
+
+    void clearSelection()
+    {
+        mSelectedRows.clear();
+        update();
+    }
+
+signals:
+    void markerClicked(int row);
+    void selectionChanged(const QVector<int>& rows);
+    void hoverChanged(int row);
+    void cursorWorldPos(const QPointF& worldPos);
+    void viewChanged();
 
 protected:
     void paintEvent(QPaintEvent*) override
     {
         QPainter p(this);
-        p.setRenderHint(QPainter::Antialiasing, false);
+        p.setRenderHint(QPainter::Antialiasing, true);
         p.fillRect(rect(), Qt::black);
 
-        const int w = width();
-        const int h = height();
-        const int grid = 32;
-
-        p.setPen(QPen(QColor(60, 60, 60), 1));
-        for (int gx = 0; gx <= w; gx += grid)
-            p.drawLine(gx, 0, gx, h);
-        for (int gy = 0; gy <= h; gy += grid)
-            p.drawLine(0, gy, w, gy);
-
-        p.setPen(QPen(QColor(120, 120, 120), 1));
-        p.drawLine(w / 2, 0, w / 2, h);
-        p.drawLine(0, h / 2, w, h / 2);
-
-        if (mPoints.isEmpty())
-            return;
-
-        float minX = std::numeric_limits<float>::max();
-        float maxX = std::numeric_limits<float>::lowest();
-        float minY = std::numeric_limits<float>::max();
-        float maxY = std::numeric_limits<float>::lowest();
-        for (const auto& pt : mPoints)
+        const QPointF tl = mView.worldToScreen(QPointF(mCellX * kCellUnits, mCellY * kCellUnits));
+        const double px = mView.pxPerUnit();
+        const QRectF cellRect(tl.x(), tl.y(), kCellUnits * px, kCellUnits * px);
+        if (cellRect.intersects(QRectF(rect())))
         {
-            minX = std::min(minX, pt.first);
-            maxX = std::max(maxX, pt.first);
-            minY = std::min(minY, pt.second);
-            maxY = std::max(maxY, pt.second);
+            p.setPen(QPen(Qt::white, 1));
+            p.drawRect(cellRect);
+
+            if (kCellUnits * px <= 32768)
+            {
+                p.setPen(QPen(QColor(50, 50, 50), 1));
+                for (int u = 512; u < kCellUnits; u += 512)
+                {
+                    const double s = u * px;
+                    if (s < 6)
+                        continue;
+                    p.drawLine(QPointF(tl.x() + s, tl.y()),
+                               QPointF(tl.x() + s, tl.y() + kCellUnits * px));
+                    p.drawLine(QPointF(tl.x(), tl.y() + s),
+                               QPointF(tl.x() + kCellUnits * px, tl.y() + s));
+                }
+            }
         }
-        if (maxX - minX < 1.0f) { maxX = minX + 1.0f; }
-        if (maxY - minY < 1.0f) { maxY = minY + 1.0f; }
 
-        const float scaleX = (w - 20.0f) / (maxX - minX);
-        const float scaleY = (h - 20.0f) / (maxY - minY);
-        const float scale = std::min(scaleX, scaleY);
-        const float ox = (w - (maxX - minX) * scale) / 2.0f;
-        const float oy = (h - (maxY - minY) * scale) / 2.0f;
-
-        p.setBrush(QBrush(QColor(80, 200, 120)));
-        p.setPen(QPen(QColor(200, 255, 200), 1));
-        for (const auto& pt : mPoints)
+        for (int i = 0; i < mPoints.size(); ++i)
         {
-            float px = ox + (pt.first - minX) * scale;
-            float py = oy + (pt.second - minY) * scale;
-            p.drawRect(QRectF(px - 2.0, py - 2.0, 4.0, 4.0));
+            const QPointF sp = mView.worldToScreen(mPoints[i]);
+            if (mSelectedRows.contains(i))
+            {
+                p.fillRect(QRectF(sp.x() - 3.5, sp.y() - 3.5, 7.0, 7.0),
+                           QColor(240, 220, 60));
+            }
+            else
+            {
+                p.fillRect(QRectF(sp.x() - 2.0, sp.y() - 2.0, 4.0, 4.0),
+                           QColor(80, 200, 120));
+            }
+            if (i == mHoverRow)
+            {
+                p.setPen(QPen(Qt::white, 1));
+                p.setBrush(Qt::NoBrush);
+                p.drawEllipse(QPointF(sp.x(), sp.y()), 3.5, 3.5);
+            }
+        }
+
+        if (mMarqueeActive)
+        {
+            p.fillRect(mMarqueeRect, QColor(60, 120, 255, 60));
+            p.setPen(QPen(QColor(120, 170, 255), 1));
+            p.drawRect(mMarqueeRect);
         }
 
         p.setPen(QPen(QColor(255, 220, 0), 1));
@@ -111,8 +153,122 @@ protected:
             .arg(mCellX).arg(mCellY).arg(mPoints.size()));
     }
 
+    void mousePressEvent(QMouseEvent* event) override
+    {
+        if (event->button() == Qt::LeftButton)
+        {
+            const int hit = mView.hitTest(mPoints, event->pos());
+            if (hit >= 0)
+            {
+                if (event->modifiers() & Qt::ShiftModifier)
+                {
+                    if (mSelectedRows.contains(hit))
+                        mSelectedRows.removeAll(hit);
+                    else
+                        mSelectedRows.push_back(hit);
+                    std::sort(mSelectedRows.begin(), mSelectedRows.end());
+                }
+                else if (event->modifiers() & Qt::ControlModifier)
+                {
+                    if (!mSelectedRows.contains(hit))
+                        mSelectedRows.push_back(hit);
+                    std::sort(mSelectedRows.begin(), mSelectedRows.end());
+                }
+                else
+                {
+                    mSelectedRows = { hit };
+                }
+                update();
+                emit markerClicked(hit);
+                emit selectionChanged(selectedRows());
+            }
+            else
+            {
+                mMarqueeActive = true;
+                mMarqueeOrigin = event->pos();
+                mMarqueeRect = QRect(mMarqueeOrigin, QSize());
+                update();
+            }
+        }
+        else if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton)
+        {
+            mPanning = true;
+            mLastPanPos = event->pos();
+            setCursor(Qt::ClosedHandCursor);
+        }
+        QWidget::mousePressEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        if (mPanning)
+        {
+            mView.panByPixels(QPointF(event->pos() - mLastPanPos));
+            mLastPanPos = event->pos();
+            update();
+            emit viewChanged();
+        }
+        else if (mMarqueeActive)
+        {
+            mMarqueeRect = QRect(mMarqueeOrigin, event->pos()).normalized();
+            mSelectedRows.clear();
+            for (int i = 0; i < mPoints.size(); ++i)
+            {
+                if (mMarqueeRect.contains(mView.worldToScreen(mPoints[i]).toPoint()))
+                    mSelectedRows.push_back(i);
+            }
+            update();
+            emit selectionChanged(selectedRows());
+        }
+        else
+        {
+            const int hit = mView.hitTest(mPoints, event->pos());
+            if (hit != mHoverRow)
+            {
+                mHoverRow = hit;
+                update();
+                emit hoverChanged(hit);
+            }
+            emit cursorWorldPos(mView.worldAt(event->pos()));
+        }
+        QWidget::mouseMoveEvent(event);
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override
+    {
+        mPanning = false;
+        unsetCursor();
+        mMarqueeActive = false;
+        update();
+        QWidget::mouseReleaseEvent(event);
+    }
+
+    void wheelEvent(QWheelEvent* event) override
+    {
+        const double factor = event->angleDelta().y() > 0 ? 1.25 : 0.8;
+        mView.zoomAt(event->position(), factor);
+        update();
+        emit viewChanged();
+        QWidget::wheelEvent(event);
+    }
+
+    void resizeEvent(QResizeEvent* event) override
+    {
+        mView.setWidgetSize(size());
+        QWidget::resizeEvent(event);
+        update();
+    }
+
 private:
-    QVector<QPair<float, float>> mPoints;
+    CellMapView mView;
+    QVector<QPointF> mPoints;
+    QVector<int> mSelectedRows;
+    int mHoverRow = -1;
+    bool mPanning = false;
+    QPoint mLastPanPos;
+    bool mMarqueeActive = false;
+    QPoint mMarqueeOrigin;
+    QRect mMarqueeRect;
     qint32 mCellX = 0;
     qint32 mCellY = 0;
 };
@@ -291,17 +447,17 @@ public:
             const qint32 gy = static_cast<qint32>(std::floor(r.posY / kCellUnits));
             if (gx != cx || gy != cy) continue;
             mRows.push_back(&r);
-            mPoints.push_back({ r.posX, r.posY });
+            mPoints.push_back(QPointF(r.posX, r.posY));
         }
         endResetModel();
     }
 
-    const QVector<QPair<float, float>>& points() const { return mPoints; }
+    const QVector<QPointF>& points() const { return mPoints; }
 
 private:
     Data* mData;
     std::vector<const RefrRecord*> mRows;
-    QVector<QPair<float, float>> mPoints;
+    QVector<QPointF> mPoints;
 };
 
 CellViewPanel::CellViewPanel(Data* data, QWidget* parent)
@@ -379,6 +535,18 @@ CellViewPanel::CellViewPanel(Data* data, QWidget* parent)
         this, &CellViewPanel::onWorldspaceChanged);
     connect(mCellList->selectionModel(), &QItemSelectionModel::currentChanged,
         this, &CellViewPanel::onCellSelected);
+    connect(mRefrTable->selectionModel(), &QItemSelectionModel::currentChanged,
+        this, &CellViewPanel::onRefrTableSelectionChanged);
+    connect(mMapCanvas, &CellMapCanvas::markerClicked, this, [this](int row)
+    {
+        syncTableToCanvas(row);
+    });
+    connect(mMapCanvas, &CellMapCanvas::selectionChanged, this, [this](const QVector<int>& rows)
+    {
+        if (!rows.isEmpty()) syncTableToCanvas(rows.first());
+    });
+    connect(mMapCanvas, &CellMapCanvas::cursorWorldPos, this, &CellViewPanel::cursorWorldPos);
+    connect(mMapCanvas, &CellMapCanvas::viewChanged, this, &CellViewPanel::viewChanged);
     connect(refreshAct, &QAction::triggered, this, [this]()
     {
         mCellModel->setWorldspace(nullptr);
@@ -413,12 +581,32 @@ void CellViewPanel::onWorldspaceChanged(int index)
     mCellModel->setWorldspace(ws);
 }
 
+void CellViewPanel::syncTableToCanvas(int canvasRow)
+{
+    if (!mRefrModel) return;
+    if (canvasRow < 0 || canvasRow >= mRefrModel->count()) return;
+    QModelIndex idx = mRefrModel->index(canvasRow, 0);
+    mRefrTable->setCurrentIndex(idx);
+    mRefrTable->scrollTo(idx);
+    emit refSelected(mRefrModel->recordAt(canvasRow));
+}
+
+void CellViewPanel::onRefrTableSelectionChanged(const QModelIndex& current, const QModelIndex&)
+{
+    if (!current.isValid()) return;
+    const int row = current.row();
+    if (row < 0 || row >= mRefrModel->count()) return;
+    mMapCanvas->setSelectedRows({ row });
+    emit refSelected(mRefrModel->recordAt(row));
+}
+
 void CellViewPanel::onCellSelected(const QModelIndex& index)
 {
     if (!index.isValid())
     {
         mRefrModel->setCell(nullptr);
         mMapCanvas->setReferences({});
+        mMapCanvas->clearSelection();
         mMapCanvas->setCellGrid(0, 0);
         return;
     }
