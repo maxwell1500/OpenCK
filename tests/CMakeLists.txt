@@ -268,3 +268,18 @@ add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)
 target_include_directories(test_zipwriter PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_zipwriter)
+
+# Convenience target that builds every test executable.
+add_custom_target(all_tests DEPENDS
+    test_pluginio test_integration test_conflict test_datamodel
+    test_searchalgorithm test_columnvalidator test_editrecordcommand
+    test_undostack test_exportimport test_lodgenerator test_configpaths
+    test_shortcutmanager test_thememanager test_gizmomath
+    test_nifpyfilewrapper test_blenderlauncher test_objectwindow
+    test_nifintegration test_compressedrecord test_headerparsing
+    test_component test_editorproperty test_editor_lifecycle
+    test_qtformdialog test_tier3_components test_editor_widgets
+    test_creatureeditor test_cellviewcanvas test_warningsdock
+    test_specialized_widgets test_navmrecord test_scenrecord
+    test_starfieldesm test_cellrecord test_brushdefinition test_zipwriter
+    test_bitwise test_framing)
