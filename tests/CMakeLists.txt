@@ -371,6 +371,12 @@ target_link_libraries(test_scenephasemodel PRIVATE openck_model test_stubs Qt6::
 target_include_directories(test_scenephasemodel PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_scenephasemodel)
 
+# Papyrus type checker (property/member access, array length)
+add_executable(test_papyrustypechecker test_papyrustypechecker.cpp)
+target_link_libraries(test_papyrustypechecker PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_papyrustypechecker PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_papyrustypechecker)
+
 # Helper that writes a minimal test plugin for manual CLI verification
 add_executable(make_testplugin make_testplugin.cpp)
 target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)

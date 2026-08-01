@@ -70,6 +70,62 @@ void PapyrusTypeChecker::registerScriptType(const QString& name)
     m_scriptTypes.insert(name);
 }
 
+void PapyrusTypeChecker::registerProperty(const QString& scriptType,
+                                          const QString& property,
+                                          const TypeInfo& type)
+{
+    m_properties[scriptType].insert(property, type);
+}
+
+bool PapyrusTypeChecker::hasProperty(const QString& scriptType, const QString& property) const
+{
+    return m_properties.contains(scriptType)
+        && m_properties[scriptType].contains(property);
+}
+
+PapyrusTypeChecker::TypeInfo PapyrusTypeChecker::propertyType(const QString& scriptType,
+                                                               const QString& property) const
+{
+    if (hasProperty(scriptType, property))
+        return m_properties[scriptType][property];
+    return TypeInfo();
+}
+
+PapyrusTypeChecker::TypeInfo PapyrusTypeChecker::resolveArrayLength(const TypeInfo& arrayType) const
+{
+    if (arrayType.isArray)
+    {
+        TypeInfo t;
+        t.name = QStringLiteral("Int");
+        return t;
+    }
+    return TypeInfo();
+}
+
+PapyrusTypeChecker::TypeInfo PapyrusTypeChecker::resolveMemberAccess(const QString& objectExpr,
+                                                                      const QString& member) const
+{
+    // "expr.Length" on an array variable resolves to Int.
+    if (member.compare(QStringLiteral("Length"), Qt::CaseInsensitive) == 0)
+    {
+        if (m_symbols.contains(objectExpr) && m_symbols[objectExpr].isArray)
+        {
+            return resolveArrayLength(m_symbols[objectExpr]);
+        }
+    }
+
+    // Only direct variable names are resolved for property lookup.
+    if (!m_symbols.contains(objectExpr))
+        return TypeInfo();
+
+    const TypeInfo objType = m_symbols[objectExpr];
+    if (objType.isScriptType && hasProperty(objType.name, member))
+    {
+        return propertyType(objType.name, member);
+    }
+    return TypeInfo();
+}
+
 bool PapyrusTypeChecker::hasVariable(const QString& name) const
 {
     return m_symbols.contains(name);

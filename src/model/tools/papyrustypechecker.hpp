@@ -49,6 +49,24 @@ public:
     void declareFunction(const FunctionSignature& sig);
     void registerScriptType(const QString& name);
 
+    // Registers a member (property) type for a script type, e.g.
+    // registerProperty("Actor", "IsInCombat", TypeInfo{Bool}) lets
+    // `actor.IsInCombat` resolve to Bool. Also declares the implicit
+    // ".length" member for arrays.
+    void registerProperty(const QString& scriptType, const QString& property,
+                          const TypeInfo& type);
+    bool hasProperty(const QString& scriptType, const QString& property) const;
+    TypeInfo propertyType(const QString& scriptType, const QString& property) const;
+
+    // Resolves the type of a member access expression "obj.Property".
+    // Returns an invalid TypeInfo if obj is not a declared variable or the
+    // property is unknown.
+    TypeInfo resolveMemberAccess(const QString& objectExpr,
+                                 const QString& member) const;
+
+    // Resolves "Array.Length" to Int when arrayType is an array.
+    TypeInfo resolveArrayLength(const TypeInfo& arrayType) const;
+
     bool hasVariable(const QString& name) const;
     TypeInfo variableType(const QString& name) const;
     bool hasFunction(const QString& name) const;
@@ -81,6 +99,7 @@ private:
 
     QMap<QString, TypeInfo> m_symbols;
     QMap<QString, FunctionSignature> m_functions;
+    QMap<QString, QMap<QString, TypeInfo>> m_properties; // scriptType -> property -> type
     QVector<TypeError> m_errors;
     QString m_scriptName;
     QSet<QString> m_scriptTypes;

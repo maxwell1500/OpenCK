@@ -680,7 +680,7 @@ Sources reconciled here:
 | 21.4 | Spell-checker in dialogue/script editors | Real CK ships Sentry SSCE with 5 dictionaries |
 | 21.5 | Papyrus language server (LSP protocol) integration | `vscodepapyrus` includes Antlr4 language server |
 | 21.6 | Remote debugger protocol (port 20548 pattern): breakpoints, locals, watch, step | `PapyrusRemoteDebugger.exe` |
-| 21.7 | Papyrus type checker completion: struct members, array types, property access | `papyrustypechecker.cpp` partial |
+| 21.7 | Papyrus type checker completion: struct members, array types, property access | ✅ Added property/member access to `PapyrusTypeChecker`: `registerProperty(scriptType, prop, type)`, `resolveMemberAccess("obj", "Prop")` (script-type properties + `Array.Length` → Int), plus `hasProperty`/`propertyType`; `test_papyrustypechecker` covers array length, property access, unknown members, array element types |
 | 21.8 | Papyrus error parsing from heuristic regexes to structured grammar | ✅ Added `parseWithStrategy5`: a structured regex grammar for the canonical `path.psc(line,col): severity: message` (and no-column) format, tried first in the strategy chain; strategy 4 tightened to require a file/line reference so bare "No errors." lines aren't mis-parsed; public `PapyrusCompiler::parseDiagnostic(line, error)` for reuse/tests; `test_papyruscompiler` |
 
 ## Phase 22: Behavior / Animation Graph Editor ⬜
@@ -752,11 +752,11 @@ Sources reconciled here:
 | 18 — Audio Pipeline | 2/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 1/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
-| 21 — Scripting Completion | 3/8 | ◐ |
+| 21 — Scripting Completion | 4/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **268/310** | ◐ |
+| **TOTAL** | **269/310** | ◐ |
 
 ---
 
@@ -806,7 +806,7 @@ Phase 17: Terrain & landscape completion (material painting with slope influence
 Phase 18: Audio pipeline (.fuz container + WavePlayer playback engine done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode done; BSMaterial graph, rule templates, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)
-Phase 21: Scripting completion (.ppj projects, .flg flags, structured diagnostic parsing done; Script Manager, spell-check, LSP, remote debugger, type-checker completion pending)
+Phase 21: Scripting completion (.ppj projects, .flg flags, structured diagnostics, type-checker property access done; Script Manager, spell-check, LSP, remote debugger pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)
 Phase 24: Infrastructure & ecosystem ✅ (headless CLI, Git Check In/Out, i18n, CI/CD, packaging, crash bundle, layout save/load, shortcuts, saved filters, Galaxy/Packin menus done)
