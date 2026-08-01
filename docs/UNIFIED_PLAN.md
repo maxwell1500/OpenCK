@@ -700,7 +700,7 @@ Sources reconciled here:
 | # | Task | Notes |
 |---|------|-------|
 | 23.1 | CSV Snippets system: column-based import/export with nested `.Import=file.txt` templates and form-field accessors `<Type:Field.SubField.Count>` | ✅ `CsvSnippet` (`libs/files/data/csvsnippet.hpp/.cpp`): parses snippet templates with `.Import=` nested-file inlining (depth-guarded), `#` comments, and `<Type:Field>`, `<Type:Field.SubField>` and `<Type:Field.Count>` accessors resolved against a record's JSON view; `test_csvsnippet` covers substitution/import/comments/missing fields |
-| 23.2 | OPAL procedural placement lists (.opl) | `Clutter_*.opl` — outpost/interior clutter placement |
+| 23.2 | OPAL procedural placement lists (.opl) | ✅ `OpalList` (`src/model/tools/opallist.hpp/.cpp`): CSV parser for `.opl` files (quoted-field aware, `#` comments, row padding to header width, column lookup); `test_opallist` |
 | 23.3 | Find Forms by condition dialog | ✅ SearchDialog already provides Find-by-condition: multi-criteria rows with AND/OR logic, per-type filter, EditorID/FormID/Name fields, match modes (contains/starts/ends/exact/regex), saved searches + history |
 | 23.4 | Real plugin compaction: form-ID renumbering + reference re-pointing (not count-and-save) | `mainwindow.cpp:2057` currently superficial |
 | 23.5 | Master file management (MMS): master update source, free-ID allocation control | CK `[MMS]` section |
@@ -754,9 +754,9 @@ Sources reconciled here:
 | 20 — Particle Editor & Icon Generation | 2/5 | ◐ |
 | 21 — Scripting Completion | 2/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
-| 23 — Data Workflows & Plugin Utilities | 5/9 | ◐ |
+| 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
-| **TOTAL** | **259/310** | ◐ |
+| **TOTAL** | **260/310** | ◐ |
 
 ---
 
@@ -808,7 +808,7 @@ Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, textur
 Phase 20: Particle editor & icon generation (NIF preview primitives + projectile variable bindings done; .pofx bundle editor, LOD presets, icon renderer pending)
 Phase 21: Scripting completion (.ppj projects + .flg flags done; Script Manager, spell-check, LSP, remote debugger, type-checker/error-parser completion pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
-Phase 23: Data workflows & plugin utilities (CSV Snippets, Find Forms, report export, Object Window layouts, reference batch actions done; OPAL, compaction, MMS, BNet pending)
+Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)
 Phase 24: Infrastructure & ecosystem (Git Check In/Out, i18n, VCS, CI/CD, packaging, crash bundle, layout save/load, shortcuts, diagnostics, saved filters done; headless API pending)
 ```
 

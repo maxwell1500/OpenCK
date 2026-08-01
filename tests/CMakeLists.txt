@@ -317,6 +317,12 @@ target_link_libraries(test_particleprojectilebindings PRIVATE openck_model test_
 target_include_directories(test_particleprojectilebindings PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_particleprojectilebindings)
 
+# OPAL procedural placement list parser (.opl)
+add_executable(test_opallist test_opallist.cpp)
+target_link_libraries(test_opallist PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_opallist PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_opallist)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel
