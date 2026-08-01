@@ -683,6 +683,7 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/qtformdialogmanager.cpp
     src/view/window/windowlayout.cpp
     src/view/window/scripteditorwidget.cpp
+src/view/window/scriptmanagerdialog.cpp
     src/view/window/dialogueeditorwidget.cpp
     src/view/window/formideditorwidget.cpp
     src/view/window/assetbrowserwidget.cpp

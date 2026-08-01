@@ -21,6 +21,7 @@
 #include "conflictdialog.hpp"
 #include "nifviewportwidget.hpp"
 #include "scripteditorwidget.hpp"
+#include "scriptmanagerdialog.hpp"
 #include "dialogueeditorwidget.hpp"
 #include "formideditorwidget.hpp"
 #include "assetbrowserwidget.hpp"
@@ -690,6 +691,31 @@ void MainWindow::setupTerrainMenu()
     QAction* openLandscapeEditorAction = new QAction(tr("Landscape Editor..."), this);
     connect(openLandscapeEditorAction, &QAction::triggered, this, &MainWindow::on_actionLandscapeEditing_triggered);
     ui->menuTerrain->addAction(openLandscapeEditorAction);
+
+    // Papyrus Script Manager (File menu equivalent)
+    QAction* scriptManagerAction = new QAction(tr("Script Manager..."), this);
+    connect(scriptManagerAction, &QAction::triggered, this, [this]() {
+        if (!mData)
+        {
+            QMessageBox::information(this, tr("Script Manager"),
+                tr("No document is currently loaded.\n\n"
+                   "Open a plugin file first via File > Data."));
+            return;
+        }
+        const QString scriptsRoot = mData->getPaths().dataDir.path()
+            + QStringLiteral("/Scripts/Source");
+        ScriptManagerDialog dialog(scriptsRoot, this);
+        if (dialog.exec() == QDialog::Accepted && !dialog.selectedScript().isEmpty())
+        {
+            on_actionScriptEditor_triggered();
+            if (scriptEditorWidget)
+            {
+                scriptEditorWidget->loadScript(dialog.selectedScript());
+            }
+        }
+    });
+    ui->menuTools->addSeparator();
+    ui->menuTools->addAction(scriptManagerAction);
 }
 
 void MainWindow::setupPrimitivePreviewMenu()

@@ -675,7 +675,7 @@ Sources reconciled here:
 | # | Task | Notes |
 |---|------|-------|
 | 21.1 | Papyrus project files (.ppj): Imports, Folders (NoRecurse), Scripts, Output, Flags, Asm (None/Keep/Only/Discard), Optimize, Release, Final | ✅ `PapyrusProject` (`src/model/tools/papyrusproject.hpp/.cpp`): QXmlStreamReader-based parser for `.ppj` XML (Imports/Import, Folders/Folder recurse attr, Scripts/Script, Output, Flags/Flag, Asm, Optimize, Release, Final); `test_papyrusproject` |
-| 21.2 | Papyrus Script Manager dialog | Real CK File menu |
+| 21.2 | Papyrus Script Manager dialog | ✅ `ScriptManagerDialog` (`src/view/window/scriptmanagerdialog.hpp/.cpp`): lists `.psc` scripts under Data/Scripts/Source (+ subfolders), name filter, Open + New Script (creates and opens); wired to Tools → Script Manager..., opening the selected script in the script editor |
 | 21.3 | Script property flags (`.flg`): Hidden/Conditional/Default/CollapsedOnRef/CollapsedOnBase/Mandatory with target validation | ✅ `ScriptFlagFile` (`src/model/tools/scriptflagfile.hpp/.cpp`): parses `.flg` mappings (`ScriptName = Flag1|Flag2`, `;`/`#` comments), validates flags against the 6 known values; `PapyrusCompiler::validateFlagFile()` reports unknown flags; `test_scriptflagfile` |
 | 21.4 | Spell-checker in dialogue/script editors | Real CK ships Sentry SSCE with 5 dictionaries |
 | 21.5 | Papyrus language server (LSP protocol) integration | `vscodepapyrus` includes Antlr4 language server |
@@ -752,11 +752,11 @@ Sources reconciled here:
 | 18 — Audio Pipeline | 2/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 1/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
-| 21 — Scripting Completion | 4/8 | ◐ |
+| 21 — Scripting Completion | 5/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **269/310** | ◐ |
+| **TOTAL** | **270/310** | ◐ |
 
 ---
 
@@ -806,7 +806,7 @@ Phase 17: Terrain & landscape completion (material painting with slope influence
 Phase 18: Audio pipeline (.fuz container + WavePlayer playback engine done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode done; BSMaterial graph, rule templates, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)
-Phase 21: Scripting completion (.ppj projects, .flg flags, structured diagnostics, type-checker property access done; Script Manager, spell-check, LSP, remote debugger pending)
+Phase 21: Scripting completion (Script Manager, .ppj, .flg, structured diagnostics, type-checker property access done; spell-check, LSP, remote debugger pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)
 Phase 24: Infrastructure & ecosystem ✅ (headless CLI, Git Check In/Out, i18n, CI/CD, packaging, crash bundle, layout save/load, shortcuts, saved filters, Galaxy/Packin menus done)
