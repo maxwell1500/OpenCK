@@ -717,7 +717,7 @@ Sources reconciled here:
 | 24.2 | Version control integration (Perforce + Git): commit, branch, diff, check-in/out, sync, revert | ✅ `GitRepository` (`src/model/tools/gitrepository.hpp/.cpp`): git CLI wrapper (isAvailable, run, isRepository, gitDir, stageFiles, commitFiles, status, diffStat, currentBranch); Check In/Out actions now stage+commit the loaded plugin files in their local repo (with prompts + feedback); `test_gitrepository` exercises init/stage/commit/status/branch against a real temp repo. Perforce remains out of scope |
 | 24.3 | CI/CD pipeline (GitHub Actions: build + all 26 tests on Windows) | ✅ `.github/workflows/windows-build.yml` upgraded to Qt 6.5.3 + MSVC 2019-arch; builds openck + all_tests, runs `ctest -C Release --output-on-failure`, uploads exe + test logs; new `all_tests` custom target builds every test (incl. ogg self-tests) |
 | 24.4 | Distributable installer packages (NSIS/WiX), CMake install target | ✅ `cmake --install` installs exe + Qt DLLs + editor.ini + bundled Blender + license tree; CPack configured (NSIS binary on Windows via `cpack -C Release`, TGZ source generator with ignore rules). NSIS not installed locally so the .exe is built in CI |
-| 24.5 | Headless/scriptable API — Python-generated plugins pattern | Morrowind project proves the workflow; CLI record import/export |
+| 24.5 | Headless/scriptable API — Python-generated plugins pattern | ✅ Headless CLI: `openck --cli export <plugin> [--format json\|csv\|xml] [--out path] [--types ...]` and `openck --cli info <plugin>` (runs under QCoreApplication, no GUI). Resolves absolute plugin paths by pointing the Data dir at the plugin's folder; exports all record types by default; fixed `CkId::stringToType` to accept on-disk 4CC names (e.g. "NPC_", "WEAP_") so JSON/CSV/XML export actually produces records; `test_cli` (help + end-to-end export of a generated plugin), `test_datamodel` stringToType coverage |
 | 24.6 | Shortcut expansion (~30 wired vs 524 in real CK) + make ShortcutEditorDialog reachable | ✅ `ShortcutEditorDialog` now reachable via new Tools → Shortcuts... action (`on_actionShortcuts_triggered`, auto-connected by name); ~30 core shortcuts already wired in `applyShortcuts()`. Note: the two historical conflicts are resolved in code (QuestGraph=F10, AIPackages=Shift+F12; no WorldView binding) |
 | 24.7 | Layout save/load actions (enable `actionSaveLayout`/`actionLoadLayout`) | ✅ Save Layout... / Load Layout... now enabled and wired: geometry + ADS dock state via `WindowLayout`, `.layout` INI files |
 | 24.8 | Crash/diagnostics bundle: EditorWarnings.txt + prefs + saved settings zipped on crash | ✅ `writeCrashBundle()`: on terminate/Win32 exception, zips the log + QSettings prefs + settings notes into `openck_crash_<ts>.zip` next to the log. `ZipWriter` (`libs/files/data/zipwriter.hpp/.cpp`) is a self-contained zlib-based ZIP writer (validated by `test_zipwriter`) |
@@ -755,8 +755,8 @@ Sources reconciled here:
 | 21 — Scripting Completion | 3/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
-| 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
-| **TOTAL** | **264/310** | ◐ |
+| 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
+| **TOTAL** | **265/310** | ◐ |
 
 ---
 
@@ -809,7 +809,7 @@ Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindi
 Phase 21: Scripting completion (.ppj projects, .flg flags, structured diagnostic parsing done; Script Manager, spell-check, LSP, remote debugger, type-checker completion pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)
-Phase 24: Infrastructure & ecosystem (Git Check In/Out, i18n, VCS, CI/CD, packaging, crash bundle, layout save/load, shortcuts, diagnostics, saved filters done; headless API pending)
+Phase 24: Infrastructure & ecosystem ✅ (headless CLI, Git Check In/Out, i18n, CI/CD, packaging, crash bundle, layout save/load, shortcuts, saved filters, Galaxy/Packin menus done)
 ```
 
 ---

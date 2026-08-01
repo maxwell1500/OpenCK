@@ -406,5 +406,44 @@ CkId::Type CkId::stringToType(const QString& typeName)
             return typesNoArg[i].type;
         }
     }
+    // Fall back to the on-disk record name (e.g. "NPC_", "WEAP_", "MGEF").
+    // These are not in the friendly-name tables but correspond 1:1 to the
+    // Type_ enum constant suffix.
+    const QString diskRaw = typeName.trimmed().toUpper();
+    QString disk = diskRaw;
+    // Some callers pass a trailing underscore ("WEAP_"); strip it for the
+    // 4CC comparison.
+    if (disk.endsWith('_'))
+        disk.chop(1);
+    if (!disk.isEmpty())
+    {
+        static const struct { CkId::Type type; const char* disk; } diskAliases[] = {
+            { Type_Gmst, "GMST" }, { Type_Npc_, "NPC" }, { Type_Weap_, "WEAP" },
+            { Type_Armor_, "ARMO" }, { Type_Spel_, "SPEL" }, { Type_Magic_, "MGEF" },
+            { Type_Quest_, "QUST" }, { Type_Dial_, "DIAL" }, { Type_Info_, "INFO" },
+            { Type_Glob_, "GLOB" }, { Type_Lcrt_, "LCRT" }, { Type_Pack_, "PACK" },
+            { Type_Tree_, "TREE" }, { Type_Alch_, "ALCH" }, { Type_Ingr_, "INGR" },
+            { Type_Cont_, "CONT" }, { Type_Ench_, "ENCH" }, { Type_Book_, "BOOK" },
+            { Type_Misc_, "MISC" }, { Type_Acti_, "ACTI" }, { Type_Stat_, "STAT" },
+            { Type_Race_, "RACE" }, { Type_Class_, "CLAS" }, { Type_Fact_, "FACT" },
+            { Type_PerK_, "PERK" }, { Type_Cel_, "CELL" }, { Type_WRLD_, "WRLD" },
+            { Type_LOCT_, "LCTN" }, { Type_Refr_, "REFR" }, { Type_Material_, "MATL" },
+            { Type_Land_, "LAND" }, { Type_Soun_, "SOUN" }, { Type_Wthr_, "WTHR" },
+            { Type_Ltex_, "LTEX" }, { Type_Ammo_, "AMMO" }, { Type_Appa_, "APPA" },
+            { Type_Avif_, "AVIF" }, { Type_Bsgn_, "BSGN" }, { Type_Clmt_, "CLMT" },
+            { Type_Clot_, "CLOT" }, { Type_Cobj_, "COBJ" }, { Type_Crea_, "CREA" },
+            { Type_Csty_, "CSTY" }, { Type_Door_, "DOOR" }, { Type_Efsh_, "EFSH" },
+            { Type_Expl_, "EXPL" }, { Type_Eyes_, "EYES" }, { Type_Flor_, "FLOR" },
+            { Type_Flst_, "FLST" }, { Type_Furn_, "FURN" }, { Type_Grass_, "GRAS" },
+            { Type_Hair_, "HAIR" }, { Type_Idle_, "IDLE" }, { Type_Idlm_, "IDLM" },
+        };
+        for (const auto& alias : diskAliases)
+        {
+            if (disk == QLatin1String(alias.disk))
+            {
+                return alias.type;
+            }
+        }
+    }
     return Type_None;
 }

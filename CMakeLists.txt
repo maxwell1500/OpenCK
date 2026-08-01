@@ -873,6 +873,8 @@ endif()
 
 add_executable(openck
     src/main.cpp
+    src/cli.cpp
+    src/cli.hpp
     src/editor.cpp
     src/editor.hpp
     ui/datadialog.ui

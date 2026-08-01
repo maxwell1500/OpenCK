@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 264/310 steps complete (85%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 19 (1/7), 20 (4/5), 21 (3/8), 23 (6/9), 24 (10/11) in progress
-- **Phase 20 (partial)**: `.pofx` particle bundle parser (with LOD presets, projectile bindings, preview primitives). Build clean, 49/49 tests.
+- **Progress**: 265/310 steps complete (85%) — Phase 24 complete; 14, 15, 24 done. 16 (6/8), 17 (5/9), 18 (1/7), 19 (1/7), 20 (4/5), 21 (3/8), 23 (6/9) in progress
+- **Phase 24 complete**: headless CLI (export/info), Git Check In/Out, i18n, CI+CPack, crash bundle, layout save/load, shortcuts, saved filters. Build clean, 50/50 tests.

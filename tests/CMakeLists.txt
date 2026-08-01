@@ -347,6 +347,17 @@ target_link_libraries(test_particlebundle PRIVATE openck_model test_stubs Qt6::T
 target_include_directories(test_particlebundle PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_particlebundle)
 
+# Headless CLI (export/info commands)
+add_executable(test_cli test_cli.cpp)
+target_link_libraries(test_cli PRIVATE openck_esm test_stubs Qt6::Test)
+target_include_directories(test_cli PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_cli)
+
+# Helper that writes a minimal test plugin for manual CLI verification
+add_executable(make_testplugin make_testplugin.cpp)
+target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)
+target_include_directories(make_testplugin PRIVATE ${TEST_INCLUDE_DIRS})
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel

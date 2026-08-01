@@ -15,6 +15,7 @@
 #include "../../libs/files/esm/questrecord.hpp"
 #include "../../model/world/idcollection.hpp"
 #include "../../model/world/record.hpp"
+#include "../../model/world/ckid.hpp"
 
 class TestDataModel : public QObject
 {
@@ -22,6 +23,7 @@ class TestDataModel : public QObject
 
 private slots:
     void testNpcRecord_DefaultValues();
+    void testStringToType();
     void testNpcRecord_SetProperties();
     void testWeaponRecord_DefaultValues();
     void testWeaponRecord_SetProperties();
@@ -235,6 +237,21 @@ void TestDataModel::testRecord_State_Transitions()
     // Test merge
     record.merge();
     QCOMPARE(record.state, State_Base);
+}
+
+void TestDataModel::testStringToType()
+{
+    QCOMPARE(CkId::stringToType(QStringLiteral("Actors")), CkId::Type_Npc_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("NPC_")), CkId::Type_Npc_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("NPC")), CkId::Type_Npc_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("WEAP_")), CkId::Type_Weap_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("MGEF")), CkId::Type_Magic_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("CELL")), CkId::Type_Cel_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("REFR")), CkId::Type_Refr_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("LCTN")), CkId::Type_LOCT_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("WRLD")), CkId::Type_WRLD_);
+    QCOMPARE(CkId::stringToType(QStringLiteral("NONSENSE")), CkId::Type_None);
+    QCOMPARE(CkId::stringToType(QString()), CkId::Type_None);
 }
 
 QTEST_MAIN(TestDataModel)

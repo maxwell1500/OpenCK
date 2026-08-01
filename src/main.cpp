@@ -1,6 +1,7 @@
 #include "editor.hpp"
 #include "logger.hpp"
 #include "filepaths.hpp"
+#include "cli.hpp"
 #include "view/window/thememanager.hpp"
 
 #include <QApplication>
@@ -22,6 +23,20 @@ int main(int argc, char *argv[])
     OpenCK::Logging::Logger::instance().setMinLevel(OpenCK::Logging::LogLevel::Debug);
     OpenCK::Logging::Logger::instance().log(OpenCK::Logging::LogLevel::Info, "=== OpenCK Starting ===");
     OpenCK::Logging::Logger::instance().log(OpenCK::Logging::LogLevel::Info, QString("Log file: %1").arg(logFile));
+
+    // Headless command-line mode: no GUI is created, so use a QCoreApplication.
+    QStringList rawArgs;
+    for (int i = 1; i < argc; ++i)
+    {
+        rawArgs << QString::fromLocal8Bit(argv[i]);
+    }
+    if (rawArgs.contains(QStringLiteral("--cli")))
+    {
+        QCoreApplication a(argc, argv);
+        a.setApplicationName("OpenCK");
+        a.setOrganizationName("OpenCK");
+        return OpenCK::Cli::run(argc, argv);
+    }
     
     try
     {
