@@ -4,6 +4,7 @@
 #include <QDockWidget>
 #include <QTreeView>
 #include <QLineEdit>
+#include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
 #include <QJsonDocument>
@@ -51,6 +52,9 @@ public slots:
     void cutRecord();
     void pasteRecord();
     void onDoubleClick(const QModelIndex& index);
+    void saveFilter();
+    void loadFilter();
+    void deleteSavedFilter();
 
 public:
     QTreeView* getTreeView() const { return mTreeView; }
@@ -80,11 +84,13 @@ private:
     void updateContextMenu(const QModelIndex& index);
     int getSelectedCategoryId(const QModelIndex& index) const;
     QString getModelPathForRecord(int categoryId, int recordIndex) const;
+    void refreshSavedFilters();
 
     Data* mData;
     ObjectWindowModel* mModel;
     QTreeView* mTreeView;
     QLineEdit* mFilterEdit;
+    QComboBox* mSavedFilterCombo;
     QPushButton* mEditButton;
     QPushButton* mDeleteButton;
     QPushButton* mCloneButton;

@@ -116,6 +116,7 @@
 #include <QAction>
 #include <QMessageBox>
 #include <QInputDialog>
+#include <QSettings>
 #include <QFileDialog>
 
 namespace {
@@ -231,6 +232,7 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
       mModel(nullptr),
       mTreeView(nullptr),
       mFilterEdit(nullptr),
+      mSavedFilterCombo(nullptr),
       mEditButton(nullptr),
       mDeleteButton(nullptr),
       mCloneButton(nullptr),
@@ -349,7 +351,27 @@ void ObjectWindowDialog::setupUI()
     mFilterEdit = new QLineEdit();
     mFilterEdit->setPlaceholderText("Search by Editor ID or Form ID...");
     filterLayout->addWidget(mFilterEdit, 1);
+
+    mSavedFilterCombo = new QComboBox();
+    mSavedFilterCombo->setToolTip("Saved filters (user-created, persisted)");
+    mSavedFilterCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    filterLayout->addWidget(mSavedFilterCombo);
+
+    QPushButton* saveFilterButton = new QPushButton("Save");
+    QPushButton* deleteFilterButton = new QPushButton("Delete");
+    saveFilterButton->setToolTip("Save the current filter text under a name");
+    deleteFilterButton->setToolTip("Delete the selected saved filter");
+    filterLayout->addWidget(saveFilterButton);
+    filterLayout->addWidget(deleteFilterButton);
+
     mainLayout->addLayout(filterLayout);
+
+    connect(mFilterEdit, &QLineEdit::textChanged, mModel, &ObjectWindowModel::applyFilter);
+    connect(saveFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::saveFilter);
+    connect(mSavedFilterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+        this, &ObjectWindowDialog::loadFilter);
+    connect(deleteFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSavedFilter);
+    refreshSavedFilters();
 
     mTreeView = new QTreeView();
     mTreeView->setAlternatingRowColors(true);
@@ -387,7 +409,6 @@ void ObjectWindowDialog::setupUI()
     mStatusLabel = new QLabel();
     mainLayout->addWidget(mStatusLabel);
 
-    connect(mFilterEdit, &QLineEdit::textChanged, mModel, &ObjectWindowModel::applyFilter);
     connect(mEditButton, &QPushButton::clicked, this, &ObjectWindowDialog::editSelected);
     connect(mDeleteButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSelected);
     connect(mCloneButton, &QPushButton::clicked, this, &ObjectWindowDialog::cloneSelected);
@@ -1076,6 +1097,100 @@ void ObjectWindowDialog::filterChanged(const QString& text)
     {
         mModel->applyFilter(text);
     }
+}
+
+void ObjectWindowDialog::refreshSavedFilters()
+{
+    if (!mSavedFilterCombo) return;
+
+    const int current = mSavedFilterCombo->currentIndex();
+    const QString selectedName = (current >= 0)
+        ? mSavedFilterCombo->itemText(current) : QString();
+
+    mSavedFilterCombo->blockSignals(true);
+    mSavedFilterCombo->clear();
+    mSavedFilterCombo->addItem("");
+
+    QSettings settings;
+    const QStringList names = settings.childGroups();
+    for (const QString& name : names)
+    {
+        if (name.startsWith(QStringLiteral("SavedFilter/")))
+        {
+            mSavedFilterCombo->addItem(name.mid(QStringLiteral("SavedFilter/").size()));
+        }
+    }
+
+    const int restore = mSavedFilterCombo->findText(selectedName);
+    mSavedFilterCombo->setCurrentIndex(restore >= 0 ? restore : 0);
+    mSavedFilterCombo->blockSignals(false);
+}
+
+void ObjectWindowDialog::saveFilter()
+{
+    const QString text = mFilterEdit ? mFilterEdit->text() : QString();
+    if (text.trimmed().isEmpty())
+    {
+        QMessageBox::information(this, "Save Filter",
+            "Enter filter text before saving.");
+        return;
+    }
+
+    bool ok = false;
+    QString name = QInputDialog::getText(this, "Save Filter",
+        "Filter name:", QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.trimmed().isEmpty()) return;
+    name = name.trimmed();
+
+    QSettings settings;
+    settings.setValue(QStringLiteral("SavedFilter/%1/text").arg(name), text);
+    settings.sync();
+    refreshSavedFilters();
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(QString("Saved filter '%1'").arg(name));
+    }
+    LOG_INFO(QString("Saved Object Window filter '%1'").arg(name));
+}
+
+void ObjectWindowDialog::loadFilter()
+{
+    const QString name = mSavedFilterCombo
+        ? mSavedFilterCombo->currentText() : QString();
+    if (name.isEmpty()) return;
+
+    QSettings settings;
+    const QString text = settings.value(
+        QStringLiteral("SavedFilter/%1/text").arg(name)).toString();
+    if (mFilterEdit && !text.isEmpty())
+    {
+        mFilterEdit->setText(text);
+        if (mModel)
+        {
+            mModel->applyFilter(text);
+        }
+        if (mStatusLabel)
+        {
+            mStatusLabel->setText(QString("Loaded filter '%1'").arg(name));
+        }
+    }
+}
+
+void ObjectWindowDialog::deleteSavedFilter()
+{
+    const QString name = mSavedFilterCombo
+        ? mSavedFilterCombo->currentText() : QString();
+    if (name.isEmpty()) return;
+
+    QSettings settings;
+    settings.remove(QStringLiteral("SavedFilter/%1").arg(name));
+    settings.sync();
+    refreshSavedFilters();
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(QString("Deleted filter '%1'").arg(name));
+    }
+    LOG_INFO(QString("Deleted Object Window filter '%1'").arg(name));
 }
 
 void ObjectWindowDialog::cloneSelected()
