@@ -305,6 +305,12 @@ target_link_libraries(test_efshrecord PRIVATE openck_esm test_stubs Qt6::Test)
 target_include_directories(test_efshrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_efshrecord)
 
+# Dictionary-based spell checker (script/dialogue editors)
+add_executable(test_spellchecker test_spellchecker.cpp)
+target_link_libraries(test_spellchecker PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_spellchecker PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_spellchecker)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

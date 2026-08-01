@@ -63,6 +63,8 @@ public:
     void logErrorToConsole(const QString& message);
     void clearConsole();
 
+    void checkSpelling();
+
     static const int FoldMarkerWidth = 14;
 
 signals:
@@ -94,6 +96,8 @@ private:
     void toggleReferenceBrowser();
     void toggleConsole();
     void onBrowserItemDoubleClicked(QTreeWidgetItem* item, int column);
+    void refreshSpellingSquiggles();
+    void loadBuiltinDictionary();
 
     ScriptTextEdit* m_textEdit;
     QSyntaxHighlighter* highlighter;
@@ -116,6 +120,7 @@ private:
 
     class PapyrusTypeChecker* m_typeChecker;
     class QToolTip* m_toolTipHelper;
+    class SpellChecker* m_spellChecker;
 };
 
 class LineNumberWidget : public QWidget

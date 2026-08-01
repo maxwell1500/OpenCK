@@ -25,9 +25,11 @@
 #include "papyruscompiler.hpp"
 #include "../../model/tools/papyrusprevalidator.hpp"
 #include "../../model/tools/papyrustypechecker.hpp"
+#include "../../model/tools/spellchecker.hpp"
 #include "logger.hpp"
 
 #include <QToolTip>
+#include <QCoreApplication>
 #include <QHelpEvent>
 
 class BlockData : public QTextBlockUserData
@@ -220,11 +222,14 @@ ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
     m_toggleConsoleBtn(nullptr),
     m_consoleContainer(nullptr),
     m_typeChecker(nullptr),
-    m_toolTipHelper(nullptr)
+    m_toolTipHelper(nullptr),
+    m_spellChecker(nullptr)
 {
     LOG_DEBUG("ScriptEditorWidget created");
 
     m_typeChecker = new PapyrusTypeChecker();
+    m_spellChecker = new SpellChecker();
+    loadBuiltinDictionary();
 
     compiler = new PapyrusCompiler(this);
     connect(compiler, &PapyrusCompiler::compilationStarted, this, &ScriptEditorWidget::compilationStarted);
@@ -289,6 +294,7 @@ ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
         modified = true;
         performCompletion();
         refreshTypeSquiggles();
+        refreshSpellingSquiggles();
     });
 
     connect(m_textEdit->document(), &QTextDocument::contentsChanged, this, &ScriptEditorWidget::updateFoldRegions);
@@ -344,6 +350,7 @@ ScriptEditorWidget::~ScriptEditorWidget()
     delete highlighter;
     delete lineNumberWidget;
     delete m_typeChecker;
+    delete m_spellChecker;
 }
 
 int ScriptEditorWidget::lineNumberWidth() const
@@ -710,6 +717,114 @@ void ScriptEditorWidget::refreshTypeSquiggles()
     if (!selections.isEmpty()) {
         m_textEdit->setExtraSelections(selections);
     }
+}
+
+void ScriptEditorWidget::loadBuiltinDictionary()
+{
+    if (!m_spellChecker)
+        return;
+
+    // Papyrus keywords, common types, and built-in vocabulary.
+    const QStringList words = {
+        "ScriptName", "EndScript", "Function", "EndFunction", "Event", "EndEvent",
+        "Property", "EndProperty", "Variable", "EndVariable", "Bool", "Int", "Float",
+        "String", "Form", "FormList", "ObjectReference", "Actor", "Quest", "Package",
+        "Spell", "EffectShader", "Keyword", "True", "False", "None", "Return", "If",
+        "Else", "ElseIf", "EndIf", "While", "EndWhile", "For", "EndFor", "Var", "Const",
+        "Auto", "Static", "Global", "Private", "Native", "Required", "MustImplement",
+        "ShowInObjectMenu", "AllowPlayerDialogue", "ActorBase", "Weapon", "Armor",
+        "AlchemyItem", "Ingredient", "MiscItem", "Book", "Note", "Apparatus", "Ammo",
+        "Food", "Key", "Tool", "SoulGem", "ScrollItem", "Enchantment", "MagicEffect",
+        "Activator", "Tree", "Flora", "Projectile", "Shader", "Texture", "Sound",
+        "Music", "AmbientSound", "Water", "Light", "Cell", "WorldSpace", "InteriorCell",
+        "ExteriorCell", "NavMesh", "QuestStage", "QuestObjective", "QuestTopic",
+        "QuestTopicInfo", "DialogueTopic", "DialogueTopicInfo", "Conversation",
+        "Topic", "Info", "Extends", "AddName", "SetValue", "GetValue", "Utility",
+        "Wait", "Game", "GetPlayer", "Self", "Papyrus"
+    };
+    for (const QString& w : words)
+        m_spellChecker->addWord(w);
+
+    // Optionally load a user dictionary next to the executable.
+    const QString dictPath = QCoreApplication::applicationDirPath()
+        + QStringLiteral("/scripts/dictionary.txt");
+    if (QFile::exists(dictPath))
+    {
+        const int added = m_spellChecker->loadDictionary(dictPath);
+        LOG_DEBUG(QString("Spell checker loaded %1 extra words from %2").arg(added).arg(dictPath));
+    }
+}
+
+void ScriptEditorWidget::checkSpelling()
+{
+    if (!m_textEdit || !m_spellChecker)
+        return;
+
+    refreshSpellingSquiggles();
+
+    const QString text = m_textEdit->toPlainText();
+    const QStringList unknown = m_spellChecker->unknownWords(text);
+    if (unknown.isEmpty())
+    {
+        QMessageBox::information(this, "Spell Check",
+            "No spelling errors found.");
+        return;
+    }
+
+    // Unique unknowns, with a suggestion for the first.
+    QStringList unique;
+    for (const QString& w : unknown)
+        if (!unique.contains(w))
+            unique.append(w);
+
+    QString message = QString("Found %1 possibly misspelled word(s):\n\n")
+        .arg(unique.size());
+    for (const QString& w : unique)
+    {
+        const QStringList sug = m_spellChecker->suggestions(w);
+        message += QString("  %1%2\n")
+            .arg(w)
+            .arg(sug.isEmpty() ? QString() : QString(" (did you mean: %1?)").arg(sug.join(", ")));
+    }
+    QMessageBox::information(this, "Spell Check", message);
+}
+
+void ScriptEditorWidget::refreshSpellingSquiggles()
+{
+    if (!m_textEdit || !m_spellChecker)
+        return;
+
+    QList<QTextEdit::ExtraSelection> selections;
+
+    static const QRegularExpression wordRe(
+        QStringLiteral("[A-Za-z]+(?:'[A-Za-z]+)*"));
+    const QString text = m_textEdit->toPlainText();
+
+    QRegularExpressionMatchIterator it = wordRe.globalMatch(text);
+    while (it.hasNext())
+    {
+        const QRegularExpressionMatch match = it.next();
+        const QString word = match.captured();
+        if (m_spellChecker->isKnown(word))
+            continue;
+
+        QTextCharFormat fmt;
+        fmt.setUnderlineStyle(QTextCharFormat::WaveUnderline);
+        fmt.setUnderlineColor(QColor(255, 60, 60));
+
+        QTextEdit::ExtraSelection sel;
+        sel.format = fmt;
+        QTextCursor cursor(m_textEdit->document());
+        cursor.setPosition(match.capturedStart());
+        cursor.setPosition(match.capturedEnd(), QTextCursor::KeepAnchor);
+        sel.cursor = cursor;
+        selections.append(sel);
+    }
+
+    // Preserve type-checker squiggles already present.
+    const auto existing = m_textEdit->extraSelections();
+    selections.append(existing);
+    m_textEdit->setExtraSelections(selections);
 }
 
 void ScriptEditorWidget::setupFont()
@@ -1151,6 +1266,23 @@ void ScriptTextEdit::keyPressEvent(QKeyEvent* event)
 {
     const int indentSize = 4;
     const QString indentUnit = QString(" ").repeated(indentSize);
+
+    // Ctrl+Shift+S runs the spell checker on the whole document.
+    if (event->key() == Qt::Key_S && (event->modifiers() & Qt::ControlModifier)
+        && (event->modifiers() & Qt::ShiftModifier))
+    {
+        QWidget* w = parentWidget();
+        while (w)
+        {
+            if (auto* editor = qobject_cast<ScriptEditorWidget*>(w))
+            {
+                editor->checkSpelling();
+                return;
+            }
+            w = w->parentWidget();
+        }
+        return;
+    }
 
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
         QTextCursor cursor = textCursor();
