@@ -412,6 +412,7 @@ endif()
 set(MODEL_SOURCES
     src/model/tools/brushdefinition.cpp
     src/model/tools/referencebatchactions.cpp
+    src/model/tools/gitrepository.cpp
     src/model/doc/document.cpp
     src/model/doc/documentmediator.cpp
     src/model/doc/loader.cpp

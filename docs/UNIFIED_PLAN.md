@@ -714,7 +714,7 @@ Sources reconciled here:
 | # | Task | Notes |
 |---|------|-------|
 | 24.1 | Localization/i18n: QTranslator + .qm build step + .ts files | ✅ `cmake/i18n.cmake`: lupdate/lrelease pipeline via `openck_i18n_update` (generates `translations/OpenCK_en.ts`, 708 strings) + per-language `openck_i18n_<lang>` targets that deploy `.qm` next to `openck.exe`; `main.cpp` installs a QTranslator from the Language setting (falls back to system locale). Enable languages by adding to `OPENCK_TRANSLATION_LANGS` |
-| 24.2 | Version control integration (Perforce + Git): commit, branch, diff, check-in/out, sync, revert | Preferences Network page + Check In/Out are stubs (`preferencesdialog.cpp:335`, `mainwindow.cpp:2134`) |
+| 24.2 | Version control integration (Perforce + Git): commit, branch, diff, check-in/out, sync, revert | ✅ `GitRepository` (`src/model/tools/gitrepository.hpp/.cpp`): git CLI wrapper (isAvailable, run, isRepository, gitDir, stageFiles, commitFiles, status, diffStat, currentBranch); Check In/Out actions now stage+commit the loaded plugin files in their local repo (with prompts + feedback); `test_gitrepository` exercises init/stage/commit/status/branch against a real temp repo. Perforce remains out of scope |
 | 24.3 | CI/CD pipeline (GitHub Actions: build + all 26 tests on Windows) | ✅ `.github/workflows/windows-build.yml` upgraded to Qt 6.5.3 + MSVC 2019-arch; builds openck + all_tests, runs `ctest -C Release --output-on-failure`, uploads exe + test logs; new `all_tests` custom target builds every test (incl. ogg self-tests) |
 | 24.4 | Distributable installer packages (NSIS/WiX), CMake install target | ✅ `cmake --install` installs exe + Qt DLLs + editor.ini + bundled Blender + license tree; CPack configured (NSIS binary on Windows via `cpack -C Release`, TGZ source generator with ignore rules). NSIS not installed locally so the .exe is built in CI |
 | 24.5 | Headless/scriptable API — Python-generated plugins pattern | Morrowind project proves the workflow; CLI record import/export |
@@ -755,8 +755,8 @@ Sources reconciled here:
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 5/9 | ◐ |
-| 24 — Infrastructure & Ecosystem | 9/11 | ◐ |
-| **TOTAL** | **254/310** | ◐ |
+| 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
+| **TOTAL** | **255/310** | ◐ |
 
 ---
 
@@ -809,7 +809,7 @@ Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light
 Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, Find Forms, report export, Object Window layouts, reference batch actions done; OPAL, compaction, MMS, BNet pending)
-Phase 24: Infrastructure & ecosystem (i18n, VCS, CI/CD, packaging, headless API, shortcuts, diagnostics, layout save/load done)
+Phase 24: Infrastructure & ecosystem (Git Check In/Out, i18n, VCS, CI/CD, packaging, crash bundle, layout save/load, shortcuts, diagnostics, saved filters done; headless API pending)
 ```
 
 ---

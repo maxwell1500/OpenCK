@@ -10,6 +10,7 @@
 #include "../../model/tools/undostack.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/world/data.hpp"
+#include "../../model/tools/gitrepository.hpp"
 #include "../../model/doc/messages.hpp"
 #include "filepaths.hpp"
 #include "searchdialog.hpp"
@@ -66,6 +67,8 @@
 #include "thememanager.hpp"
 
 #include <QInputDialog>
+#include <QFileInfo>
+#include <QDir>
 
 #include <QCoreApplication>
 #include <QMenu>
@@ -2333,9 +2336,60 @@ void MainWindow::on_actionCheckOut_triggered()
             "Open a plugin file first via File > Data.");
         return;
     }
+
+    const QStringList contentFiles = mData->getContentFiles();
+    if (contentFiles.isEmpty())
+    {
+        QMessageBox::information(this, "Check Out",
+            "The loaded document has no plugin files to check out.");
+        return;
+    }
+
+    // Check Out = make sure the plugin is tracked by its local git repo so
+    // edits can be committed later. We stage it; the user commits with
+    // Check In.
+    QString repoDir;
+    for (const QString& file : contentFiles)
+    {
+        const QString dir = QFileInfo(file).absolutePath();
+        if (GitRepository::isRepository(dir))
+        {
+            repoDir = dir;
+            break;
+        }
+    }
+
+    if (repoDir.isEmpty())
+    {
+        QMessageBox::information(this, "Check Out",
+            "The plugin is not inside a Git repository.\n\n"
+            "Initialize a repository in the plugin's folder (git init) to use "
+            "Check Out / Check In.");
+        return;
+    }
+
+    QStringList relPaths;
+    for (const QString& file : contentFiles)
+    {
+        relPaths << QDir(repoDir).relativeFilePath(file);
+    }
+
+    const GitRepository::Result staged = GitRepository::stageFiles(repoDir, relPaths);
+    if (!staged.ok)
+    {
+        QMessageBox::warning(this, "Check Out",
+            "git add failed:\n" + staged.stderrText.trimmed());
+        return;
+    }
+
     QMessageBox::information(this, "Check Out",
-        "Check Out is a version-control operation.\n"
-        "Select records in the Object Window to check out.");
+        QString("Checked out %1 plugin file(s) from %2 (branch %3).\n\n"
+                "Files are now staged. Use Check In to commit your changes.")
+            .arg(relPaths.size())
+            .arg(QDir(repoDir).absolutePath())
+            .arg(GitRepository::currentBranch(repoDir)));
+    LOG_INFO(QString("Check Out: staged %1 file(s) in %2")
+        .arg(relPaths.size()).arg(repoDir));
 }
 
 void MainWindow::on_actionCheckIn_triggered()
@@ -2347,7 +2401,71 @@ void MainWindow::on_actionCheckIn_triggered()
             "Open a plugin file first via File > Data.");
         return;
     }
+
+    const QStringList contentFiles = mData->getContentFiles();
+    if (contentFiles.isEmpty())
+    {
+        QMessageBox::information(this, "Check In",
+            "The loaded document has no plugin files to check in.");
+        return;
+    }
+
+    QString repoDir;
+    for (const QString& file : contentFiles)
+    {
+        const QString dir = QFileInfo(file).absolutePath();
+        if (GitRepository::isRepository(dir))
+        {
+            repoDir = dir;
+            break;
+        }
+    }
+
+    if (repoDir.isEmpty())
+    {
+        QMessageBox::information(this, "Check In",
+            "The plugin is not inside a Git repository.\n\n"
+            "Use Check Out first, or initialize a repository in the plugin's "
+            "folder (git init).");
+        return;
+    }
+
+    QStringList relPaths;
+    for (const QString& file : contentFiles)
+    {
+        relPaths << QDir(repoDir).relativeFilePath(file);
+    }
+
+    bool ok = false;
+    const QString message = QInputDialog::getText(this, "Check In",
+        "Commit message:", QLineEdit::Normal,
+        QString("Update %1").arg(relPaths.join(QStringLiteral(", "))), &ok);
+    if (!ok)
+        return;
+
+    const GitRepository::Result staged = GitRepository::stageFiles(repoDir, relPaths);
+    if (!staged.ok)
+    {
+        QMessageBox::warning(this, "Check In",
+            "git add failed:\n" + staged.stderrText.trimmed());
+        return;
+    }
+
+    const GitRepository::Result committed = GitRepository::commitFiles(
+        repoDir, relPaths, message);
+    if (!committed.ok)
+    {
+        QMessageBox::warning(this, "Check In",
+            "git commit failed:\n" + committed.stderrText.trimmed());
+        return;
+    }
+
     QMessageBox::information(this, "Check In",
-        "Check In is a version-control operation.\n"
-        "Select checked-out records in the Object Window to check in.");
+        QString("Checked in %1 file(s) to %2 (branch %3).\n\n%4")
+            .arg(relPaths.size())
+            .arg(QDir(repoDir).absolutePath())
+            .arg(GitRepository::currentBranch(repoDir))
+            .arg(committed.stdoutText.trimmed()));
+    LOG_INFO(QString("Check In: committed %1 file(s) in %2")
+        .arg(relPaths.size()).arg(repoDir));
 }
