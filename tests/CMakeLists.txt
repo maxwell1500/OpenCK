@@ -287,6 +287,12 @@ target_link_libraries(test_textureconversionrules PRIVATE openck_model test_stub
 target_include_directories(test_textureconversionrules PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_textureconversionrules)
 
+# Master file management ([MMS] ini section + free-ID allocation)
+add_executable(test_mastermanagement test_mastermanagement.cpp)
+target_link_libraries(test_mastermanagement PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_mastermanagement PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_mastermanagement)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)
