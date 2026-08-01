@@ -26,6 +26,13 @@ public:
                                            const QString& outputDir,
                                            const QString& targetFormat);
 
+    // Rule-aware texture conversion: converts every input to DDS, choosing
+    // the block format (DXT1/DXT5) from the matching xtexconv-style rule.
+    // If rulesPath is empty the built-in rules are used.
+    static ConversionResult convertTexturesByRules(const QStringList& inputPaths,
+                                                   const QString& outputDir,
+                                                   const QString& rulesPath = QString());
+
     // Sound batch conversion (WAV -> OGG)
     static ConversionResult convertSounds(const QStringList& inputPaths,
                                          const QString& outputDir);

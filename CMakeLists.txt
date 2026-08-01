@@ -418,6 +418,7 @@ set(MODEL_SOURCES
     src/model/tools/brushalphamask.cpp
     src/model/tools/iconrenderer.cpp
     src/model/tools/plugincompactor.cpp
+    src/model/tools/textureconversionrules.cpp
     src/model/tools/referencebatchactions.cpp
     src/model/tools/gitrepository.cpp
     src/model/tools/primitivemeshgenerator.cpp
@@ -523,6 +524,7 @@ set(MODEL_HEADERS
     src/model/tools/brushalphamask.hpp
     src/model/tools/iconrenderer.hpp
     src/model/tools/plugincompactor.hpp
+    src/model/tools/textureconversionrules.hpp
     src/model/tools/referencebatchactions.hpp
     src/model/tools/gitrepository.hpp
     src/model/tools/primitivemeshgenerator.hpp

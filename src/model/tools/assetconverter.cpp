@@ -5,6 +5,7 @@
 #include "ddsencoder.hpp"
 #include "tgaencoder.hpp"
 #include "oggencoder.hpp"
+#include "textureconversionrules.hpp"
 
 #include <QFile>
 #include <QFileInfo>
@@ -419,6 +420,92 @@ AssetConverter::ConversionResult AssetConverter::convertTextures(const QStringLi
     result.success = (result.filesConverted > 0);
     LOG_INFO(QString("Texture conversion: %1 of %2 files converted to %3")
                  .arg(result.filesConverted).arg(inputPaths.size()).arg(targetFormat));
+    return result;
+}
+
+AssetConverter::ConversionResult AssetConverter::convertTexturesByRules(
+    const QStringList& inputPaths, const QString& outputDir, const QString& rulesPath)
+{
+    ConversionResult result;
+
+    QVector<TextureConversionRule> rules;
+    if (!rulesPath.isEmpty())
+    {
+        if (!TextureConversionRules::loadFile(rulesPath, rules))
+        {
+            result.error = QString("Failed to load conversion rules: %1").arg(rulesPath);
+            LOG_ERROR(result.error);
+            return result;
+        }
+    }
+    else
+    {
+        rules = TextureConversionRules::builtin();
+    }
+
+    QDir outDir(outputDir);
+    if (!outDir.exists())
+        outDir.mkpath(".");
+
+    for (const QString& inputPath : inputPaths)
+    {
+        QFileInfo info(inputPath);
+        if (!info.exists())
+        {
+            LOG_WARNING(QString("Texture file does not exist, skipping: %1").arg(inputPath));
+            continue;
+        }
+
+        // Pick the DXT format from the first matching rule. Normal maps
+        // (BC5/RG) and height/single-channel maps (BC4/R8) stay DXT5-ish;
+        // everything else goes DXT1 unless the rule asks for a full-RGBA
+        // layout, in which case DXT5 preserves the alpha channel.
+        const TextureConversionRule* rule = TextureConversionRules::findRule(
+            rules, info.filePath());
+        int dxtFormat = 1; // DXT1
+        if (rule)
+        {
+            switch (rule->format)
+            {
+            case TextureConversionRule::Format::BC5:
+            case TextureConversionRule::Format::BC4:
+            case TextureConversionRule::Format::R8:
+                dxtFormat = 5; // keep two-channel/single-channel data lossless-ish
+                break;
+            case TextureConversionRule::Format::R8G8B8A8:
+            case TextureConversionRule::Format::R8G8B8A8_UNORM_SRGB:
+                dxtFormat = 5; // preserve alpha
+                break;
+            case TextureConversionRule::Format::BC7:
+            case TextureConversionRule::Format::Unknown:
+            default:
+                dxtFormat = 1;
+                break;
+            }
+        }
+
+        QString outputPath = outDir.absoluteFilePath(info.completeBaseName() + ".dds");
+        QImage image;
+        if (!image.load(inputPath))
+        {
+            LOG_ERROR(QString("Failed to load texture: %1").arg(inputPath));
+            continue;
+        }
+        if (image.isNull())
+            continue;
+
+        if (DdsEncoder::encode(image, outputPath, dxtFormat))
+        {
+            ++result.filesConverted;
+            LOG_INFO(QString("Converted %1 -> %2 (DXT%3, rule '%4')")
+                .arg(inputPath).arg(outputPath).arg(dxtFormat == 1 ? 1 : 5)
+                .arg(rule ? rule->pathPattern : QStringLiteral("(builtin)")));
+        }
+    }
+
+    result.success = (result.filesConverted > 0);
+    LOG_INFO(QString("Rule-aware texture conversion: %1 of %2 files converted")
+                 .arg(result.filesConverted).arg(inputPaths.size()));
     return result;
 }
 
