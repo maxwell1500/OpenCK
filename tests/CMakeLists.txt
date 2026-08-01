@@ -281,6 +281,12 @@ target_link_libraries(test_referencebatchactions PRIVATE openck_model test_stubs
 target_include_directories(test_referencebatchactions PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_referencebatchactions)
 
+# CSV Snippets template engine (.Import= directives + field accessors)
+add_executable(test_csvsnippet test_csvsnippet.cpp)
+target_link_libraries(test_csvsnippet PRIVATE openck_files test_stubs Qt6::Test)
+target_include_directories(test_csvsnippet PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_csvsnippet)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel

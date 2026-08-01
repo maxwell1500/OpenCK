@@ -699,7 +699,7 @@ Sources reconciled here:
 
 | # | Task | Notes |
 |---|------|-------|
-| 23.1 | CSV Snippets system: column-based import/export with nested `.Import=file.txt` templates and form-field accessors `<Type:Field.SubField.Count>` | `Snippets\*.txt` — real CK bulk workflows |
+| 23.1 | CSV Snippets system: column-based import/export with nested `.Import=file.txt` templates and form-field accessors `<Type:Field.SubField.Count>` | ✅ `CsvSnippet` (`libs/files/data/csvsnippet.hpp/.cpp`): parses snippet templates with `.Import=` nested-file inlining (depth-guarded), `#` comments, and `<Type:Field>`, `<Type:Field.SubField>` and `<Type:Field.Count>` accessors resolved against a record's JSON view; `test_csvsnippet` covers substitution/import/comments/missing fields |
 | 23.2 | OPAL procedural placement lists (.opl) | `Clutter_*.opl` — outpost/interior clutter placement |
 | 23.3 | Find Forms by condition dialog | ✅ SearchDialog already provides Find-by-condition: multi-criteria rows with AND/OR logic, per-type filter, EditorID/FormID/Name fields, match modes (contains/starts/ends/exact/regex), saved searches + history |
 | 23.4 | Real plugin compaction: form-ID renumbering + reference re-pointing (not count-and-save) | `mainwindow.cpp:2057` currently superficial |
@@ -754,9 +754,9 @@ Sources reconciled here:
 | 20 — Particle Editor & Icon Generation | 0/5 | ⬜ |
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
-| 23 — Data Workflows & Plugin Utilities | 4/9 | ◐ |
+| 23 — Data Workflows & Plugin Utilities | 5/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 9/11 | ◐ |
-| **TOTAL** | **253/310** | ◐ |
+| **TOTAL** | **254/310** | ◐ |
 
 ---
 
@@ -808,7 +808,7 @@ Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, textur
 Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light icon renderer)
 Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
-Phase 23: Data workflows & plugin utilities (Find Forms, report export, Object Window layouts, reference batch actions done; CSV Snippets, OPAL, compaction, MMS, BNet pending)
+Phase 23: Data workflows & plugin utilities (CSV Snippets, Find Forms, report export, Object Window layouts, reference batch actions done; OPAL, compaction, MMS, BNet pending)
 Phase 24: Infrastructure & ecosystem (i18n, VCS, CI/CD, packaging, headless API, shortcuts, diagnostics, layout save/load done)
 ```
 

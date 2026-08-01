@@ -323,6 +323,7 @@ set(FILES_SOURCES
     libs/files/data/dataexporter2.cpp
     libs/files/data/dataimporter2.cpp
     libs/files/data/zipwriter.cpp
+    libs/files/data/csvsnippet.cpp
     libs/files/nif/nifparser.cpp
     libs/files/nif/ddsencoder.cpp
     libs/files/nif/tgaencoder.cpp
@@ -345,6 +346,7 @@ set(FILES_HEADERS
     libs/files/data/dataexporter.hpp
     libs/files/data/dataimporter.hpp
     libs/files/data/zipwriter.hpp
+    libs/files/data/csvsnippet.hpp
     libs/files/log/logger.hpp
     libs/files/nif/nifparser.hpp
     libs/files/nif/ddsencoder.hpp
