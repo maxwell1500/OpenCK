@@ -692,8 +692,8 @@ Sources reconciled here:
 | 22.1 | Node-graph editor canvas (pan/zoom, node add/connect, edge routing) | ✅ `NodeGraph` (`src/model/tools/nodegraph.hpp/.cpp`): nodes with typed input/output ports, directed edges with duplicate/self-loop validation, remove-node drops touching edges, nodeAt/nodePortAt hit-testing, Kahn cycle detection; `NodeGraphWidget` (`src/view/window/nodegraphwidget.hpp/.cpp`) renders the graph with pan/zoom-about-cursor, bezier edge routing with arrowheads, port-drag connections, node dragging; AnimationEditor gained a Behavior Graph tab; `test_nodegraph` |
 | 22.2 | Node palette: State_Machine, Blend_Tree, Blend, Merge, Switch, Animation, Locomotion_Blend, Random_Animation, Timer_Event, Two_Bone_IK, Look_At, Direct_At, Foot_IK, Momentum_Animation, Ragdoll_Get_Up, ... (43+ types) | ✅ `NodeGraphWidget::paletteTypes()` returns 20 node types incl. all listed above (State_Machine, Blend_Tree, Blend, Merge, Switch, Animation, Locomotion_Blend, Random_Animation, Timer_Event, Two_Bone_IK, Look_At, Direct_At, Foot_IK, Momentum_Animation, Ragdoll_Get_Up) plus variable nodes; Add Node... dialog uses the palette |
 | 22.3 | Animation event validation (SyncRightFoot on Run/Walk/Jog, WeaponFire on FireSingle/FireAuto, HitFrame on MeleeAttack, etc.) | ✅ `AnimationEventValidator` (`src/model/tools/animationeventvalidator.hpp/.cpp`): canonical event rules (SyncRightFoot/LeftFoot, WeaponFire/Swing, HitFrame, Impact, Reload, Draw/Sheathe, Cast, Jump/Land, Voice, Footstep, SoundPlay) each with the animation types they are valid for; `isEventValidForAnimation` + `matchingRules`/`matchingRuleNames` (unknown events allowed); `test_animationeventvalidator` |
-| 22.4 | Variable assignment nodes (Assign_Variable, State_Variable_Control, Dampen_Variable, Linear_Variable, Rotation_Variable) | |
-| 22.5 | Blend tree editing with blend weights | |
+| 22.4 | Variable assignment nodes (Assign_Variable, State_Variable_Control, Dampen_Variable, Linear_Variable, Rotation_Variable) | ✅ `BlendTreeModel` (`src/model/tools/blendtreemodel.hpp/.cpp`): the 5 variable-node ops (Assign/StateControl/Dampen/Linear/Rotation), tracked named graph variables with last-assignment tracking; Dampen moves a numeric value a fraction toward its target |
+| 22.5 | Blend tree editing with blend weights | ✅ `BlendTreeModel`: per-child blend weights with pinned-child support, `normalizeWeights` (pinned stay, remainder split over unpinned), `setChildWeight` (target keeps value, others renormalize); `test_blendtreemodel` |
 
 ## Phase 23: Data Workflows & Plugin Utilities ⬜
 
@@ -753,10 +753,10 @@ Sources reconciled here:
 | 19 — Material Editor & Asset Pipeline | 5/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 8/8 | ✅ |
-| 22 — Behavior / Animation Graph Editor | 3/5 | ◐ |
+| 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **291/310** | ◐ |
+| **TOTAL** | **293/310** | ◐ |
 
 ---
 
@@ -807,7 +807,7 @@ Phase 18: Audio pipeline (full phase done: .fuz container, WavePlayer playback, 
 Phase 19: Material editor & asset pipeline (DDS import/decode, rule templates, texture conversion rules, property graph, mesh LOD config done; physics-LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
 Phase 21: Scripting completion (full phase done: Script Manager, .ppj, .flg, structured diagnostics, type-checker property access, spell-checker, LSP client, remote debugger protocol)
-Phase 22: Behavior / animation graph editor (node-graph canvas, 20-type palette, event validation done; variable nodes, blend-tree weights pending)
+Phase 22: Behavior / animation graph editor (full phase done: node-graph canvas, 20-type palette, event validation, variable nodes, blend-tree weights)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions, real form-ID compaction, MMS done; BNet pending)
 Phase 24: Infrastructure & ecosystem ✅ (headless CLI, Git Check In/Out, i18n, CI/CD, packaging, crash bundle, layout save/load, shortcuts, saved filters, Galaxy/Packin menus done)
 ```

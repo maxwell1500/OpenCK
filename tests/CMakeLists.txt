@@ -371,6 +371,12 @@ target_link_libraries(test_animationeventvalidator PRIVATE openck_model test_stu
 target_include_directories(test_animationeventvalidator PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_animationeventvalidator)
 
+# Blend-tree weights + variable assignment nodes
+add_executable(test_blendtreemodel test_blendtreemodel.cpp)
+target_link_libraries(test_blendtreemodel PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_blendtreemodel PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_blendtreemodel)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)
