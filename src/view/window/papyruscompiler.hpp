@@ -46,6 +46,11 @@ public:
     QStringList getCompilerFlags() const;
     GameId getGameVersion() const { return gameVersion; }
 
+    // Loads and validates a Papyrus script flag file (.flg) against the
+    // known property flags. Returns a human-readable list of problems,
+    // empty if the file parses cleanly (or is absent).
+    static QStringList validateFlagFile(const QString& flagFilePath);
+
     QVector<CompilerError> getLastErrors() const { return lastErrors; }
 
     bool compile();

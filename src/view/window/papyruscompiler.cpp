@@ -1,5 +1,6 @@
 #include "papyruscompiler.hpp"
 #include "logger.hpp"
+#include "../../model/tools/scriptflagfile.hpp"
 
 #include <QFile>
 #include <QFileInfo>
@@ -173,6 +174,27 @@ QStringList PapyrusCompiler::getCompilerFlags() const
     }
 
     return flags;
+}
+
+QStringList PapyrusCompiler::validateFlagFile(const QString& flagFilePath)
+{
+    if (!QFile::exists(flagFilePath))
+    {
+        return {};
+    }
+
+    QVector<ScriptFlagFile::Entry> entries;
+    if (!ScriptFlagFile::loadFile(flagFilePath, entries))
+    {
+        return { QStringLiteral("Could not parse flag file %1").arg(flagFilePath) };
+    }
+
+    QStringList problems;
+    for (const QString& unknown : ScriptFlagFile::unknownFlags(entries))
+    {
+        problems << QStringLiteral("Unknown flag: %1").arg(unknown);
+    }
+    return problems;
 }
 
 bool PapyrusCompiler::compile()

@@ -670,13 +670,13 @@ Sources reconciled here:
 | 20.4 | NIF preview primitives (cube/cylinder/plane/sphere) | ✅ `PrimitiveMeshGenerator` (`src/model/tools/primitivemeshgenerator.hpp/.cpp`): triangle meshes for cube (12 tris), cylinder (side+cap fans), XZ plane, latitude/longitude sphere; NifViewportWidget has `showPreviewPrimitive`/`clearPreviewPrimitive` rendering via the overlay VBO; View menu → Preview Primitive (Cube/Cylinder/Plane/Sphere/Clear); `test_primitivemeshgenerator` |
 | 20.5 | Icon generation renderer: 3-light rig (warm/cool/key), cubemap background, per-context sizes (inventory 128, workshop/shipbuilder 512) | `CreationKitCustom_*.ini` `[Preview]`/`[IconGenerator]` |
 
-## Phase 21: Scripting Completion ⬜
+## Phase 21: Scripting Completion ◐
 
 | # | Task | Notes |
 |---|------|-------|
 | 21.1 | Papyrus project files (.ppj): Imports, Folders (NoRecurse), Scripts, Output, Flags, Asm (None/Keep/Only/Discard), Optimize, Release, Final | `PapyrusProject.xsd` |
 | 21.2 | Papyrus Script Manager dialog | Real CK File menu |
-| 21.3 | Script property flags (`.flg`): Hidden/Conditional/Default/CollapsedOnRef/CollapsedOnBase/Mandatory with target validation | `Starfield_Papyrus_Flags.flg` |
+| 21.3 | Script property flags (`.flg`): Hidden/Conditional/Default/CollapsedOnRef/CollapsedOnBase/Mandatory with target validation | ✅ `ScriptFlagFile` (`src/model/tools/scriptflagfile.hpp/.cpp`): parses `.flg` mappings (`ScriptName = Flag1|Flag2`, `;`/`#` comments), validates flags against the 6 known values; `PapyrusCompiler::validateFlagFile()` reports unknown flags; `test_scriptflagfile` |
 | 21.4 | Spell-checker in dialogue/script editors | Real CK ships Sentry SSCE with 5 dictionaries |
 | 21.5 | Papyrus language server (LSP protocol) integration | `vscodepapyrus` includes Antlr4 language server |
 | 21.6 | Remote debugger protocol (port 20548 pattern): breakpoints, locals, watch, step | `PapyrusRemoteDebugger.exe` |
@@ -752,11 +752,11 @@ Sources reconciled here:
 | 18 — Audio Pipeline | 1/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
 | 20 — Particle Editor & Icon Generation | 1/5 | ◐ |
-| 21 — Scripting Completion | 0/8 | ⬜ |
+| 21 — Scripting Completion | 1/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 5/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
-| **TOTAL** | **256/310** | ◐ |
+| **TOTAL** | **257/310** | ◐ |
 
 ---
 
@@ -806,7 +806,7 @@ Phase 17: Terrain & landscape completion (.lbr JSON brush system, R32 heightmap 
 Phase 18: Audio pipeline (WavePlayer waveOut streaming playback engine done; XWM/FUZ, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)
 Phase 20: Particle editor & icon generation (NIF preview primitives done; .pofx bundles, LOD presets, projectile vars, icon renderer pending)
-Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
+Phase 21: Scripting completion (.flg property flags done; .ppj projects, Script Manager, spell-check, LSP, remote debugger, type-checker/error-parser completion pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, Find Forms, report export, Object Window layouts, reference batch actions done; OPAL, compaction, MMS, BNet pending)
 Phase 24: Infrastructure & ecosystem (Git Check In/Out, i18n, VCS, CI/CD, packaging, crash bundle, layout save/load, shortcuts, diagnostics, saved filters done; headless API pending)
