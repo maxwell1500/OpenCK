@@ -15,6 +15,7 @@ class QDoubleSpinBox;
 class QLineEdit;
 class QGroupBox;
 class QOpenGLShaderProgram;
+class QCheckBox;
 
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
@@ -61,6 +62,10 @@ public:
     // LandRecord that was written, or nullptr if no cell is loaded.
     LandRecord* saveLandscapeToRecord();
 
+    // Writes the water-plane height (XCLW) from the Water tab back into
+    // the loaded CellRecord and marks it modified in the collection.
+    void saveWaterToCell();
+
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
@@ -78,6 +83,8 @@ private slots:
     void onLoadClicked();
     void onCopyHeightmapClicked();
     void onPasteHeightmapClicked();
+    void onImportR32Clicked();
+    void onExportR32Clicked();
 
     void onAddLayer();
     void onRemoveLayer();
@@ -194,10 +201,12 @@ private:
     QPushButton* removePlantButton;
 
     // Water tab widgets
+    QCheckBox* waterEnabledCheckBox;
     QDoubleSpinBox* waterHeightSpinBox;
     QComboBox* waterTypeCombo;
     QDoubleSpinBox* depthAttenuationSpinBox;
     QDoubleSpinBox* reflectionAmountSpinBox;
+    QPushButton* applyWaterButton;
 };
 
 #endif // LANDSCAPEEDITOR_HPP

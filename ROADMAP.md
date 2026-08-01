@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 235/310 steps complete (76%) — Phase 14 + 15 complete; Phase 16 in progress (6/8); Phase 17 started (1/9)
-- **Phase 17 (partial)**: Terrain menu wired (Save Landscape / Generate Landscape / Landscape Editor → `saveLandscapeToRecord`); landscape undo/redo confirmed via `LandscapeEditCommand`. Build clean, 33/33 tests.
+- **Progress**: 238/310 steps complete (77%) — Phase 14 + 15 complete; Phase 16 in progress (6/8); Phase 17 in progress (4/9)
+- **Phase 17 (partial)**: R32 raw-float heightmap import/export (with undo), XCLW water-plane support on CellRecord (Enable Water + Apply Water Plane in editor), Terrain menu wired to landscape save/generate. Build clean, 34/34 tests.

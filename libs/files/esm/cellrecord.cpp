@@ -54,6 +54,10 @@ void CellRecord::load(ESMReader& esm, bool)
         }
         case 'XOWN': owner = esm.readType<quint32>(); break;
         case 'XLOC': lockLevel = esm.readType<quint32>(); break;
+        case 'XCLW':
+            hasWaterHeight = true;
+            waterHeight = esm.readType<float>();
+            break;
         default:
         {
             RawSubRecord raw;
@@ -88,6 +92,9 @@ void CellRecord::save(ESMWriter& esm) const
     esm.endSubRecord();
     esm.writeSubData<quint32>('XOWN', owner);
     esm.writeSubData<quint32>('XLOC', lockLevel);
+    if (hasWaterHeight) {
+        esm.writeSubData<float>('XCLW', waterHeight);
+    }
     components.saveAll(esm);
     esm.writeSubZString('FULL', cellName);
 
@@ -109,6 +116,8 @@ void CellRecord::blank()
     owner = 0;
     lockLevel = 0;
     cellName = "";
+    hasWaterHeight = false;
+    waterHeight = 0.0f;
     rawSubRecords.clear();
     initComponents();
 }

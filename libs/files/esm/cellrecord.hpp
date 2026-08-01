@@ -22,6 +22,8 @@ struct CellRecord
     quint32 owner;
     quint32 lockLevel;
     QString cellName;
+    bool hasWaterHeight = false;
+    float waterHeight = 0.0f;
     QVector<RawSubRecord> rawSubRecords;
 
     void load(ESMReader& esm, bool base);
@@ -35,6 +37,7 @@ inline bool operator==(const CellRecord& l, const CellRecord& r)
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.cellX == r.cellX && l.cellY == r.cellY && l.owner == r.owner
         && l.lockLevel == r.lockLevel && l.cellName == r.cellName
+        && l.hasWaterHeight == r.hasWaterHeight && l.waterHeight == r.waterHeight
         && l.components == r.components
         && l.rawSubRecords == r.rawSubRecords;
 }

@@ -76,6 +76,8 @@ LandscapeEditor::LandscapeEditor(QWidget* parent) :
     waterTypeCombo(nullptr),
     depthAttenuationSpinBox(nullptr),
     reflectionAmountSpinBox(nullptr),
+    applyWaterButton(nullptr),
+    waterEnabledCheckBox(nullptr),
     mData(nullptr),
     currentLand(nullptr),
     mBrushTool(nullptr),
@@ -159,6 +161,13 @@ void LandscapeEditor::setupUI()
     copyPasteLayout->addWidget(pasteHeightmapButton);
     controlLayout->addLayout(copyPasteLayout);
 
+    auto* r32Layout = new QHBoxLayout();
+    QPushButton* importR32Button = new QPushButton("Import R32...");
+    QPushButton* exportR32Button = new QPushButton("Export R32...");
+    r32Layout->addWidget(importR32Button);
+    r32Layout->addWidget(exportR32Button);
+    controlLayout->addLayout(r32Layout);
+
     mainLayout->addLayout(controlLayout);
 
     statusLabel = new QLabel("Ready");
@@ -192,6 +201,8 @@ void LandscapeEditor::setupUI()
     connect(loadButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadClicked);
     connect(copyHeightmapButton, &QPushButton::clicked, this, &LandscapeEditor::onCopyHeightmapClicked);
     connect(pasteHeightmapButton, &QPushButton::clicked, this, &LandscapeEditor::onPasteHeightmapClicked);
+    connect(importR32Button, &QPushButton::clicked, this, &LandscapeEditor::onImportR32Clicked);
+    connect(exportR32Button, &QPushButton::clicked, this, &LandscapeEditor::onExportR32Clicked);
     connect(mApplyButton, &QPushButton::clicked, this, &LandscapeEditor::applyHeightmap);
 
     connect(mHeightSlider, &QSlider::valueChanged, this, [this](int value) {
@@ -283,11 +294,16 @@ void LandscapeEditor::setupWaterTab(QWidget* tab)
     auto* waterGroup = new QGroupBox("Water Settings");
     auto* waterLayout = new QFormLayout(waterGroup);
 
+    waterEnabledCheckBox = new QCheckBox();
+    waterEnabledCheckBox->setChecked(false);
+    waterLayout->addRow("Enable Water:", waterEnabledCheckBox);
+
     waterHeightSpinBox = new QDoubleSpinBox();
     waterHeightSpinBox->setRange(-100000.0, 100000.0);
     waterHeightSpinBox->setValue(waterHeight);
     waterHeightSpinBox->setDecimals(2);
     waterHeightSpinBox->setSingleStep(1.0);
+    waterHeightSpinBox->setEnabled(false);
     waterLayout->addRow("Water Height:", waterHeightSpinBox);
 
     waterTypeCombo = new QComboBox();
@@ -310,7 +326,20 @@ void LandscapeEditor::setupWaterTab(QWidget* tab)
     waterLayout->addRow("Reflection Amount:", reflectionAmountSpinBox);
 
     layout->addWidget(waterGroup);
+
+    applyWaterButton = new QPushButton("Apply Water Plane");
+    layout->addWidget(applyWaterButton);
     layout->addStretch();
+
+    connect(waterEnabledCheckBox, &QCheckBox::toggled, this, [this](bool checked) {
+        waterHeightSpinBox->setEnabled(checked);
+        if (checked) {
+            waterHeightSpinBox->setValue(waterHeight);
+        }
+    });
+    connect(waterHeightSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+        this, [this](double value) { waterHeight = value; });
+    connect(applyWaterButton, &QPushButton::clicked, this, &LandscapeEditor::saveWaterToCell);
 }
 
 void LandscapeEditor::loadCell(CellRecord* cell)
@@ -322,6 +351,13 @@ void LandscapeEditor::loadCell(CellRecord* cell)
         loadHeightmap();
         setupOpenGL();
         glWidget->update();
+
+        bool waterEnabled = cell->hasWaterHeight;
+        waterEnabledCheckBox->setChecked(waterEnabled);
+        waterHeightSpinBox->setEnabled(waterEnabled);
+        waterHeight = waterEnabled ? cell->waterHeight : 0.0;
+        waterHeightSpinBox->setValue(waterHeight);
+
         statusLabel->setText(QString("Loaded cell: %1").arg(cell->editorId));
     }
 }
@@ -517,6 +553,36 @@ LandRecord* LandscapeEditor::saveLandscapeToRecord()
     statusLabel->setText(QString("Saved landscape to LandRecord 0x%1")
         .arg(currentLand->formId, 8, 16, QChar('0')));
     return currentLand;
+}
+
+void LandscapeEditor::saveWaterToCell()
+{
+    if (!currentCell) {
+        statusLabel->setText("No cell loaded");
+        return;
+    }
+    if (!mData) {
+        statusLabel->setText("No data model set");
+        return;
+    }
+
+    currentCell->hasWaterHeight = waterEnabledCheckBox->isChecked();
+    currentCell->waterHeight = static_cast<float>(waterHeightSpinBox->value());
+
+    const auto& cellCollection = mData->getCellCollection();
+    for (int i = 0; i < cellCollection.size(); ++i) {
+        Record<CellRecord>& record = const_cast<IdCollection<CellRecord>&>(cellCollection).getRecord(i);
+        if (&record.get() == currentCell) {
+            record.setModified(*currentCell);
+            break;
+        }
+    }
+    statusLabel->setText(currentCell->hasWaterHeight
+        ? QString("Water plane set to %1").arg(currentCell->waterHeight)
+        : QString("Water plane disabled"));
+    LOG_INFO(QString("Saved water plane height %1 to CellRecord 0x%2")
+        .arg(currentCell->waterHeight)
+        .arg(currentCell->formId, 8, 16, QChar('0')));
 }
 
 void LandscapeEditor::loadHeightmap()
@@ -898,6 +964,94 @@ void LandscapeEditor::onPasteHeightmapClicked()
     hasCopiedHeightmap = false;
     statusLabel->setText("Heightmap pasted");
     glWidget->update();
+}
+
+void LandscapeEditor::onImportR32Clicked()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "Import R32 Heightmap", "", "Raw 32-bit Float (*.r32 *.raw);;All Files (*)");
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        statusLabel->setText("Failed to open R32 file");
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    if (data.size() % static_cast<int>(sizeof(float)) != 0) {
+        statusLabel->setText("R32 file size is not a multiple of 4 bytes");
+        return;
+    }
+
+    const int floatCount = data.size() / static_cast<int>(sizeof(float));
+    const int side = static_cast<int>(std::sqrt(static_cast<double>(floatCount)));
+    if (side * side != floatCount || side < 2) {
+        statusLabel->setText(QString("R32 file has %1 floats; not a square grid").arg(floatCount));
+        return;
+    }
+
+    QVector<float> imported(floatCount);
+    memcpy(imported.data(), data.constData(), static_cast<size_t>(data.size()));
+
+    if (side != terrainSize) {
+        if (!hasOriginalState) {
+            originalHeightmap = heightmap;
+            hasOriginalState = true;
+        }
+        terrainSize = side;
+        heightmap.resize(terrainSize * terrainSize);
+    }
+
+    float minH = imported.first();
+    float maxH = imported.first();
+    for (float h : imported) {
+        if (h < minH) minH = h;
+        if (h > maxH) maxH = h;
+    }
+
+    for (int i = 0; i < imported.size(); ++i) {
+        heightmap[i] = imported[i];
+    }
+    minHeight = minH;
+    maxHeight = maxH;
+
+    if (mUndoStack) {
+        mUndoStack->push(new LandscapeEditCommand(
+            &heightmap, terrainSize, originalHeightmap, heightmap));
+    }
+
+    statusLabel->setText(QString("Imported %1x%1 R32 heightmap (range %2..%3)")
+        .arg(terrainSize).arg(minH).arg(maxH));
+    glWidget->update();
+}
+
+void LandscapeEditor::onExportR32Clicked()
+{
+    if (heightmap.isEmpty()) {
+        statusLabel->setText("No heightmap to export");
+        return;
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(this, "Export R32 Heightmap", "", "Raw 32-bit Float (*.r32 *.raw);;All Files (*)");
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly)) {
+        statusLabel->setText("Failed to create R32 file");
+        return;
+    }
+
+    const qint64 bytes = static_cast<qint64>(heightmap.size()) * static_cast<qint64>(sizeof(float));
+    file.write(reinterpret_cast<const char*>(heightmap.constData()), bytes);
+    file.close();
+
+    statusLabel->setText(QString("Exported %1x%1 R32 heightmap").arg(terrainSize));
 }
 
 float LandscapeEditor::getHeightAt(int x, int y) const
