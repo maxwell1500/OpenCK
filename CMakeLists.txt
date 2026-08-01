@@ -409,6 +409,7 @@ endif()
 # Document, tools, world model (data structures, collections, commands)
 set(MODEL_SOURCES
     src/model/tools/brushdefinition.cpp
+    src/model/tools/referencebatchactions.cpp
     src/model/doc/document.cpp
     src/model/doc/documentmediator.cpp
     src/model/doc/loader.cpp
@@ -606,6 +607,7 @@ set(VIEW_SOURCES
     src/view/window/facteditor.cpp
     src/view/window/cell_editor.cpp
     src/view/window/cellreferenceeditor.cpp
+src/view/window/referencebatchdialog.cpp
     src/view/window/worldspace_editor.cpp
     src/view/window/location_editor.cpp
     src/view/window/ref_editor.cpp

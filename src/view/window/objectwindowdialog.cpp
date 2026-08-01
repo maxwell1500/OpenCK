@@ -8,6 +8,7 @@
 #include "../../model/tools/undostack.hpp"
 #include "../../view/messageboxhelper.hpp"
 #include "qtformdialogmanager.hpp"
+#include "referencebatchdialog.hpp"
 #include "npcrecorddatawidget.hpp"
 #include "racedatawidget.hpp"
 #include "wthrdatawidget.hpp"
@@ -41,6 +42,7 @@
 #include "../../../libs/files/esm/worldspacerecord.hpp"
 #include "../../../libs/files/esm/locationrecord.hpp"
 #include "../../../libs/files/esm/refrecord.hpp"
+#include "../../../libs/files/esm/cellreferencedata.hpp"
 #include "../../../libs/files/esm/sounrecord.hpp"
 #include "../../../libs/files/esm/wthrrecord.hpp"
 #include "../../../libs/files/esm/materialrecord.hpp"
@@ -509,6 +511,25 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
 
             connect(batchSetIdAction, &QAction::triggered, this, &ObjectWindowDialog::batchSetEditorId);
             connect(batchDuplicateAction, &QAction::triggered, this, &ObjectWindowDialog::batchDuplicateIds);
+
+            // Reference batch actions apply to selected REFR records.
+            bool allRefr = true;
+            for (const QModelIndex& idx : selectedIndices)
+            {
+                if (!idx.isValid() || !mModel->isRecord(idx)) { allRefr = false; break; }
+                int cat = mModel->getCategoryIndex(idx);
+                if (mModel->getCategoryType(cat) != static_cast<int>(CkId::Type_Refr_))
+                {
+                    allRefr = false;
+                    break;
+                }
+            }
+            if (allRefr)
+            {
+                QAction* batchRefAction = mContextMenu->addAction(
+                    QString("Batch Actions on %1 References...").arg(count));
+                connect(batchRefAction, &QAction::triggered, this, &ObjectWindowDialog::batchReferenceActions);
+            }
         }
     }
     else
@@ -2769,6 +2790,98 @@ void ObjectWindowDialog::batchDuplicateIds()
 
     mModel->setData(mData);
     mStatusLabel->setText(QString("Batch duplicate: %1 record(s) cloned").arg(successCount));
+}
+
+void ObjectWindowDialog::batchReferenceActions()
+{
+    QList<QModelIndex> selectedIndices = getSelectedIndices();
+    if (selectedIndices.isEmpty())
+    {
+        QMessageBox::warning(this, "No Selection",
+            "Please select one or more reference records.\n\nUse Ctrl+Click for multi-select.");
+        return;
+    }
+
+    const auto& collection = mData->getRefrCollection();
+    const int collectionSize = collection.size();
+
+    QVector<CellRefEntry> refs;
+    QVector<int> recordIndices;
+    QVector<RefrRecord> originals;
+
+    for (const QModelIndex& idx : selectedIndices)
+    {
+        int categoryId = mModel->getCategoryIndex(idx);
+        int recordIndex = mModel->getRecordIndex(idx);
+        CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
+        if (type != CkId::Type_Refr_ || recordIndex < 0 || recordIndex >= collectionSize)
+            continue;
+
+        const RefrRecord& rec = collection.getRecord(recordIndex).get();
+
+        CellRefEntry entry;
+        entry.formId = rec.formId;
+        entry.baseObject = rec.baseId;
+        entry.posX = rec.posX;
+        entry.posY = rec.posY;
+        entry.posZ = rec.posZ;
+        entry.rotX = rec.rotX;
+        entry.rotY = rec.rotY;
+        entry.rotZ = rec.rotZ;
+        entry.scale = rec.scale;
+        entry.flags = rec.initiallyDisabled ? 0x01 : 0;
+
+        refs.append(entry);
+        recordIndices.append(recordIndex);
+        originals.append(rec);
+    }
+
+    if (refs.isEmpty())
+    {
+        QMessageBox::information(this, "Batch Reference Actions",
+            "None of the selected records are cell references.");
+        return;
+    }
+
+    ReferenceBatchDialog dialog(refs, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const QVector<CellRefEntry> result = dialog.getReferences();
+
+    int changed = 0;
+    for (int i = 0; i < result.size() && i < recordIndices.size(); ++i)
+    {
+        const CellRefEntry& entry = result[i];
+        RefrRecord& rec = originals[i];
+        rec.posX = entry.posX;
+        rec.posY = entry.posY;
+        rec.posZ = entry.posZ;
+        rec.rotX = entry.rotX;
+        rec.rotY = entry.rotY;
+        rec.rotZ = entry.rotZ;
+        rec.scale = entry.scale;
+        rec.initiallyDisabled = entry.isDisabled();
+
+        auto& record = const_cast<IdCollection<RefrRecord>&>(collection).getRecord(recordIndices[i]);
+        if (record.get() == rec)
+            continue;
+
+        if (mData->getUndoStack())
+        {
+            mData->getUndoStack()->push(new EditRecordCommand<RefrRecord>(
+                &const_cast<IdCollection<RefrRecord>&>(collection), recordIndices[i],
+                record.get(), rec, "Batch reference actions"));
+        }
+        ++changed;
+    }
+
+    mModel->setData(mData);
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(QString("Batch reference actions applied to %1 record(s)").arg(changed));
+    }
+    LOG_INFO(QString("Batch reference actions applied to %1 reference record(s)").arg(changed));
 }
 
 CellRecord* ObjectWindowDialog::getSelectedCell() const

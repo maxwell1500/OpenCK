@@ -78,6 +78,7 @@ public:
 public slots:
     void batchSetEditorId();
     void batchDuplicateIds();
+    void batchReferenceActions();
     void openInBlender();
     void previewNif();
     void compareNifs();

@@ -275,6 +275,12 @@ target_link_libraries(test_reportexport PRIVATE openck_model test_stubs Qt6::Tes
 target_include_directories(test_reportexport PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_reportexport)
 
+# Reference batch action utilities (move/snap/scale/flag/rotation)
+add_executable(test_referencebatchactions test_referencebatchactions.cpp)
+target_link_libraries(test_referencebatchactions PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_referencebatchactions PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_referencebatchactions)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel
