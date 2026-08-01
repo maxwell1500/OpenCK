@@ -341,6 +341,12 @@ target_link_libraries(test_particleslodpresets PRIVATE openck_model test_stubs Q
 target_include_directories(test_particleslodpresets PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_particleslodpresets)
 
+# Particle effect bundle (.pofx)
+add_executable(test_particlebundle test_particlebundle.cpp)
+target_link_libraries(test_particlebundle PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_particlebundle PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_particlebundle)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel

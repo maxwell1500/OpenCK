@@ -664,7 +664,7 @@ Sources reconciled here:
 
 | # | Task | Notes |
 |---|------|-------|
-| 20.1 | Particle editor: JSON `.pofx` bundle-node system (Age & Lifetime, AlphaByCurve, Velocity, Gravity, Drag, Rotation, Ribbon, UVScroll, Attractors, Turbulence, FlipBook) | `EditorFiles\Bundles\*.pofx` + `RuleTemplates\Bundles\` |
+| 20.1 | Particle editor: JSON `.pofx` bundle-node system (Age & Lifetime, AlphaByCurve, Velocity, Gravity, Drag, Rotation, Ribbon, UVScroll, Attractors, Turbulence, FlipBook) | ✅ `ParticleBundle` (`src/model/tools/particlebundle.hpp/.cpp`): parses `.pofx` bundle/nodes JSON (nodes or emitters arrays, or a single-node bundle object) into named emitter nodes with age/lifetime, alphaByCurve, velocity, gravity, drag, rotationSpeed, ribbon, uvScroll, texture; `test_particlebundle`. Attractors/Turbulence/FlipBook fields still pending |
 | 20.2 | Particle LOD presets (`ParticlesLODPresets.json` budgets per category × Near/Middle/Far) | ✅ `ParticleLodPresets` (`src/model/tools/particleslodpresets.hpp/.cpp`): parses JSON category budgets (near/middle/far), array or `{"presets":[...]}`; `test_particleslodpresets` |
 | 20.3 | Projectile variable bindings (BeamLength, BeamLifeTime, HasHit) | ✅ `ParticleProjectileBindings` (`src/model/tools/particleprojectilebindings.hpp/.cpp`): parses `.pofx`-style JSON binding lists (`particleVariable` → `projectileAttribute`), known-variable set, file loader; `test_particleprojectilebindings` |
 | 20.4 | NIF preview primitives (cube/cylinder/plane/sphere) | ✅ `PrimitiveMeshGenerator` (`src/model/tools/primitivemeshgenerator.hpp/.cpp`): triangle meshes for cube (12 tris), cylinder (side+cap fans), XZ plane, latitude/longitude sphere; NifViewportWidget has `showPreviewPrimitive`/`clearPreviewPrimitive` rendering via the overlay VBO; View menu → Preview Primitive (Cube/Cylinder/Plane/Sphere/Clear); `test_primitivemeshgenerator` |
@@ -751,12 +751,12 @@ Sources reconciled here:
 | 17 — Terrain & Landscape Completion | 5/9 | ◐ |
 | 18 — Audio Pipeline | 1/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 1/7 | ◐ |
-| 20 — Particle Editor & Icon Generation | 3/5 | ◐ |
+| 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
 | 21 — Scripting Completion | 3/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
-| **TOTAL** | **263/310** | ◐ |
+| **TOTAL** | **264/310** | ◐ |
 
 ---
 
@@ -805,7 +805,7 @@ Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMes
 Phase 17: Terrain & landscape completion (.lbr JSON brush system, R32 heightmap import/export, XCLW water planes done; alpha masks, overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (WavePlayer waveOut streaming playback engine done; XWM/FUZ, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode done; BSMaterial graph, rule templates, texture conversion, mesh/phys LOD, FBX→NIF pending)
-Phase 20: Particle editor & icon generation (preview primitives, projectile var bindings, LOD presets done; .pofx bundle editor, icon renderer pending)
+Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)
 Phase 21: Scripting completion (.ppj projects, .flg flags, structured diagnostic parsing done; Script Manager, spell-check, LSP, remote debugger, type-checker completion pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)
