@@ -1,6 +1,8 @@
 #ifndef CRASH_HANDLER_HPP
 #define CRASH_HANDLER_HPP
 
+#include <QString>
+
 namespace OpenCK {
 
 // Installs platform-specific signal handlers and (on Windows) a
@@ -17,6 +19,12 @@ void installCrashHandlers();
 // Safe to call from main thread; on signal context it falls back
 // to a minimal unbacktraceable entry.
 void writeStackTrace(const char* reason);
+
+// Packages the current log file, the QSettings prefs file, and the
+// in-memory settings cache into a timestamped .zip diagnostic bundle
+// next to the log file. Returns the bundle path, or an empty string if
+// nothing could be written. Safe to call from a crash handler context.
+QString writeCrashBundle();
 
 } // namespace OpenCK
 

@@ -95,6 +95,12 @@ public:
         return m_minLevel;
     }
 
+    // Path of the active log file, or empty if logging to nowhere.
+    QString logFilePath() const {
+        QMutexLocker locker(&m_mutex);
+        return m_initialized && m_file.isOpen() ? m_file.fileName() : QString();
+    }
+
     ~Logger() {
         if (m_file.isOpen()) {
             m_file.close();

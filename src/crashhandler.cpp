@@ -1,5 +1,12 @@
 #include "crashhandler.hpp"
 #include "../libs/files/log/logger.hpp"
+#include "../libs/files/data/zipwriter.hpp"
+
+#include <QSettings>
+#include <QDir>
+#include <QFileInfo>
+#include <QDateTime>
+#include <QCoreApplication>
 
 #include <cstdio>
 #include <cstdlib>
@@ -125,6 +132,7 @@ void terminateHandler()
         LOG_FATAL("std::terminate called (no current exception)");
     }
     writeStackTrace("terminate");
+    writeCrashBundle();
     std::_Exit(2);
 }
 
@@ -175,6 +183,7 @@ LONG WINAPI exceptionHandler(EXCEPTION_POINTERS* ex)
         LOG_FATAL("Win32 exception with null ExceptionRecord");
     }
     writeStackTrace("win32-exception");
+    writeCrashBundle();
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -249,6 +258,48 @@ void installCrashHandlers()
 #endif
 
     LOG_INFO("Crash handlers installed (terminate, structured-exception, signal)");
+}
+
+QString writeCrashBundle()
+{
+    const QString logPath = Logging::Logger::instance().logFilePath();
+    if (logPath.isEmpty()) {
+        return QString();
+    }
+
+    const QFileInfo logInfo(logPath);
+    const QString dir = logInfo.absolutePath();
+    const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    const QString bundlePath = QDir(dir).filePath(QStringLiteral("openck_crash_%1.zip").arg(stamp));
+
+    ZipWriter zip;
+    if (!zip.open(bundlePath)) {
+        LOG_WARNING("writeCrashBundle: could not open bundle for writing");
+        return QString();
+    }
+
+    if (!zip.addFileFromDisk(logPath, logInfo.fileName())) {
+        LOG_WARNING("writeCrashBundle: could not add log file");
+    }
+
+    // Prefs file lives next to the executable (INI in AppData on Windows).
+    QSettings settings(QSettings::IniFormat, QSettings::UserScope,
+                       QCoreApplication::organizationName(),
+                       QCoreApplication::applicationName());
+    const QString prefsPath = settings.fileName();
+    if (!prefsPath.isEmpty() && QFile::exists(prefsPath)) {
+        zip.addFileFromDisk(prefsPath, QFileInfo(prefsPath).fileName());
+    }
+
+    // Include the current in-memory settings cache even if prefs are binary.
+    const QString prefsCache = settings.allKeys().isEmpty()
+        ? QStringLiteral("")
+        : QStringLiteral("Skipped: no persisted settings keys.\n");
+    zip.addFile(QStringLiteral("settings_notes.txt"), prefsCache.toUtf8());
+
+    zip.close();
+    LOG_WARNING(QString("Crash diagnostics bundle written to %1").arg(bundlePath));
+    return bundlePath;
 }
 
 } // namespace OpenCK
