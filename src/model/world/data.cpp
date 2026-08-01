@@ -1313,6 +1313,16 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
     };
 }
 
+QVector<IRecordCollection*> Data::allCollections() const
+{
+    return const_cast<Data*>(this)->allCollections();
+}
+
+QVector<Data::TypedCollection> Data::allCollectionsWithTypes() const
+{
+    return const_cast<Data*>(this)->allCollectionsWithTypes();
+}
+
 void Data::addModel(QAbstractItemModel* model, CkId::Type type, bool update)
 {
     models.push_back(model);

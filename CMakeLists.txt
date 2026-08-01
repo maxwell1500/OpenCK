@@ -619,6 +619,7 @@ set(VIEW_SOURCES
     src/view/window/celldatawidget.cpp
     src/view/window/questdatawidget.cpp
     src/view/window/creatureeditor.cpp
+    src/view/window/warningsdockwidget.cpp
     src/view/window/searchdialog.cpp
     src/view/world/enumdelegate.cpp
     src/view/world/genericdelegate.cpp
@@ -718,6 +719,7 @@ set(VIEW_HEADERS
     src/view/window/celldatawidget.hpp
     src/view/window/questdatawidget.hpp
     src/view/window/creatureeditor.hpp
+    src/view/window/warningsdockwidget.hpp
     src/view/window/searchdialog.hpp
     src/view/world/delegatefactory.hpp
     src/view/world/enumdelegate.hpp

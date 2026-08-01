@@ -6,6 +6,7 @@
 #include "../../model/tools/npcvalidator.hpp"
 #include "../../model/tools/weaponvalidator.hpp"
 #include "../../model/tools/questvalidator.hpp"
+#include "../../model/tools/coveragevalidator.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/world/data.hpp"
@@ -54,6 +55,7 @@
 #include "modmanagerdialog.hpp"
 #include "validationreportdialog.hpp"
 #include "inspectorwidget.hpp"
+#include "warningsdockwidget.hpp"
 #include "../../model/tools/assetvalidator.hpp"
 #include "../../model/tools/assetdependencyscanner.hpp"
 #include "../../model/tools/batchtools.hpp"
@@ -112,6 +114,7 @@ MainWindow::MainWindow(QWidget *parent) :
       mCellViewPanel(nullptr),
       mCellViewDock(nullptr),
       mWarningsDock(nullptr),
+      mWarningsWidget(nullptr),
       mInspectorWidget(nullptr),
       mInspectorDock(nullptr),
       mDockManager(nullptr),
@@ -337,18 +340,9 @@ void MainWindow::setData(Data* data)
         // Create Warnings dock widget
         if (!mWarningsDock)
         {
-            auto* warningsWidget = new QWidget(this);
-            auto* warningsLayout = new QVBoxLayout(warningsWidget);
-            warningsLayout->setContentsMargins(4, 4, 4, 4);
-            auto* warningsList = new QTableWidget(warningsWidget);
-            warningsList->setColumnCount(3);
-            warningsList->setHorizontalHeaderLabels({"Level", "Message", "Record"});
-            warningsList->horizontalHeader()->setStretchLastSection(true);
-            warningsList->setSelectionBehavior(QAbstractItemView::SelectRows);
-            warningsList->setEditTriggers(QAbstractItemView::NoEditTriggers);
-            warningsLayout->addWidget(warningsList);
+            mWarningsWidget = new WarningsDockWidget(this);
             mWarningsDock = new ads::CDockWidget("Warnings");
-            mWarningsDock->setWidget(warningsWidget);
+            mWarningsDock->setWidget(mWarningsWidget);
             mDockManager->addDockWidget(ads::BottomDockWidgetArea, mWarningsDock);
         }
 
@@ -370,6 +364,8 @@ void MainWindow::setData(Data* data)
                 } else {
                     mInspectorWidget->clear();
                 }
+                mStatusSelectedObject->setText(QStringLiteral("%1: %2")
+                    .arg(lookup.recordType, eid));
             });
         }
         
@@ -403,6 +399,16 @@ void MainWindow::setData(Data* data)
         }
 
         objectWindowDock->setVisible(true);
+
+        int totalRecords = 0;
+        const QVector<Data::TypedCollection> allTypes = mData->allCollectionsWithTypes();
+        for (const auto& entry : allTypes)
+            totalRecords += entry.collection ? entry.collection->count() : 0;
+        updateRecordCount(totalRecords);
+
+        QStringList contentFiles = mData->getContentFiles();
+        QString active = contentFiles.isEmpty() ? QString() : contentFiles.last();
+        updatePluginInfo(active);
 
         updateStatus("Data loaded");
 
@@ -1258,7 +1264,8 @@ void MainWindow::runValidation()
     QVector<Validator*> validators = {
         new NpcValidator(),
         new WeaponValidator(),
-        new QuestValidator()
+        new QuestValidator(),
+        new CoverageValidator()
     };
 
     for (auto* validator : validators)
@@ -1271,14 +1278,16 @@ void MainWindow::runValidation()
         delete validator;
     }
 
-    if (messages.hasMessages())
+    if (mWarningsWidget)
     {
-        QMessageBox::information(this, "Validation Results", messages.toString());
+        mWarningsWidget->setMessages(messages);
+        mWarningsDock->toggleView(true);
     }
-    else
-    {
-        QMessageBox::information(this, "Validation", "No errors found.");
-    }
+
+    int count = 0;
+    for (auto it = messages.begin(); it != messages.end(); ++it)
+        ++count;
+    updateStatus(QString("Validation complete: %1 message(s)").arg(count));
 }
 
 void MainWindow::on_actionAssetValidation_triggered()

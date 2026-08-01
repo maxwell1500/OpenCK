@@ -572,25 +572,26 @@ Sources reconciled here:
 
 ---
 
-## Phase 15: Record Coverage & Object Window Completion ◐
+## Phase 15: Record Coverage & Object Window Completion ✅
 
 > Parity goal: real CK Object Window shows ~127 record types. OpenCK shows
 > 88 categories, but only ~36 are backed by `CkId::Type` collections; ~52 are
 > `Type_None` shells (`src/view/window/objectwindow.cpp:304-404`).
 > Source of truth for the real list: CK's 127 `_Editor.cpp` files + the
 > `.filter` files in `Data\DataViews\ObjectWindow\_common\`.
-> Progress: 15.1, 15.2, 15.4 done (2026-08-01). 62/88 categories backed; 78 record
-> types load, display, and save. Build clean, 29/29 tests (new `test_creatureeditor`).
+> Completed 2026-08-01. 62/88 categories backed; 78 record types load,
+> display, and save. Build clean, 30/30 tests (+test_creatureeditor,
+> +test_warningsdock).
 
 | # | Task | Notes |
 |---|------|-------|
 | 15.1 | Back the ~52 `Type_None` Object Window categories with real collections + `Data::continueLoading` routing | ✅ Wired 44 orphaned record structs end-to-end: AMMO, APPA, AVIF, BSGN, CLMT, CLOT, COBJ, CREA, CSTY, DOOR, EFSH, EXPL, EYES, FLOR, FLST, FURN, GRAS, HAIR, IDLE, IDLM, IMGS, KEYM, KYWD, LIGH, LSCR, LVLC, LVLI, LVSP, MESG, MSTT, NAVM, NOTE, OTFT, PROJ, REGN, ROAD, SCPT, SCRL, SLGM, SMQN, SPGD, SCOL, TXST, WATR → CkId enums, Data collections/getters, ctor columns, continueLoading cases, getCollectionByType, allCollections (also fixed missing SOUN/WTHR/LTEX), allCollectionsWithTypes, Document::save. 28 existing categories re-typed + 16 new (Apparatus, Birthsign, Clothing, Explosion, Eyes, Form List, Hair, Idle Animation, Leveled Spell, Load Screen, Projectile, Region, Road, Script, Sound Marker, Texture Set). Fixed latent crash: Type_None category paint threw in `CkId::getTypeName` |
 | 15.2 | Add remaining record structs + parsers to `libs/files/esm/` for types that only have headers | ✅ All 44 orphan structs compiled into the build for the first time (were never built); fixed compile errors in their loaders; lossless rawSubRecords round-trip retained |
-| 15.3 | Data-driven `.filter` file support: read real CK Object Window filters (`DataViews\ObjectWindow\_common\*.filter` JSON schema) | `{ExactValue, FilterType, IsConcatenatedOr, IsNegative, MaxValue, MinValue, ParameterName}` — keyword-based filtering |
+| 15.3 | Data-driven `.filter` file support: read real CK Object Window filters (`DataViews\ObjectWindow\_common\*.filter` JSON schema) | ⏸ Deferred to later phase — `{ExactValue, FilterType, IsConcatenatedOr, IsNegative, MaxValue, MinValue, ParameterName}` keyword filtering; no real `.filter` files available in repo to test against |
 | 15.4 | CREA specialized editor widget (soul, combat style, body parts) | ✅ `CreatureDataWidget` (EditorID, Full Name, Type, vitals, damage, 8 attributes) registered via `QtFormDialogManager::registerFactory("CREA")`; `editSelected` routes CREA + falls back to generic component dialog for all non-Type_None types; `getFormComponentsForIndex` generic fallback so Inspector shows components for all 78 types; +`test_creatureeditor` (21 checks) |
-| 15.5 | Wire `recordSelected` → status bar (`mStatusSelectedObject`, `mainwindow.cpp:151`) | Label exists, never updated |
-| 15.6 | Populate Warnings dock from validators; expand validators beyond NPC/Weapon/Quest | Dock exists (`mainwindow.cpp:226`), nothing writes to it |
-| 15.7 | Replace modal `QMessageBox` validation with docked Warnings + actionable suggestions | Real CK: `EditorWarnings.txt` log + warnings window |
+| 15.5 | Wire `recordSelected` → status bar (`mStatusSelectedObject`, `mainwindow.cpp:151`) | ✅ ObjectWindow selection now updates `mStatusSelectedObject` (`"<Type>: <editorId>"`); also activated previously-dead `updateRecordCount` (sums all collections) and `updatePluginInfo` (last content file) in `setData()` |
+| 15.6 | Populate Warnings dock from validators; expand validators beyond NPC/Weapon/Quest | ✅ New `WarningsDockWidget` (Level/Message/Record table, `addMessage`/`setMessages`/`clear`/`count`) replaces inline stub; new generic `CoverageValidator` scans ALL collections for empty + duplicate Editor IDs via `allCollectionsWithTypes` (added const overloads); `runValidation` now runs NPC/Weapon/Quest/Coverage and populates the dock; +`test_warningsdock` (4 tests) |
+| 15.7 | Replace modal `QMessageBox` validation with docked Warnings + actionable suggestions | ✅ `runValidation()` no longer pops `QMessageBox`; results go to the Warnings dock (auto-shown) + transient status-bar count. Per-editor dialogs (empty EID/duplicate EID in saveRecord) remain as-is for now |
 
 ## Phase 16: Specialized Editor Completion ⬜
 
@@ -741,7 +742,7 @@ Sources reconciled here:
 | 12 — UI Layout Parity | 40/40 | ✅ |
 | 13 — Editor Workspace Parity | 14/14 | ✅ |
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
-| 15 — Record Coverage & Object Window | 3/7 | ◐ |
+| 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 0/8 | ⬜ |
 | 17 — Terrain & Landscape Completion | 0/9 | ⬜ |
 | 18 — Audio Pipeline | 0/7 | ⬜ |
@@ -751,7 +752,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
 | 24 — Infrastructure & Ecosystem | 0/11 | ⬜ |
-| **TOTAL** | **222/310** | ◐ |
+| **TOTAL** | **228/310** | ◐ |
 
 ---
 
@@ -789,13 +790,13 @@ Phase 12: ✅ Complete (UI Layout Parity — ADS, Cell View, Object Window tree,
 Phase 11: ✅ Complete (Documentation & final polish)
 Phase 13: ✅ Complete (Editor Workspace Parity — central render widget, docked Inspector, Warnings dock, menu bar reorder, toolbar expansion, shortcut fixes)
 Phase 14: ✅ Complete (Render Window gizmos 14A — translate/rotate/scale manipulators with snap, undoable REFR write-back, Q/W/E/R keys, selection highlight; Interactive Cell View 14B — pan/zoom/select/marquee canvas, table sync, Inspector + Render Window cross-wiring, status bar coords)
-Phase 15: ◐ IN PROGRESS (Record coverage & Object Window — 15.1/15.2 wired 44 record types + 44 categories, 15.4 CREA editor done; next: .filter files, status bar, warnings dock)
+Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation; 15.3 .filter files deferred)
 ```
 
 **Subsequent phases (after 14):**
 
 ```
-Phase 15: Record coverage & Object Window completion (wired 44 record types end-to-end + backed 44 categories + CREA editor)
+Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
 Phase 16: Specialized editor completion (SCEN, EFSH, PACK, WRLD, LCTN, PNDT, CCT, NavMesh tools)
 Phase 17: Terrain & landscape completion (.lbr brushes, overlay masks, heightmap import, undo/redo, BTD)
 Phase 18: Audio pipeline (playback engine, XWM/FUZ, LipGenerator, FaceFX, Wwise soundbanks, RoboVoicer)

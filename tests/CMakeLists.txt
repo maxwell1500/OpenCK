@@ -226,3 +226,9 @@ add_executable(test_cellviewcanvas test_cellviewcanvas.cpp)
 target_link_libraries(test_cellviewcanvas PRIVATE openck_view Qt6::Test)
 target_include_directories(test_cellviewcanvas PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_cellviewcanvas)
+
+# Warnings dock widget tests
+add_executable(test_warningsdock test_warningsdock.cpp)
+target_link_libraries(test_warningsdock PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_warningsdock PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_warningsdock)

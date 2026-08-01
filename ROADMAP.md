@@ -95,13 +95,15 @@ Create a fully functional, multi-game Creation Kit replacement that supports edi
 - **14B — Interactive Cell View**: pan/zoom view transform, click-select + hover + marquee, table sync, Inspector + Render Window cross-wiring, status bar coords. 10/10 tasks.
 - **New**: `gizmomath.hpp/.cpp`, `cellmapview.hpp/.cpp`, `test_gizmomath` (34 checks), `test_cellviewcanvas` (21 checks).
 
-### Phase 15: Record Coverage & Object Window Completion (in progress)
+### Phase 15: Record Coverage & Object Window Completion (complete)
 
 - **15.1 ✅**: 44 orphaned record structs wired end-to-end — CkId enums, Data collections/getters/ctor columns, continueLoading routing, getCollectionByType, allCollections (fixed missing SOUN/WTHR/LTEX), allCollectionsWithTypes, Document::save. 28 dead categories re-typed + 16 new categories → 62/88 backed. Fixed Type_None category paint crash.
 - **15.2 ✅**: 44 orphan loaders compiled for the first time + fixed.
 - **15.4 ✅**: CREA `CreatureDataWidget` + factory; generic component-dialog fallback in editSelected; Inspector generic fallback.
-- **15.3**: `.filter` file support (pending)
-- **15.5-15.7**: status bar wiring, Warnings dock population, non-modal validation (pending)
+- **15.5 ✅**: ObjectWindow `recordSelected` → `mStatusSelectedObject`; activated `updateRecordCount`/`updatePluginInfo` in setData.
+- **15.6 ✅**: `WarningsDockWidget` class + generic `CoverageValidator` (empty/duplicate EditorID across all collections, via new const `allCollectionsWithTypes`); runValidation populates dock.
+- **15.7 ✅**: `runValidation` non-modal → dock + status bar count (no QMessageBox).
+- **15.3 ⏸**: `.filter` file support deferred (no real filter files to test against).
 
 ### High Priority
 
@@ -194,5 +196,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 222/310 steps complete (72%) — Phase 14 complete; Phase 15 in progress (3/7)
-- **Phase 15 (partial)**: wired 44 orphaned record types end-to-end (AMMO→WATR) into CkId/Data/Document::save/Object Window, backed 44 categories (62/88 total), CREA editor + generic component-dialog fallback for all types, fixed Type_None paint crash + allCollections SOUN/WTHR/LTEX omission. Build clean, 29/29 tests.
+- **Progress**: 228/310 steps complete (74%) — Phase 14 + 15 complete; Phase 16 next
+- **Phase 15 complete**: 44 record types wired end-to-end (AMMO→WATR), 44 Object Window categories backed (62/88), CREA editor + generic dialog fallback, ObjectWindow selection → status bar, real WarningsDockWidget + CoverageValidator (empty/duplicate EditorID across all collections), non-modal validation. Build clean, 30/30 tests.

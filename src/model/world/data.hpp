@@ -658,6 +658,9 @@ public:
     /// \brief Get all collections as a vector
     /// \return Vector of all record collection pointers
     QVector<IRecordCollection*> allCollections();
+    /// \brief Get all collections as a vector (const)
+    /// \return Vector of all record collection pointers
+    QVector<IRecordCollection*> allCollections() const;
 
     /// \brief Collection type pairing structure
     struct TypedCollection {
@@ -667,6 +670,9 @@ public:
     /// \brief Get all collections with their types
     /// \return Vector of TypedCollection pairs
     QVector<TypedCollection> allCollectionsWithTypes();
+    /// \brief Get all collections with their types (const)
+    /// \return Vector of TypedCollection pairs
+    QVector<TypedCollection> allCollectionsWithTypes() const;
 
     /// \brief Clone a record from source to destination
     /// \param type Record type to clone

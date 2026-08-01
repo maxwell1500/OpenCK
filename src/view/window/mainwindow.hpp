@@ -32,6 +32,7 @@ class ObjectPalette;
 class BashedPatchDialog;
 class CellViewPanel;
 class InspectorWidget;
+class WarningsDockWidget;
 struct CellRecord;
 
 namespace Ui {
@@ -173,6 +174,7 @@ private:
     CellViewPanel* mCellViewPanel;
     ads::CDockWidget* mCellViewDock;
     ads::CDockWidget* mWarningsDock;
+    WarningsDockWidget* mWarningsWidget;
     InspectorWidget* mInspectorWidget;
     ads::CDockWidget* mInspectorDock;
     ads::CDockManager* mDockManager;
