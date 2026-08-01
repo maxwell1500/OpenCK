@@ -147,18 +147,6 @@
      </property>
      <addaction name="actionSoundEditor"/>
     </widget>
-    <widget class="QMenu" name="menuGalaxy">
-     <property name="title">
-      <string>Galaxy</string>
-     </property>
-     <addaction name="actionNotImplementedGalaxy"/>
-    </widget>
-    <widget class="QMenu" name="menuPackin">
-     <property name="title">
-      <string>Packin</string>
-     </property>
-     <addaction name="actionNotImplementedPackin"/>
-    </widget>
     <widget class="QMenu" name="menuDocks">
      <property name="title">
       <string>Docks</string>
@@ -221,8 +209,6 @@
        <addaction name="menuNavmesh"/>
        <addaction name="menuTerrain"/>
        <addaction name="menuAudio"/>
-       <addaction name="menuGalaxy"/>
-       <addaction name="menuPackin"/>
        <addaction name="menuDocks"/>
        <addaction name="menuTheme"/>
        <addaction name="menuTests"/>
@@ -322,6 +308,8 @@
        <addaction name="actionParticleEffectsEditor"/>
        <addaction name="separator"/>
        <addaction name="actionModManager"/>
+       <addaction name="separator"/>
+       <addaction name="actionShortcuts"/>
       </widget>
      <action name="actionPreviewWindow">
       <property name="text">
@@ -371,23 +359,7 @@
        <bool>false</bool>
       </property>
      </action>
-     <action name="actionNotImplementedGalaxy">
-      <property name="text">
-       <string>Not implemented</string>
-      </property>
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-     </action>
-     <action name="actionNotImplementedPackin">
-      <property name="text">
-       <string>Not implemented</string>
-      </property>
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-     </action>
-      <action name="actionThemeDefault">
+     <action name="actionThemeDefault">
        <property name="text">
         <string>Default</string>
        </property>
@@ -878,6 +850,11 @@
     <action name="actionModManager">
      <property name="text">
       <string>Mod Manager...</string>
+     </property>
+    </action>
+    <action name="actionShortcuts">
+     <property name="text">
+      <string>Shortcuts...</string>
      </property>
     </action>
    </widget>

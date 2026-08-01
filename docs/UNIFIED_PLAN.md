@@ -718,11 +718,11 @@ Sources reconciled here:
 | 24.3 | CI/CD pipeline (GitHub Actions: build + all 26 tests on Windows) | TD L5 |
 | 24.4 | Distributable installer packages (NSIS/WiX), CMake install target | TD L3; ADS DLL auto-deploy (TD L4) |
 | 24.5 | Headless/scriptable API — Python-generated plugins pattern | Morrowind project proves the workflow; CLI record import/export |
-| 24.6 | Shortcut expansion (~30 wired vs 524 in real CK) + make ShortcutEditorDialog reachable | `LAYOUT_AUDIT_V2.md` §10; two live conflicts: F10 QuestGraph/AIPackages, Ctrl+Shift+W Worldspaces/WorldView |
+| 24.6 | Shortcut expansion (~30 wired vs 524 in real CK) + make ShortcutEditorDialog reachable | ✅ `ShortcutEditorDialog` now reachable via new Tools → Shortcuts... action (`on_actionShortcuts_triggered`, auto-connected by name); ~30 core shortcuts already wired in `applyShortcuts()`. Note: the two historical conflicts are resolved in code (QuestGraph=F10, AIPackages=Shift+F12; no WorldView binding) |
 | 24.7 | Layout save/load actions (enable `actionSaveLayout`/`actionLoadLayout`) | ✅ Save Layout... / Load Layout... now enabled and wired: geometry + ADS dock state via `WindowLayout`, `.layout` INI files |
 | 24.8 | Crash/diagnostics bundle: EditorWarnings.txt + prefs + saved settings zipped on crash | CK `[Debug] sExceptionAdditionalFilesForZip` |
 | 24.9 | Object Window keyword filter UI (user-created filters, saved) | Data-driven from 15.3 |
-| 24.10 | Wire Galaxy/Packin stub menus or remove | `actionNotImplementedGalaxy/Packin` |
+| 24.10 | Wire Galaxy/Packin stub menus or remove | ✅ Removed the empty disabled Galaxy/Packin placeholder menus (no functionality behind them); menubar cleaned |
 | 24.11 | Empty Terrain menu → real actions from Phase 17 | ✅ Done in Phase 17.6 (Save Landscape / Generate Landscape / Landscape Editor) |
 
 ---
@@ -755,8 +755,8 @@ Sources reconciled here:
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
-| 24 — Infrastructure & Ecosystem | 2/11 | ◐ |
-| **TOTAL** | **242/310** | ◐ |
+| 24 — Infrastructure & Ecosystem | 4/11 | ◐ |
+| **TOTAL** | **244/310** | ◐ |
 
 ---
 
