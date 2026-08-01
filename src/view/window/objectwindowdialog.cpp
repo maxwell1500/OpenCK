@@ -23,6 +23,9 @@
 #include "worldspacedatawidget.hpp"
 #include "locationdatawidget.hpp"
 #include "navmesheditordialog.hpp"
+#include "rawsubrecordwidget.hpp"
+#include "../../../libs/files/esm/effectshaderrecord.hpp"
+#include "../../../libs/files/esm/imagespacerecord.hpp"
 #include "lcrteditor.hpp"
 #include "logger.hpp"
 #include "../../model/tools/blenderlauncher.hpp"
@@ -299,6 +302,22 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("LCTN"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new LocationDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("EFSH"),
+            [](FormComponents*, void* recPtr, QWidget* parent) -> QWidget* {
+                auto* w = new RawSubrecordWidget(parent);
+                if (auto* rec = static_cast<EfshRecord*>(recPtr))
+                    w->setSubrecords(rec->rawSubRecords);
+                return w;
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("IMGS"),
+            [](FormComponents*, void* recPtr, QWidget* parent) -> QWidget* {
+                auto* w = new RawSubrecordWidget(parent);
+                if (auto* rec = static_cast<ImgsRecord*>(recPtr))
+                    w->setSubrecords(rec->rawSubRecords);
+                return w;
             });
     }
 }
@@ -930,6 +949,32 @@ void ObjectWindowDialog::editSelected()
                 }
                 LOG_INFO(QString("Navmesh '%1' edited").arg(original.editorId));
             }
+        }
+        break;
+    }
+    case CkId::Type_Efsh_:
+    {
+        auto& collection = mData->getEfshCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            EfshRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("EFSH"), &rec.components, &rec, this);
+        }
+        break;
+    }
+    case CkId::Type_Imgs_:
+    {
+        auto& collection = mData->getImgsCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            ImgsRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("IMGS"), &rec.components, &rec, this);
         }
         break;
     }

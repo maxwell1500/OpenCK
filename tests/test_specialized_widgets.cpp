@@ -8,9 +8,11 @@
 #include "../../src/view/window/packdatawidget.hpp"
 #include "../../src/view/window/worldspacedatawidget.hpp"
 #include "../../src/view/window/locationdatawidget.hpp"
+#include "../../src/view/window/rawsubrecordwidget.hpp"
 #include "../../libs/files/esm/Packagerecord.hpp"
 #include "../../libs/files/esm/worldspacerecord.hpp"
 #include "../../libs/files/esm/locationrecord.hpp"
+#include "../../libs/files/esm/records.hpp"
 #include "../../libs/components/formcomponents.hpp"
 
 #define CHECK(cond) \
@@ -102,6 +104,22 @@ int main(int argc, char** argv)
             CHECK(spins.at(2)->value() == 20);
             CHECK(spins.at(3)->value() == 30);
         }
+    }
+
+    {
+        RawSubrecordWidget w;
+        CHECK(w.count() == 0);
+        QVector<RawSubRecord> subs;
+        RawSubRecord r1;
+        r1.name = 'DATA';
+        r1.data = QByteArray::fromHex("01020304");
+        subs.append(r1);
+        RawSubRecord r2;
+        r2.name = 'FULL';
+        r2.data = QByteArray("hello");
+        subs.append(r2);
+        w.setSubrecords(subs);
+        CHECK(w.count() == 2);
     }
 
     if (failures == 0)
