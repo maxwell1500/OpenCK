@@ -232,3 +232,9 @@ add_executable(test_warningsdock test_warningsdock.cpp)
 target_link_libraries(test_warningsdock PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
 target_include_directories(test_warningsdock PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_warningsdock)
+
+# PACK/WRLD/LCTN specialized editor widgets
+add_executable(test_specialized_widgets test_specialized_widgets.cpp)
+target_link_libraries(test_specialized_widgets PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_specialized_widgets PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_specialized_widgets)

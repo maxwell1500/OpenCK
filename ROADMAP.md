@@ -105,6 +105,16 @@ Create a fully functional, multi-game Creation Kit replacement that supports edi
 - **15.7 ✅**: `runValidation` non-modal → dock + status bar count (no QMessageBox).
 - **15.3 ⏸**: `.filter` file support deferred (no real filter files to test against).
 
+### Phase 16: Specialized Editor Completion (in progress)
+
+- **16.3 ✅ (partial)**: PACK `PackDataWidget` (EditorID, package/target type, flags, target list) + `"PACK"` factory + editSelected case.
+- **16.4 ✅ (partial)**: WRLD `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) + `"WRLD"` factory + editSelected case.
+- **16.5 ✅ (partial)**: LCTN `LocationDataWidget` (name, parent, X/Y/Z) + `"LCTN"` factory + editSelected case.
+- **16.1**: SCEN timeline editor (pending — no record struct exists)
+- **16.2**: EFSH/IMGS editor (pending — structs have no typed fields)
+- **16.6-16.7**: PNDT/CCT Starfield editors (pending)
+- **16.8**: NavMesh record binding (pending)
+
 ### High Priority
 
 **P5-08: Landscape undo/redo**
@@ -196,5 +206,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 228/310 steps complete (74%) — Phase 14 + 15 complete; Phase 16 next
-- **Phase 15 complete**: 44 record types wired end-to-end (AMMO→WATR), 44 Object Window categories backed (62/88), CREA editor + generic dialog fallback, ObjectWindow selection → status bar, real WarningsDockWidget + CoverageValidator (empty/duplicate EditorID across all collections), non-modal validation. Build clean, 30/30 tests.
+- **Progress**: 231/310 steps complete (75%) — Phase 14 + 15 complete; Phase 16 in progress (3/8)
+- **Phase 16 (partial)**: PACK/WRLD/LCTN specialized factory widgets (PackDataWidget, WorldspaceDataWidget, LocationDataWidget) wired into the generic editor dialog. Build clean, 31/31 tests.

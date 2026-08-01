@@ -19,6 +19,9 @@
 #include "questdatawidget.hpp"
 #include "globvar_editor.hpp"
 #include "creatureeditor.hpp"
+#include "packdatawidget.hpp"
+#include "worldspacedatawidget.hpp"
+#include "locationdatawidget.hpp"
 #include "lcrteditor.hpp"
 #include "logger.hpp"
 #include "../../model/tools/blenderlauncher.hpp"
@@ -280,6 +283,21 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("CREA"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new CreatureDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("PACK"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new PackDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("WRLD"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new WorldspaceDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("LCTN"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new LocationDataWidget(recPtr, comps, parent);
             });
     }
 }
@@ -694,7 +712,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             PackageRecord& pack = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(pack.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &pack.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("PACK"), &pack.components, &pack, this);
         }
         break;
     }
@@ -754,7 +773,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             WorldspaceRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("WRLD"), &rec.components, &rec, this);
         }
         break;
     }
@@ -766,7 +786,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             LocationRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("LCTN"), &rec.components, &rec, this);
         }
         break;
     }
