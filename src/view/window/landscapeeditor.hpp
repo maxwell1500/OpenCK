@@ -20,6 +20,8 @@ class QCheckBox;
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
 
+#include "../../../model/tools/brushdefinition.hpp"
+
 class CellRecord;
 class LandRecord;
 class Data;
@@ -78,6 +80,7 @@ private slots:
     void onBrushSizeChanged(int size);
     void onBrushStrengthChanged(int strength);
     void onBrushTypeChanged(int type);
+    void onBrushSelected(int index);
     void onHeightLimitChanged(int height);
     void onSaveClicked();
     void onLoadClicked();
@@ -85,6 +88,7 @@ private slots:
     void onPasteHeightmapClicked();
     void onImportR32Clicked();
     void onExportR32Clicked();
+    void onLoadBrushesClicked();
 
     void onAddLayer();
     void onRemoveLayer();
@@ -133,8 +137,12 @@ private:
     // Brush settings
     int brushSize;
     int brushStrength;
-    int brushType; // 0=Raise, 1=Lower, 2=Smooth, 3=Flat
+    int brushType; // 0=Raise, 1=Lower, 2=Smooth, 3=Flat (legacy)
     int heightLimit;
+    QVector<BrushDefinition> brushes;
+    int activeBrushIndex;
+    QComboBox* brushCombo;
+    QPushButton* loadBrushesButton;
 
     // Cell data
     CellRecord* currentCell;

@@ -610,14 +610,14 @@ Sources reconciled here:
 
 > Real CK landscape editor is a full sculpt/paint system driven by JSON
 > brushes (`.lbr`), brush-alphas (`.dds`), and terrain overlay masks (`.tif`).
-> Progress: 17.5, 17.6, 17.7, 17.9 done (2026-08-01). The Landscape
+> Progress: 17.1, 17.5, 17.6, 17.7, 17.9 done (2026-08-01). The Landscape
 > Editor already has brush sculpting (raise/lower/smooth/flat), heightmap
 > save/load/copy/paste, texture layers, vegetation, water tabs, and
 > undo/redo via `LandscapeEditCommand`.
 
 | # | Task | Notes |
 |---|------|-------|
-| 17.1 | JSON `.lbr` brush system: Sculpt/Flatten/Smooth/Stamp/BuildUp/Subtractive | Landscape brushes: `CropRows, DefaultBrush, GrassSpray, MeadowNoise, OrganicFlatten, Oval01, ProcGenMask, RiverBrush, Square` |
+| 17.1 | JSON `.lbr` brush system: Sculpt/Flatten/Smooth/Stamp/BuildUp/Subtractive | ✅ `BrushDefinition` model (`src/model/tools/brushdefinition.hpp/.cpp`): 6 operations, JSON `.lbr` loader, built-in default set; LandscapeEditor has Brush combo + Load Brushes button, `applyBrush()` dispatches on brush operation with falloff shaping; `test_brushdefinition` covers ops/JSON/builtin. Brush alpha `.dds` masking itself still pending |
 | 17.2 | Brush alpha textures (19 `.dds` in `Data\Textures\BrushAlphas\`) | Circle, CloudSpray, Clumpiness, Road, Splatter, Square, BillowyNoise... |
 | 17.3 | Material painting with `MaxMaterialOpacity`, slope influence (`ApplySlopeInfluence`, falloff/threshold/invert) | |
 | 17.4 | Terrain overlay masks (463 `.tif` in `Source\TGATextures\Terrain\OverlayMasks\`) | POI biome masks, settlement masks |
@@ -748,7 +748,7 @@ Sources reconciled here:
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
-| 17 — Terrain & Landscape Completion | 4/9 | ◐ |
+| 17 — Terrain & Landscape Completion | 5/9 | ◐ |
 | 18 — Audio Pipeline | 0/7 | ⬜ |
 | 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
 | 20 — Particle Editor & Icon Generation | 0/5 | ⬜ |
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
 | 24 — Infrastructure & Ecosystem | 0/11 | ⬜ |
-| **TOTAL** | **238/310** | ◐ |
+| **TOTAL** | **239/310** | ◐ |
 
 ---
 
@@ -802,7 +802,7 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 ```
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
-Phase 17: Terrain & landscape completion (R32 heightmap import/export + XCLW water planes done; .lbr brushes, overlay masks, autopaint, BTD pending)
+Phase 17: Terrain & landscape completion (.lbr JSON brush system, R32 heightmap import/export, XCLW water planes done; alpha masks, overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (playback engine, XWM/FUZ, LipGenerator, FaceFX, Wwise soundbanks, RoboVoicer)
 Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)
 Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light icon renderer)

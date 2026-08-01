@@ -82,8 +82,12 @@ LandscapeEditor::LandscapeEditor(QWidget* parent) :
     currentLand(nullptr),
     mBrushTool(nullptr),
     mHeightSlider(nullptr),
-    mApplyButton(nullptr)
+    mApplyButton(nullptr),
+    activeBrushIndex(0),
+    brushCombo(nullptr),
+    loadBrushesButton(nullptr)
 {
+    brushes = BrushDefinition::builtin();
     setupUI();
 }
 
@@ -130,6 +134,17 @@ void LandscapeEditor::setupUI()
     brushTypeCombo->addItem("Flat");
     brushTypeCombo->setCurrentIndex(brushType);
     controlLayout->addWidget(brushTypeCombo);
+
+    controlLayout->addWidget(new QLabel("Brush:"));
+    brushCombo = new QComboBox();
+    for (const BrushDefinition& b : brushes) {
+        brushCombo->addItem(b.name);
+    }
+    brushCombo->setCurrentIndex(activeBrushIndex);
+    controlLayout->addWidget(brushCombo);
+
+    loadBrushesButton = new QPushButton("Load Brushes...");
+    controlLayout->addWidget(loadBrushesButton);
 
     controlLayout->addWidget(new QLabel("Height:"));
     heightLimitSpin = new QSpinBox();
@@ -196,6 +211,8 @@ void LandscapeEditor::setupUI()
     connect(brushSizeSlider, &QSlider::valueChanged, this, &LandscapeEditor::onBrushSizeChanged);
     connect(brushStrengthSlider, &QSlider::valueChanged, this, &LandscapeEditor::onBrushStrengthChanged);
     connect(brushTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &LandscapeEditor::onBrushTypeChanged);
+    connect(brushCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &LandscapeEditor::onBrushSelected);
+    connect(loadBrushesButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadBrushesClicked);
     connect(heightLimitSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &LandscapeEditor::onHeightLimitChanged);
     connect(saveButton, &QPushButton::clicked, this, &LandscapeEditor::onSaveClicked);
     connect(loadButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadClicked);
@@ -884,6 +901,42 @@ void LandscapeEditor::onBrushTypeChanged(int type)
     brushType = type;
 }
 
+void LandscapeEditor::onBrushSelected(int index)
+{
+    if (index >= 0 && index < brushes.size()) {
+        activeBrushIndex = index;
+        const BrushDefinition& b = brushes[index];
+        brushSizeSlider->setValue(qBound(1, static_cast<int>(b.radius), 20));
+        brushStrengthSlider->setValue(qBound(1, static_cast<int>(b.strength), 100));
+        statusLabel->setText(QString("Brush: %1 (%2)").arg(b.name,
+            BrushDefinition::operationToString(b.operation)));
+    }
+}
+
+void LandscapeEditor::onLoadBrushesClicked()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "Load Landscape Brushes", "", "Brush Files (*.lbr *.json);;All Files (*)");
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QVector<BrushDefinition> loaded;
+    if (!BrushDefinition::loadFile(fileName, loaded)) {
+        statusLabel->setText("No valid brushes found in file");
+        return;
+    }
+
+    brushes = loaded;
+    brushCombo->clear();
+    for (const BrushDefinition& b : brushes) {
+        brushCombo->addItem(b.name);
+    }
+    activeBrushIndex = 0;
+    brushCombo->setCurrentIndex(0);
+    statusLabel->setText(QString("Loaded %1 brushes from %2").arg(brushes.size()).arg(fileName));
+    LOG_INFO(QString("Loaded %1 landscape brushes from %2").arg(brushes.size()).arg(fileName));
+}
+
 void LandscapeEditor::onHeightLimitChanged(int height)
 {
     heightLimit = height;
@@ -1073,6 +1126,12 @@ void LandscapeEditor::setHeightAt(int x, int y, float height)
 void LandscapeEditor::applyBrush(int x, int y)
 {
     int radius = brushSize / 2;
+    if (radius < 1) radius = 1;
+
+    const BrushDefinition* brush = nullptr;
+    if (activeBrushIndex >= 0 && activeBrushIndex < brushes.size()) {
+        brush = &brushes[activeBrushIndex];
+    }
 
     for (int dy = -radius; dy <= radius; dy++) {
         for (int dx = -radius; dx <= radius; dx++) {
@@ -1087,33 +1146,74 @@ void LandscapeEditor::applyBrush(int x, int y)
             float factor = 1.0f - (dist / radius);
             factor = factor * factor;
 
+            // Soften the edge further when the brush has a high falloff.
+            if (brush && brush->falloff > 0.0) {
+                const float edge = qBound(0.0f, (dist / static_cast<float>(radius)), 1.0f);
+                factor *= (1.0f - static_cast<float>(brush->falloff) * edge);
+            }
+
             float currentHeight = getHeightAt(nx, ny);
             float newHeight = currentHeight;
 
-            switch (brushType) {
-            case 0: // Raise
-                newHeight += brushStrength * factor * 0.1f;
-                break;
-            case 1: // Lower
-                newHeight -= brushStrength * factor * 0.1f;
-                break;
-            case 2: // Smooth
-            {
-                float avg = 0.0f;
-                int count = 0;
-                for (int sy = -1; sy <= 1; sy++) {
-                    for (int sx = -1; sx <= 1; sx++) {
-                        avg += getHeightAt(nx + sx, ny + sy);
-                        count++;
+            if (brush) {
+                const float strength = static_cast<float>(brush->strength) * 0.1f;
+                switch (brush->operation) {
+                case BrushDefinition::Operation::Sculpt:
+                    newHeight += strength * factor * (brush->invert ? -1.0f : 1.0f);
+                    break;
+                case BrushDefinition::Operation::Flatten:
+                    newHeight += (static_cast<float>(brush->targetHeight) - currentHeight) * factor;
+                    break;
+                case BrushDefinition::Operation::Smooth:
+                {
+                    float avg = 0.0f;
+                    int count = 0;
+                    for (int sy = -1; sy <= 1; sy++) {
+                        for (int sx = -1; sx <= 1; sx++) {
+                            avg += getHeightAt(nx + sx, ny + sy);
+                            count++;
+                        }
                     }
+                    avg /= count;
+                    newHeight = currentHeight + (avg - currentHeight) * factor * 0.5f;
+                    break;
                 }
-                avg /= count;
-                newHeight = currentHeight + (avg - currentHeight) * factor * 0.5f;
-                break;
-            }
-            case 3: // Flat
-                newHeight = currentHeight + (heightLimit - currentHeight) * factor;
-                break;
+                case BrushDefinition::Operation::Stamp:
+                    newHeight += strength * factor * factor;
+                    break;
+                case BrushDefinition::Operation::BuildUp:
+                    newHeight += strength * factor;
+                    break;
+                case BrushDefinition::Operation::Subtractive:
+                    newHeight -= strength * factor;
+                    break;
+                }
+            } else {
+                switch (brushType) {
+                case 0: // Raise
+                    newHeight += brushStrength * factor * 0.1f;
+                    break;
+                case 1: // Lower
+                    newHeight -= brushStrength * factor * 0.1f;
+                    break;
+                case 2: // Smooth
+                {
+                    float avg = 0.0f;
+                    int count = 0;
+                    for (int sy = -1; sy <= 1; sy++) {
+                        for (int sx = -1; sx <= 1; sx++) {
+                            avg += getHeightAt(nx + sx, ny + sy);
+                            count++;
+                        }
+                    }
+                    avg /= count;
+                    newHeight = currentHeight + (avg - currentHeight) * factor * 0.5f;
+                    break;
+                }
+                case 3: // Flat
+                    newHeight = currentHeight + (heightLimit - currentHeight) * factor;
+                    break;
+                }
             }
 
             // Apply height limit clamping for Raise/Lower brush types

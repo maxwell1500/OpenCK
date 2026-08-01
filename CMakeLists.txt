@@ -406,6 +406,7 @@ endif()
 # ─── Library: openck_model ──────────────────────────────────────────────────
 # Document, tools, world model (data structures, collections, commands)
 set(MODEL_SOURCES
+    src/model/tools/brushdefinition.cpp
     src/model/doc/document.cpp
     src/model/doc/documentmediator.cpp
     src/model/doc/loader.cpp
