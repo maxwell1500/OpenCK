@@ -416,6 +416,7 @@ endif()
 set(MODEL_SOURCES
     src/model/tools/brushdefinition.cpp
     src/model/tools/brushalphamask.cpp
+    src/model/tools/autopainter.cpp
     src/model/tools/iconrenderer.cpp
     src/model/tools/plugincompactor.cpp
     src/model/tools/mastermanagement.cpp
@@ -523,6 +524,7 @@ set(MODEL_HEADERS
     src/model/tools/batchtools.hpp
     src/model/tools/brushdefinition.hpp
     src/model/tools/brushalphamask.hpp
+    src/model/tools/autopainter.hpp
     src/model/tools/iconrenderer.hpp
     src/model/tools/plugincompactor.hpp
     src/model/tools/mastermanagement.hpp

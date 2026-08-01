@@ -122,6 +122,7 @@ private slots:
     void onRemoveLayer();
     void onMoveLayerUp();
     void onMoveLayerDown();
+    void onAutoPaint();
 
     void onAddPlant();
     void onRemovePlant();
@@ -233,6 +234,7 @@ private:
     QPushButton* removeLayerButton;
     QPushButton* moveLayerUpButton;
     QPushButton* moveLayerDownButton;
+    QPushButton* autoPaintButton;
 
     // Vegetation tab widgets
     QTableWidget* vegetationTable;

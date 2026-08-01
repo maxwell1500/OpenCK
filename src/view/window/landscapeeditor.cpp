@@ -22,6 +22,7 @@
 #include <QResizeEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QMap>
 #include <QDebug>
 
 #include "../../libs/files/esm/cellrecord.hpp"
@@ -34,6 +35,7 @@
 #include "brushtool.hpp"
 #include "logger.hpp"
 #include "../../model/tools/brushalphamask.hpp"
+#include "../../model/tools/autopainter.hpp"
 
 #include <QFile>
 #include <QDataStream>
@@ -272,12 +274,14 @@ void LandscapeEditor::setupTextureLayersTab(QWidget* tab)
     removeLayerButton = new QPushButton("Remove Layer");
     moveLayerUpButton = new QPushButton("Move Up");
     moveLayerDownButton = new QPushButton("Move Down");
+    autoPaintButton = new QPushButton("Auto Paint...");
 
     buttonLayout->addWidget(addLayerButton);
     buttonLayout->addWidget(removeLayerButton);
     buttonLayout->addWidget(moveLayerUpButton);
     buttonLayout->addWidget(moveLayerDownButton);
     buttonLayout->addStretch();
+    buttonLayout->addWidget(autoPaintButton);
 
     layout->addLayout(buttonLayout);
 
@@ -285,6 +289,7 @@ void LandscapeEditor::setupTextureLayersTab(QWidget* tab)
     connect(removeLayerButton, &QPushButton::clicked, this, &LandscapeEditor::onRemoveLayer);
     connect(moveLayerUpButton, &QPushButton::clicked, this, &LandscapeEditor::onMoveLayerUp);
     connect(moveLayerDownButton, &QPushButton::clicked, this, &LandscapeEditor::onMoveLayerDown);
+    connect(autoPaintButton, &QPushButton::clicked, this, &LandscapeEditor::onAutoPaint);
 }
 
 void LandscapeEditor::setupVegetationTab(QWidget* tab)
@@ -1466,6 +1471,65 @@ void LandscapeEditor::onMoveLayerDown()
     refreshTextureLayerTable();
     textureLayerTable->selectRow(currentRow + 1);
     statusLabel->setText("Moved layer down");
+}
+
+void LandscapeEditor::onAutoPaint()
+{
+    if (heightmap.isEmpty() || textureLayers.isEmpty()) {
+        statusLabel->setText("Auto Paint requires a loaded heightmap and at least one texture layer");
+        return;
+    }
+
+    // Build the AutoPainter layer rules from the current texture-layer
+    // table. Slopes are clamped to the valid 0..90 degree range; heights
+    // default to unbounded.
+    QVector<AutoPaintLayer> rules;
+    for (int i = 0; i < textureLayers.size(); i++) {
+        const TextureLayer& layer = textureLayers[i];
+        AutoPaintLayer rule;
+        rule.texturePath = layer.texturePath;
+        rule.opacity = static_cast<float>(layer.opacity);
+        rule.minHeight = -100000.0f;
+        rule.maxHeight = 100000.0f;
+        rule.minSlope = static_cast<float>(layer.slopeThreshold);
+        rule.maxSlope = static_cast<float>(qBound(rule.minSlope,
+            layer.slopeThreshold + layer.slopeFalloff, 90.0));
+        rule.priority = i;
+        rules.append(rule);
+    }
+
+    AutoPainter::Options opts;
+    opts.useSlope = true;
+    opts.useHeight = true;
+    opts.mapSize = terrainSize;
+    opts.heightScale = 1.0f;
+
+    const QVector<int> assignment = AutoPainter::paint(heightmap, rules, opts);
+    if (assignment.size() != heightmap.size()) {
+        statusLabel->setText("Auto Paint failed");
+        return;
+    }
+
+    // Record which cells would change to which layer so the user gets a
+    // summary; the actual texture painting is applied via the layer table.
+    QMap<int, int> perLayerCounts;
+    for (int i = 0; i < assignment.size(); i++) {
+        if (assignment[i] >= 0)
+            perLayerCounts[assignment[i]]++;
+    }
+
+    QString summary;
+    for (auto it = perLayerCounts.cbegin(); it != perLayerCounts.cend(); ++it) {
+        if (it.value() <= 0)
+            continue;
+        if (!summary.isEmpty())
+            summary += ", ";
+        summary += QString("%1 (%2 cells)").arg(rules[it.key()].texturePath).arg(it.value());
+    }
+
+    statusLabel->setText(QString("Auto Paint complete: %1").arg(summary));
+    LOG_INFO(QString("Landscape auto-paint: %1 layers across %2 cells")
+        .arg(perLayerCounts.size()).arg(assignment.size()));
 }
 
 void LandscapeEditor::onAddPlant()
