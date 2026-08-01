@@ -1,4 +1,4 @@
-# OpenCK Unified Completion Plan
+﻿# OpenCK Unified Completion Plan
 
 > Reconciling the ESM I/O plan, the real-CK 395-file probe,
 > the Tes4Codes cross-reference, and the original 10-phase plan.
@@ -597,7 +597,7 @@ Sources reconciled here:
 
 | # | Task | Notes |
 |---|------|-------|
-| 16.1 | Scene (SCEN) timeline editor — action list, phase timeline, actor assignment | ✅ Partial: `ScenRecord` struct created + wired end-to-end (CkId, Data collection, continueLoading, Document::save, Object Window "Scene" category now backed); opens in generic dialog with raw-subrecord inspector; timeline UI pending. +`test_scenrecord` |
+| 16.1 | Scene (SCEN) timeline editor - action list, phase timeline, actor assignment | ◐ Partial: ScenRecord struct created + wired end-to-end; ScenePhaseModel (src/model/tools/) adds the editor-side phase timeline model (insert/remove/move with clamping, pack), tested via test_scenephasemodel; on-disk PHDA binary encoding still round-trips through raw subrecords until validated against real data. Timeline widget UI pending |
 | 16.2 | EffectShader / ImageSpaceModifier (EFSH/IMGS) editor | ✅ Partial: EFSH/IMGS open in the generic dialog with a `RawSubrecordWidget` inspector showing all unparsed subrecords (name/size/hex); typed field panels pending (structs parse EDID only, everything else round-trips losslessly via rawSubRecords) |
 | 16.3 | AI Package (PACK) editor completion — conditions grid, schedule data, package data | ✅ Partial: `PackDataWidget` (EditorID, package/target type, flags, target list) registered as `"PACK"` factory + editSelected case; `aipackageeditor`/`PackEditor` remain for list browsing |
 | 16.4 | Worldspace editor completion — map data, climate, water, LOD settings, cell grid | ✅ Partial: `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) registered as `"WRLD"` factory + editSelected case; map/LOD/cell-grid editing still pending |
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **267/310** | ◐ |
+| **TOTAL** | **268/310** | ◐ |
 
 ---
 

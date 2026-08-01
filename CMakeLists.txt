@@ -424,6 +424,7 @@ set(MODEL_SOURCES
     src/model/tools/opallist.cpp
     src/model/tools/particleslodpresets.cpp
     src/model/tools/particlebundle.cpp
+    src/model/tools/scenephasemodel.cpp
     src/model/doc/document.cpp
     src/model/doc/documentmediator.cpp
     src/model/doc/loader.cpp
@@ -524,6 +525,7 @@ set(MODEL_HEADERS
     src/model/tools/opallist.hpp
     src/model/tools/particleslodpresets.hpp
     src/model/tools/particlebundle.hpp
+    src/model/tools/scenephasemodel.hpp
     src/model/tools/lodgenerator.hpp
     src/model/tools/treelodgenerator.hpp
     src/model/tools/textureatlasgenerator.hpp

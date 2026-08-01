@@ -365,6 +365,12 @@ target_link_libraries(test_fuzparser PRIVATE openck_files test_stubs Qt6::Test)
 target_include_directories(test_fuzparser PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_fuzparser)
 
+# Scene (SCEN) phase timeline model
+add_executable(test_scenephasemodel test_scenephasemodel.cpp)
+target_link_libraries(test_scenephasemodel PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_scenephasemodel PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_scenephasemodel)
+
 # Helper that writes a minimal test plugin for manual CLI verification
 add_executable(make_testplugin make_testplugin.cpp)
 target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)
