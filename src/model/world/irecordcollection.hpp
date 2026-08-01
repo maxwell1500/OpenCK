@@ -16,6 +16,7 @@ public:
     virtual int searchId(const QString& id) const = 0;
     virtual QString getEditorId(int index) const = 0;
     virtual quint32 getFormId(int index) const = 0;
+    virtual void setFormId(int index, quint32 formId) = 0;
     virtual bool containsFormId(quint32 formId) const = 0;
     virtual bool isRecordModified(int index) const = 0;
     virtual QVector<QString> getAllIds(bool includeDeleted = true) const = 0;

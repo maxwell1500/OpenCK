@@ -275,6 +275,12 @@ target_link_libraries(test_iconrenderer PRIVATE openck_model test_stubs Qt6::Tes
 target_include_directories(test_iconrenderer PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_iconrenderer)
 
+# Real plugin compaction: form-ID renumbering + reference re-pointing
+add_executable(test_plugincompactor test_plugincompactor.cpp)
+target_link_libraries(test_plugincompactor PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_plugincompactor PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_plugincompactor)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

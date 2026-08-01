@@ -702,7 +702,7 @@ Sources reconciled here:
 | 23.1 | CSV Snippets system: column-based import/export with nested `.Import=file.txt` templates and form-field accessors `<Type:Field.SubField.Count>` | ✅ `CsvSnippet` (`libs/files/data/csvsnippet.hpp/.cpp`): parses snippet templates with `.Import=` nested-file inlining (depth-guarded), `#` comments, and `<Type:Field>`, `<Type:Field.SubField>` and `<Type:Field.Count>` accessors resolved against a record's JSON view; `test_csvsnippet` covers substitution/import/comments/missing fields |
 | 23.2 | OPAL procedural placement lists (.opl) | ✅ `OpalList` (`src/model/tools/opallist.hpp/.cpp`): CSV parser for `.opl` files (quoted-field aware, `#` comments, row padding to header width, column lookup); `test_opallist` |
 | 23.3 | Find Forms by condition dialog | ✅ SearchDialog already provides Find-by-condition: multi-criteria rows with AND/OR logic, per-type filter, EditorID/FormID/Name fields, match modes (contains/starts/ends/exact/regex), saved searches + history |
-| 23.4 | Real plugin compaction: form-ID renumbering + reference re-pointing (not count-and-save) | `mainwindow.cpp:2057` currently superficial |
+| 23.4 | Real plugin compaction: form-ID renumbering + reference re-pointing (not count-and-save) | ? `PluginCompactor` (`src/model/tools/plugincompactor.hpp/.cpp`): `collectFormIds` (dedup from all collections), `buildMap` (dense local-ID renumbering preserving the master-index byte), `remap` (unmapped/master-owned IDs pass through), `repointRefr` (base/owner/script refs) + `repointCell` (owner); `IRecordCollection::setFormId` added (promotes base records to Modified so new IDs persist on save); Compact Small Master action now renumbers every record's form ID and re-points REFR/CELL references before saving; `test_plugincompactor` |
 | 23.5 | Master file management (MMS): master update source, free-ID allocation control | CK `[MMS]` section |
 | 23.6 | Plugin upload to Bethesda.net (login/logout, upload) | CK BNet logs present in Morrowind project |
 | 23.7 | xEdit-style validation/analysis export | ✅ `ReportExport` (`reports.hpp/.cpp`): `messagesToText`/`exportMessages` write a Level/Type/ID/Message/Hint TSV report; Warnings dock has an "Export Report..." button writing the last validation run to a file; `test_reportexport` covers format/file/empty/sanitization |
@@ -754,9 +754,9 @@ Sources reconciled here:
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 5/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
-| 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
+| 23 — Data Workflows & Plugin Utilities | 7/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **274/310** | ◐ |
+| **TOTAL** | **275/310** | ◐ |
 
 ---
 
@@ -808,7 +808,7 @@ Phase 19: Material editor & asset pipeline (DDS import/decode + rule templates d
 Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
 Phase 21: Scripting completion (Script Manager, .ppj, .flg, structured diagnostics, type-checker property access done; spell-check, LSP, remote debugger pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
-Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)
+Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions, real form-ID compaction done; MMS, BNet pending)
 Phase 24: Infrastructure & ecosystem ✅ (headless CLI, Git Check In/Out, i18n, CI/CD, packaging, crash bundle, layout save/load, shortcuts, saved filters, Galaxy/Packin menus done)
 ```
 

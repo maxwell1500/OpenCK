@@ -56,6 +56,7 @@ public:
     // Default implementations for IRecordCollection (overridden in Collection<T>)
     QString getEditorId(int index) const override { return getId(index); }
     quint32 getFormId(int) const override { return 0; }
+    void setFormId(int, quint32) override {}
     bool containsFormId(quint32) const override { return false; }
     bool isRecordModified(int) const override { return false; }
     void saveModifiedRecords(ESMWriter&, uint32_t) const override {}

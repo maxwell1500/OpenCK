@@ -106,6 +106,7 @@ public:
 
     // IRecordCollection overrides
     quint32 getFormId(int index) const override;
+    void setFormId(int index, quint32 formId) override;
     bool containsFormId(quint32 formId) const override;
     bool isRecordModified(int index) const override;
     void saveModifiedRecords(ESMWriter& writer, uint32_t recordType) const override;

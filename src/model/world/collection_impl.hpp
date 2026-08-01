@@ -25,6 +25,31 @@ quint32 Collection<ESXRecord, IdAccessorT>::getFormId(int index) const
 }
 
 template<typename ESXRecord, typename IdAccessorT>
+void Collection<ESXRecord, IdAccessorT>::setFormId(int index, quint32 formId)
+{
+    if constexpr (HasFormIdField<ESXRecord>::value)
+    {
+        if (index >= 0 && index < records.size())
+        {
+            Record<ESXRecord>& rec = records[index];
+            if (rec.state == State_Base || rec.state == State_Deleted)
+            {
+                // Promote the record to Modified so the new ID is persisted.
+                rec.modifiedRecord = rec.baseRecord;
+                rec.modifiedRecord.formId = formId;
+                rec.state = State_Modified;
+            }
+            else
+            {
+                rec.get().formId = formId;
+                if (rec.state == State_Modified)
+                    rec.modifiedRecord.formId = formId;
+            }
+        }
+    }
+}
+
+template<typename ESXRecord, typename IdAccessorT>
 bool Collection<ESXRecord, IdAccessorT>::containsFormId(quint32 formId) const
 {
     if constexpr (HasFormIdField<ESXRecord>::value)

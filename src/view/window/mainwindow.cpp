@@ -12,6 +12,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/tools/gitrepository.hpp"
 #include "../../model/tools/primitivemeshgenerator.hpp"
+#include "../../model/tools/plugincompactor.hpp"
 #include "../../model/doc/messages.hpp"
 #include "filepaths.hpp"
 #include "searchdialog.hpp"
@@ -98,6 +99,8 @@
 #include <QVector3D>
 
 #include "../../../libs/files/esm/refrecord.hpp"
+#include "../../../libs/files/esm/cellrecord.hpp"
+#include "../../model/world/idcollection.hpp"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -2334,49 +2337,82 @@ void MainWindow::on_actionCompactSmallMaster_triggered()
 
     showProgress(0, 100);
 
-    int totalRecords = 0;
-    int deletedRecords = 0;
+    // Build the renumbering map from every record's form ID.
+    const QVector<IRecordCollection*> collections = mData->allCollections();
+    QVector<const IRecordCollection*> constCollections;
+    for (IRecordCollection* col : collections)
+        constCollections.append(col);
 
-    auto countCollection = [&](const BaseCollection& collection) {
-        for (int i = 0; i < collection.size(); ++i) {
-            totalRecords++;
-            if (collection.getRecord(i).isDeleted()) {
-                deletedRecords++;
+    const QVector<quint32> formIds = PluginCompactor::collectFormIds(constCollections);
+    const PluginCompactor::RenumberMap renumberMap = PluginCompactor::buildMap(formIds);
+
+    PluginCompactor::Result result;
+    result.totalRecords = static_cast<int>(formIds.size());
+
+    showProgress(30, 100);
+
+    // Phase 1: renumber each record's own form ID through the generic
+    // collection interface (promotes base records to Modified so the new
+    // IDs persist on save).
+    for (IRecordCollection* col : collections)
+    {
+        for (int i = 0; i < col->count(); ++i)
+        {
+            const quint32 oldId = col->getFormId(i);
+            if (oldId == 0)
+                continue;
+            const quint32 newId = PluginCompactor::remap(renumberMap, oldId);
+            if (newId != oldId)
+            {
+                col->setFormId(i, newId);
+                ++result.renumbered;
             }
         }
-    };
+    }
 
-    countCollection(mData->getNpcCollection());
-    countCollection(mData->getWeaponCollection());
-    countCollection(mData->getArmorCollection());
-    countCollection(mData->getSpellCollection());
-    countCollection(mData->getQuestCollection());
-    countCollection(mData->getDialCollection());
-    countCollection(mData->getInfoCollection());
-    countCollection(mData->getBookCollection());
-    countCollection(mData->getMiscCollection());
-    countCollection(mData->getStatCollection());
-    countCollection(mData->getActiCollection());
-    countCollection(mData->getContCollection());
-    countCollection(mData->getAlchCollection());
-    countCollection(mData->getIngrCollection());
-    countCollection(mData->getEnchCollection());
-    countCollection(mData->getTreeCollection());
+    showProgress(60, 100);
 
-    showProgress(50, 100);
+    // Phase 2: re-point references that target renumbered records.
+    // REFR records carry base-object / owner / script references.
+    IdCollection<RefrRecord>& refrCol = mData->getRefrCollection();
+    for (int i = 0; i < refrCol.size(); ++i)
+    {
+        Record<RefrRecord>& rec = refrCol.getRecord(i);
+        if (rec.isErased() || rec.isDeleted())
+            continue;
+        PluginCompactor::repointRefr(rec.get(), renumberMap, result);
+    }
+
+    // CELL records carry an owner reference.
+    IdCollection<CellRecord>& cellCol = mData->getCellCollection();
+    for (int i = 0; i < cellCol.size(); ++i)
+    {
+        Record<CellRecord>& rec = cellCol.getRecord(i);
+        if (rec.isErased() || rec.isDeleted())
+            continue;
+        PluginCompactor::repointCell(rec.get(), renumberMap, result);
+    }
+
+    showProgress(90, 100);
+
+    // Records owned by other masters keep their IDs.
+    result.skippedMasterOwned = result.totalRecords - result.renumbered;
 
     emit actionSaveAs_triggered();
 
-    updateStatus(QString("Compacted: %1 of %2 records were deleted-flagged").arg(deletedRecords).arg(totalRecords));
+    updateStatus(QString("Compacted: %1 records renumbered, %2 references re-pointed")
+        .arg(result.renumbered).arg(result.repointedReferences));
     hideProgress();
 
     QMessageBox::information(this, "Compact Small Master",
-        QString("Compaction analysis complete.\n\n"
-                "Total records scanned: %1\n"
-                "Deleted-flagged records: %2\n\n"
-                "The master has been saved to the selected path.\n"
-                "Deleted records are skipped during save, producing a smaller file.")
-            .arg(totalRecords).arg(deletedRecords));
+        QString("Compaction complete.\n\n"
+                "Form IDs renumbered: %1\n"
+                "References re-pointed: %2\n"
+                "Master-owned records left unchanged: %3\n\n"
+                "The compacted plugin has been saved to the selected path.")
+            .arg(result.renumbered)
+            .arg(result.repointedReferences)
+            .arg(result.skippedMasterOwned));
 }
 
 void MainWindow::on_actionSaveAllButton_triggered()
