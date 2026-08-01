@@ -311,6 +311,12 @@ target_link_libraries(test_spellchecker PRIVATE openck_model test_stubs Qt6::Tes
 target_include_directories(test_spellchecker PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_spellchecker)
 
+# BSMaterial shader property graph (TextureSet slots, blenders, SSS)
+add_executable(test_materialpropertygraph test_materialpropertygraph.cpp)
+target_link_libraries(test_materialpropertygraph PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_materialpropertygraph PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_materialpropertygraph)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)
