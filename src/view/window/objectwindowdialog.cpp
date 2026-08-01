@@ -22,6 +22,7 @@
 #include "packdatawidget.hpp"
 #include "worldspacedatawidget.hpp"
 #include "locationdatawidget.hpp"
+#include "navmesheditordialog.hpp"
 #include "lcrteditor.hpp"
 #include "logger.hpp"
 #include "../../model/tools/blenderlauncher.hpp"
@@ -865,6 +866,70 @@ void ObjectWindowDialog::editSelected()
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
             openck::QtFormDialogManager::instance().openOrFocus(
                 formIdKey, QStringLiteral("WTHR"), &rec.components, &rec, this);
+        }
+        break;
+    }
+    case CkId::Type_Navm_:
+    {
+        auto& collection = mData->getNavmCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            NavmRecord original = record.get();
+
+            NavMeshData navData;
+            navData.vertices = original.vertices;
+            navData.triangles.reserve(original.triangles.size());
+            for (const auto& t : original.triangles)
+            {
+                NavTriangle nt;
+                nt.v0 = t.v0;
+                nt.v1 = t.v1;
+                nt.v2 = t.v2;
+                nt.walkable = (t.flags & 1) != 0;
+                if (nt.v0 >= 0 && nt.v0 < navData.vertices.size() &&
+                    nt.v1 >= 0 && nt.v1 < navData.vertices.size() &&
+                    nt.v2 >= 0 && nt.v2 < navData.vertices.size())
+                {
+                    const QVector3D a = navData.vertices[nt.v1] - navData.vertices[nt.v0];
+                    const QVector3D b = navData.vertices[nt.v2] - navData.vertices[nt.v0];
+                    nt.normal = QVector3D::crossProduct(a, b);
+                    if (nt.normal.lengthSquared() > 0.0f)
+                        nt.normal.normalize();
+                }
+                navData.triangles.append(nt);
+            }
+
+            NavmeshEditorDialog dialog(this);
+            dialog.setNavMesh(navData);
+            if (dialog.exec() == QDialog::Accepted)
+            {
+                const NavMeshData edited = dialog.getNavMesh();
+                NavmRecord editedRecord = original;
+                editedRecord.vertices = edited.vertices;
+                editedRecord.triangles.clear();
+                editedRecord.triangles.reserve(edited.triangles.size());
+                for (const auto& nt : edited.triangles)
+                {
+                    NavmTriangle t;
+                    t.v0 = static_cast<qint16>(nt.v0);
+                    t.v1 = static_cast<qint16>(nt.v1);
+                    t.v2 = static_cast<qint16>(nt.v2);
+                    t.flags = nt.walkable ? 1 : 0;
+                    editedRecord.triangles.append(t);
+                }
+
+                auto& coll = mData->getNavmCollection();
+                int idx = coll.searchId(original.editorId);
+                if (idx >= 0 && mData->getUndoStack())
+                {
+                    EditRecordCommand<NavmRecord>* cmd = new EditRecordCommand<NavmRecord>(
+                        &coll, idx, original, editedRecord,
+                        "Edit Navmesh: " + original.editorId);
+                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
+                }
+                LOG_INFO(QString("Navmesh '%1' edited").arg(original.editorId));
+            }
         }
         break;
     }

@@ -238,3 +238,9 @@ add_executable(test_specialized_widgets test_specialized_widgets.cpp)
 target_link_libraries(test_specialized_widgets PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
 target_include_directories(test_specialized_widgets PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_specialized_widgets)
+
+# NavmRecord load/save round-trip
+add_executable(test_navmrecord test_navmrecord.cpp)
+target_link_libraries(test_navmrecord PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_navmrecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_navmrecord)

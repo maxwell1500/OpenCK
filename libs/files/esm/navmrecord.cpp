@@ -17,10 +17,11 @@ void NavmRecord::load(ESMReader& esm, bool) {
             handled = true; break;
         }
         case 'NVTR': {
-            qint64 count = esm.subLeft() / 6;
+            qint64 count = esm.subLeft() / 7;
             for (qint64 i = 0; i < count; ++i) {
                 NavmTriangle tri;
                 tri.v0 = esm.readType<qint16>(); tri.v1 = esm.readType<qint16>(); tri.v2 = esm.readType<qint16>();
+                tri.flags = esm.readType<quint8>();
                 triangles.append(tri);
             }
             handled = true; break;
@@ -57,7 +58,7 @@ void NavmRecord::save(ESMWriter& esm) const {
     }
     if (!triangles.isEmpty()) {
         esm.startSubRecord('NVTR');
-        for (const auto& tri : triangles) { esm.writeType<qint16>(tri.v0); esm.writeType<qint16>(tri.v1); esm.writeType<qint16>(tri.v2); }
+        for (const auto& tri : triangles) { esm.writeType<qint16>(tri.v0); esm.writeType<qint16>(tri.v1); esm.writeType<qint16>(tri.v2); esm.writeType<quint8>(tri.flags & 0xFF); }
         esm.endSubRecord();
         esm.startSubRecord('NVCA');
         for (const auto& tri : triangles) { esm.writeType<qint16>(tri.edge0); esm.writeType<qint16>(tri.edge1); esm.writeType<qint16>(tri.edge2); }

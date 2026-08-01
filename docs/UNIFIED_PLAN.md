@@ -604,7 +604,7 @@ Sources reconciled here:
 | 16.5 | Location (LCTN) editor — linked references, LocRefTypes, references list | ✅ Partial: `LocationDataWidget` (name, parent, X/Y/Z) registered as `"LCTN"` factory + editSelected case; linked refs/LocRefTypes not yet parsed |
 | 16.6 | Planet (PNDT) editor (Starfield) — star system, biomes, traits, day length, resources | Real CK snippet: `<PNDT:Biomes>...<PNDT:Resources.Count>` |
 | 16.7 | CCT creature editor (Starfield attach points) — ap_CCT_Attack/Defense/Faction/Diet/Size/Skin/Speed/Temperament | Attach-point-driven mod system |
-| 16.8 | NavMesh editor completion — connect interiors/worldspace, clean splines, finalize cell navmeshes, check navmeshes | Real CK menu actions; current editor has triangle tables only |
+| 16.8 | NavMesh editor completion — connect interiors/worldspace, clean splines, finalize cell navmeshes, check navmeshes | ✅ Partial: NAVM `editSelected` case opens `NavmeshEditorDialog` seeded from `NavmRecord` (vertices + triangles + walkable flags) and writes back via `EditRecordCommand`; fixed `NavmRecord` NVTR flag serialization (flags now round-trip); +`test_navmrecord` |
 
 ## Phase 17: Terrain & Landscape Completion ⬜
 
@@ -743,7 +743,7 @@ Sources reconciled here:
 | 13 — Editor Workspace Parity | 14/14 | ✅ |
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
-| 16 — Specialized Editor Completion | 3/8 | ◐ |
+| 16 — Specialized Editor Completion | 4/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 0/9 | ⬜ |
 | 18 — Audio Pipeline | 0/7 | ⬜ |
 | 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
@@ -752,7 +752,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
 | 24 — Infrastructure & Ecosystem | 0/11 | ⬜ |
-| **TOTAL** | **231/310** | ◐ |
+| **TOTAL** | **232/310** | ◐ |
 
 ---
 
@@ -797,7 +797,7 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 
 ```
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
-Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets done; SCEN, EFSH/IMGS, PNDT, CCT, NavMesh record binding next)
+Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding done; SCEN, EFSH/IMGS, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (.lbr brushes, overlay masks, heightmap import, undo/redo, BTD)
 Phase 18: Audio pipeline (playback engine, XWM/FUZ, LipGenerator, FaceFX, Wwise soundbanks, RoboVoicer)
 Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)
