@@ -18,6 +18,8 @@ class QOpenGLContext;
 class QOffscreenSurface;
 class QOpenGLShaderProgram;
 
+#include "../../../model/tools/iconrenderer.hpp"
+
 class AssetBrowserWidget : public QWidget
 {
     Q_OBJECT
@@ -40,6 +42,7 @@ private slots:
     void onFilterChanged(int index);
     void onSearchTextChanged(const QString& text);
     void onFileContextMenu(const QPoint& pos);
+    void generateIcon();
 
 private:
     void setupUI();
@@ -51,6 +54,7 @@ private:
     QPixmap generateNifThumbnail(const QString& filePath);
     QStringList scanDependencies(const QString& filePath);
     void initPreviewGL();
+    void runIconRender(const QString& nifPath, IconRenderer::Context ctx);
 
     QSplitter* mMainSplitter;
     QTreeView* mDirTree;
@@ -81,6 +85,7 @@ private:
     QOpenGLVertexArrayObject* mPreviewVAO;
     bool mPreviewGLInitialized;
     QPoint mDragStartPos;
+    QString mPendingIconPath;
 };
 
 #endif // ASSETBROWSERWIDGET_HPP

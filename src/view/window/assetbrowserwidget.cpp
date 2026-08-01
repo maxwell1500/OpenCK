@@ -29,10 +29,14 @@
 #include <QOpenGLWidget>
 #include <QMatrix4x4>
 #include <QDataStream>
+#include <QProcess>
+#include <QMessageBox>
 #include <functional>
 
 #include "nifviewportwidget.hpp"
 #include "../../libs/files/nif/nifparser.hpp"
+#include "../../model/tools/blenderlauncher.hpp"
+#include "../../model/tools/iconrenderer.hpp"
 #include "logger.hpp"
 
 static double parseWavDuration(const QString& filePath)
@@ -813,11 +817,21 @@ void AssetBrowserWidget::onFileContextMenu(const QPoint& pos)
     QAction* copyPathAction = menu.addAction(tr("Copy Path"));
     QAction* openAction = menu.addAction(tr("Open in Editor"));
 
+    const bool isNif = filePath.endsWith(QStringLiteral(".nif"), Qt::CaseInsensitive);
+    QAction* iconAction = nullptr;
+    if (isNif) {
+        menu.addSeparator();
+        iconAction = menu.addAction(tr("Generate Icon..."));
+    }
+
     QAction* chosen = menu.exec(mFileList->viewport()->mapToGlobal(pos));
     if (chosen == copyPathAction) {
         QApplication::clipboard()->setText(filePath);
     } else if (chosen == openAction) {
         emit assetDoubleClicked(filePath);
+    } else if (chosen == iconAction && isNif) {
+        mPendingIconPath = filePath;
+        generateIcon();
     }
 }
 
@@ -828,4 +842,68 @@ QString AssetBrowserWidget::fileTypeForExtension(const QString& ext) const
     if (mTextureExts.contains(lower)) return tr("Texture");
     if (mSoundExts.contains(lower)) return tr("Sound");
     return tr("Unknown");
+}
+
+void AssetBrowserWidget::generateIcon()
+{
+    if (mPendingIconPath.isEmpty()) {
+        return;
+    }
+
+    const QFileInfo nifInfo(mPendingIconPath);
+    const QString outPath = nifInfo.absolutePath()
+        + QStringLiteral("/%1_icon.png").arg(nifInfo.completeBaseName());
+
+    QMessageBox::StandardButton choice = QMessageBox::question(this,
+        tr("Generate Icon"),
+        tr("Render %1 as a %2-size icon?\nOutput: %3")
+            .arg(nifInfo.fileName())
+            .arg(IconRenderer::contextSize(IconRenderer::Context::Inventory))
+            .arg(outPath),
+        QMessageBox::Ok | QMessageBox::Cancel);
+
+    if (choice != QMessageBox::Ok) {
+        return;
+    }
+
+    runIconRender(mPendingIconPath, IconRenderer::Context::Inventory);
+}
+
+void AssetBrowserWidget::runIconRender(const QString& nifPath, IconRenderer::Context ctx)
+{
+    if (!QFile::exists(IconRenderer::scriptPath())) {
+        QMessageBox::warning(this, tr("Generate Icon"),
+            tr("The icon generation script is missing:\n%1").arg(IconRenderer::scriptPath()));
+        return;
+    }
+
+    const QString blender = BlenderLauncher::getRecommendedBlenderPath();
+    if (blender.isEmpty()) {
+        QMessageBox::warning(this, tr("Generate Icon"),
+            tr("Blender was not found. Install Blender to generate icons."));
+        return;
+    }
+
+    const QFileInfo nifInfo(nifPath);
+    const QString outPath = nifInfo.absolutePath()
+        + QStringLiteral("/%1_icon.png").arg(nifInfo.completeBaseName());
+
+    auto* process = new QProcess(this);
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, outPath, process](int exitCode, QProcess::ExitStatus) {
+        process->deleteLater();
+        if (exitCode == 0) {
+            QMessageBox::information(this, tr("Generate Icon"),
+                tr("Icon generated:\n%1").arg(outPath));
+        } else {
+            QMessageBox::warning(this, tr("Generate Icon"),
+                tr("Icon generation failed."));
+        }
+    });
+
+    const QStringList args = IconRenderer::blenderArguments(
+        blender, nifPath, outPath, ctx);
+    process->start(args.first(), args.mid(1));
+    LOG_INFO(QString("AssetBrowser: generating icon for %1 (%2)")
+        .arg(nifPath).arg(IconRenderer::contextName(ctx)));
 }

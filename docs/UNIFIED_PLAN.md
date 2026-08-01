@@ -668,7 +668,7 @@ Sources reconciled here:
 | 20.2 | Particle LOD presets (`ParticlesLODPresets.json` budgets per category × Near/Middle/Far) | ✅ `ParticleLodPresets` (`src/model/tools/particleslodpresets.hpp/.cpp`): parses JSON category budgets (near/middle/far), array or `{"presets":[...]}`; `test_particleslodpresets` |
 | 20.3 | Projectile variable bindings (BeamLength, BeamLifeTime, HasHit) | ✅ `ParticleProjectileBindings` (`src/model/tools/particleprojectilebindings.hpp/.cpp`): parses `.pofx`-style JSON binding lists (`particleVariable` → `projectileAttribute`), known-variable set, file loader; `test_particleprojectilebindings` |
 | 20.4 | NIF preview primitives (cube/cylinder/plane/sphere) | ✅ `PrimitiveMeshGenerator` (`src/model/tools/primitivemeshgenerator.hpp/.cpp`): triangle meshes for cube (12 tris), cylinder (side+cap fans), XZ plane, latitude/longitude sphere; NifViewportWidget has `showPreviewPrimitive`/`clearPreviewPrimitive` rendering via the overlay VBO; View menu → Preview Primitive (Cube/Cylinder/Plane/Sphere/Clear); `test_primitivemeshgenerator` |
-| 20.5 | Icon generation renderer: 3-light rig (warm/cool/key), cubemap background, per-context sizes (inventory 128, workshop/shipbuilder 512) | `CreationKitCustom_*.ini` `[Preview]`/`[IconGenerator]` |
+| 20.5 | Icon generation renderer: 3-light rig (warm/cool/key), cubemap background, per-context sizes (inventory 128, workshop/shipbuilder 512) | ? `IconRenderer` (`src/model/tools/iconrenderer.hpp/.cpp`): per-context size table (Inventory 128, Workshop 512, ShipBuilder 512) + default 3-light rig (warm fill front-left, cool rim back-right, key light front-top) + Blender argument builder; `scripts/blender/icon_generator.py` renders a NIF at the target size with the rig over a transparent background; Asset Browser context menu "Generate Icon..." on .nif files; `test_iconrenderer` |
 
 ## Phase 21: Scripting Completion ◐
 
@@ -751,12 +751,12 @@ Sources reconciled here:
 | 17 — Terrain & Landscape Completion | 7/9 | ◐ |
 | 18 — Audio Pipeline | 3/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 2/7 | ◐ |
-| 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
+| 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 5/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **273/310** | ◐ |
+| **TOTAL** | **274/310** | ◐ |
 
 ---
 
@@ -805,7 +805,7 @@ Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMes
 Phase 17: Terrain & landscape completion (brush alpha masks now added; material painting with slope influence done; overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (.fuz container, local WAV processing, WavePlayer done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode + rule templates done; BSMaterial graph, texture conversion, mesh/phys LOD, FBX→NIF pending)
-Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)
+Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
 Phase 21: Scripting completion (Script Manager, .ppj, .flg, structured diagnostics, type-checker property access done; spell-check, LSP, remote debugger pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)

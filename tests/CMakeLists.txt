@@ -269,6 +269,12 @@ target_link_libraries(test_brushalphamask PRIVATE openck_model test_stubs Qt6::T
 target_include_directories(test_brushalphamask PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_brushalphamask)
 
+# Icon generation renderer (context sizes, light rig, Blender invocation)
+add_executable(test_iconrenderer test_iconrenderer.cpp)
+target_link_libraries(test_iconrenderer PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_iconrenderer PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_iconrenderer)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

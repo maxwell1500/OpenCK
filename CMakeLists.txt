@@ -416,6 +416,7 @@ endif()
 set(MODEL_SOURCES
     src/model/tools/brushdefinition.cpp
     src/model/tools/brushalphamask.cpp
+    src/model/tools/iconrenderer.cpp
     src/model/tools/referencebatchactions.cpp
     src/model/tools/gitrepository.cpp
     src/model/tools/primitivemeshgenerator.cpp
@@ -519,6 +520,7 @@ set(MODEL_HEADERS
     src/model/tools/batchtools.hpp
     src/model/tools/brushdefinition.hpp
     src/model/tools/brushalphamask.hpp
+    src/model/tools/iconrenderer.hpp
     src/model/tools/referencebatchactions.hpp
     src/model/tools/gitrepository.hpp
     src/model/tools/primitivemeshgenerator.hpp
@@ -947,6 +949,8 @@ add_custom_command(
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/blender/preview_generator.py $<TARGET_FILE_DIR:openck>/scripts/blender/
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/blender/blender_operations.py $<TARGET_FILE_DIR:openck>/scripts/blender/
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/blender/icon_generator.py $<TARGET_FILE_DIR:openck>/scripts/blender/
 )
 
 # Deploy Qt6 runtime DLLs to output directory
