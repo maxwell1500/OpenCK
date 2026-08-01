@@ -197,6 +197,21 @@ QStringList PapyrusCompiler::validateFlagFile(const QString& flagFilePath)
     return problems;
 }
 
+bool PapyrusCompiler::parseDiagnostic(const QString& line, CompilerError& error)
+{
+    error = CompilerError();
+    error.line = 0;
+    error.column = 0;
+
+    PapyrusCompiler tmp;
+    if (tmp.parseWithStrategy5(line, error)) return true;
+    if (tmp.parseWithStrategy1(line, error)) return true;
+    if (tmp.parseWithStrategy2(line, error)) return true;
+    if (tmp.parseWithStrategy3(line, error)) return true;
+    if (tmp.parseWithStrategy4(line, error)) return true;
+    return false;
+}
+
 bool PapyrusCompiler::compile()
 {
     if (compilerPath.isEmpty()) {
@@ -296,7 +311,9 @@ void PapyrusCompiler::parseCompilerOutput(const QString& output)
         error.column = 0;
         bool parsed = false;
 
-        if (parseWithStrategy1(line, error)) {
+        if (parseWithStrategy5(line, error)) {
+            parsed = true;
+        } else if (parseWithStrategy1(line, error)) {
             parsed = true;
         } else if (parseWithStrategy2(line, error)) {
             parsed = true;
@@ -463,6 +480,12 @@ bool PapyrusCompiler::parseWithStrategy4(const QString& line, CompilerError& err
         return false;
     }
 
+    // Require a file reference or a line number; otherwise a bare
+    // "No errors." style line would be mis-parsed as a diagnostic.
+    if (!line.contains(".psc", Qt::CaseInsensitive) && !line.contains('(')) {
+        return false;
+    }
+
     if (line.contains("Error", Qt::CaseInsensitive)) {
         error.severity = CompilerError::Severity::Error;
     } else if (line.contains("Fatal", Qt::CaseInsensitive)) {
@@ -489,6 +512,39 @@ bool PapyrusCompiler::parseWithStrategy4(const QString& line, CompilerError& err
     }
 
     error.message = line.trimmed();
+    return true;
+}
+
+// Structured grammar strategy: handles the canonical Papyrus compiler
+// diagnostic format
+//   "<path>.psc(<line>,<col>): <severity>: <message>"
+// and the compact variant
+//   "<path>.psc(<line>): <severity>: <message>"
+// The path may be a full path (with slashes) or just the file name.
+bool PapyrusCompiler::parseWithStrategy5(const QString& line, CompilerError& error)
+{
+    static const QRegularExpression re(
+        QStringLiteral(R"((.+?\.psc)\((\d+)(?:,\s*(\d+))?\)\s*:\s*(Error|Warning|Fatal)\s*:\s*(.*))"),
+        QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpressionMatch m = re.match(line);
+    if (!m.hasMatch()) {
+        return false;
+    }
+
+    error.file = m.captured(1).trimmed();
+    error.line = m.captured(2).toInt();
+    error.column = m.captured(3).isEmpty() ? 0 : m.captured(3).toInt();
+
+    const QString severity = m.captured(4).toLower();
+    if (severity == QLatin1String("error")) {
+        error.severity = CompilerError::Severity::Error;
+    } else if (severity == QLatin1String("fatal")) {
+        error.severity = CompilerError::Severity::Fatal;
+    } else {
+        error.severity = CompilerError::Severity::Warning;
+    }
+
+    error.message = m.captured(5).trimmed();
     return true;
 }
 

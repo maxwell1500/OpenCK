@@ -51,6 +51,11 @@ public:
     // empty if the file parses cleanly (or is absent).
     static QStringList validateFlagFile(const QString& flagFilePath);
 
+    // Parses a single compiler diagnostic line into a CompilerError using
+    // the same strategy chain as compile(). Returns true if the line was
+    // recognized as a diagnostic.
+    static bool parseDiagnostic(const QString& line, CompilerError& error);
+
     QVector<CompilerError> getLastErrors() const { return lastErrors; }
 
     bool compile();
@@ -76,6 +81,7 @@ private:
     bool parseWithStrategy2(const QString& line, CompilerError& error);
     bool parseWithStrategy3(const QString& line, CompilerError& error);
     bool parseWithStrategy4(const QString& line, CompilerError& error);
+    bool parseWithStrategy5(const QString& line, CompilerError& error);
     QString extractLineNumber(const QString& line, int startPos) const;
     QString escapePath(const QString& path) const;
     bool compileScript(const QString& scriptPath);

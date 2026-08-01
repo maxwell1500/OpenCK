@@ -681,7 +681,7 @@ Sources reconciled here:
 | 21.5 | Papyrus language server (LSP protocol) integration | `vscodepapyrus` includes Antlr4 language server |
 | 21.6 | Remote debugger protocol (port 20548 pattern): breakpoints, locals, watch, step | `PapyrusRemoteDebugger.exe` |
 | 21.7 | Papyrus type checker completion: struct members, array types, property access | `papyrustypechecker.cpp` partial |
-| 21.8 | Papyrus error parsing from heuristic regexes to structured grammar | `papyruscompiler.cpp:297-471` |
+| 21.8 | Papyrus error parsing from heuristic regexes to structured grammar | ✅ Added `parseWithStrategy5`: a structured regex grammar for the canonical `path.psc(line,col): severity: message` (and no-column) format, tried first in the strategy chain; strategy 4 tightened to require a file/line reference so bare "No errors." lines aren't mis-parsed; public `PapyrusCompiler::parseDiagnostic(line, error)` for reuse/tests; `test_papyruscompiler` |
 
 ## Phase 22: Behavior / Animation Graph Editor ⬜
 
@@ -752,11 +752,11 @@ Sources reconciled here:
 | 18 — Audio Pipeline | 1/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 1/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 2/5 | ◐ |
-| 21 — Scripting Completion | 2/8 | ◐ |
+| 21 — Scripting Completion | 3/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
-| **TOTAL** | **261/310** | ◐ |
+| **TOTAL** | **262/310** | ◐ |
 
 ---
 
@@ -806,7 +806,7 @@ Phase 17: Terrain & landscape completion (.lbr JSON brush system, R32 heightmap 
 Phase 18: Audio pipeline (WavePlayer waveOut streaming playback engine done; XWM/FUZ, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode done; BSMaterial graph, rule templates, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (NIF preview primitives + projectile variable bindings done; .pofx bundle editor, LOD presets, icon renderer pending)
-Phase 21: Scripting completion (.ppj projects + .flg flags done; Script Manager, spell-check, LSP, remote debugger, type-checker/error-parser completion pending)
+Phase 21: Scripting completion (.ppj projects, .flg flags, structured diagnostic parsing done; Script Manager, spell-check, LSP, remote debugger, type-checker completion pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions done; compaction, MMS, BNet pending)
 Phase 24: Infrastructure & ecosystem (Git Check In/Out, i18n, VCS, CI/CD, packaging, crash bundle, layout save/load, shortcuts, diagnostics, saved filters done; headless API pending)

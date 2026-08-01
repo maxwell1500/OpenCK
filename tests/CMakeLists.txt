@@ -329,6 +329,12 @@ target_link_libraries(test_ddsdecoder PRIVATE openck_files test_stubs Qt6::Test)
 target_include_directories(test_ddsdecoder PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_ddsdecoder)
 
+# Papyrus compiler diagnostic parsing (structured grammar)
+add_executable(test_papyruscompiler test_papyruscompiler.cpp)
+target_link_libraries(test_papyruscompiler PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_papyruscompiler PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_papyruscompiler)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel

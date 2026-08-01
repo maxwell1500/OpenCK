@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 261/310 steps complete (84%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 19 (1/7), 20 (2/5), 21 (2/8), 23 (6/9), 24 (10/11) in progress
-- **Phase 19 (partial)**: reusable DDS texture decoder (BC1-5 + uncompressed) with viewport integration, fixing a header-offset crash + R/B swap in the old loader. Build clean, 46/46 tests.
+- **Progress**: 262/310 steps complete (85%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 19 (1/7), 20 (2/5), 21 (3/8), 23 (6/9), 24 (10/11) in progress
+- **Phase 21 (partial)**: structured Papyrus diagnostic parsing (`.psc(line,col): severity: msg` grammar), `.ppj` parser, `.flg` validator. Build clean, 47/47 tests.
