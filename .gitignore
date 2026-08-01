@@ -92,3 +92,10 @@ ipch/
 translations/*.ts
 translations/*.qm
 !translations/.gitkeep
+
+# CPack source/binary packaging output
+_CPack_Packages/
+*.tar.gz
+*.tgz
+*.zip
+*.exe

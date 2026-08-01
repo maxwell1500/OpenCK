@@ -996,3 +996,28 @@ endif()
 
 # Localization: lupdate/lrelease .ts -> .qm build steps (optional)
 include(cmake/i18n.cmake)
+
+# ─── CPack: distributable installer packages ────────────────────────────────
+# `cmake --build build --config Release && cpack -C Release`
+# produces NSIS .exe (Windows) or TGZ/STGZ (Unix).
+if(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
+    set(CPACK_PACKAGE_NAME "OpenCK")
+    set(CPACK_PACKAGE_VENDOR "OpenCK Project")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Open-source Creation Kit alternative")
+    set(CPACK_PACKAGE_VERSION "1.0.0")
+    set(CPACK_PACKAGE_VERSION_MAJOR "1")
+    set(CPACK_PACKAGE_VERSION_MINOR "0")
+    set(CPACK_PACKAGE_VERSION_PATCH "0")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "OpenCK")
+    set(CPACK_NSIS_DISPLAY_NAME "OpenCK ${CPACK_PACKAGE_VERSION}")
+    set(CPACK_NSIS_HELP_LINK "https://github.com/maxwell1500/OpenCK")
+    set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/maxwell1500/OpenCK")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+
+    set(CPACK_SOURCE_GENERATOR "TGZ")
+    set(CPACK_SOURCE_IGNORE_FILES
+        "/build/;/out/;/\.git/;/translations/OpenCK_.*\\.ts$"
+        ".*\\.log$;.*\\.obj$;.*\\.pdb$;.*\\.tlog$"
+    )
+    include(CPack)
+endif()

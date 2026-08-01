@@ -716,7 +716,7 @@ Sources reconciled here:
 | 24.1 | Localization/i18n: QTranslator + .qm build step + .ts files | ✅ `cmake/i18n.cmake`: lupdate/lrelease pipeline via `openck_i18n_update` (generates `translations/OpenCK_en.ts`, 708 strings) + per-language `openck_i18n_<lang>` targets that deploy `.qm` next to `openck.exe`; `main.cpp` installs a QTranslator from the Language setting (falls back to system locale). Enable languages by adding to `OPENCK_TRANSLATION_LANGS` |
 | 24.2 | Version control integration (Perforce + Git): commit, branch, diff, check-in/out, sync, revert | Preferences Network page + Check In/Out are stubs (`preferencesdialog.cpp:335`, `mainwindow.cpp:2134`) |
 | 24.3 | CI/CD pipeline (GitHub Actions: build + all 26 tests on Windows) | ✅ `.github/workflows/windows-build.yml` upgraded to Qt 6.5.3 + MSVC 2019-arch; builds openck + all_tests, runs `ctest -C Release --output-on-failure`, uploads exe + test logs; new `all_tests` custom target builds every test (incl. ogg self-tests) |
-| 24.4 | Distributable installer packages (NSIS/WiX), CMake install target | TD L3; ADS DLL auto-deploy (TD L4) |
+| 24.4 | Distributable installer packages (NSIS/WiX), CMake install target | ✅ `cmake --install` installs exe + Qt DLLs + editor.ini + bundled Blender + license tree; CPack configured (NSIS binary on Windows via `cpack -C Release`, TGZ source generator with ignore rules). NSIS not installed locally so the .exe is built in CI |
 | 24.5 | Headless/scriptable API — Python-generated plugins pattern | Morrowind project proves the workflow; CLI record import/export |
 | 24.6 | Shortcut expansion (~30 wired vs 524 in real CK) + make ShortcutEditorDialog reachable | ✅ `ShortcutEditorDialog` now reachable via new Tools → Shortcuts... action (`on_actionShortcuts_triggered`, auto-connected by name); ~30 core shortcuts already wired in `applyShortcuts()`. Note: the two historical conflicts are resolved in code (QuestGraph=F10, AIPackages=Shift+F12; no WorldView binding) |
 | 24.7 | Layout save/load actions (enable `actionSaveLayout`/`actionLoadLayout`) | ✅ Save Layout... / Load Layout... now enabled and wired: geometry + ADS dock state via `WindowLayout`, `.layout` INI files |
@@ -755,8 +755,8 @@ Sources reconciled here:
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
-| 24 — Infrastructure & Ecosystem | 7/11 | ◐ |
-| **TOTAL** | **247/310** | ◐ |
+| 24 — Infrastructure & Ecosystem | 8/11 | ◐ |
+| **TOTAL** | **248/310** | ◐ |
 
 ---
 
