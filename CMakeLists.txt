@@ -416,6 +416,7 @@ set(MODEL_SOURCES
     src/model/tools/primitivemeshgenerator.cpp
     src/model/tools/scriptflagfile.cpp
     src/model/tools/papyrusproject.cpp
+    src/model/tools/particleprojectilebindings.cpp
     src/model/doc/document.cpp
     src/model/doc/documentmediator.cpp
     src/model/doc/loader.cpp
@@ -512,6 +513,7 @@ set(MODEL_HEADERS
     src/model/tools/primitivemeshgenerator.hpp
     src/model/tools/scriptflagfile.hpp
     src/model/tools/papyrusproject.hpp
+    src/model/tools/particleprojectilebindings.hpp
     src/model/tools/lodgenerator.hpp
     src/model/tools/treelodgenerator.hpp
     src/model/tools/textureatlasgenerator.hpp

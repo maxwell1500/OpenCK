@@ -311,6 +311,12 @@ target_link_libraries(test_papyrusproject PRIVATE openck_model test_stubs Qt6::T
 target_include_directories(test_papyrusproject PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_papyrusproject)
 
+# Particle projectile variable bindings (.pofx-style JSON)
+add_executable(test_particleprojectilebindings test_particleprojectilebindings.cpp)
+target_link_libraries(test_particleprojectilebindings PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_particleprojectilebindings PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_particleprojectilebindings)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel
