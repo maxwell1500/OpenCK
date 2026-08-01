@@ -181,6 +181,12 @@ MainWindow::MainWindow(QWidget *parent) :
         WindowLayout::applyDefaultLayout(this);
         LOG_INFO("Window layout reset to default");
     });
+
+    // Save / Load Layout actions (enabled in code; disabled in the UI file)
+    ui->actionSaveLayout->setEnabled(true);
+    ui->actionLoadLayout->setEnabled(true);
+    connect(ui->actionSaveLayout, &QAction::triggered, this, &MainWindow::on_actionSaveLayout_triggered);
+    connect(ui->actionLoadLayout, &QAction::triggered, this, &MainWindow::on_actionLoadLayout_triggered);
 }
 
 MainWindow::~MainWindow()
@@ -969,6 +975,37 @@ void MainWindow::on_actionRedo_triggered()
 void MainWindow::on_actionExit_triggered()
 {
     QCoreApplication::quit();
+}
+
+void MainWindow::on_actionSaveLayout_triggered()
+{
+    const QString path = QFileDialog::getSaveFileName(this, tr("Save Layout"), "", tr("OpenCK Layout (*.layout);;All Files (*)"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QSettings settings(path, QSettings::IniFormat);
+    settings.setValue("mainWindow/geometry", saveGeometry());
+    WindowLayout::saveLayout(this, settings);
+    settings.sync();
+
+    LOG_INFO(QString("Window layout saved to %1").arg(path));
+}
+
+void MainWindow::on_actionLoadLayout_triggered()
+{
+    const QString path = QFileDialog::getOpenFileName(this, tr("Load Layout"), "", tr("OpenCK Layout (*.layout);;All Files (*)"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QSettings settings(path, QSettings::IniFormat);
+    if (settings.contains("mainWindow/geometry")) {
+        restoreGeometry(settings.value("mainWindow/geometry").toByteArray());
+    }
+    WindowLayout::restoreLayout(this, settings);
+
+    LOG_INFO(QString("Window layout loaded from %1").arg(path));
 }
 
 void MainWindow::on_actionLoadOrder_triggered()

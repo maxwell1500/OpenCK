@@ -1,4 +1,5 @@
 #include "waveformwidget.hpp"
+#include "waveplayer.hpp"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -28,6 +29,7 @@ WaveformWidget::WaveformWidget(QWidget* parent)
     , mDragSelectionEnd(0)
     , mPlaying(false)
     , mPlayStartSample(0)
+    , mAudioPlayer(new WavePlayer(this))
 {
     setMinimumHeight(120);
     setMouseTracking(true);
@@ -153,6 +155,9 @@ bool WaveformWidget::loadAudio(const QString& filePath)
         mSelectionEnd = 0;
         mHasSelection = false;
         mPlayheadPosition = 0;
+        if (mAudioPlayer) {
+            mAudioPlayer->load(mSamples, mSampleRate);
+        }
         rebuildDisplayData();
         update();
         return true;
@@ -642,6 +647,9 @@ void WaveformWidget::play()
     mPlayStartSample = mPlayheadPosition;
     mElapsedTimer.start();
     startPlaybackTimer();
+    if (mAudioPlayer) {
+        mAudioPlayer->play(mPlayheadPosition);
+    }
     update();
 }
 
@@ -655,6 +663,9 @@ void WaveformWidget::pause()
     if (mPlayheadPosition >= mSamples.size()) {
         mPlayheadPosition = mSamples.size() - 1;
     }
+    if (mAudioPlayer) {
+        mAudioPlayer->pause();
+    }
     update();
 }
 
@@ -662,6 +673,9 @@ void WaveformWidget::stop()
 {
     mPlaying = false;
     stopPlaybackTimer();
+    if (mAudioPlayer) {
+        mAudioPlayer->stop();
+    }
     update();
 }
 

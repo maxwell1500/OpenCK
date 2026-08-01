@@ -627,7 +627,7 @@ Sources reconciled here:
 | 17.8 | BTD land-texture files | Morrowind project reverse-engineered `generate_btd*.py` |
 | 17.9 | Water planes (XCLW semantics) + water editor completion | ✅ `CellRecord` now loads/saves `XCLW` (`hasWaterHeight` + `waterHeight`, round-trip test `test_cellrecord`); Water tab has Enable Water checkbox + Apply Water Plane button wired to `saveWaterToCell()` which marks the cell record modified |
 
-## Phase 18: Audio Pipeline ⬜
+## Phase 18: Audio Pipeline ◐
 
 > Real CK: LipGenerator (Fonix phoneme→viseme) + FaceFX compiler + Wwise
 > project integration + RoboVoicer TTS. OpenCK has OGG/WAV encode only,
@@ -635,7 +635,7 @@ Sources reconciled here:
 
 | # | Task | Notes |
 |---|------|-------|
-| 18.1 | Audio playback engine (QMediaPlayer / QSoundEffect) for voice preview + waveform playback | `WaveformWidget::play()` is visual-only (`waveformwidget.cpp:637`); only Win32 `PlaySoundW` used today |
+| 18.1 | Audio playback engine (QMediaPlayer / QSoundEffect) for voice preview + waveform playback | ✅ `WavePlayer` (`src/view/window/waveplayer.hpp/.cpp`): Win32 `waveOut` streaming engine (16-bit PCM from float samples, queued fixed-size buffers, play-from-offset/pause/resume/stop, WOM_DONE position tracking, `winmm.lib`); `WaveformWidget::play()` now feeds it, so SoundEditor + waveform Play emits real audio |
 | 18.2 | XWM decode + .fuz (lip+audio) handling | Voice file format |
 | 18.3 | LipGenerator integration: .lip generation from WAV (Fonix phoneme analysis) | `Tools\LipGenerator\LipGenerator.exe` + `FonixData.cdf` |
 | 18.4 | FaceFX compiler wrapper (`ffxc.exe` + `.facefx` actors) | `Tools\FaceFX\` |
@@ -709,7 +709,7 @@ Sources reconciled here:
 | 23.8 | Reference batch action window | Real CK ObjectWindows menu |
 | 23.9 | Object Window layouts (saved filter/layout presets) | |
 
-## Phase 24: Infrastructure & Ecosystem ⬜
+## Phase 24: Infrastructure & Ecosystem ◐
 
 | # | Task | Notes |
 |---|------|-------|
@@ -719,11 +719,11 @@ Sources reconciled here:
 | 24.4 | Distributable installer packages (NSIS/WiX), CMake install target | TD L3; ADS DLL auto-deploy (TD L4) |
 | 24.5 | Headless/scriptable API — Python-generated plugins pattern | Morrowind project proves the workflow; CLI record import/export |
 | 24.6 | Shortcut expansion (~30 wired vs 524 in real CK) + make ShortcutEditorDialog reachable | `LAYOUT_AUDIT_V2.md` §10; two live conflicts: F10 QuestGraph/AIPackages, Ctrl+Shift+W Worldspaces/WorldView |
-| 24.7 | Layout save/load actions (enable `actionSaveLayout`/`actionLoadLayout`) | Disabled in `ui/mainwindow.ui` |
+| 24.7 | Layout save/load actions (enable `actionSaveLayout`/`actionLoadLayout`) | ✅ Save Layout... / Load Layout... now enabled and wired: geometry + ADS dock state via `WindowLayout`, `.layout` INI files |
 | 24.8 | Crash/diagnostics bundle: EditorWarnings.txt + prefs + saved settings zipped on crash | CK `[Debug] sExceptionAdditionalFilesForZip` |
 | 24.9 | Object Window keyword filter UI (user-created filters, saved) | Data-driven from 15.3 |
 | 24.10 | Wire Galaxy/Packin stub menus or remove | `actionNotImplementedGalaxy/Packin` |
-| 24.11 | Empty Terrain menu → real actions from Phase 17 | `ui/mainwindow.ui:139-143` |
+| 24.11 | Empty Terrain menu → real actions from Phase 17 | ✅ Done in Phase 17.6 (Save Landscape / Generate Landscape / Landscape Editor) |
 
 ---
 
@@ -749,14 +749,14 @@ Sources reconciled here:
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 5/9 | ◐ |
-| 18 — Audio Pipeline | 0/7 | ⬜ |
+| 18 — Audio Pipeline | 1/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
 | 20 — Particle Editor & Icon Generation | 0/5 | ⬜ |
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
-| 24 — Infrastructure & Ecosystem | 0/11 | ⬜ |
-| **TOTAL** | **239/310** | ◐ |
+| 24 — Infrastructure & Ecosystem | 2/11 | ◐ |
+| **TOTAL** | **242/310** | ◐ |
 
 ---
 
@@ -803,13 +803,13 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (.lbr JSON brush system, R32 heightmap import/export, XCLW water planes done; alpha masks, overlay masks, autopaint, BTD pending)
-Phase 18: Audio pipeline (playback engine, XWM/FUZ, LipGenerator, FaceFX, Wwise soundbanks, RoboVoicer)
+Phase 18: Audio pipeline (WavePlayer waveOut streaming playback engine done; XWM/FUZ, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)
 Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light icon renderer)
 Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, real compaction, MMS, BNet upload)
-Phase 24: Infrastructure & ecosystem (i18n, VCS, CI/CD, packaging, headless API, shortcuts, diagnostics)
+Phase 24: Infrastructure & ecosystem (i18n, VCS, CI/CD, packaging, headless API, shortcuts, diagnostics, layout save/load done)
 ```
 
 ---

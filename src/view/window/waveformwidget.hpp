@@ -7,6 +7,8 @@
 #include <QPointF>
 #include <QElapsedTimer>
 
+class WavePlayer;
+
 class WaveformWidget : public QWidget
 {
     Q_OBJECT
@@ -88,4 +90,5 @@ private:
     QTimer mPlaybackTimer;
     QElapsedTimer mElapsedTimer;
     qint64 mPlayStartSample;
+    WavePlayer* mAudioPlayer;
 };

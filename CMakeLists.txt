@@ -638,6 +638,7 @@ set(VIEW_SOURCES
     src/view/window/textureeditordialog.cpp
     src/view/window/soundeditor.cpp
     src/view/window/waveformwidget.cpp
+    src/view/window/waveplayer.cpp
     src/view/window/animationeditor.cpp
     src/view/window/timeline.cpp
     src/view/window/particleeffectseffecteditor.cpp

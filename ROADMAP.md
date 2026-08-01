@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 239/310 steps complete (77%) — Phase 14 + 15 complete; Phase 16 in progress (6/8); Phase 17 in progress (5/9)
-- **Phase 17 (partial)**: JSON `.lbr` brush system (Sculpt/Flatten/Smooth/Stamp/BuildUp/Subtractive + loader), R32 raw-float heightmap import/export (with undo), XCLW water-plane support on CellRecord, Terrain menu wired. Build clean, 35/35 tests.
+- **Progress**: 242/310 steps complete (78%) — Phases 14+15 complete; 16 (6/8), 17 (5/9), 18 (1/7), 24 (2/11) in progress
+- **Phase 18 (partial)**: Win32 waveOut streaming playback engine (`WavePlayer`); SoundEditor + waveform Play now emit real audio. **Phase 24 (partial)**: Save/Load Layout actions wired. Build clean, 35/35 tests.

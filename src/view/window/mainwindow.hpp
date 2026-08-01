@@ -71,6 +71,8 @@ protected:
 
 private slots:
     void on_actionExit_triggered();
+    void on_actionSaveLayout_triggered();
+    void on_actionLoadLayout_triggered();
     void on_actionData_triggered();
     void on_actionNewPlugin_triggered();
     void on_actionSaveAs_triggered();
