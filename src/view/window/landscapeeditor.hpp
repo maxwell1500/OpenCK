@@ -33,6 +33,31 @@ struct TextureLayer
     int index;
     QString texturePath;
     double opacity;
+    double maxMaterialOpacity = 1.0;
+    bool applySlopeInfluence = false;
+    double slopeThreshold = 0.0;   // degrees; painting fades above this
+    double slopeFalloff = 1.0;     // smoothness of the fade
+    bool slopeInvert = false;      // paint below threshold instead
+
+    // Returns a 0..1 multiplier for painting at the given slope angle
+    // (degrees). With slope influence disabled the result is 1.0. With it
+    // enabled, the layer fades out across [threshold, threshold+falloff]
+    // (inverted: fades in).
+    double slopeModifier(double slopeDegrees) const
+    {
+        if (!applySlopeInfluence)
+            return 1.0;
+        const double start = slopeThreshold;
+        const double end = slopeThreshold + slopeFalloff;
+        double t = 0.0;
+        if (slopeDegrees <= start)
+            t = 1.0;
+        else if (slopeDegrees >= end)
+            t = 0.0;
+        else
+            t = 1.0 - (slopeDegrees - start) / (end - start);
+        return slopeInvert ? (1.0 - t) : t;
+    }
 };
 
 struct VegetationEntry

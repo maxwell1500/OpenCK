@@ -353,6 +353,12 @@ target_link_libraries(test_cli PRIVATE openck_esm test_stubs Qt6::Test)
 target_include_directories(test_cli PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_cli)
 
+# Landscape texture-layer slope influence + material opacity
+add_executable(test_texturelayer test_texturelayer.cpp)
+target_link_libraries(test_texturelayer PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_texturelayer PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_texturelayer)
+
 # Helper that writes a minimal test plugin for manual CLI verification
 add_executable(make_testplugin make_testplugin.cpp)
 target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)

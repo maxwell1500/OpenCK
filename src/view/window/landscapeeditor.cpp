@@ -246,8 +246,10 @@ void LandscapeEditor::setupTextureLayersTab(QWidget* tab)
     auto* layout = new QVBoxLayout(tab);
     layout->setContentsMargins(8, 8, 8, 8);
 
-    textureLayerTable = new QTableWidget(0, 3);
-    textureLayerTable->setHorizontalHeaderLabels({"Layer Index", "Texture Path", "Opacity"});
+    textureLayerTable = new QTableWidget(0, 7);
+    textureLayerTable->setHorizontalHeaderLabels({
+        "Layer Index", "Texture Path", "Opacity", "Max Material Opacity",
+        "Slope Influence", "Slope Threshold", "Slope Falloff"});
     textureLayerTable->horizontalHeader()->setStretchLastSection(true);
     textureLayerTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     textureLayerTable->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -1250,10 +1252,59 @@ void LandscapeEditor::refreshTextureLayerTable()
         opacitySpin->setSingleStep(0.01);
         textureLayerTable->setCellWidget(row, 2, opacitySpin);
 
+        auto* maxOpacitySpin = new QDoubleSpinBox();
+        maxOpacitySpin->setRange(0.0, 1.0);
+        maxOpacitySpin->setValue(layer.maxMaterialOpacity);
+        maxOpacitySpin->setDecimals(2);
+        maxOpacitySpin->setSingleStep(0.01);
+        textureLayerTable->setCellWidget(row, 3, maxOpacitySpin);
+
+        auto* slopeCheck = new QCheckBox();
+        slopeCheck->setChecked(layer.applySlopeInfluence);
+        textureLayerTable->setCellWidget(row, 4, slopeCheck);
+
+        auto* thresholdSpin = new QDoubleSpinBox();
+        thresholdSpin->setRange(0.0, 90.0);
+        thresholdSpin->setValue(layer.slopeThreshold);
+        thresholdSpin->setDecimals(1);
+        thresholdSpin->setSuffix(" deg");
+        textureLayerTable->setCellWidget(row, 5, thresholdSpin);
+
+        auto* falloffSpin = new QDoubleSpinBox();
+        falloffSpin->setRange(0.0, 90.0);
+        falloffSpin->setValue(layer.slopeFalloff);
+        falloffSpin->setDecimals(1);
+        falloffSpin->setSuffix(" deg");
+        textureLayerTable->setCellWidget(row, 6, falloffSpin);
+
         QObject::connect(opacitySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             [this, i](double value) {
                 if (i < textureLayers.size()) {
                     textureLayers[i].opacity = value;
+                }
+            });
+        QObject::connect(maxOpacitySpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            [this, i](double value) {
+                if (i < textureLayers.size()) {
+                    textureLayers[i].maxMaterialOpacity = value;
+                }
+            });
+        QObject::connect(slopeCheck, &QCheckBox::toggled,
+            [this, i](bool checked) {
+                if (i < textureLayers.size()) {
+                    textureLayers[i].applySlopeInfluence = checked;
+                }
+            });
+        QObject::connect(thresholdSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            [this, i](double value) {
+                if (i < textureLayers.size()) {
+                    textureLayers[i].slopeThreshold = value;
+                }
+            });
+        QObject::connect(falloffSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            [this, i](double value) {
+                if (i < textureLayers.size()) {
+                    textureLayers[i].slopeFalloff = value;
                 }
             });
     }
