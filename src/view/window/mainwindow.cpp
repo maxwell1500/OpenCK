@@ -11,6 +11,7 @@
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/world/data.hpp"
 #include "../../model/tools/gitrepository.hpp"
+#include "../../model/tools/primitivemeshgenerator.hpp"
 #include "../../model/doc/messages.hpp"
 #include "filepaths.hpp"
 #include "searchdialog.hpp"
@@ -133,6 +134,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     setupEditMenu();
     setupTerrainMenu();
+    setupPrimitivePreviewMenu();
     setupShortcuts();
     restoreUiState();
 
@@ -688,6 +690,36 @@ void MainWindow::setupTerrainMenu()
     QAction* openLandscapeEditorAction = new QAction(tr("Landscape Editor..."), this);
     connect(openLandscapeEditorAction, &QAction::triggered, this, &MainWindow::on_actionLandscapeEditing_triggered);
     ui->menuTerrain->addAction(openLandscapeEditorAction);
+}
+
+void MainWindow::setupPrimitivePreviewMenu()
+{
+    QMenu* previewMenu = new QMenu(tr("Preview Primitive"), ui->menuView);
+    auto addPrimitiveAction = [this, previewMenu](const QString& label,
+        PrimitiveMeshGenerator::Type type) {
+        QAction* action = previewMenu->addAction(label);
+        connect(action, &QAction::triggered, this, [this, type]() {
+            if (nifViewportWidget)
+            {
+                nifViewportWidget->showPreviewPrimitive(type, 1.0f);
+            }
+        });
+    };
+    addPrimitiveAction(tr("Cube"), PrimitiveMeshGenerator::Type::Cube);
+    addPrimitiveAction(tr("Cylinder"), PrimitiveMeshGenerator::Type::Cylinder);
+    addPrimitiveAction(tr("Plane"), PrimitiveMeshGenerator::Type::Plane);
+    addPrimitiveAction(tr("Sphere"), PrimitiveMeshGenerator::Type::Sphere);
+
+    QAction* clearAction = previewMenu->addAction(tr("Clear Preview"));
+    connect(clearAction, &QAction::triggered, this, [this]() {
+        if (nifViewportWidget)
+        {
+            nifViewportWidget->clearPreviewPrimitive();
+        }
+    });
+
+    ui->menuView->addSeparator();
+    ui->menuView->addMenu(previewMenu);
 }
 
 void MainWindow::setupShortcuts()

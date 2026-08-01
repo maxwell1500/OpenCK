@@ -293,6 +293,12 @@ target_link_libraries(test_gitrepository PRIVATE openck_model test_stubs Qt6::Te
 target_include_directories(test_gitrepository PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_gitrepository)
 
+# Preview primitive mesh generator (cube/cylinder/plane/sphere)
+add_executable(test_primitivemeshgenerator test_primitivemeshgenerator.cpp)
+target_link_libraries(test_primitivemeshgenerator PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_primitivemeshgenerator PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_primitivemeshgenerator)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel

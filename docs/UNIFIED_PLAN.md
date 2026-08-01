@@ -660,14 +660,14 @@ Sources reconciled here:
 | 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | Morrowind project wrote custom hknp encoders — reference |
 | 19.7 | FBX→NIF import (AssetWatcher pattern) | WeldSkin, bones, editor markers, physics LOD settings |
 
-## Phase 20: Particle Editor & Icon Generation ⬜
+## Phase 20: Particle Editor & Icon Generation ◐
 
 | # | Task | Notes |
 |---|------|-------|
 | 20.1 | Particle editor: JSON `.pofx` bundle-node system (Age & Lifetime, AlphaByCurve, Velocity, Gravity, Drag, Rotation, Ribbon, UVScroll, Attractors, Turbulence, FlipBook) | `EditorFiles\Bundles\*.pofx` + `RuleTemplates\Bundles\` |
 | 20.2 | Particle LOD presets (`ParticlesLODPresets.json` budgets per category × Near/Middle/Far) | |
 | 20.3 | Projectile variable bindings (BeamLength, BeamLifeTime, HasHit) | `EmitterProjectileVars.pofx` |
-| 20.4 | NIF preview primitives (cube/cylinder/plane/sphere) | `EditorFiles\Primitives\` |
+| 20.4 | NIF preview primitives (cube/cylinder/plane/sphere) | ✅ `PrimitiveMeshGenerator` (`src/model/tools/primitivemeshgenerator.hpp/.cpp`): triangle meshes for cube (12 tris), cylinder (side+cap fans), XZ plane, latitude/longitude sphere; NifViewportWidget has `showPreviewPrimitive`/`clearPreviewPrimitive` rendering via the overlay VBO; View menu → Preview Primitive (Cube/Cylinder/Plane/Sphere/Clear); `test_primitivemeshgenerator` |
 | 20.5 | Icon generation renderer: 3-light rig (warm/cool/key), cubemap background, per-context sizes (inventory 128, workshop/shipbuilder 512) | `CreationKitCustom_*.ini` `[Preview]`/`[IconGenerator]` |
 
 ## Phase 21: Scripting Completion ⬜
@@ -751,12 +751,12 @@ Sources reconciled here:
 | 17 — Terrain & Landscape Completion | 5/9 | ◐ |
 | 18 — Audio Pipeline | 1/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
-| 20 — Particle Editor & Icon Generation | 0/5 | ⬜ |
+| 20 — Particle Editor & Icon Generation | 1/5 | ◐ |
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 5/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 10/11 | ◐ |
-| **TOTAL** | **255/310** | ◐ |
+| **TOTAL** | **256/310** | ◐ |
 
 ---
 
@@ -805,7 +805,7 @@ Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMes
 Phase 17: Terrain & landscape completion (.lbr JSON brush system, R32 heightmap import/export, XCLW water planes done; alpha masks, overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (WavePlayer waveOut streaming playback engine done; XWM/FUZ, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)
-Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light icon renderer)
+Phase 20: Particle editor & icon generation (NIF preview primitives done; .pofx bundles, LOD presets, projectile vars, icon renderer pending)
 Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, Find Forms, report export, Object Window layouts, reference batch actions done; OPAL, compaction, MMS, BNet pending)

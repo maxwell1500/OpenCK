@@ -151,6 +151,7 @@ private slots:
 private:
 void setupEditMenu();
 void setupTerrainMenu();
+void setupPrimitivePreviewMenu();
     void setupShortcuts();
     void applyShortcuts();
     void updateUndoRedoActions();

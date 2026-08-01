@@ -413,6 +413,7 @@ set(MODEL_SOURCES
     src/model/tools/brushdefinition.cpp
     src/model/tools/referencebatchactions.cpp
     src/model/tools/gitrepository.cpp
+    src/model/tools/primitivemeshgenerator.cpp
     src/model/doc/document.cpp
     src/model/doc/documentmediator.cpp
     src/model/doc/loader.cpp
@@ -503,6 +504,10 @@ set(MODEL_HEADERS
     src/model/tools/pluginsignature.hpp
     src/model/tools/cloudsave.hpp
     src/model/tools/batchtools.hpp
+    src/model/tools/brushdefinition.hpp
+    src/model/tools/referencebatchactions.hpp
+    src/model/tools/gitrepository.hpp
+    src/model/tools/primitivemeshgenerator.hpp
     src/model/tools/lodgenerator.hpp
     src/model/tools/treelodgenerator.hpp
     src/model/tools/textureatlasgenerator.hpp

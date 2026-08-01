@@ -8,6 +8,7 @@
 #include <QVector3D>
 
 #include "gizmomath.hpp"
+#include "../../model/tools/primitivemeshgenerator.hpp"
 
 class QOpenGLWidget;
 class QOpenGLFunctions;
@@ -128,6 +129,12 @@ public:
 
     void setCellReferences(const QVector<ViewportCellRef>& refs);
 
+    // Renders a standalone preview primitive (cube/cylinder/plane/sphere)
+    // centered at the origin, replacing any loaded NIF mesh display.
+    void showPreviewPrimitive(PrimitiveMeshGenerator::Type type, float size = 1.0f);
+    void clearPreviewPrimitive();
+    bool isShowingPreviewPrimitive() const;
+
     void updateParticleSystem(const ParticleSystemData* data);
 
 private:
@@ -217,6 +224,7 @@ private:
     OverlayVBO m_cellGridVBO;
     OverlayVBO m_cellRefVBO;
     OverlayVBO m_nodeAxisVBO_R, m_nodeAxisVBO_G, m_nodeAxisVBO_B;
+    OverlayVBO m_primitiveVBO;
 
     QSplitter* mainSplitter;
     QTreeWidget* hierarchyTree;

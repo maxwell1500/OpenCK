@@ -716,6 +716,39 @@ void NifViewportWidget::refreshMesh()
     glWidget->update();
 }
 
+void NifViewportWidget::showPreviewPrimitive(PrimitiveMeshGenerator::Type type, float size)
+{
+    const PrimitiveMeshGenerator::Mesh mesh =
+        PrimitiveMeshGenerator::generate(type, size);
+
+    QVector<OverlayVertex> verts;
+    verts.reserve(mesh.vertices.size());
+    const QVector3D color(0.55f, 0.75f, 0.95f);
+    for (const QVector3D& v : mesh.vertices)
+    {
+        verts.append({ v, color });
+    }
+    if (m_primitiveVBO.dirty || m_primitiveVBO.vertexCount != verts.size())
+    {
+        m_primitiveVBO.build(verts, GL_TRIANGLES);
+    }
+    glWidget->update();
+    LOG_INFO(QString("Showing preview primitive (%1 triangles)")
+        .arg(mesh.triangleCount()));
+}
+
+void NifViewportWidget::clearPreviewPrimitive()
+{
+    if (m_primitiveVBO.vertexCount == 0) return;
+    m_primitiveVBO.clear();
+    glWidget->update();
+}
+
+bool NifViewportWidget::isShowingPreviewPrimitive() const
+{
+    return m_primitiveVBO.vertexCount > 0;
+}
+
 const Nif::NifParser* NifViewportWidget::getNifParser() const
 {
     return nifParser.get();
@@ -1825,6 +1858,11 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         m_cellRefVBO.draw(m_overlayShader, modelView);
 
         glEnable(GL_DEPTH_TEST);
+    }
+
+    // Standalone preview primitive (cube/cylinder/plane/sphere)
+    if (m_primitiveVBO.vertexCount > 0) {
+        m_primitiveVBO.draw(m_overlayShader, modelView);
     }
 
     // Transform gizmo for the selected reference
