@@ -377,6 +377,12 @@ target_link_libraries(test_papyrustypechecker PRIVATE openck_model test_stubs Qt
 target_include_directories(test_papyrustypechecker PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_papyrustypechecker)
 
+# BSMaterial layered material rule templates
+add_executable(test_materialruletemplate test_materialruletemplate.cpp)
+target_link_libraries(test_materialruletemplate PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_materialruletemplate PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_materialruletemplate)
+
 # Helper that writes a minimal test plugin for manual CLI verification
 add_executable(make_testplugin make_testplugin.cpp)
 target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)

@@ -653,7 +653,7 @@ Sources reconciled here:
 | # | Task | Notes |
 |---|------|-------|
 | 19.1 | Material editor: BSMaterial property graph (TextureSet slots: Albedo/Normal/Roughness/Metalness/AO/Curvature/Height/Emissive/Flow/Frost; Blenders 1-5; SSS; translucency) | From `RuleTemplates\ShaderModels\*.json` |
-| 19.2 | Material rule templates: 1LayerStandard → 4LayerStandard, Terrain, Skin, Hair, Eye, Water, Vegetation | Add/Remove/Move/MakeConst ops |
+| 19.2 | Material rule templates: 1LayerStandard → 4LayerStandard, Terrain, Skin, Hair, Eye, Water, Vegetation | ✅ `MaterialRuleTemplate` (`src/model/tools/materialruletemplate.hpp/.cpp`): parses BSMaterial layered-material template JSON (name, shaderModel, layerCount, operations[op/target] with Add/Remove/Move/MakeConst), array or `{"templates":[...]}`; builtin name set; `test_materialruletemplate` |
 | 19.3 | DDS texture *import/decode* for UI (BC1/BC3/BC7) | ✅ `DdsDecoder` (`libs/files/nif/ddsdecoder.hpp/.cpp`): decodes BC1/DXT1, BC2/DXT3, BC3/DXT5, BC4, BC5, and uncompressed RGB(A) into ARGB32 QImage (BC7 returns null); the viewport's inline DDS loader replaced by this shared decoder (fixes a header-offset crash and an R/B channel-swap bug it inherited); `test_ddsdecoder` round-trips DXT1/DXT5 through the encoder + decodes a crafted uncompressed DDS |
 | 19.4 | Texture conversion pipeline: BC7/BC4/R8/R8G8B8A8, mipmaps, physically-based mipmaps, distance fields, gamma handling | `xtexconv` rules in `Textures_Settings*.json` |
 | 19.5 | Mesh LOD generation (Simplygon-style `GenerationConfig.json` pipeline) | `-GenerateMeshLODAssociations` mode |
@@ -750,13 +750,13 @@ Sources reconciled here:
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 6/9 | ◐ |
 | 18 — Audio Pipeline | 2/7 | ◐ |
-| 19 — Material Editor & Asset Pipeline | 1/7 | ◐ |
+| 19 — Material Editor & Asset Pipeline | 2/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
 | 21 — Scripting Completion | 5/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **270/310** | ◐ |
+| **TOTAL** | **271/310** | ◐ |
 
 ---
 
@@ -804,7 +804,7 @@ Phase 15: Record coverage & Object Window completion (44 record types wired, 44 
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (material painting with slope influence done; alpha masks, overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (.fuz container + WavePlayer playback engine done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
-Phase 19: Material editor & asset pipeline (DDS import/decode done; BSMaterial graph, rule templates, texture conversion, mesh/phys LOD, FBX→NIF pending)
+Phase 19: Material editor & asset pipeline (DDS import/decode + rule templates done; BSMaterial graph, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)
 Phase 21: Scripting completion (Script Manager, .ppj, .flg, structured diagnostics, type-checker property access done; spell-check, LSP, remote debugger pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
