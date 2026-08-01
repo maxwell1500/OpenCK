@@ -656,7 +656,7 @@ Sources reconciled here:
 | 19.2 | Material rule templates: 1LayerStandard → 4LayerStandard, Terrain, Skin, Hair, Eye, Water, Vegetation | ✅ `MaterialRuleTemplate` (`src/model/tools/materialruletemplate.hpp/.cpp`): parses BSMaterial layered-material template JSON (name, shaderModel, layerCount, operations[op/target] with Add/Remove/Move/MakeConst), array or `{"templates":[...]}`; builtin name set; `test_materialruletemplate` |
 | 19.3 | DDS texture *import/decode* for UI (BC1/BC3/BC7) | ✅ `DdsDecoder` (`libs/files/nif/ddsdecoder.hpp/.cpp`): decodes BC1/DXT1, BC2/DXT3, BC3/DXT5, BC4, BC5, and uncompressed RGB(A) into ARGB32 QImage (BC7 returns null); the viewport's inline DDS loader replaced by this shared decoder (fixes a header-offset crash and an R/B channel-swap bug it inherited); `test_ddsdecoder` round-trips DXT1/DXT5 through the encoder + decodes a crafted uncompressed DDS |
 | 19.4 | Texture conversion pipeline: BC7/BC4/R8/R8G8B8A8, mipmaps, physically-based mipmaps, distance fields, gamma handling | ? `TextureConversionRules` (`src/model/tools/textureconversionrules.hpp/.cpp`): parses xtexconv-style `Textures_Settings*.json` rules (array, `{"rules":[...]}` or per-key `{"settings":{...}}`), `TextureConversionRule` with path glob, format (BC7/BC5/BC4/R8/R8G8B8A8), mipmaps, sRGB/gamma, distance-field, physically-based mipmaps, max size; `findRule` glob matching + builtin defaults; `AssetConverter::convertTexturesByRules` converts inputs to DDS picking DXT1/DXT5 from the matching rule; `test_textureconversionrules` |
-| 19.5 | Mesh LOD generation (Simplygon-style `GenerationConfig.json` pipeline) | `-GenerateMeshLODAssociations` mode |
+| 19.5 | Mesh LOD generation (Simplygon-style `GenerationConfig.json` pipeline) | ? `MeshLodConfig` (`src/model/tools/meshlodconfig.hpp/.cpp`): parses the GenerationConfig.json LOD pipeline (array or `{"levels"/"lodLevels":[...]}`), per-level screen-size threshold / reduction / max triangles / UV+normal preservation / collision generation, plus name / output association / LOD name pattern; `levelForScreenSize` + builtin 3-level default; drives the existing in-process NIF decimation; `test_meshlodconfig` |
 | 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | Morrowind project wrote custom hknp encoders — reference |
 | 19.7 | FBX→NIF import (AssetWatcher pattern) | WeldSkin, bones, editor markers, physics LOD settings |
 
@@ -750,13 +750,13 @@ Sources reconciled here:
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 7/9 | ◐ |
 | 18 — Audio Pipeline | 3/7 | ◐ |
-| 19 — Material Editor & Asset Pipeline | 4/7 | ◐ |
+| 19 — Material Editor & Asset Pipeline | 5/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 6/8 | ◐ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **279/310** | ◐ |
+| **TOTAL** | **280/310** | ◐ |
 
 ---
 
@@ -804,7 +804,7 @@ Phase 15: Record coverage & Object Window completion (44 record types wired, 44 
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (brush alpha masks now added; material painting with slope influence done; overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (.fuz container, local WAV processing, WavePlayer done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
-Phase 19: Material editor & asset pipeline (DDS import/decode, rule templates, texture conversion rules, property graph done; mesh/phys LOD, FBX→NIF pending)
+Phase 19: Material editor & asset pipeline (DDS import/decode, rule templates, texture conversion rules, property graph, mesh LOD config done; physics-LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
 Phase 21: Scripting completion (Script Manager, .ppj, .flg, structured diagnostics, type-checker property access, spell-checker done; LSP, remote debugger pending)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)

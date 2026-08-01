@@ -323,6 +323,12 @@ target_link_libraries(test_locationrecord PRIVATE openck_esm test_stubs Qt6::Tes
 target_include_directories(test_locationrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_locationrecord)
 
+# Simplygon-style mesh LOD pipeline config (GenerationConfig.json)
+add_executable(test_meshlodconfig test_meshlodconfig.cpp)
+target_link_libraries(test_meshlodconfig PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_meshlodconfig PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_meshlodconfig)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)
