@@ -13,8 +13,11 @@
 #include <QInputDialog>
 #include <QDir>
 #include <QFileInfo>
+#include <QProcess>
+#include <QCoreApplication>
 
 #include "../../libs/files/ba2/ba2archive.hpp"
+#include "../../model/tools/audiopipelinetools.hpp"
 #include "logger.hpp"
 #include <QSettings>
 
@@ -85,10 +88,14 @@ void SoundEditor::setupUi()
     auto* toolLayout = new QHBoxLayout();
     mLoadLocalBtn = new QPushButton(tr("Load Local WAV..."));
     mLoadLocalBtn->setToolTip(tr("Load a standalone .wav voice file for editing"));
+    mGenerateLipBtn = new QPushButton(tr("Generate Lip..."));
+    mGenerateLipBtn->setToolTip(tr("Run LipGenerator on the loaded WAV to produce a .lip file"));
     mPlayBtn = new QPushButton(tr("Play"));
     mPauseBtn = new QPushButton(tr("Pause"));
     mStopBtn = new QPushButton(tr("Stop"));
     toolLayout->addWidget(mLoadLocalBtn);
+    toolLayout->addSpacing(8);
+    toolLayout->addWidget(mGenerateLipBtn);
     toolLayout->addSpacing(16);
     toolLayout->addWidget(mPlayBtn);
     toolLayout->addWidget(mPauseBtn);
@@ -165,6 +172,7 @@ void SoundEditor::setupUi()
     connect(mStopBtn, &QPushButton::clicked, this, &SoundEditor::onStop);
     connect(mTrimBtn, &QPushButton::clicked, this, &SoundEditor::onTrimSelection);
     connect(mLoadLocalBtn, &QPushButton::clicked, this, &SoundEditor::loadLocalWav);
+    connect(mGenerateLipBtn, &QPushButton::clicked, this, &SoundEditor::generateLip);
     connect(mVolumeBtn, &QPushButton::clicked, this, &SoundEditor::onSetVolume);
     connect(mFadeInBtn, &QPushButton::clicked, this, &SoundEditor::onFadeIn);
     connect(mFadeOutBtn, &QPushButton::clicked, this, &SoundEditor::onFadeOut);
@@ -224,12 +232,67 @@ void SoundEditor::loadLocalWav()
     }
 
     mSelectedIndex = -1;
+    mLoadedWavPath = path;
     mNameEdit->setText(QFileInfo(path).fileName());
     mSelectionLabel->setText(tr("Duration: %1s | %2 samples @ %3 Hz")
         .arg(mWaveform->durationSeconds(), 0, 'f', 2)
         .arg(mWaveform->totalSamples())
         .arg(mWaveform->sampleRate()));
     LOG_INFO(QString("SoundEditor: loaded local WAV %1").arg(path));
+}
+
+void SoundEditor::generateLip()
+{
+    if (mLoadedWavPath.isEmpty())
+    {
+        QMessageBox::information(this, tr("Generate Lip"),
+            tr("Load a local WAV first (Load Local WAV...), then generate its lip file."));
+        return;
+    }
+
+    // Find the LipGenerator install relative to this executable's Tools dir.
+    const QString toolsDir = QDir::cleanPath(QCoreApplication::applicationDirPath())
+        + QStringLiteral("/Tools");
+    const QString lipGen = AudioPipelineTools::findTool(
+        AudioPipelineTools::Tool::LipGenerator, toolsDir);
+    const QString dataFile = AudioPipelineTools::lipDataFile(toolsDir);
+
+    if (lipGen.isEmpty())
+    {
+        QMessageBox::warning(this, tr("Generate Lip"),
+            tr("LipGenerator was not found under %1.\n"
+               "Install the Creation Kit tools into that folder.").arg(toolsDir));
+        return;
+    }
+
+    const QFileInfo wavInfo(mLoadedWavPath);
+    const QString lipPath = wavInfo.absolutePath()
+        + QStringLiteral("/%1.lip").arg(wavInfo.completeBaseName());
+    const QString lipData = dataFile.isEmpty()
+        ? QStringLiteral("FonixData.cdf") : dataFile;
+
+    QStringList args = AudioPipelineTools::lipGeneratorArguments(
+        lipGen, mLoadedWavPath, lipPath, lipData,
+        mWaveform->sampleRate() > 0 ? mWaveform->sampleRate() : 22050);
+
+    auto* process = new QProcess(this);
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, process, lipPath](int exitCode, QProcess::ExitStatus) {
+        process->deleteLater();
+        if (exitCode == 0)
+        {
+            mSelectionLabel->setText(tr("Lip file generated: %1").arg(lipPath));
+            QMessageBox::information(this, tr("Generate Lip"),
+                tr("Lip file written to:\n%1").arg(lipPath));
+        }
+        else
+        {
+            QMessageBox::warning(this, tr("Generate Lip"),
+                tr("LipGenerator failed (exit code %1).").arg(exitCode));
+        }
+    });
+    process->start(args.first(), args.mid(1));
+    LOG_INFO(QString("SoundEditor: LipGenerator running for %1").arg(mLoadedWavPath));
 }
 
 void SoundEditor::onFileSelected(int index)

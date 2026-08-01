@@ -347,6 +347,12 @@ target_link_libraries(test_papyrusremotedebugger PRIVATE openck_model test_stubs
 target_include_directories(test_papyrusremotedebugger PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_papyrusremotedebugger)
 
+# External audio pipeline tools (LipGenerator/FaceFX/Wwise/RoboVoicer)
+add_executable(test_audiopipelinetools test_audiopipelinetools.cpp)
+target_link_libraries(test_audiopipelinetools PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_audiopipelinetools PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_audiopipelinetools)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

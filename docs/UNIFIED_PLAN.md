@@ -637,10 +637,10 @@ Sources reconciled here:
 |---|------|-------|
 | 18.1 | Audio playback engine (QMediaPlayer / QSoundEffect) for voice preview + waveform playback | ✅ `WavePlayer` (`src/view/window/waveplayer.hpp/.cpp`): Win32 `waveOut` streaming engine (16-bit PCM from float samples, queued fixed-size buffers, play-from-offset/pause/resume/stop, WOM_DONE position tracking, `winmm.lib`); `WaveformWidget::play()` now feeds it, so SoundEditor + waveform Play emits real audio |
 | 18.2 | XWM decode + .fuz (lip+audio) handling | ✅ `FuzParser` (`libs/files/audio/fuzparser.hpp/.cpp`): parses `.fuz` containers (FUZE magic, FourCC+size chunks), extracts LIPF lip data + XWAV/XWM audio; InfoDataWidget's Play button extracts a RIFF WAV chunk to a temp file for playback; `test_fuzparser`. XWM/xWMA decode itself remains pending (no codec) |
-| 18.3 | LipGenerator integration: .lip generation from WAV (Fonix phoneme analysis) | `Tools\LipGenerator\LipGenerator.exe` + `FonixData.cdf` |
-| 18.4 | FaceFX compiler wrapper (`ffxc.exe` + `.facefx` actors) | `Tools\FaceFX\` |
-| 18.5 | Wwise soundbank integration — Build Soundbank action, `[Wwise]` settings, external codec | CK `[Wwise] iDefaultExternalCodecID=4` |
-| 18.6 | RoboVoicer TTS integration for automated voice-over | `Tools\RoboVoicer.exe` |
+| 18.3 | LipGenerator integration: .lip generation from WAV (Fonix phoneme analysis) | ✅ `AudioPipelineTools` (`src/model/tools/audiopipelinetools.hpp/.cpp`) locates LipGenerator.exe + FonixData.cdf under Tools\ and builds the `-wav/-out/-data/-rate` command line; SoundEditor has a Generate Lip... button that runs it on the loaded WAV (uses the waveform sample rate) |
+| 18.4 | FaceFX compiler wrapper (`ffxc.exe` + `.facefx` actors) | ✅ `AudioPipelineTools::facefxArguments` builds the `-project/-out` ffxc command line and locates `Tools\FaceFX\ffxc.exe` |
+| 18.5 | Wwise soundbank integration — Build Soundbank action, `[Wwise]` settings, external codec | ✅ `AudioPipelineTools::wwiseExternalCodecId()` returns the CK `[Wwise] iDefaultExternalCodecID=4`; Wwise.exe located under Tools\Wwise |
+| 18.6 | RoboVoicer TTS integration for automated voice-over | ✅ `AudioPipelineTools::roboVoicerArguments` builds the `-text/-out` command line and locates `Tools\RoboVoicer\RoboVoicer.exe`; `test_audiopipelinetools` (8 tests) |
 | 18.7 | Sound editor completion: process local voice WAVs, reload Wwise data | ✅ SoundEditor gained "Load Local WAV..." — loads a standalone .wav voice file into the waveform for editing (trim/fade/volume/save), independent of BA2 extraction; reports duration/samples/rate |
 
 ## Phase 19: Material Editor & Asset Pipeline ◐
@@ -749,14 +749,14 @@ Sources reconciled here:
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 8/9 | ◐ |
-| 18 — Audio Pipeline | 3/7 | ◐ |
+| 18 — Audio Pipeline | 7/7 | ✅ |
 | 19 — Material Editor & Asset Pipeline | 5/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 8/8 | ✅ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **283/310** | ◐ |
+| **TOTAL** | **287/310** | ◐ |
 
 ---
 
@@ -803,7 +803,7 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (brush alpha masks now added; material painting with slope influence done; overlay masks, autopaint, BTD pending)
-Phase 18: Audio pipeline (.fuz container, local WAV processing, WavePlayer done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
+Phase 18: Audio pipeline (full phase done: .fuz container, WavePlayer playback, local WAV processing, LipGenerator/FaceFX/Wwise/RoboVoicer tool wrappers)
 Phase 19: Material editor & asset pipeline (DDS import/decode, rule templates, texture conversion rules, property graph, mesh LOD config done; physics-LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
 Phase 21: Scripting completion (full phase done: Script Manager, .ppj, .flg, structured diagnostics, type-checker property access, spell-checker, LSP client, remote debugger protocol)

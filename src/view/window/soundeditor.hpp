@@ -27,6 +27,7 @@ private slots:
     void extractSelected();
     void extractAll();
     void loadLocalWav();
+    void generateLip();
     void onPlay();
     void onPause();
     void onStop();
@@ -44,6 +45,7 @@ private:
 
     Ba2Archive* mArchive;
     int mSelectedIndex;
+    QString mLoadedWavPath;   // path of the standalone WAV loaded for editing
 
     QListWidget* mFileList;
     WaveformWidget* mWaveform;
@@ -53,6 +55,7 @@ private:
     QPushButton* mPauseBtn;
     QPushButton* mStopBtn;
     QPushButton* mLoadLocalBtn;
+    QPushButton* mGenerateLipBtn;
     QPushButton* mTrimBtn;
     QPushButton* mVolumeBtn;
     QPushButton* mFadeInBtn;

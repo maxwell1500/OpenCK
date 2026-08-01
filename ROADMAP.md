@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 283/310 steps complete (91%) — Phases 14, 15, 20, 21, 24 done. 16 (7/8), 17 (8/9), 18 (3/7), 19 (5/7), 23 (8/9) in progress
-- **Phase 21 (complete)**: Papyrus remote debugger wire protocol (port 20548). Build clean, 69/69 tests.
+- **Progress**: 287/310 steps complete (93%) — Phases 14, 15, 18, 20, 21, 24 done. 16 (7/8), 17 (8/9), 19 (5/7), 23 (8/9) in progress
+- **Phase 18 (complete)**: Audio pipeline — external tool wrappers (LipGenerator/FaceFX/Wwise/RoboVoicer) + Generate Lip button. Build clean, 70/70 tests.
