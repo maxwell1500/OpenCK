@@ -679,7 +679,7 @@ Sources reconciled here:
 | 21.3 | Script property flags (`.flg`): Hidden/Conditional/Default/CollapsedOnRef/CollapsedOnBase/Mandatory with target validation | ✅ `ScriptFlagFile` (`src/model/tools/scriptflagfile.hpp/.cpp`): parses `.flg` mappings (`ScriptName = Flag1|Flag2`, `;`/`#` comments), validates flags against the 6 known values; `PapyrusCompiler::validateFlagFile()` reports unknown flags; `test_scriptflagfile` |
 | 21.4 | Spell-checker in dialogue/script editors | ✅ `SpellChecker` (`src/model/tools/spellchecker.hpp/.cpp`): dictionary-based checking (case-insensitive, comment-aware word lists), Levenshtein edit-distance suggestions; ScriptEditorWidget has Check Spelling (Ctrl+Shift+S) with wavy-underline squiggles + builtin Papyrus dictionary, optional user `scripts/dictionary.txt`; `test_spellchecker` |
 | 21.5 | Papyrus language server (LSP protocol) integration | ✅ `PapyrusLanguageServer` (`src/model/tools/papyruslanguageserver.hpp/.cpp`): Content-Length framed JSON-RPC transport (frame/parse with split-message buffering), request/notification builders, initialize/didOpen/didChange/hover/completion, child-process lifecycle; ScriptEditorWidget starts it when `[Scripting] PapyrusLanguageServerPath` is set (vscodepapyrus server), opens the script and pushes changes; `test_papyruslanguageserver` (transport) |
-| 21.6 | Remote debugger protocol (port 20548 pattern): breakpoints, locals, watch, step | `PapyrusRemoteDebugger.exe` |
+| 21.6 | Remote debugger protocol (port 20548 pattern): breakpoints, locals, watch, step | ✅ `PapyrusRemoteDebugger` (`src/model/tools/papyrusremotedebugger.hpp/.cpp`): line-oriented JSON wire protocol over TCP (default port 20548), set/clear breakpoint, getLocals/getStack, watch/setWatchValue, step/stepOver/stepOut/resume/pause; line-buffered response parsing; `test_papyrusremotedebugger` (command/response builders) |
 | 21.7 | Papyrus type checker completion: struct members, array types, property access | ✅ Added property/member access to `PapyrusTypeChecker`: `registerProperty(scriptType, prop, type)`, `resolveMemberAccess("obj", "Prop")` (script-type properties + `Array.Length` → Int), plus `hasProperty`/`propertyType`; `test_papyrustypechecker` covers array length, property access, unknown members, array element types |
 | 21.8 | Papyrus error parsing from heuristic regexes to structured grammar | ✅ Added `parseWithStrategy5`: a structured regex grammar for the canonical `path.psc(line,col): severity: message` (and no-column) format, tried first in the strategy chain; strategy 4 tightened to require a file/line reference so bare "No errors." lines aren't mis-parsed; public `PapyrusCompiler::parseDiagnostic(line, error)` for reuse/tests; `test_papyruscompiler` |
 
@@ -752,11 +752,11 @@ Sources reconciled here:
 | 18 — Audio Pipeline | 3/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 5/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
-| 21 — Scripting Completion | 7/8 | ◐ |
+| 21 — Scripting Completion | 8/8 | ✅ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **282/310** | ◐ |
+| **TOTAL** | **283/310** | ◐ |
 
 ---
 
@@ -806,7 +806,7 @@ Phase 17: Terrain & landscape completion (brush alpha masks now added; material 
 Phase 18: Audio pipeline (.fuz container, local WAV processing, WavePlayer done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode, rule templates, texture conversion rules, property graph, mesh LOD config done; physics-LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
-Phase 21: Scripting completion (Script Manager, .ppj, .flg, structured diagnostics, type-checker property access, spell-checker, LSP client done; remote debugger pending)
+Phase 21: Scripting completion (full phase done: Script Manager, .ppj, .flg, structured diagnostics, type-checker property access, spell-checker, LSP client, remote debugger protocol)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
 Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions, real form-ID compaction, MMS done; BNet pending)
 Phase 24: Infrastructure & ecosystem ✅ (headless CLI, Git Check In/Out, i18n, CI/CD, packaging, crash bundle, layout save/load, shortcuts, saved filters, Galaxy/Packin menus done)

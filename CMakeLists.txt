@@ -461,6 +461,7 @@ set(MODEL_SOURCES
     src/model/tools/papyrusprevalidator.cpp
     src/model/tools/papyrustypechecker.cpp
     src/model/tools/papyruslanguageserver.cpp
+    src/model/tools/papyrusremotedebugger.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
     src/model/tools/pluginsignature.cpp
@@ -523,6 +524,7 @@ set(MODEL_HEADERS
     src/model/tools/papyrusprevalidator.hpp
     src/model/tools/papyrustypechecker.hpp
     src/model/tools/papyruslanguageserver.hpp
+    src/model/tools/papyrusremotedebugger.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
     src/model/tools/pluginsignature.hpp
@@ -595,6 +597,7 @@ target_include_directories(openck_model PUBLIC
 target_link_libraries(openck_model PUBLIC
     openck_files
     Qt6::Widgets
+    Qt6::Network
 )
 
 if(WIN32)
