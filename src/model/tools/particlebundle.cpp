@@ -27,6 +27,48 @@ void parseNode(const QJsonObject& obj, const QString& bundleName, ParticleBundle
     node.texture = obj.value(QStringLiteral("texture")).toString();
     if (node.name.isEmpty())
         node.name = QStringLiteral("Unnamed");
+
+    // Attractors: an array of {name, x, y, z, strength, radius}.
+    const QJsonValue attrArr = obj.value(QStringLiteral("attractors"));
+    if (attrArr.isArray())
+    {
+        for (const QJsonValue& av : attrArr.toArray())
+        {
+            if (!av.isObject())
+                continue;
+            const QJsonObject aobj = av.toObject();
+            ParticleBundle::Node::Attractor attr;
+            attr.name = aobj.value(QStringLiteral("name")).toString();
+            attr.x = static_cast<float>(aobj.value(QStringLiteral("x")).toDouble(0.0));
+            attr.y = static_cast<float>(aobj.value(QStringLiteral("y")).toDouble(0.0));
+            attr.z = static_cast<float>(aobj.value(QStringLiteral("z")).toDouble(0.0));
+            attr.strength = static_cast<float>(aobj.value(QStringLiteral("strength")).toDouble(1.0));
+            attr.radius = static_cast<float>(aobj.value(QStringLiteral("radius")).toDouble(1.0));
+            node.attractors.append(attr);
+        }
+    }
+
+    // Turbulence: {strength, frequency}.
+    const QJsonValue turbVal = obj.value(QStringLiteral("turbulence"));
+    if (turbVal.isObject())
+    {
+        const QJsonObject tobj = turbVal.toObject();
+        node.turbulence.strength = static_cast<float>(tobj.value(QStringLiteral("strength")).toDouble(0.0));
+        node.turbulence.frequency = static_cast<float>(tobj.value(QStringLiteral("frequency")).toDouble(1.0));
+    }
+
+    // FlipBook: {columns, rows, frameRate, loop}.
+    const QJsonValue fbVal = obj.value(QStringLiteral("flipBook"));
+    if (fbVal.isObject())
+    {
+        const QJsonObject fobj = fbVal.toObject();
+        node.flipBook.columns = fobj.value(QStringLiteral("columns")).toInt(
+            fobj.value(QStringLiteral("cols")).toInt(1));
+        node.flipBook.rows = fobj.value(QStringLiteral("rows")).toInt(1);
+        node.flipBook.frameRate = static_cast<float>(fobj.value(QStringLiteral("frameRate")).toDouble(30.0));
+        node.flipBook.loop = fobj.value(QStringLiteral("loop")).toBool(false);
+    }
+
     out.nodes.append(node);
 }
 

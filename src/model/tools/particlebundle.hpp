@@ -25,6 +25,35 @@ struct ParticleBundle
         bool ribbon = false;
         bool uvScroll = false;
         QString texture;
+
+        // Attractors pull particles toward a point; multiple attractors
+        // may be chained.
+        struct Attractor
+        {
+            QString name;
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            float strength = 1.0f;
+            float radius = 1.0f;
+        };
+        QVector<Attractor> attractors;
+
+        // Turbulence perturbs particle motion (wind-like noise).
+        struct Turbulence
+        {
+            float strength = 0.0f;
+            float frequency = 1.0f;
+        };
+        Turbulence turbulence;
+
+        // FlipBook animation: an animated texture sheet of NxM frames.
+        struct FlipBook
+        {
+            int columns = 1;       // frames across
+            int rows = 1;          // frames down
+            float frameRate = 30.0f;
+            bool loop = false;
+        };
+        FlipBook flipBook;
     };
 
     QString name;

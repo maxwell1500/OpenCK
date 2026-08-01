@@ -208,4 +208,4 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
 - **Progress**: 277/310 steps complete (89%) — Phases 14, 15, 20, 24 done. 16 (7/8), 17 (7/9), 18 (3/7), 19 (3/7), 21 (5/8), 23 (8/9) in progress
-- **Phase 17 (partial)**: Landscape autopaint (height/slope band texture assignment). Build clean, 61/61 tests.
+- **Phase 20 (complete)**: Particle editor + icon generation renderer (pofx bundles with attractors/turbulence/flipbook). Build clean, 61/61 tests.

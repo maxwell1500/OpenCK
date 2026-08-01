@@ -15,6 +15,7 @@ private slots:
     void testParseEmittersKey();
     void testParseInvalid();
     void testLoadFile();
+    void testParseAttractorsTurbulenceFlipBook();
 };
 
 void TestParticleBundle::initTestCase()
@@ -93,6 +94,54 @@ void TestParticleBundle::testLoadFile()
 
     ParticleBundle missing;
     QVERIFY(!ParticleBundle::loadFile(QStringLiteral("Z:/missing.pofx"), missing));
+}
+
+void TestParticleBundle::testParseAttractorsTurbulenceFlipBook()
+{
+    const QByteArray json = R"({
+        "name": "MagicalBundle",
+        "nodes": [
+            {
+                "name": "Glow",
+                "attractors": [
+                    { "name": "Center", "x": 1.0, "y": 2.0, "z": 3.0, "strength": 2.5, "radius": 4.0 },
+                    { "name": "Side", "x": -1.0, "strength": 0.5 }
+                ],
+                "turbulence": { "strength": 3.0, "frequency": 2.0 },
+                "flipBook": { "columns": 4, "rows": 2, "frameRate": 24.0, "loop": true }
+            }
+        ]
+    })";
+    const ParticleBundle bundle = ParticleBundle::parse(json);
+    QCOMPARE(bundle.nodes.size(), 1);
+    const auto& node = bundle.nodes[0];
+
+    QCOMPARE(node.attractors.size(), 2);
+    QCOMPARE(node.attractors[0].name, QStringLiteral("Center"));
+    QVERIFY(qFuzzyCompare(node.attractors[0].x, 1.0f));
+    QVERIFY(qFuzzyCompare(node.attractors[0].y, 2.0f));
+    QVERIFY(qFuzzyCompare(node.attractors[0].z, 3.0f));
+    QVERIFY(qFuzzyCompare(node.attractors[0].strength, 2.5f));
+    QVERIFY(qFuzzyCompare(node.attractors[0].radius, 4.0f));
+    QVERIFY(qFuzzyCompare(node.attractors[1].x, -1.0f));
+    QVERIFY(qFuzzyCompare(node.attractors[1].strength, 0.5f));
+
+    QVERIFY(qFuzzyCompare(node.turbulence.strength, 3.0f));
+    QVERIFY(qFuzzyCompare(node.turbulence.frequency, 2.0f));
+
+    QCOMPARE(node.flipBook.columns, 4);
+    QCOMPARE(node.flipBook.rows, 2);
+    QVERIFY(qFuzzyCompare(node.flipBook.frameRate, 24.0f));
+    QVERIFY(node.flipBook.loop);
+
+    // Defaults when the keys are absent.
+    const QByteArray plain = R"({ "name": "Plain", "nodes": [ { "name": "P" } ] })";
+    const ParticleBundle plainBundle = ParticleBundle::parse(plain);
+    QVERIFY(plainBundle.nodes[0].attractors.isEmpty());
+    QVERIFY(qFuzzyCompare(plainBundle.nodes[0].turbulence.strength, 0.0f));
+    QCOMPARE(plainBundle.nodes[0].flipBook.columns, 1);
+    QCOMPARE(plainBundle.nodes[0].flipBook.rows, 1);
+    QVERIFY(!plainBundle.nodes[0].flipBook.loop);
 }
 
 QTEST_MAIN(TestParticleBundle)
