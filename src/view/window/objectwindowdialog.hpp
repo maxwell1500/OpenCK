@@ -55,6 +55,9 @@ public slots:
     void saveFilter();
     void loadFilter();
     void deleteSavedFilter();
+    void saveColumnLayout();
+    void loadColumnLayout();
+    void deleteColumnLayout();
 
 public:
     QTreeView* getTreeView() const { return mTreeView; }
@@ -85,12 +88,16 @@ private:
     int getSelectedCategoryId(const QModelIndex& index) const;
     QString getModelPathForRecord(int categoryId, int recordIndex) const;
     void refreshSavedFilters();
+    void refreshColumnLayouts();
+    QByteArray captureColumnState() const;
+    void applyColumnState(const QByteArray& state);
 
     Data* mData;
     ObjectWindowModel* mModel;
     QTreeView* mTreeView;
     QLineEdit* mFilterEdit;
     QComboBox* mSavedFilterCombo;
+    QComboBox* mColumnLayoutCombo;
     QPushButton* mEditButton;
     QPushButton* mDeleteButton;
     QPushButton* mCloneButton;

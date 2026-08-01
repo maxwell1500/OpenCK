@@ -233,6 +233,7 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
       mTreeView(nullptr),
       mFilterEdit(nullptr),
       mSavedFilterCombo(nullptr),
+      mColumnLayoutCombo(nullptr),
       mEditButton(nullptr),
       mDeleteButton(nullptr),
       mCloneButton(nullptr),
@@ -373,6 +374,21 @@ void ObjectWindowDialog::setupUI()
     connect(deleteFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSavedFilter);
     refreshSavedFilters();
 
+    auto* layoutRow = new QHBoxLayout();
+    layoutRow->addWidget(new QLabel("Layout:"));
+    mColumnLayoutCombo = new QComboBox();
+    mColumnLayoutCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    layoutRow->addWidget(mColumnLayoutCombo);
+
+    QPushButton* saveLayoutButton = new QPushButton("Save");
+    QPushButton* deleteLayoutButton = new QPushButton("Delete");
+    saveLayoutButton->setToolTip("Save the current column widths/visibility under a name");
+    deleteLayoutButton->setToolTip("Delete the selected column layout");
+    layoutRow->addWidget(saveLayoutButton);
+    layoutRow->addWidget(deleteLayoutButton);
+    layoutRow->addStretch();
+    mainLayout->addLayout(layoutRow);
+
     mTreeView = new QTreeView();
     mTreeView->setAlternatingRowColors(true);
     mTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -412,6 +428,11 @@ void ObjectWindowDialog::setupUI()
     connect(mEditButton, &QPushButton::clicked, this, &ObjectWindowDialog::editSelected);
     connect(mDeleteButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSelected);
     connect(mCloneButton, &QPushButton::clicked, this, &ObjectWindowDialog::cloneSelected);
+    connect(saveLayoutButton, &QPushButton::clicked, this, &ObjectWindowDialog::saveColumnLayout);
+    connect(mColumnLayoutCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+        this, &ObjectWindowDialog::loadColumnLayout);
+    connect(deleteLayoutButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteColumnLayout);
+    refreshColumnLayouts();
     connect(mTreeView, &QTreeView::doubleClicked, this, &ObjectWindowDialog::onDoubleClick);
     connect(mTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
         [this](const QModelIndex& current, const QModelIndex&) {
@@ -1191,6 +1212,101 @@ void ObjectWindowDialog::deleteSavedFilter()
         mStatusLabel->setText(QString("Deleted filter '%1'").arg(name));
     }
     LOG_INFO(QString("Deleted Object Window filter '%1'").arg(name));
+}
+
+QByteArray ObjectWindowDialog::captureColumnState() const
+{
+    return mTreeView ? mTreeView->header()->saveState() : QByteArray();
+}
+
+void ObjectWindowDialog::applyColumnState(const QByteArray& state)
+{
+    if (mTreeView && !state.isEmpty())
+    {
+        mTreeView->header()->restoreState(state);
+    }
+}
+
+void ObjectWindowDialog::refreshColumnLayouts()
+{
+    if (!mColumnLayoutCombo) return;
+
+    const int current = mColumnLayoutCombo->currentIndex();
+    const QString selectedName = (current >= 0)
+        ? mColumnLayoutCombo->itemText(current) : QString();
+
+    mColumnLayoutCombo->blockSignals(true);
+    mColumnLayoutCombo->clear();
+    mColumnLayoutCombo->addItem("");
+
+    QSettings settings;
+    const QStringList names = settings.childGroups();
+    for (const QString& name : names)
+    {
+        if (name.startsWith(QStringLiteral("ColumnLayout/")))
+        {
+            mColumnLayoutCombo->addItem(name.mid(QStringLiteral("ColumnLayout/").size()));
+        }
+    }
+
+    const int restore = mColumnLayoutCombo->findText(selectedName);
+    mColumnLayoutCombo->setCurrentIndex(restore >= 0 ? restore : 0);
+    mColumnLayoutCombo->blockSignals(false);
+}
+
+void ObjectWindowDialog::saveColumnLayout()
+{
+    if (!mTreeView) return;
+
+    bool ok = false;
+    QString name = QInputDialog::getText(this, "Save Column Layout",
+        "Layout name:", QLineEdit::Normal, QString(), &ok);
+    if (!ok || name.trimmed().isEmpty()) return;
+    name = name.trimmed();
+
+    QSettings settings;
+    settings.setValue(QStringLiteral("ColumnLayout/%1/state").arg(name),
+        captureColumnState());
+    settings.sync();
+    refreshColumnLayouts();
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(QString("Saved column layout '%1'").arg(name));
+    }
+    LOG_INFO(QString("Saved Object Window column layout '%1'").arg(name));
+}
+
+void ObjectWindowDialog::loadColumnLayout()
+{
+    const QString name = mColumnLayoutCombo
+        ? mColumnLayoutCombo->currentText() : QString();
+    if (name.isEmpty()) return;
+
+    QSettings settings;
+    const QByteArray state = settings.value(
+        QStringLiteral("ColumnLayout/%1/state").arg(name)).toByteArray();
+    applyColumnState(state);
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(QString("Loaded column layout '%1'").arg(name));
+    }
+}
+
+void ObjectWindowDialog::deleteColumnLayout()
+{
+    const QString name = mColumnLayoutCombo
+        ? mColumnLayoutCombo->currentText() : QString();
+    if (name.isEmpty()) return;
+
+    QSettings settings;
+    settings.remove(QStringLiteral("ColumnLayout/%1").arg(name));
+    settings.sync();
+    refreshColumnLayouts();
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(QString("Deleted column layout '%1'").arg(name));
+    }
+    LOG_INFO(QString("Deleted Object Window column layout '%1'").arg(name));
 }
 
 void ObjectWindowDialog::cloneSelected()

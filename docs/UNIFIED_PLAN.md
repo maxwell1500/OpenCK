@@ -707,7 +707,7 @@ Sources reconciled here:
 | 23.6 | Plugin upload to Bethesda.net (login/logout, upload) | CK BNet logs present in Morrowind project |
 | 23.7 | xEdit-style validation/analysis export | ✅ `ReportExport` (`reports.hpp/.cpp`): `messagesToText`/`exportMessages` write a Level/Type/ID/Message/Hint TSV report; Warnings dock has an "Export Report..." button writing the last validation run to a file; `test_reportexport` covers format/file/empty/sanitization |
 | 23.8 | Reference batch action window | Real CK ObjectWindows menu |
-| 23.9 | Object Window layouts (saved filter/layout presets) | |
+| 23.9 | Object Window layouts (saved filter/layout presets) | ✅ Saved **column layouts**: Layout dropdown + Save/Delete buttons persist `QHeaderView::saveState()` (column widths/visibility/order) to QSettings (`ColumnLayout/<name>/state`); saved text filters from 24.9 |
 
 ## Phase 24: Infrastructure & Ecosystem ◐
 
@@ -754,9 +754,9 @@ Sources reconciled here:
 | 20 — Particle Editor & Icon Generation | 0/5 | ⬜ |
 | 21 — Scripting Completion | 0/8 | ⬜ |
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
-| 23 — Data Workflows & Plugin Utilities | 2/9 | ◐ |
+| 23 — Data Workflows & Plugin Utilities | 3/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 9/11 | ◐ |
-| **TOTAL** | **251/310** | ◐ |
+| **TOTAL** | **252/310** | ◐ |
 
 ---
 
@@ -808,7 +808,7 @@ Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, textur
 Phase 20: Particle editor & icon generation (.pofx bundles, LOD presets, 3-light icon renderer)
 Phase 21: Scripting completion (.ppj projects, Script Manager, flags, spell-check, LSP, remote debugger)
 Phase 22: Behavior / animation graph editor (FlowChartX pattern, 43+ node types, event validation)
-Phase 23: Data workflows & plugin utilities (Find Forms by condition + xEdit-style report export done; CSV Snippets, OPAL, compaction, MMS, BNet, batch refs pending)
+Phase 23: Data workflows & plugin utilities (Find Forms, xEdit-style report export, Object Window column layouts done; CSV Snippets, OPAL, compaction, MMS, BNet, batch refs pending)
 Phase 24: Infrastructure & ecosystem (i18n, VCS, CI/CD, packaging, headless API, shortcuts, diagnostics, layout save/load done)
 ```
 
