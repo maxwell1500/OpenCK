@@ -329,6 +329,12 @@ target_link_libraries(test_meshlodconfig PRIVATE openck_model test_stubs Qt6::Te
 target_include_directories(test_meshlodconfig PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_meshlodconfig)
 
+# Terrain-block cutting (heightmap region cut/insert with edge blending)
+add_executable(test_terrainblock test_terrainblock.cpp)
+target_link_libraries(test_terrainblock PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_terrainblock PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_terrainblock)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

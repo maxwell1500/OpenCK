@@ -22,6 +22,7 @@
 #include <QResizeEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QMap>
 #include <QDebug>
 
@@ -36,6 +37,7 @@
 #include "logger.hpp"
 #include "../../model/tools/brushalphamask.hpp"
 #include "../../model/tools/autopainter.hpp"
+#include "../../model/tools/terrainblock.hpp"
 
 #include <QFile>
 #include <QDataStream>
@@ -88,7 +90,8 @@ LandscapeEditor::LandscapeEditor(QWidget* parent) :
     mApplyButton(nullptr),
     activeBrushIndex(0),
     brushCombo(nullptr),
-    loadBrushesButton(nullptr)
+    loadBrushesButton(nullptr),
+    cutBlockGrid(8)
 {
     brushes = BrushDefinition::builtin();
     setupUI();
@@ -182,8 +185,12 @@ void LandscapeEditor::setupUI()
     auto* copyPasteLayout = new QHBoxLayout();
     copyHeightmapButton = new QPushButton("Copy Heightmap");
     pasteHeightmapButton = new QPushButton("Paste Heightmap");
+    cutRegionButton = new QPushButton("Cut Region...");
+    pasteRegionButton = new QPushButton("Paste Region...");
     copyPasteLayout->addWidget(copyHeightmapButton);
     copyPasteLayout->addWidget(pasteHeightmapButton);
+    copyPasteLayout->addWidget(cutRegionButton);
+    copyPasteLayout->addWidget(pasteRegionButton);
     controlLayout->addLayout(copyPasteLayout);
 
     auto* r32Layout = new QHBoxLayout();
@@ -230,6 +237,8 @@ void LandscapeEditor::setupUI()
     connect(loadButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadClicked);
     connect(copyHeightmapButton, &QPushButton::clicked, this, &LandscapeEditor::onCopyHeightmapClicked);
     connect(pasteHeightmapButton, &QPushButton::clicked, this, &LandscapeEditor::onPasteHeightmapClicked);
+    connect(cutRegionButton, &QPushButton::clicked, this, &LandscapeEditor::onCutRegionClicked);
+    connect(pasteRegionButton, &QPushButton::clicked, this, &LandscapeEditor::onPasteRegionClicked);
     connect(importR32Button, &QPushButton::clicked, this, &LandscapeEditor::onImportR32Clicked);
     connect(exportR32Button, &QPushButton::clicked, this, &LandscapeEditor::onExportR32Clicked);
     connect(mApplyButton, &QPushButton::clicked, this, &LandscapeEditor::applyHeightmap);
@@ -1063,6 +1072,75 @@ void LandscapeEditor::onPasteHeightmapClicked()
 
     hasCopiedHeightmap = false;
     statusLabel->setText("Heightmap pasted");
+    glWidget->update();
+}
+
+void LandscapeEditor::onCutRegionClicked()
+{
+    if (heightmap.isEmpty()) {
+        statusLabel->setText("No heightmap to cut");
+        return;
+    }
+
+    // Ask for the region size in cells.
+    bool ok = false;
+    const int size = QInputDialog::getInt(this, "Cut Terrain Region",
+        "Region size (cells, aligned to grid):", 32, 1, terrainSize, 1, &ok);
+    if (!ok)
+        return;
+
+    QRect region(0, 0, size, size);
+    region = TerrainBlock::alignToGrid(region, cutBlockGrid);
+    region = region.intersected(QRect(0, 0, terrainSize, terrainSize));
+    if (region.width() <= 0 || region.height() <= 0) {
+        statusLabel->setText("Cut region is empty");
+        return;
+    }
+
+    TerrainBlock::Block block;
+    if (!TerrainBlock::cut(heightmap, terrainSize, region, block)) {
+        statusLabel->setText("Cut failed");
+        return;
+    }
+    mCutRegion = block;
+    statusLabel->setText(QString("Terrain region cut: %1x%2 (top-left %3,%4)")
+        .arg(block.width()).arg(block.height())
+        .arg(block.rect.left()).arg(block.rect.top()));
+    LOG_INFO(QString("Landscape cut %1x%2 region at (%3,%4)")
+        .arg(block.width()).arg(block.height())
+        .arg(block.rect.left()).arg(block.rect.top()));
+}
+
+void LandscapeEditor::onPasteRegionClicked()
+{
+    if (mCutRegion.heights.isEmpty()) {
+        statusLabel->setText("No terrain region cut");
+        return;
+    }
+    if (mCutRegion.sourceSize != terrainSize) {
+        statusLabel->setText(QString("Region was cut from a %1x%1 heightmap")
+            .arg(mCutRegion.sourceSize));
+        return;
+    }
+
+    bool ok = false;
+    const int originX = QInputDialog::getInt(this, "Paste Terrain Region",
+        "Target X:", 0, 0, terrainSize - 1, 1, &ok);
+    if (!ok)
+        return;
+    const int originY = QInputDialog::getInt(this, "Paste Terrain Region",
+        "Target Y:", 0, 0, terrainSize - 1, 1, &ok);
+    if (!ok)
+        return;
+
+    QVector<float> before = heightmap;
+    TerrainBlock::insert(heightmap, terrainSize, mCutRegion, QPoint(originX, originY), 2);
+
+    if (mData && currentCell && currentLand && mUndoStack) {
+        QVector<float>* heightmapPtr = &heightmap;
+        mUndoStack->push(new LandscapeEditCommand(heightmapPtr, terrainSize, before, heightmap));
+    }
+    statusLabel->setText("Terrain region pasted");
     glWidget->update();
 }
 

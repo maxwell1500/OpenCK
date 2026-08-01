@@ -22,6 +22,7 @@ class QCheckBox;
 
 #include "../../../model/tools/brushdefinition.hpp"
 #include "../../../model/tools/brushalphamask.hpp"
+#include "../../../model/tools/terrainblock.hpp"
 
 class CellRecord;
 class LandRecord;
@@ -112,6 +113,8 @@ private slots:
     void onLoadClicked();
     void onCopyHeightmapClicked();
     void onPasteHeightmapClicked();
+    void onCutRegionClicked();
+    void onPasteRegionClicked();
     void onImportR32Clicked();
     void onExportR32Clicked();
     void onLoadBrushesClicked();
@@ -202,6 +205,8 @@ private:
     QPushButton* mApplyButton;
     QPushButton* copyHeightmapButton;
     QPushButton* pasteHeightmapButton;
+    QPushButton* cutRegionButton;
+    QPushButton* pasteRegionButton;
     QLabel* statusLabel;
 
     bool dragging;
@@ -224,6 +229,10 @@ private:
     // Clipboard
     QVector<float> copiedHeightmap;
     bool hasCopiedHeightmap;
+
+    // Terrain-block cutting clipboard
+    TerrainBlock::Block mCutRegion;
+    int cutBlockGrid;              // grid alignment used when cutting
 
     // Property tabs
     QTabWidget* propertyTabWidget;
