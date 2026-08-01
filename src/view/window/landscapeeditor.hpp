@@ -21,6 +21,7 @@ class QCheckBox;
 #include <QOpenGLVertexArrayObject>
 
 #include "../../../model/tools/brushdefinition.hpp"
+#include "../../../model/tools/brushalphamask.hpp"
 
 class CellRecord;
 class LandRecord;
@@ -114,6 +115,8 @@ private slots:
     void onImportR32Clicked();
     void onExportR32Clicked();
     void onLoadBrushesClicked();
+    void onLoadMaskClicked();
+    void onClearMaskClicked();
 
     void onAddLayer();
     void onRemoveLayer();
@@ -166,8 +169,11 @@ private:
     int heightLimit;
     QVector<BrushDefinition> brushes;
     int activeBrushIndex;
+    BrushAlphaMask brushMask;
     QComboBox* brushCombo;
     QPushButton* loadBrushesButton;
+    QPushButton* loadMaskButton;
+    QPushButton* clearMaskButton;
 
     // Cell data
     CellRecord* currentCell;

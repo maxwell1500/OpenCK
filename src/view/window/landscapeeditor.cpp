@@ -33,6 +33,7 @@
 #include "../../model/tools/landscapeeditcommand.hpp"
 #include "brushtool.hpp"
 #include "logger.hpp"
+#include "../../model/tools/brushalphamask.hpp"
 
 #include <QFile>
 #include <QDataStream>
@@ -146,6 +147,13 @@ void LandscapeEditor::setupUI()
     loadBrushesButton = new QPushButton("Load Brushes...");
     controlLayout->addWidget(loadBrushesButton);
 
+    loadMaskButton = new QPushButton("Load Alpha Mask...");
+    loadMaskButton->setToolTip("Load a DDS brush alpha texture to stencil the brush shape");
+    clearMaskButton = new QPushButton("Clear Mask");
+    clearMaskButton->setToolTip("Remove the alpha mask and paint with a plain brush");
+    controlLayout->addWidget(loadMaskButton);
+    controlLayout->addWidget(clearMaskButton);
+
     controlLayout->addWidget(new QLabel("Height:"));
     heightLimitSpin = new QSpinBox();
     heightLimitSpin->setRange(-5000, 5000);
@@ -213,6 +221,8 @@ void LandscapeEditor::setupUI()
     connect(brushTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &LandscapeEditor::onBrushTypeChanged);
     connect(brushCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &LandscapeEditor::onBrushSelected);
     connect(loadBrushesButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadBrushesClicked);
+    connect(loadMaskButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadMaskClicked);
+    connect(clearMaskButton, &QPushButton::clicked, this, &LandscapeEditor::onClearMaskClicked);
     connect(heightLimitSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &LandscapeEditor::onHeightLimitChanged);
     connect(saveButton, &QPushButton::clicked, this, &LandscapeEditor::onSaveClicked);
     connect(loadButton, &QPushButton::clicked, this, &LandscapeEditor::onLoadClicked);
@@ -939,6 +949,36 @@ void LandscapeEditor::onLoadBrushesClicked()
     LOG_INFO(QString("Loaded %1 landscape brushes from %2").arg(brushes.size()).arg(fileName));
 }
 
+void LandscapeEditor::onLoadMaskClicked()
+{
+    QString fileName = QFileDialog::getOpenFileName(this,
+        "Load Brush Alpha Mask", "",
+        "Brush Alpha Masks (*.dds *.png *.bmp);;DDS Textures (*.dds);;All Files (*)");
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    if (!brushMask.load(fileName)) {
+        statusLabel->setText("Failed to load alpha mask");
+        return;
+    }
+
+    statusLabel->setText(QString("Alpha mask loaded: %1 (%2x%3)").arg(
+        QFileInfo(fileName).fileName()).arg(brushMask.width()).arg(brushMask.height()));
+    LOG_INFO(QString("Loaded brush alpha mask %1 (%2x%3)").arg(
+        fileName).arg(brushMask.width()).arg(brushMask.height()));
+}
+
+void LandscapeEditor::onClearMaskClicked()
+{
+    if (!brushMask.isValid()) {
+        return;
+    }
+    brushMask.clear();
+    statusLabel->setText("Alpha mask cleared");
+    LOG_INFO("Cleared brush alpha mask");
+}
+
 void LandscapeEditor::onHeightLimitChanged(int height)
 {
     heightLimit = height;
@@ -1152,6 +1192,15 @@ void LandscapeEditor::applyBrush(int x, int y)
             if (brush && brush->falloff > 0.0) {
                 const float edge = qBound(0.0f, (dist / static_cast<float>(radius)), 1.0f);
                 factor *= (1.0f - static_cast<float>(brush->falloff) * edge);
+            }
+
+            // Multiply by the loaded alpha mask (stretched over the brush
+            // footprint). The built-in falloff still shapes the edge; the
+            // mask stencils the interior (e.g. Splatter/Square/BillowyNoise).
+            if (brushMask.isValid()) {
+                const float nx = (radius > 0) ? static_cast<float>(dx) / static_cast<float>(radius) : 0.0f;
+                const float ny = (radius > 0) ? static_cast<float>(dy) / static_cast<float>(radius) : 0.0f;
+                factor *= brushMask.valueAt(nx, ny);
             }
 
             float currentHeight = getHeightAt(nx, ny);

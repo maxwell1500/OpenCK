@@ -618,7 +618,7 @@ Sources reconciled here:
 | # | Task | Notes |
 |---|------|-------|
 | 17.1 | JSON `.lbr` brush system: Sculpt/Flatten/Smooth/Stamp/BuildUp/Subtractive | ✅ `BrushDefinition` model (`src/model/tools/brushdefinition.hpp/.cpp`): 6 operations, JSON `.lbr` loader, built-in default set; LandscapeEditor has Brush combo + Load Brushes button, `applyBrush()` dispatches on brush operation with falloff shaping; `test_brushdefinition` covers ops/JSON/builtin. Brush alpha `.dds` masking itself still pending |
-| 17.2 | Brush alpha textures (19 `.dds` in `Data\Textures\BrushAlphas\`) | Circle, CloudSpray, Clumpiness, Road, Splatter, Square, BillowyNoise... |
+| 17.2 | Brush alpha textures (19 `.dds` in `Data\Textures\BrushAlphas\`) | ? `BrushAlphaMask` (`src/model/tools/brushalphamask.hpp/.cpp`): loads a DDS alpha texture (via `DdsDecoder`) or PNG/BMP, stretches the alpha channel over the brush footprint, and multiplies the brush falloff so opaque pixels keep full strength and transparent pixels suppress it; bilinear sampling, identity when no mask loaded; LandscapeEditor has Load Alpha Mask... / Clear Mask buttons; `test_brushalphamask` |
 | 17.3 | Material painting with `MaxMaterialOpacity`, slope influence (`ApplySlopeInfluence`, falloff/threshold/invert) | ✅ Texture-layer table now exposes Max Material Opacity, Slope Influence (checkbox), Slope Threshold, and Slope Falloff per layer; `TextureLayer::slopeModifier(deg)` computes the 0..1 paint multiplier (with invert); `test_texturelayer` |
 | 17.4 | Terrain overlay masks (463 `.tif` in `Source\TGATextures\Terrain\OverlayMasks\`) | POI biome masks, settlement masks |
 | 17.5 | Heightmap import (R32) + autopaint + export between cells | ✅ `Import R32...` / `Export R32...` buttons in LandscapeEditor: raw 32-bit-float square-grid heightmaps, auto-detect grid size from file byte count, min/max range display, pushed as `LandscapeEditCommand` for undo; cross-cell export/import via `.r32` + existing copy/paste. Autopaint itself pending |
@@ -748,7 +748,7 @@ Sources reconciled here:
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 6/8 | ◐ |
-| 17 — Terrain & Landscape Completion | 6/9 | ◐ |
+| 17 — Terrain & Landscape Completion | 7/9 | ◐ |
 | 18 — Audio Pipeline | 3/7 | ◐ |
 | 19 — Material Editor & Asset Pipeline | 2/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 4/5 | ◐ |
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 6/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **272/310** | ◐ |
+| **TOTAL** | **273/310** | ◐ |
 
 ---
 
@@ -802,7 +802,7 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 ```
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
-Phase 17: Terrain & landscape completion (material painting with slope influence done; alpha masks, overlay masks, autopaint, BTD pending)
+Phase 17: Terrain & landscape completion (brush alpha masks now added; material painting with slope influence done; overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (.fuz container, local WAV processing, WavePlayer done; XWM decode, LipGenerator, FaceFX, Wwise, RoboVoicer pending)
 Phase 19: Material editor & asset pipeline (DDS import/decode + rule templates done; BSMaterial graph, texture conversion, mesh/phys LOD, FBX→NIF pending)
 Phase 20: Particle editor & icon generation (.pofx bundles, projectile var bindings, LOD presets, preview primitives done; icon renderer pending)

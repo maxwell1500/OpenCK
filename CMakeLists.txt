@@ -415,6 +415,7 @@ endif()
 # Document, tools, world model (data structures, collections, commands)
 set(MODEL_SOURCES
     src/model/tools/brushdefinition.cpp
+    src/model/tools/brushalphamask.cpp
     src/model/tools/referencebatchactions.cpp
     src/model/tools/gitrepository.cpp
     src/model/tools/primitivemeshgenerator.cpp
@@ -517,6 +518,7 @@ set(MODEL_HEADERS
     src/model/tools/cloudsave.hpp
     src/model/tools/batchtools.hpp
     src/model/tools/brushdefinition.hpp
+    src/model/tools/brushalphamask.hpp
     src/model/tools/referencebatchactions.hpp
     src/model/tools/gitrepository.hpp
     src/model/tools/primitivemeshgenerator.hpp
