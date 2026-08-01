@@ -335,6 +335,12 @@ target_link_libraries(test_papyruscompiler PRIVATE openck_view openck_model test
 target_include_directories(test_papyruscompiler PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_papyruscompiler)
 
+# Particle LOD presets (ParticlesLODPresets.json)
+add_executable(test_particleslodpresets test_particleslodpresets.cpp)
+target_link_libraries(test_particleslodpresets PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_particleslodpresets PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_particleslodpresets)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel
