@@ -464,6 +464,7 @@ set(MODEL_SOURCES
     src/model/tools/papyrusremotedebugger.cpp
     src/model/tools/audiopipelinetools.cpp
     src/model/tools/nodegraph.cpp
+    src/model/tools/animationeventvalidator.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
     src/model/tools/pluginsignature.cpp
@@ -529,6 +530,7 @@ set(MODEL_HEADERS
     src/model/tools/papyrusremotedebugger.hpp
     src/model/tools/audiopipelinetools.hpp
     src/model/tools/nodegraph.hpp
+    src/model/tools/animationeventvalidator.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
     src/model/tools/pluginsignature.hpp

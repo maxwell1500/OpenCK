@@ -365,6 +365,12 @@ target_link_libraries(test_nodegraph PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_nodegraph PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_nodegraph)
 
+# Animation event validation (event-name -> animation-type sets)
+add_executable(test_animationeventvalidator test_animationeventvalidator.cpp)
+target_link_libraries(test_animationeventvalidator PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_animationeventvalidator PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_animationeventvalidator)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)
