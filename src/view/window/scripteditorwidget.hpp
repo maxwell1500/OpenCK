@@ -98,6 +98,8 @@ private:
     void onBrowserItemDoubleClicked(QTreeWidgetItem* item, int column);
     void refreshSpellingSquiggles();
     void loadBuiltinDictionary();
+    void maybeStartLsp();
+    void onLspResponse(int id, const QJsonObject& body);
 
     ScriptTextEdit* m_textEdit;
     QSyntaxHighlighter* highlighter;
@@ -121,6 +123,7 @@ private:
     class PapyrusTypeChecker* m_typeChecker;
     class QToolTip* m_toolTipHelper;
     class SpellChecker* m_spellChecker;
+    class PapyrusLanguageServer* m_lsp;
 };
 
 class LineNumberWidget : public QWidget

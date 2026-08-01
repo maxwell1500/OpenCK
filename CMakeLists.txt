@@ -460,6 +460,7 @@ set(MODEL_SOURCES
     src/model/tools/assetvalidator.cpp
     src/model/tools/papyrusprevalidator.cpp
     src/model/tools/papyrustypechecker.cpp
+    src/model/tools/papyruslanguageserver.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
     src/model/tools/pluginsignature.cpp
@@ -521,6 +522,7 @@ set(MODEL_HEADERS
     src/model/tools/assetvalidator.hpp
     src/model/tools/papyrusprevalidator.hpp
     src/model/tools/papyrustypechecker.hpp
+    src/model/tools/papyruslanguageserver.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
     src/model/tools/pluginsignature.hpp

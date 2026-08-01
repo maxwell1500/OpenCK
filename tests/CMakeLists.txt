@@ -335,6 +335,12 @@ target_link_libraries(test_terrainblock PRIVATE openck_model test_stubs Qt6::Tes
 target_include_directories(test_terrainblock PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_terrainblock)
 
+# Papyrus LSP client transport (Content-Length framing + JSON-RPC)
+add_executable(test_papyruslanguageserver test_papyruslanguageserver.cpp)
+target_link_libraries(test_papyruslanguageserver PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_papyruslanguageserver PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_papyruslanguageserver)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

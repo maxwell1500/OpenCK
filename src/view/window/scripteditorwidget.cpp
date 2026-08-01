@@ -25,11 +25,15 @@
 #include "papyruscompiler.hpp"
 #include "../../model/tools/papyrusprevalidator.hpp"
 #include "../../model/tools/papyrustypechecker.hpp"
+#include "../../model/tools/papyruslanguageserver.hpp"
 #include "../../model/tools/spellchecker.hpp"
 #include "logger.hpp"
 
 #include <QToolTip>
 #include <QCoreApplication>
+#include <QSettings>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QHelpEvent>
 
 class BlockData : public QTextBlockUserData
@@ -223,7 +227,8 @@ ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
     m_consoleContainer(nullptr),
     m_typeChecker(nullptr),
     m_toolTipHelper(nullptr),
-    m_spellChecker(nullptr)
+    m_spellChecker(nullptr),
+    m_lsp(nullptr)
 {
     LOG_DEBUG("ScriptEditorWidget created");
 
@@ -295,6 +300,9 @@ ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
         performCompletion();
         refreshTypeSquiggles();
         refreshSpellingSquiggles();
+        if (m_lsp && m_lsp->isRunning() && !currentFileName.isEmpty())
+            m_lsp->didChange(QStringLiteral("file:///") + currentFileName,
+                             m_textEdit->toPlainText());
     });
 
     connect(m_textEdit->document(), &QTextDocument::contentsChanged, this, &ScriptEditorWidget::updateFoldRegions);
@@ -351,6 +359,7 @@ ScriptEditorWidget::~ScriptEditorWidget()
     delete lineNumberWidget;
     delete m_typeChecker;
     delete m_spellChecker;
+    delete m_lsp;
 }
 
 int ScriptEditorWidget::lineNumberWidth() const
@@ -488,6 +497,12 @@ void ScriptEditorWidget::loadScript(const QString& fileName)
 
     updateFoldRegions();
     refreshTypeSquiggles();
+    maybeStartLsp();
+    if (m_lsp && m_lsp->isRunning())
+    {
+        m_lsp->didOpen(QStringLiteral("file:///") + fileName,
+                       QStringLiteral("papyrus"), m_textEdit->toPlainText());
+    }
 
     LOG_INFO("Script loaded successfully");
 }
@@ -753,6 +768,62 @@ void ScriptEditorWidget::loadBuiltinDictionary()
         const int added = m_spellChecker->loadDictionary(dictPath);
         LOG_DEBUG(QString("Spell checker loaded %1 extra words from %2").arg(added).arg(dictPath));
     }
+}
+
+void ScriptEditorWidget::maybeStartLsp()
+{
+    if (m_lsp)
+        return;
+
+    // The Papyrus LSP server path is configured via settings
+    // [Scripting] PapyrusLanguageServerPath (vscodepapyrus language server).
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("Scripting"));
+    const QString serverPath = settings.value(
+        QStringLiteral("PapyrusLanguageServerPath")).toString();
+    settings.endGroup();
+
+    if (serverPath.isEmpty())
+        return;
+    if (!QFile::exists(serverPath))
+    {
+        LOG_WARNING(QString("PapyrusLSP: configured server not found: %1")
+            .arg(serverPath));
+        return;
+    }
+
+    m_lsp = new PapyrusLanguageServer(this);
+    connect(m_lsp, &PapyrusLanguageServer::responseReceived,
+            this, &ScriptEditorWidget::onLspResponse);
+    connect(m_lsp, &PapyrusLanguageServer::serverStopped,
+            this, [this](int) {
+        LOG_WARNING("PapyrusLSP: server stopped; disabling LSP features");
+        m_lsp->deleteLater();
+        m_lsp = nullptr;
+    });
+
+    if (!m_lsp->start(serverPath))
+    {
+        m_lsp->deleteLater();
+        m_lsp = nullptr;
+        return;
+    }
+
+    m_lsp->initialize();
+    if (!currentFileName.isEmpty())
+    {
+        m_lsp->didOpen(QStringLiteral("file:///") + currentFileName,
+                       QStringLiteral("papyrus"), m_textEdit->toPlainText());
+    }
+    LOG_INFO(QString("PapyrusLSP: language server connected: %1").arg(serverPath));
+}
+
+void ScriptEditorWidget::onLspResponse(int id, const QJsonObject& body)
+{
+    Q_UNUSED(id);
+    Q_UNUSED(body);
+    // Hover / completion responses are consumed here; the built-in
+    // completer and type checker remain the primary completion source.
 }
 
 void ScriptEditorWidget::checkSpelling()
