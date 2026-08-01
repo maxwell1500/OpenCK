@@ -305,6 +305,12 @@ target_link_libraries(test_scriptflagfile PRIVATE openck_model test_stubs Qt6::T
 target_include_directories(test_scriptflagfile PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_scriptflagfile)
 
+# Papyrus project file parser (.ppj)
+add_executable(test_papyrusproject test_papyrusproject.cpp)
+target_link_libraries(test_papyrusproject PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_papyrusproject PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_papyrusproject)
+
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
     test_pluginio test_integration test_conflict test_datamodel
