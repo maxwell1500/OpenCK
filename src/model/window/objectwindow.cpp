@@ -271,6 +271,9 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Wate_:
             cat.totalRecords = data->getWateCollection().size();
             break;
+        case CkId::Type_Scen_:
+            cat.totalRecords = data->getScenCollection().size();
+            break;
         default:
             break;
         }
@@ -597,6 +600,10 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getWateCollection().getId(i);
                 formId = formatFormId(data->getWateCollection().getRecord(i).get().formId);
                 break;
+            case CkId::Type_Scen_:
+                editorId = data->getScenCollection().getId(i);
+                formId = formatFormId(data->getScenCollection().getRecord(i).get().formId);
+                break;
             default:
                 break;
             }
@@ -693,7 +700,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Voice Type", CkId::Type_None);
 
     addCategory("Topic", CkId::Type_None);
-    addCategory("Scene", CkId::Type_None);
+    addCategory("Scene", CkId::Type_Scen_);
     addCategory("Message", CkId::Type_Mesg_);
     addCategory("Note", CkId::Type_Note_);
     addCategory("Terminal", CkId::Type_None);

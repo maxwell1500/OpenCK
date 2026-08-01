@@ -101,6 +101,7 @@ void Document::save(const QString& savePath)
             {&data->getSounCollection(), 'SOUN'},
             {&data->getWthrCollection(), 'WTHR'},
             {&data->getLtexCollection(), 'LTEX'},
+            {&data->getScenCollection(), 'SCEN'},
             {&data->getAmmoCollection(), 'AMMO'},
             {&data->getAppaCollection(), 'APPA'},
             {&data->getAvifCollection(), 'AVIF'},

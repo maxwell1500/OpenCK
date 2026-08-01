@@ -40,6 +40,7 @@
 #include "../../../libs/files/esm/sounrecord.hpp"
 #include "../../../libs/files/esm/wthrrecord.hpp"
 #include "../../../libs/files/esm/ltexrecord.hpp"
+#include "../../../libs/files/esm/scenrecord.hpp"
 #include "../../../libs/files/esm/ammorecord.hpp"
 #include "../../../libs/files/esm/apparatusrecord.hpp"
 #include "../../../libs/files/esm/actorvalueinforecord.hpp"
@@ -273,6 +274,9 @@ public:
     /// \brief Get land texture collection (LTEX records)
     /// \return Const reference to the land texture record collection
     const IdCollection<LtexRecord>& getLtexCollection() const;
+    /// \brief Get SCEN collection
+    /// \return Const reference to the SCEN record collection
+    const IdCollection<ScenRecord>& getScenCollection() const;
     /// \brief Get AMMO collection
     /// \return Const reference to the AMMO record collection
     const IdCollection<AmmoRecord>& getAmmoCollection() const;
@@ -513,6 +517,9 @@ public:
     /// \brief Get land texture collection (mutable)
     /// \return Reference to the land texture record collection for modification
     IdCollection<LtexRecord>& getLtexCollection();
+    /// \brief Get SCEN collection (mutable)
+    /// \return Reference to the SCEN record collection for modification
+    IdCollection<ScenRecord>& getScenCollection();
     /// \brief Get AMMO collection (mutable)
     /// \return Reference to the AMMO record collection for modification
     IdCollection<AmmoRecord>& getAmmoCollection();
@@ -924,6 +931,7 @@ private:
     IdCollection<SounRecord> sounCollection;
     IdCollection<WthrRecord> wthrCollection;
     IdCollection<LtexRecord> ltexCollection;
+    IdCollection<ScenRecord> scenCollection;
     IdCollection<AmmoRecord> ammoCollection;
     IdCollection<AppaRecord> appaCollection;
     IdCollection<ActorValueInfoRecord> avifCollection;

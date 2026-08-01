@@ -87,6 +87,7 @@ static const TypeData typesIdArg[] =
     { CkId::Type_Smqn_, "Sound Marker" },
     { CkId::Type_Spgd_, "Shader Particle Geometry" },
     { CkId::Type_Scol_, "Static Collection" },
+    { CkId::Type_Scen_, "Scene" },
     { CkId::Type_Txst_, "Texture Set" },
     { CkId::Type_Wate_, "Water" },
     { CkId::Type_None, 0 }
@@ -170,6 +171,7 @@ static const TypeData typesNoArg[] =
     { CkId::Type_Smqn_, "Sound Markers" },
     { CkId::Type_Spgd_, "Shader Particle Geometries" },
     { CkId::Type_Scol_, "Static Collections" },
+    { CkId::Type_Scen_, "Scenes" },
     { CkId::Type_Txst_, "Texture Sets" },
     { CkId::Type_Wate_, "Water" },
     { CkId::Type_None, 0 }

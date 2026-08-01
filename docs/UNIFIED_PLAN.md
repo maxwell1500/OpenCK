@@ -597,7 +597,7 @@ Sources reconciled here:
 
 | # | Task | Notes |
 |---|------|-------|
-| 16.1 | Scene (SCEN) timeline editor — action list, phase timeline, actor assignment | `BGSSceneView` pattern |
+| 16.1 | Scene (SCEN) timeline editor — action list, phase timeline, actor assignment | ✅ Partial: `ScenRecord` struct created + wired end-to-end (CkId, Data collection, continueLoading, Document::save, Object Window "Scene" category now backed); opens in generic dialog with raw-subrecord inspector; timeline UI pending. +`test_scenrecord` |
 | 16.2 | EffectShader / ImageSpaceModifier (EFSH/IMGS) editor | ✅ Partial: EFSH/IMGS open in the generic dialog with a `RawSubrecordWidget` inspector showing all unparsed subrecords (name/size/hex); typed field panels pending (structs parse EDID only, everything else round-trips losslessly via rawSubRecords) |
 | 16.3 | AI Package (PACK) editor completion — conditions grid, schedule data, package data | ✅ Partial: `PackDataWidget` (EditorID, package/target type, flags, target list) registered as `"PACK"` factory + editSelected case; `aipackageeditor`/`PackEditor` remain for list browsing |
 | 16.4 | Worldspace editor completion — map data, climate, water, LOD settings, cell grid | ✅ Partial: `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) registered as `"WRLD"` factory + editSelected case; map/LOD/cell-grid editing still pending |
@@ -743,7 +743,7 @@ Sources reconciled here:
 | 13 — Editor Workspace Parity | 14/14 | ✅ |
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
-| 16 — Specialized Editor Completion | 5/8 | ◐ |
+| 16 — Specialized Editor Completion | 6/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 0/9 | ⬜ |
 | 18 — Audio Pipeline | 0/7 | ⬜ |
 | 19 — Material Editor & Asset Pipeline | 0/7 | ⬜ |
@@ -752,7 +752,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 0/5 | ⬜ |
 | 23 — Data Workflows & Plugin Utilities | 0/9 | ⬜ |
 | 24 — Infrastructure & Ecosystem | 0/11 | ⬜ |
-| **TOTAL** | **233/310** | ◐ |
+| **TOTAL** | **234/310** | ◐ |
 
 ---
 
@@ -797,7 +797,7 @@ Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wire
 
 ```
 Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
-Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector done; SCEN, PNDT, CCT next)
+Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (.lbr brushes, overlay masks, heightmap import, undo/redo, BTD)
 Phase 18: Audio pipeline (playback engine, XWM/FUZ, LipGenerator, FaceFX, Wwise soundbanks, RoboVoicer)
 Phase 19: Material editor & asset pipeline (BSMaterial graph, DDS import, texture conversion, mesh/phys LOD, FBX→NIF)

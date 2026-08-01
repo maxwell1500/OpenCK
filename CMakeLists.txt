@@ -142,6 +142,7 @@ set(ESM_SOURCES
     libs/files/esm/slgmrecord.cpp
     libs/files/esm/soundmarkerrecord.cpp
     libs/files/esm/staticcollectionrecord.cpp
+    libs/files/esm/scenrecord.cpp
     libs/files/esm/texturesetrecord.cpp
     libs/files/esm/waterecord.cpp
     libs/files/data/strings.cpp
@@ -242,6 +243,7 @@ set(ESM_HEADERS
     libs/files/esm/slgmrecord.hpp
     libs/files/esm/soundmarkerrecord.hpp
     libs/files/esm/staticcollectionrecord.hpp
+    libs/files/esm/scenrecord.hpp
     libs/files/esm/texturesetrecord.hpp
     libs/files/esm/waterecord.hpp
     libs/components/component.hpp

@@ -272,6 +272,12 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     ltexCollection.addColumn(new IntColumn<LtexRecord>("Havok Material", &LtexRecord::havokMaterial));
     addModel(new IdTable(&ltexCollection), CkId::Type_Ltex_);
 
+    // SCEN - Scenes
+    scenCollection.addColumn(new StringIdColumn<ScenRecord>());
+    scenCollection.addColumn(new RecordStateColumn<ScenRecord>());
+    scenCollection.addColumn(new StringColumn<ScenRecord>("Name", &ScenRecord::editorId));
+    addModel(new IdTable(&scenCollection), CkId::Type_Scen_);
+
     // AMMO - Ammo_s
     ammoCollection.addColumn(new StringIdColumn<AmmoRecord>());
     ammoCollection.addColumn(new RecordStateColumn<AmmoRecord>());
@@ -663,6 +669,7 @@ bool Data::continueLoading(Messages& messages)
             case 'SOUN': sounCollection.load(*reader, base); break;
             case 'WTHR': wthrCollection.load(*reader, base); break;
             case 'LTEX': ltexCollection.load(*reader, base); break;
+            case 'SCEN': scenCollection.load(*reader, base); break;
             case 'AMMO': ammoCollection.load(*reader, base); break;
             case 'APPA': appaCollection.load(*reader, base); break;
             case 'AVIF': avifCollection.load(*reader, base); break;
@@ -929,6 +936,7 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Soun_:     return &sounCollection;
     case CkId::Type_Wthr_:     return &wthrCollection;
     case CkId::Type_Ltex_:     return &ltexCollection;
+    case CkId::Type_Scen_:     return &scenCollection;
     case CkId::Type_Ammo_:    return &ammoCollection;
     case CkId::Type_Appa_:    return &appaCollection;
     case CkId::Type_Avif_:    return &avifCollection;
@@ -1015,6 +1023,7 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Soun_:     return &sounCollection;
     case CkId::Type_Wthr_:     return &wthrCollection;
     case CkId::Type_Ltex_:     return &ltexCollection;
+    case CkId::Type_Scen_:     return &scenCollection;
     case CkId::Type_Ammo_:    return &ammoCollection;
     case CkId::Type_Appa_:    return &appaCollection;
     case CkId::Type_Avif_:    return &avifCollection;
@@ -1100,6 +1109,7 @@ IdCollection<LandRecord>& Data::getLandCollection() { return landCollection; }
 IdCollection<SounRecord>& Data::getSounCollection() { return sounCollection; }
 IdCollection<WthrRecord>& Data::getWthrCollection() { return wthrCollection; }
 IdCollection<LtexRecord>& Data::getLtexCollection() { return ltexCollection; }
+IdCollection<ScenRecord>& Data::getScenCollection() { return scenCollection; }
 IdCollection<AmmoRecord>& Data::getAmmoCollection() { return ammoCollection; }
 IdCollection<AppaRecord>& Data::getAppaCollection() { return appaCollection; }
 IdCollection<ActorValueInfoRecord>& Data::getAvifCollection() { return avifCollection; }
@@ -1226,6 +1236,7 @@ QVector<IRecordCollection*> Data::allCollections()
         &scolCollection,
         &txstCollection,
         &wateCollection,
+        &scenCollection,
     };
 }
 
@@ -1310,6 +1321,7 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&scolCollection,    CkId::Type_Scol_},
         {&txstCollection,    CkId::Type_Txst_},
         {&wateCollection,    CkId::Type_Wate_},
+        {&scenCollection,    CkId::Type_Scen_},
     };
 }
 
@@ -1663,6 +1675,11 @@ const IdCollection<WthrRecord>& Data::getWthrCollection() const
 const IdCollection<LtexRecord>& Data::getLtexCollection() const
 {
     return ltexCollection;
+}
+
+const IdCollection<ScenRecord>& Data::getScenCollection() const
+{
+    return scenCollection;
 }
 
 const IdCollection<AmmoRecord>& Data::getAmmoCollection() const

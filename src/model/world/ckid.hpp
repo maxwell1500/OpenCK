@@ -96,6 +96,7 @@ public:
     Type_Smqn_,
     Type_Spgd_,
     Type_Scol_,
+    Type_Scen_,
     Type_Txst_,
     Type_Wate_,
 

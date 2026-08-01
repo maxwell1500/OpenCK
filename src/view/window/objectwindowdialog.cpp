@@ -26,6 +26,7 @@
 #include "rawsubrecordwidget.hpp"
 #include "../../../libs/files/esm/effectshaderrecord.hpp"
 #include "../../../libs/files/esm/imagespacerecord.hpp"
+#include "../../../libs/files/esm/scenrecord.hpp"
 #include "lcrteditor.hpp"
 #include "logger.hpp"
 #include "../../model/tools/blenderlauncher.hpp"
@@ -204,6 +205,7 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(SpgdRecord) \
     MACRO(StaticCollectionRecord) \
     MACRO(StatRecord) \
+    MACRO(ScenRecord) \
     MACRO(TextureSetRecord) \
     MACRO(TreeRecord) \
     MACRO(WateRecord) \
@@ -316,6 +318,14 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             [](FormComponents*, void* recPtr, QWidget* parent) -> QWidget* {
                 auto* w = new RawSubrecordWidget(parent);
                 if (auto* rec = static_cast<ImgsRecord*>(recPtr))
+                    w->setSubrecords(rec->rawSubRecords);
+                return w;
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("SCEN"),
+            [](FormComponents*, void* recPtr, QWidget* parent) -> QWidget* {
+                auto* w = new RawSubrecordWidget(parent);
+                if (auto* rec = static_cast<ScenRecord*>(recPtr))
                     w->setSubrecords(rec->rawSubRecords);
                 return w;
             });
@@ -975,6 +985,19 @@ void ObjectWindowDialog::editSelected()
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
             openck::QtFormDialogManager::instance().openOrFocus(
                 formIdKey, QStringLiteral("IMGS"), &rec.components, &rec, this);
+        }
+        break;
+    }
+    case CkId::Type_Scen_:
+    {
+        auto& collection = mData->getScenCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            ScenRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("SCEN"), &rec.components, &rec, this);
         }
         break;
     }

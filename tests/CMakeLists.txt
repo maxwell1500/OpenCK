@@ -244,3 +244,9 @@ add_executable(test_navmrecord test_navmrecord.cpp)
 target_link_libraries(test_navmrecord PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_navmrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_navmrecord)
+
+# ScenRecord load/save round-trip
+add_executable(test_scenrecord test_scenrecord.cpp)
+target_link_libraries(test_scenrecord PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_scenrecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_scenrecord)
