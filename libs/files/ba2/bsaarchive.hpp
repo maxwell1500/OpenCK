@@ -18,8 +18,9 @@ struct BsaFileEntry {
     quint32 rawSize() const { return size & 0x3FFFFFFFu; }
 };
 
-/// Skyrim SE / Fallout 3 / Skyrim LE / Oblivion BSA reader (magic "BSA\0").
-/// Layout per the xEdit wbBSArchive implementation:
+/// Skyrim SE / Fallout 3 / Skyrim LE / Oblivion BSA reader (magic "BSA\0"),
+/// plus the older Morrowind (TES3) BSA (magic "\0\1\0\0").
+/// TES4-family layout per the xEdit wbBSArchive implementation:
 ///   magic 'BSA\0' (4) + version (4, 0x69 = SSE, 0x68 = FO3/TES5, 0x67 = Oblivion)
 ///   28-byte header: FoldersOffset, Flags, FolderCount, FileCount,
 ///                   FolderNamesLength, FileNamesLength, FileFlags
@@ -28,9 +29,13 @@ struct BsaFileEntry {
 ///   then per folder: name (u8 len + bytes) + FileCount file records
 ///     (16 bytes each: Hash u64, Size u32, Offset u32)
 ///   then all file names (null-terminated).
+/// TES3 layout: magic "\0\1\0\0" + header (HashOffset, FileCount) + per file
+///   Size+Offset, name offsets, null-terminated names, 8-byte hashes; data
+///   offsets are relative to the end of the table.
 /// Compression: a file is compressed when
 ///   (archiveFlags & 0x0004) XOR (size & 0x40000000) is set.
-///   Compressed data is zlib with a 4-byte LE uncompressed-size prefix.
+///   SSE compressed data is an LZ4 frame with a 4-byte LE uncompressed-size
+///   prefix; older games use zlib.
 class BsaArchive {
 public:
     BsaArchive();

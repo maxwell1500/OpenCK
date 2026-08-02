@@ -17,6 +17,7 @@ private slots:
     void initTestCase();
     void testOpenVoicesArchive();
     void testOpenMeshesArchive();
+    void testOpenMorrowindArchive();
     void testExtractFuzRoundTrip();
 };
 
@@ -78,6 +79,24 @@ void TestBsaArchive::testOpenMeshesArchive()
     QVERIFY(archive.readData(nifIndex, data));
     qDebug() << "extracted nif:" << archive.entries()[nifIndex].fullPath << data.size() << "bytes";
     QVERIFY(data.size() > 16);
+}
+
+void TestBsaArchive::testOpenMorrowindArchive()
+{
+    const QString path = QStringLiteral(
+        "C:/XboxGames/The Elder Scrolls III- Morrowind (PC)/Content/Morrowind GOTY English/Data Files/Morrowind.bsa");
+    QVERIFY2(QFileInfo::exists(path), "Morrowind not found");
+
+    BsaArchive archive;
+    QVERIFY(archive.open(path));
+    qDebug() << "morrowind entries:" << archive.fileCount();
+    QVERIFY(archive.fileCount() > 1000);
+
+    // Extract the first entry and verify it reads back.
+    QByteArray data;
+    QVERIFY(archive.readData(0, data));
+    QVERIFY(data.size() > 0);
+    qDebug() << "first entry:" << archive.entries()[0].fullPath << data.size() << "bytes";
 }
 
 void TestBsaArchive::testExtractFuzRoundTrip()

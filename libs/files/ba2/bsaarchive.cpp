@@ -11,6 +11,7 @@
 namespace {
 
 constexpr quint32 MAGIC_BSA = 0x00415342;          // 'BSA\0'
+constexpr quint32 MAGIC_TES3 = 0x00000100;         // '\0\1\0\0'
 constexpr quint32 FLAG_PATHNAMES = 0x0001;
 constexpr quint32 FLAG_FILENAMES = 0x0002;
 constexpr quint32 FLAG_COMPRESS = 0x0004;
@@ -236,12 +237,57 @@ bool BsaArchive::open(const QString& path)
     ds.setByteOrder(QDataStream::LittleEndian);
 
     quint32 magic = readU32(ds);
-    if (magic != MAGIC_BSA) {
-        LOG_ERROR(QString("BsaArchive: invalid magic 0x%1 (expected 'BSA\\0')").arg(magic, 8, 16, QChar('0')));
+    if (magic != MAGIC_BSA && magic != MAGIC_TES3) {
+        LOG_ERROR(QString("BsaArchive: invalid magic 0x%1 (expected 'BSA\\0' or TES3)").arg(magic, 8, 16, QChar('0')));
         mFile->close();
         delete mFile;
         mFile = nullptr;
         return false;
+    }
+
+    if (magic == MAGIC_TES3)
+    {
+        // Morrowind BSA: header (HashOffset, FileCount) then per-file records.
+        readU32(ds); // hash offset
+        const quint32 fileCount = readU32(ds);
+
+        struct Tes3File { quint32 size; quint32 offset; QString name; };
+        QVector<Tes3File> files;
+        files.reserve(fileCount);
+        for (quint32 i = 0; i < fileCount; ++i) {
+            Tes3File f;
+            f.size = readU32(ds);
+            f.offset = readU32(ds);
+            files.append(f);
+        }
+        // Skip name-offset table, then read names.
+        ds.device()->seek(12 + 8 * static_cast<qint64>(fileCount) + 4 * static_cast<qint64>(fileCount));
+        for (quint32 i = 0; i < fileCount; ++i) {
+            bool ok = true;
+            files[i].name = readNullTerminated(ds, ok);
+            if (!ok) break;
+        }
+        // Data offsets are relative to the end of the table (magic + header +
+        // file records + name offsets + names + hashes).
+        qint64 dataOffset = 12 + 8 * static_cast<qint64>(fileCount)
+                          + 4 * static_cast<qint64>(fileCount);
+        for (int i = 0; i < files.size(); ++i)
+            dataOffset += files[i].name.size() + 1;
+        dataOffset += 8 * static_cast<qint64>(fileCount);
+
+        for (const Tes3File& f : files) {
+            BsaFileEntry entry;
+            entry.fileName = f.name;
+            entry.fullPath = f.name;
+            entry.size = f.size;
+            entry.offset = f.offset + static_cast<quint32>(dataOffset);
+            entry.compressed = false;
+            mEntries.append(entry);
+        }
+        mVersion = 0;
+        mFlags = 0;
+        LOG_INFO(QString("BsaArchive: loaded %1 TES3 files from %2").arg(mEntries.size()).arg(path));
+        return !mEntries.isEmpty();
     }
 
     mVersion = readU32(ds);
