@@ -387,6 +387,11 @@ void ObjectWindowDialog::setupUI()
         "Read an Object Window keyword filter file (DataViews\\ObjectWindow\\*.filter)");
     filterLayout->addWidget(loadFilterFileButton);
 
+    QPushButton* saveFilterFileButton = new QPushButton("Save .filter File...");
+    saveFilterFileButton->setToolTip(
+        "Write the current filter rules to an Object Window keyword filter file");
+    filterLayout->addWidget(saveFilterFileButton);
+
     mainLayout->addLayout(filterLayout);
 
     connect(mFilterEdit, &QLineEdit::textChanged, mModel, &ObjectWindowModel::applyFilter);
@@ -396,6 +401,8 @@ void ObjectWindowDialog::setupUI()
     connect(deleteFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSavedFilter);
     connect(loadFilterFileButton, &QPushButton::clicked,
         this, &ObjectWindowDialog::loadFilterFile);
+    connect(saveFilterFileButton, &QPushButton::clicked,
+        this, &ObjectWindowDialog::saveFilterFile);
     refreshSavedFilters();
 
     auto* layoutRow = new QHBoxLayout();
@@ -1303,6 +1310,45 @@ void ObjectWindowDialog::loadFilterFile()
                 .arg(filter.count()));
     }
     LOG_INFO(QString("Loaded Object Window filter '%1' with %2 rules")
+        .arg(path).arg(filter.count()));
+}
+
+void ObjectWindowDialog::saveFilterFile()
+{
+    const ObjectWindowFilter filter = mModel ? mModel->activeObjectFilter() : ObjectWindowFilter();
+    if (filter.count() == 0)
+    {
+        QMessageBox::information(this, tr("Save Object Window Filter"),
+            tr("No structured filter is active. Load a .filter file first, then "
+               "Save .filter File... to re-export it."));
+        return;
+    }
+
+    const QString path = QFileDialog::getSaveFileName(this,
+        tr("Save Object Window Filter"), QString(),
+        tr("Filter files (*.filter);;JSON files (*.json)"));
+    if (path.isEmpty())
+        return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+        QMessageBox::warning(this, tr("Save Object Window Filter"),
+            tr("Could not write %1.").arg(path));
+        return;
+    }
+    const QJsonDocument doc(filter.toJson());
+    file.write(doc.toJson(QJsonDocument::Indented));
+    file.close();
+
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(
+            tr("Saved filter '%1' (%2 rules)")
+                .arg(QFileInfo(path).fileName())
+                .arg(filter.count()));
+    }
+    LOG_INFO(QString("Saved Object Window filter '%1' with %2 rules")
         .arg(path).arg(filter.count()));
 }
 

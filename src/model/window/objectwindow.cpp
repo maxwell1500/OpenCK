@@ -823,6 +823,7 @@ void ObjectWindowModel::applyFilter(const QString& text)
 
 void ObjectWindowModel::applyObjectFilter(const ObjectWindowFilter& filter)
 {
+    mActiveObjectFilter = filter;
     rebuildAllRecords();
     for (auto& cat : mCategories)
     {

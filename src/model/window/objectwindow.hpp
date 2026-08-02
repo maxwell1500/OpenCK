@@ -6,8 +6,9 @@
 #include <QVector>
 #include <functional>
 
+#include "../tools/objectwindowfilter.hpp"
+
 class Data;
-class ObjectWindowFilter;
 
 /// Tree model presenting records grouped by category for the Object Window.
 class ObjectWindowModel : public QAbstractItemModel
@@ -39,6 +40,9 @@ public:
 public slots:
     void applyFilter(const QString& text);
     void applyObjectFilter(const ObjectWindowFilter& filter);
+
+    // Returns the most recently applied structured filter (may be empty).
+    ObjectWindowFilter activeObjectFilter() const { return mActiveObjectFilter; }
 
 private:
     struct VisibleRecord
@@ -81,6 +85,7 @@ private:
     QVector<Category> mCategories;
     QVector<CategoryGroup> mGroups;
     QString mFilter;
+    ObjectWindowFilter mActiveObjectFilter;
 };
 
 #endif // OBJECTWINDOW_H

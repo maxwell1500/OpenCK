@@ -63,6 +63,10 @@ public:
     // [...] } / { "rules": [...] }.
     static ObjectWindowFilter fromJson(const QJsonValue& value);
 
+    // Serializes the filter in the full file form { "IsConcatenatedOr": bool,
+    // "Rules": [...] }. Round-trips through fromJson.
+    QJsonObject toJson() const;
+
     void addRule(const FilterRule& rule);
     void clear();
     int count() const { return rules.size(); }

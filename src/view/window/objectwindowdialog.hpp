@@ -56,6 +56,7 @@ public slots:
     void loadFilter();
     void deleteSavedFilter();
     void loadFilterFile();
+    void saveFilterFile();
     void saveColumnLayout();
     void loadColumnLayout();
     void deleteColumnLayout();

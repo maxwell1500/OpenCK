@@ -167,6 +167,17 @@ ObjectWindowFilter ObjectWindowFilter::fromJson(const QJsonValue& value)
     return filter;
 }
 
+QJsonObject ObjectWindowFilter::toJson() const
+{
+    QJsonObject obj;
+    obj.insert(QStringLiteral("IsConcatenatedOr"), isConcatenatedOr);
+    QJsonArray arr;
+    for (const FilterRule& rule : rules)
+        arr.append(rule.toJson());
+    obj.insert(QStringLiteral("Rules"), arr);
+    return obj;
+}
+
 void ObjectWindowFilter::addRule(const FilterRule& rule)
 {
     rules.append(rule);

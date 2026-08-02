@@ -16,8 +16,9 @@ private slots:
     void testRuleJsonRoundTrip();
     void testFilterAnd();
     void testFilterOr();
-    void testFilterFullFileForm();
-    void testFilterArrayForm();
+void testFilterFullFileForm();
+void testFilterArrayForm();
+void testFilterJsonRoundTrip();
     void testFilterEmpty();
     void testFilterDisabledRules();
     void testFilterNegation();
@@ -178,6 +179,36 @@ void TestObjectWindowFilter::testFilterArrayForm()
         { QStringLiteral("Name"), QStringLiteral("Fire Scroll") } }));
     QVERIFY(!filter.matches(QJsonObject{
         { QStringLiteral("Name"), QStringLiteral("Potion") } }));
+}
+
+void TestObjectWindowFilter::testFilterJsonRoundTrip()
+{
+    const QByteArray text = R"({
+        "IsConcatenatedOr": true,
+        "Rules": [
+            {"ParameterName": "Type", "FilterType": "EqualTo", "ExactValue": "Weapon"},
+            {"ParameterName": "Name", "FilterType": "RegexMatch", "ExactValue": "^Iron"},
+            {"ParameterName": "Weight", "FilterType": "Range", "MinValue": 1, "MaxValue": 20}
+        ]
+    })";
+    ObjectWindowFilter filter =
+        ObjectWindowFilter::fromJson(QJsonDocument::fromJson(text).object());
+    QCOMPARE(filter.count(), 3);
+
+    const QJsonDocument doc(filter.toJson());
+    ObjectWindowFilter reloaded =
+        ObjectWindowFilter::fromJson(doc.object());
+    QCOMPARE(reloaded.isConcatenatedOr, true);
+    QCOMPARE(reloaded.count(), 3);
+    QCOMPARE(reloaded.rules[0].parameter, QStringLiteral("Type"));
+    QCOMPARE(reloaded.rules[0].type, FilterRule::Type::Equals);
+    QCOMPARE(reloaded.rules[0].exactValue, QStringLiteral("Weapon"));
+    QCOMPARE(reloaded.rules[1].parameter, QStringLiteral("Name"));
+    QCOMPARE(reloaded.rules[1].type, FilterRule::Type::RegexMatch);
+    QCOMPARE(reloaded.rules[2].parameter, QStringLiteral("Weight"));
+    QCOMPARE(reloaded.rules[2].type, FilterRule::Type::Range);
+    QCOMPARE(reloaded.rules[2].minValue, 1.0);
+    QCOMPARE(reloaded.rules[2].maxValue, 20.0);
 }
 
 void TestObjectWindowFilter::testFilterEmpty()
