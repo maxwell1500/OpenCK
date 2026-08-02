@@ -6,6 +6,8 @@
 #include <QDir>
 #include <QDebug>
 
+#include <cstring>
+
 #include <zlib.h>
 
 #include "logger.hpp"
@@ -13,6 +15,10 @@
 namespace {
 
 constexpr quint32 BA2_MAGIC = 0x20584142; // 'BA2 ' in little-endian
+constexpr quint32 BTDX_MAGIC = 0x58445442; // 'BTDX'
+constexpr quint32 TYPE_GNRL = 0x4C524E47;  // 'GNRL'
+constexpr quint32 TYPE_DX10 = 0x30315844;  // 'DX10'
+constexpr quint32 BAADF00D = 0xBAADF00D;
 
 } // namespace
 
@@ -26,6 +32,31 @@ Ba2Archive::~Ba2Archive()
         if (mMappedData) mFile->unmap(mMappedData);
         delete mFile;
     }
+}
+
+quint32 Ba2Archive::readU32(const uchar* p)
+{
+    quint32 v = 0;
+    memcpy(&v, p, sizeof(v));
+    return v;
+}
+
+quint64 Ba2Archive::readU64(const uchar* p)
+{
+    quint64 v = 0;
+    memcpy(&v, p, sizeof(v));
+    return v;
+}
+
+void Ba2Archive::failOpen()
+{
+    if (mFile) {
+        if (mMappedData) mFile->unmap(mMappedData);
+        mMappedData = nullptr;
+        delete mFile;
+        mFile = nullptr;
+    }
+    mEntries.clear();
 }
 
 bool Ba2Archive::open(const QString& path)
@@ -47,36 +78,120 @@ bool Ba2Archive::open(const QString& path)
         return false;
     }
 
-    if (mFileSize < 16) {
+    if (mFileSize < 36) {
         LOG_ERROR("BA2 archive too small");
-        mFile->unmap(mMappedData); mMappedData = nullptr;
-        delete mFile; mFile = nullptr;
+        failOpen();
         return false;
     }
-
-    // Read magic
-    quint32 magic = *reinterpret_cast<const quint32*>(mMappedData);
-    if (magic != BA2_MAGIC) {
-        LOG_ERROR(QString("Invalid BA2 magic: 0x%1").arg(magic, 8, 16, QChar('0')));
-        mFile->unmap(mMappedData); mMappedData = nullptr;
-        delete mFile; mFile = nullptr;
-        return false;
-    }
-
-    // Read version
-    quint32 version = *reinterpret_cast<const quint32*>(mMappedData + 4);
-    LOG_INFO(QString("BA2 archive version: %1").arg(version));
-
-    // Read file table offset and count
-    mFileTableOffset = *reinterpret_cast<const quint32*>(mMappedData + 8);
-    mFileCount = *reinterpret_cast<const quint32*>(mMappedData + 12);
-
-    LOG_INFO(QString("BA2 archive: %1 files, table at offset 0x%2")
-                 .arg(mFileCount).arg(mFileTableOffset, 8, 16, QChar('0')));
 
     mName = QFileInfo(path).completeBaseName();
 
-    // Parse file entries
+    const quint32 magic = readU32(mMappedData);
+    if (magic == BTDX_MAGIC)
+        return openBtdx(path);
+    if (magic == BA2_MAGIC)
+        return openLegacy(path);
+
+    LOG_ERROR(QString("Invalid BA2 magic: 0x%1").arg(magic, 8, 16, QChar('0')));
+    failOpen();
+    return false;
+}
+
+bool Ba2Archive::openBtdx(const QString&)
+{
+    const quint32 version = readU32(mMappedData + 4);
+    const quint32 type = readU32(mMappedData + 8);
+    mFileCount = readU32(mMappedData + 12);
+    const quint64 nameOffs = readU64(mMappedData + 16);
+
+    // v1 / v7 / v8 use a 24-byte header; v2 / v3 use 32 bytes (the file
+    // records start right after the header).
+    const quint32 hdrSize = (version == 1 || version == 7 || version == 8) ? 24 : 32;
+    LOG_INFO(QString("BA2 archive: %1 v%2 type=%3 files=%4 nameOffs=%5")
+        .arg(mName).arg(version).arg(type, 4, 16, QChar('0')).arg(mFileCount).arg(nameOffs));
+
+    if (type == TYPE_GNRL)
+        return parseBtdxGeneral(hdrSize, nameOffs);
+    if (type == TYPE_DX10)
+        return parseBtdxTextures(hdrSize, nameOffs);
+
+    LOG_ERROR(QString("BA2 archive type 0x%1 not supported").arg(type, 8, 16, QChar('0')));
+    failOpen();
+    return false;
+}
+
+bool Ba2Archive::parseBtdxGeneral(quint32 hdrSize, quint64 nameOffs)
+{
+    mEntries.clear();
+    mEntries.reserve(mFileCount);
+
+    // File names are a u16-length-prefixed table (length includes the NUL).
+    QVector<QString> names;
+    names.reserve(mFileCount);
+    quint64 pos = nameOffs;
+    for (quint32 i = 0; i < mFileCount && pos + 2 <= mFileSize; ++i)
+    {
+        const quint16 len = static_cast<quint16>(readU32(mMappedData + pos));
+        pos += 2;
+        if (pos + len > mFileSize) break;
+        QString name = QString::fromLatin1(
+            reinterpret_cast<const char*>(mMappedData + pos), len);
+        while (name.endsWith(QLatin1Char('\0'))) name.chop(1);
+        names.append(name);
+        pos += len;
+    }
+    if (names.size() < static_cast<int>(mFileCount))
+    {
+        LOG_ERROR(QString("BA2 name table truncated (%1 of %2 names)")
+            .arg(names.size()).arg(mFileCount));
+        failOpen();
+        return false;
+    }
+
+    // 36-byte file records: CRC32 base, ext FourCC, CRC32 dir, flags,
+    // u64 data offset, packed size, unpacked size, 0xBAADF00D.
+    for (quint32 i = 0; i < mFileCount; ++i)
+    {
+        const quint64 rec = static_cast<quint64>(hdrSize) + static_cast<quint64>(i) * 36;
+        if (rec + 36 > mFileSize) break;
+        const uchar* p = mMappedData + rec;
+        const quint32 sentinel = readU32(p + 32);
+        if (sentinel != BAADF00D)
+        {
+            LOG_WARNING(QString("BA2 record %1 has bad sentinel 0x%2")
+                .arg(i).arg(sentinel, 8, 16, QChar('0')));
+            continue;
+        }
+
+        Ba2FileEntry entry;
+        entry.relativePath = names[i];
+        entry.fileOffset = readU64(p + 16);
+        entry.compressedSize = readU32(p + 24);
+        entry.uncompressedSize = readU32(p + 28);
+        entry.compressed = (entry.compressedSize != 0);
+        mEntries.append(entry);
+    }
+
+    LOG_INFO(QString("Parsed %1 file entries from BA2 archive").arg(mEntries.size()));
+    return !mEntries.isEmpty();
+}
+
+bool Ba2Archive::parseBtdxTextures(quint32 hdrSize, quint64 nameOffs)
+{
+    // DX10 archives store per-chunk texture data; not yet supported.
+    Q_UNUSED(hdrSize);
+    Q_UNUSED(nameOffs);
+    LOG_WARNING("BA2 DX10 (texture) archives not yet supported");
+    failOpen();
+    return false;
+}
+
+bool Ba2Archive::openLegacy(const QString&)
+{
+    // Self-written "BA2 " archives (the legacy create() format).
+    mFileTableOffset = readU32(mMappedData + 8);
+    mFileCount = readU32(mMappedData + 12);
+
     mEntries.clear();
     mEntries.reserve(mFileCount);
 
@@ -84,35 +199,29 @@ bool Ba2Archive::open(const QString& path)
     for (quint32 i = 0; i < mFileCount && pos + 24 <= mFileSize; ++i) {
         Ba2FileEntry entry;
 
-        // Read filename length
         if (pos + 4 > mFileSize) break;
-        quint32 nameLen = *reinterpret_cast<const quint32*>(mMappedData + pos);
+        quint32 nameLen = readU32(mMappedData + pos);
         pos += 4;
 
-        // Read filename
         if (pos + nameLen > mFileSize) break;
         entry.relativePath = QString::fromLatin1(reinterpret_cast<const char*>(mMappedData + pos), nameLen);
         pos += nameLen;
 
-        // Read compressed size
         if (pos + 4 > mFileSize) break;
-        entry.compressedSize = *reinterpret_cast<const quint32*>(mMappedData + pos);
+        entry.compressedSize = readU32(mMappedData + pos);
         pos += 4;
 
-        // Read uncompressed size
         if (pos + 4 > mFileSize) break;
-        entry.uncompressedSize = *reinterpret_cast<const quint32*>(mMappedData + pos);
+        entry.uncompressedSize = readU32(mMappedData + pos);
         pos += 4;
 
-        // Read flags
         if (pos + 4 > mFileSize) break;
-        quint32 flags = *reinterpret_cast<const quint32*>(mMappedData + pos);
+        quint32 flags = readU32(mMappedData + pos);
         entry.compressed = (flags & 0x1) != 0;
         pos += 4;
 
-        // Read file offset
         if (pos + 8 > mFileSize) break;
-        entry.fileOffset = *reinterpret_cast<const quint64*>(mMappedData + pos);
+        entry.fileOffset = readU64(mMappedData + pos);
         pos += 8;
 
         mEntries.append(entry);
@@ -131,7 +240,12 @@ bool Ba2Archive::extract(quint32 index, const QString& outputPath) const
 
     const auto& entry = mEntries[index];
 
-    if (entry.fileOffset + entry.uncompressedSize > mFileSize) {
+    // Bounds check against the on-disk extent (compressed size for packed
+    // files, unpacked size for stored files).
+    const quint64 onDiskSize = entry.compressed
+        ? static_cast<quint64>(entry.compressedSize)
+        : static_cast<quint64>(entry.uncompressedSize);
+    if (entry.fileOffset + onDiskSize > mFileSize) {
         LOG_ERROR(QString("BA2 extract: file data out of range for %1")
                      .arg(entry.relativePath));
         return false;

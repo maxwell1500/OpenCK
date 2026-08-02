@@ -49,6 +49,14 @@ public:
                 bool compress = true, const QString& archiveType = "GNRL");
 
 private:
+    bool openBtdx(const QString& path);
+    bool parseBtdxGeneral(quint32 hdrSize, quint64 nameOffs);
+    bool parseBtdxTextures(quint32 hdrSize, quint64 nameOffs);
+    bool openLegacy(const QString& path);
+    static quint32 readU32(const uchar* p);
+    static quint64 readU64(const uchar* p);
+    void failOpen();
+
     QString mName;
     QVector<Ba2FileEntry> mEntries;
     QFile* mFile = nullptr;

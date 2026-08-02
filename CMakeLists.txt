@@ -489,6 +489,7 @@ set(MODEL_SOURCES
     src/model/tools/planetdefinition.cpp
     src/model/tools/creatureattachpoints.cpp
     src/model/tools/btdfile.cpp
+    src/model/tools/btdterrain.cpp
     src/model/tools/bnetclient.cpp
     src/model/tools/objectwindowfilter.cpp
     src/model/tools/assetdependencyscanner.cpp
@@ -566,6 +567,7 @@ set(MODEL_HEADERS
     src/model/tools/planetdefinition.hpp
     src/model/tools/creatureattachpoints.hpp
     src/model/tools/btdfile.hpp
+    src/model/tools/btdterrain.hpp
     src/model/tools/bnetclient.hpp
     src/model/tools/objectwindowfilter.hpp
     src/model/tools/assetdependencyscanner.hpp

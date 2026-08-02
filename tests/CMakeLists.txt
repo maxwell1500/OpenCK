@@ -196,6 +196,12 @@ target_link_libraries(test_scanbtd PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_scanbtd PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — needs a game data dir with archives.
 
+# BtdTerrain: real Starfield .btd (BTDB) reader against the Terrain BA2.
+add_executable(test_btdterrain test_btdterrain.cpp)
+target_link_libraries(test_btdterrain PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_btdterrain PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Starfield install.
+
 # XwmaDecoder: decodes a real Skyrim voice .fuz's xWMA audio to PCM via WMF.
 add_executable(test_xwmadecoder test_xwmadecoder.cpp)
 target_link_libraries(test_xwmadecoder PRIVATE openck_model test_stubs Qt6::Test)
