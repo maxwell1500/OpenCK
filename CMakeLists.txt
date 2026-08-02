@@ -439,6 +439,7 @@ set(MODEL_SOURCES
     src/model/tools/textureconversionrules.cpp
     src/model/tools/referencebatchactions.cpp
     src/model/tools/gitrepository.cpp
+    src/model/tools/perforcerepository.cpp
     src/model/tools/primitivemeshgenerator.cpp
     src/model/tools/scriptflagfile.cpp
     src/model/tools/papyrusproject.cpp
@@ -583,6 +584,7 @@ set(MODEL_HEADERS
     src/model/tools/textureconversionrules.hpp
     src/model/tools/referencebatchactions.hpp
     src/model/tools/gitrepository.hpp
+    src/model/tools/perforcerepository.hpp
     src/model/tools/primitivemeshgenerator.hpp
     src/model/tools/scriptflagfile.hpp
     src/model/tools/papyrusproject.hpp

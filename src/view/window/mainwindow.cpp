@@ -11,6 +11,7 @@
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/world/data.hpp"
 #include "../../model/tools/gitrepository.hpp"
+#include "../../model/tools/perforcerepository.hpp"
 #include "../../model/tools/primitivemeshgenerator.hpp"
 #include "../../model/tools/plugincompactor.hpp"
 #include "../../model/tools/bnetclient.hpp"
@@ -2552,14 +2553,14 @@ void MainWindow::on_actionCheckOut_triggered()
         return;
     }
 
-    // Check Out = make sure the plugin is tracked by its local git repo so
-    // edits can be committed later. We stage it; the user commits with
-    // Check In.
+    // Check Out = make sure the plugin is tracked so edits can be submitted
+    // later. Perforce (p4 edit) is preferred when the plugin lives in a
+    // workspace; otherwise we stage it in its local git repo.
     QString repoDir;
     for (const QString& file : contentFiles)
     {
         const QString dir = QFileInfo(file).absolutePath();
-        if (GitRepository::isRepository(dir))
+        if (PerforceRepository::isWorkspace(dir) || GitRepository::isRepository(dir))
         {
             repoDir = dir;
             break;
@@ -2569,9 +2570,9 @@ void MainWindow::on_actionCheckOut_triggered()
     if (repoDir.isEmpty())
     {
         QMessageBox::information(this, "Check Out",
-            "The plugin is not inside a Git repository.\n\n"
-            "Initialize a repository in the plugin's folder (git init) to use "
-            "Check Out / Check In.");
+            "The plugin is not inside a Perforce workspace or Git repository.\n\n"
+            "For Git: initialize a repository in the plugin's folder (git init).\n"
+            "For Perforce: ensure p4 is on PATH and a workspace maps the folder.");
         return;
     }
 
@@ -2579,6 +2580,25 @@ void MainWindow::on_actionCheckOut_triggered()
     for (const QString& file : contentFiles)
     {
         relPaths << QDir(repoDir).relativeFilePath(file);
+    }
+
+    if (PerforceRepository::isWorkspace(repoDir))
+    {
+        const PerforceRepository::Result edited = PerforceRepository::checkOut(repoDir, relPaths);
+        if (!edited.ok)
+        {
+            QMessageBox::warning(this, "Check Out",
+                "p4 edit failed:\n" + edited.stderrText.trimmed());
+            return;
+        }
+        QMessageBox::information(this, "Check Out",
+            QString("Checked out %1 plugin file(s) for edit from Perforce "
+                    "client %2.\n\nUse Check In to submit your changes.")
+                .arg(relPaths.size())
+                .arg(PerforceRepository::clientName(repoDir)));
+        LOG_INFO(QString("Check Out: p4 edit %1 file(s) in %2")
+            .arg(relPaths.size()).arg(repoDir));
+        return;
     }
 
     const GitRepository::Result staged = GitRepository::stageFiles(repoDir, relPaths);
@@ -2621,7 +2641,7 @@ void MainWindow::on_actionCheckIn_triggered()
     for (const QString& file : contentFiles)
     {
         const QString dir = QFileInfo(file).absolutePath();
-        if (GitRepository::isRepository(dir))
+        if (PerforceRepository::isWorkspace(dir) || GitRepository::isRepository(dir))
         {
             repoDir = dir;
             break;
@@ -2631,7 +2651,7 @@ void MainWindow::on_actionCheckIn_triggered()
     if (repoDir.isEmpty())
     {
         QMessageBox::information(this, "Check In",
-            "The plugin is not inside a Git repository.\n\n"
+            "The plugin is not inside a Perforce workspace or Git repository.\n\n"
             "Use Check Out first, or initialize a repository in the plugin's "
             "folder (git init).");
         return;
@@ -2649,6 +2669,25 @@ void MainWindow::on_actionCheckIn_triggered()
         QString("Update %1").arg(relPaths.join(QStringLiteral(", "))), &ok);
     if (!ok)
         return;
+
+    if (PerforceRepository::isWorkspace(repoDir))
+    {
+        const PerforceRepository::Result submitted = PerforceRepository::checkIn(
+            repoDir, relPaths, message);
+        if (!submitted.ok)
+        {
+            QMessageBox::warning(this, "Check In",
+                "p4 submit failed:\n" + submitted.stderrText.trimmed());
+            return;
+        }
+        QMessageBox::information(this, "Check In",
+            QString("Checked in %1 file(s) to Perforce client %2.")
+                .arg(relPaths.size())
+                .arg(PerforceRepository::clientName(repoDir)));
+        LOG_INFO(QString("Check In: p4 submit %1 file(s) in %2")
+            .arg(relPaths.size()).arg(repoDir));
+        return;
+    }
 
     const GitRepository::Result staged = GitRepository::stageFiles(repoDir, relPaths);
     if (!staged.ok)

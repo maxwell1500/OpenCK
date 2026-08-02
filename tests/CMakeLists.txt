@@ -190,6 +190,12 @@ target_link_libraries(test_assetresolver PRIVATE openck_model test_stubs Qt6::Te
 target_include_directories(test_assetresolver PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Skyrim SE install.
 
+# Diagnostic: scan archives for .btd terrain samples (test_scanbtd [dataDir]).
+add_executable(test_scanbtd test_scanbtd.cpp)
+target_link_libraries(test_scanbtd PRIVATE openck_model test_stubs Qt6::Core)
+target_include_directories(test_scanbtd PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — needs a game data dir with archives.
+
 # XwmaDecoder: decodes a real Skyrim voice .fuz's xWMA audio to PCM via WMF.
 add_executable(test_xwmadecoder test_xwmadecoder.cpp)
 target_link_libraries(test_xwmadecoder PRIVATE openck_model test_stubs Qt6::Test)
@@ -521,6 +527,12 @@ add_executable(test_gitrepository test_gitrepository.cpp)
 target_link_libraries(test_gitrepository PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_gitrepository PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_gitrepository)
+
+# PerforceRepository: p4 CLI wrapper (skips when p4 is not on PATH).
+add_executable(test_perforcerepository test_perforcerepository.cpp)
+target_link_libraries(test_perforcerepository PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_perforcerepository PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_perforcerepository)
 
 # Preview primitive mesh generator (cube/cylinder/plane/sphere)
 add_executable(test_primitivemeshgenerator test_primitivemeshgenerator.cpp)
