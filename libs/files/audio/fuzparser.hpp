@@ -4,22 +4,20 @@
 #include <QString>
 #include <QByteArray>
 
-// Parses Fallout 4 / Skyrim voice-over .fuz files. Format:
-//   "FUZE" magic, then chunks of [4-byte FourCC][4-byte size LE][data].
-// Known chunk types: "LIPF" (lip-sync data, plain text/JSON) and "XWAV"
-// (embedded audio). OpenCK extracts both so voice preview can play the
-// audio and show the lip cues.
+// Parses Skyrim / Fallout voice-over .fuz files. Real .fuz layout (per xEdit
+// FUZer and verified against Skyrim SE archives):
+//   "FUZE" magic, uint32 version, uint32 lipSize, raw lip data (lipSize bytes),
+//   then the audio stream (a RIFF container: "RIFF" size "XWMA".../fmt chunk,
+//   or a "WAVE" container for PCM). Some tools emit an older chunked form
+//   ([4-byte FourCC][4-byte size][data]) which is also accepted for
+//   compatibility.
+// OpenCK extracts both lip and audio so voice preview can play audio and show
+// lip cues.
 struct FuzParser
 {
-    struct Chunk
-    {
-        QByteArray fourCC;
-        QByteArray data;
-    };
-
     QByteArray lipData;
     QByteArray audioData;
-    QString audioFourCC;   // e.g. "XWAV" or "XWM "
+    QString audioFourCC;   // e.g. "XWMA" or "WAVE"
 
     bool hasLip() const { return !lipData.isEmpty(); }
     bool hasAudio() const { return !audioData.isEmpty(); }

@@ -12,6 +12,7 @@ private slots:
     void initTestCase();
     void testParseBasic();
     void testParseLipAndAudio();
+    void testParseRealForm();
     void testWrongMagic();
     void testLoadFile();
 };
@@ -74,6 +75,45 @@ void TestFuzParser::testParseLipAndAudio()
     QVERIFY(FuzParser::parse(makeFuz(QByteArray(), "RIFF...."), audioOnly));
     QVERIFY(!audioOnly.hasLip());
     QVERIFY(audioOnly.hasAudio());
+}
+
+void TestFuzParser::testParseRealForm()
+{
+    // Real .fuz layout: "FUZE" + version(4) + lipSize(4) + raw lip + RIFF audio.
+    const QByteArray lip = "{\"cues\":[{\"t\":0,\"p\":\"a\"}]}";
+    const QByteArray riffBody = QByteArray("XWMA") +
+        "\x10\x00\x00\x00" +          // fmt chunk header
+        "fmt\x20\x00\x00\x00" +       // fmt chunk name+size (fabricated)
+        "\x00\x00\x00\x00";           // fmt payload
+    const QByteArray audio = "RIFF" + QByteArray(4, '\0') + riffBody;
+
+    QByteArray fuz("FUZE", 4);
+    fuz.append("\x01\x00\x00\x00", 4);                    // version = 1
+    fuz.append(static_cast<char>(lip.size() & 0xFF));
+    fuz.append(static_cast<char>((lip.size() >> 8) & 0xFF));
+    fuz.append(static_cast<char>((lip.size() >> 16) & 0xFF));
+    fuz.append(static_cast<char>((lip.size() >> 24) & 0xFF));
+    fuz.append(lip);
+    fuz.append(audio);
+
+    FuzParser out;
+    QVERIFY(FuzParser::parse(fuz, out));
+    QCOMPARE(out.lipData, lip);
+    QCOMPARE(out.audioData, audio);
+    QCOMPARE(out.audioFourCC, QStringLiteral("XWMA"));
+
+    // Lip-only real form (empty audio region must still be valid).
+    QByteArray lipOnlyFuz("FUZE", 4);
+    lipOnlyFuz.append("\x01\x00\x00\x00", 4);
+    lipOnlyFuz.append(static_cast<char>(lip.size() & 0xFF));
+    lipOnlyFuz.append(static_cast<char>((lip.size() >> 8) & 0xFF));
+    lipOnlyFuz.append(static_cast<char>((lip.size() >> 16) & 0xFF));
+    lipOnlyFuz.append(static_cast<char>((lip.size() >> 24) & 0xFF));
+    lipOnlyFuz.append(lip);
+    lipOnlyFuz.append(QByteArray("RIFF") + QByteArray(8, '\0'));
+    FuzParser lipOut;
+    QVERIFY(FuzParser::parse(lipOnlyFuz, lipOut));
+    QCOMPARE(lipOut.lipData, lip);
 }
 
 void TestFuzParser::testWrongMagic()

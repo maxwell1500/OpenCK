@@ -333,6 +333,7 @@ set(FILES_SOURCES
     libs/files/nif/ddsdecoder.cpp
     libs/files/nif/tgaencoder.cpp
     libs/files/ba2/ba2archive.cpp
+    libs/files/ba2/bsaarchive.cpp
     libs/files/nifanim/nifanimationexporter.cpp
     libs/files/nifanim/nifanimationimporter.cpp
     libs/files/nifanim/nifanimationwriter.cpp
@@ -359,6 +360,7 @@ set(FILES_HEADERS
     libs/files/nif/ddsdecoder.hpp
     libs/files/nif/tgaencoder.hpp
     libs/files/ba2/ba2archive.hpp
+    libs/files/ba2/bsaarchive.hpp
     libs/files/nifanim/nifanimation.hpp
     libs/files/nifanim/nifanimationexporter.hpp
     libs/files/nifanim/nifanimationimporter.hpp

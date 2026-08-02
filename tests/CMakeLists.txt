@@ -172,6 +172,12 @@ target_link_libraries(test_pndrecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_pndrecord PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Starfield.esm.
 
+# BsaArchive (Skyrim SE .bsa) reader against the user's Skyrim install.
+add_executable(test_bsaarchive test_bsaarchive.cpp)
+target_link_libraries(test_bsaarchive PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_bsaarchive PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Skyrim SE install.
+
 # Header parsing robustness tests
 add_executable(test_headerparsing test_headerparsing.cpp)
 target_link_libraries(test_headerparsing PRIVATE openck_esm Qt6::Test)
