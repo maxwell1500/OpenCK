@@ -466,6 +466,7 @@ set(MODEL_SOURCES
     src/model/tools/nodegraph.cpp
     src/model/tools/animationeventvalidator.cpp
     src/model/tools/blendtreemodel.cpp
+    src/model/tools/terrainoverlaymask.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
     src/model/tools/pluginsignature.cpp
@@ -533,6 +534,7 @@ set(MODEL_HEADERS
     src/model/tools/nodegraph.hpp
     src/model/tools/animationeventvalidator.hpp
     src/model/tools/blendtreemodel.hpp
+    src/model/tools/terrainoverlaymask.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
     src/model/tools/pluginsignature.hpp

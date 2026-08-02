@@ -620,7 +620,7 @@ Sources reconciled here:
 | 17.1 | JSON `.lbr` brush system: Sculpt/Flatten/Smooth/Stamp/BuildUp/Subtractive | ✅ `BrushDefinition` model (`src/model/tools/brushdefinition.hpp/.cpp`): 6 operations, JSON `.lbr` loader, built-in default set; LandscapeEditor has Brush combo + Load Brushes button, `applyBrush()` dispatches on brush operation with falloff shaping; `test_brushdefinition` covers ops/JSON/builtin. Brush alpha `.dds` masking itself still pending |
 | 17.2 | Brush alpha textures (19 `.dds` in `Data\Textures\BrushAlphas\`) | ? `BrushAlphaMask` (`src/model/tools/brushalphamask.hpp/.cpp`): loads a DDS alpha texture (via `DdsDecoder`) or PNG/BMP, stretches the alpha channel over the brush footprint, and multiplies the brush falloff so opaque pixels keep full strength and transparent pixels suppress it; bilinear sampling, identity when no mask loaded; LandscapeEditor has Load Alpha Mask... / Clear Mask buttons; `test_brushalphamask` |
 | 17.3 | Material painting with `MaxMaterialOpacity`, slope influence (`ApplySlopeInfluence`, falloff/threshold/invert) | ✅ Texture-layer table now exposes Max Material Opacity, Slope Influence (checkbox), Slope Threshold, and Slope Falloff per layer; `TextureLayer::slopeModifier(deg)` computes the 0..1 paint multiplier (with invert); `test_texturelayer` |
-| 17.4 | Terrain overlay masks (463 `.tif` in `Source\TGATextures\Terrain\OverlayMasks\`) | POI biome masks, settlement masks |
+| 17.4 | Terrain overlay masks (463 `.tif` in `Source\TGATextures\Terrain\OverlayMasks\`) | ? `TerrainOverlayMask` (`src/model/tools/terrainoverlaymask.hpp/.cpp`): loads overlay-mask images (DDS via `DdsDecoder`, or TIF/TGA/PNG via QImageReader), samples the alpha channel bilinearly at normalized landscape coords, and resamples the mask to a per-cell texture-alpha grid; `test_terrainoverlaymask` |
 | 17.5 | Heightmap import (R32) + autopaint + export between cells | ✅ `Import R32...` / `Export R32...` buttons in LandscapeEditor: raw 32-bit-float square-grid heightmaps, auto-detect grid size from file byte count, min/max range display, pushed as `LandscapeEditCommand` for undo; cross-cell export/import via `.r32` + existing copy/paste. Autopaint: `AutoPainter` (`src/model/tools/autopainter.hpp/.cpp`) assigns texture layers per-cell by height/slope bands with priorities; LandscapeEditor has an Auto Paint... button mapping the current layer table (slope threshold/falloff) into rules and reports per-layer cell counts; `test_autopainter` |
 | 17.6 | Terrain blocks + landscape cutting + save landscape menu actions | ✅ Partial: Terrain menu has Save Landscape / Generate Landscape / Landscape Editor actions wired to `LandscapeEditor::saveLandscapeToRecord()`; terrain-block cutting: `TerrainBlock` (`src/model/tools/terrainblock.hpp/.cpp`) cuts rectangular heightmap sub-blocks (grid-aligned) and pastes with edge blending, wired into LandscapeEditor as Cut Region... / Paste Region... (undoable via `LandscapeEditCommand`); `test_terrainblock` |
 | 17.7 | Landscape undo/redo via EditRecordCommand | ✅ Existing `LandscapeEditCommand` (raise/lower/smooth/flat strokes push undo commands, `landscapeeditor.cpp:753`) |
@@ -748,7 +748,7 @@ Sources reconciled here:
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
 | 16 — Specialized Editor Completion | 7/8 | ◐ |
-| 17 — Terrain & Landscape Completion | 8/9 | ◐ |
+| 17 — Terrain & Landscape Completion | 9/9 | ✅ |
 | 18 — Audio Pipeline | 7/7 | ✅ |
 | 19 — Material Editor & Asset Pipeline | 5/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **293/310** | ◐ |
+| **TOTAL** | **294/310** | ◐ |
 
 ---
 

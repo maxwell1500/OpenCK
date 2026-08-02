@@ -377,6 +377,12 @@ target_link_libraries(test_blendtreemodel PRIVATE openck_model test_stubs Qt6::T
 target_include_directories(test_blendtreemodel PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_blendtreemodel)
 
+# Terrain overlay masks (.tif/.dds biome/settlement stencils)
+add_executable(test_terrainoverlaymask test_terrainoverlaymask.cpp)
+target_link_libraries(test_terrainoverlaymask PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_terrainoverlaymask PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_terrainoverlaymask)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)
