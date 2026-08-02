@@ -13,6 +13,7 @@
 #include "../../model/tools/gitrepository.hpp"
 #include "../../model/tools/primitivemeshgenerator.hpp"
 #include "../../model/tools/plugincompactor.hpp"
+#include "../../model/tools/bnetclient.hpp"
 #include "../../model/doc/messages.hpp"
 #include "filepaths.hpp"
 #include "searchdialog.hpp"
@@ -1587,6 +1588,108 @@ void MainWindow::on_actionExternalTools_triggered()
     LOG_DEBUG("External Tools triggered");
     ExternalToolsDialog dialog(this);
     dialog.exec();
+}
+
+void MainWindow::on_actionBnetLogin_triggered()
+{
+    bool emailOk = false;
+    const QString email = QInputDialog::getText(this, tr("Bethesda.net Login"),
+        tr("Email address:"), QLineEdit::Normal, QString(), &emailOk);
+    if (!emailOk || email.isEmpty())
+        return;
+
+    bool passwordOk = false;
+    const QString password = QInputDialog::getText(this, tr("Bethesda.net Login"),
+        tr("Password:"), QLineEdit::Password, QString(), &passwordOk);
+    if (!passwordOk || password.isEmpty())
+        return;
+
+    BnetClient::Credentials creds;
+    creds.email = email;
+    creds.password = password;
+
+    BnetClient client;
+    const BnetClient::LoginResult result = client.login(creds);
+    if (result.ok)
+    {
+        mBnetToken = result.token;
+        QSettings settings;
+        settings.setValue(QStringLiteral("bnet/displayName"), result.displayName);
+        QMessageBox::information(this, tr("Bethesda.net Login"),
+            tr("Logged in as %1.").arg(result.displayName));
+    }
+    else
+    {
+        QMessageBox::warning(this, tr("Bethesda.net Login"),
+            tr("Login failed: %1").arg(result.error));
+    }
+}
+
+void MainWindow::on_actionBnetLogout_triggered()
+{
+    if (mBnetToken.isEmpty())
+    {
+        QMessageBox::information(this, tr("Bethesda.net Logout"),
+            tr("You are not logged in."));
+        return;
+    }
+
+    BnetClient client;
+    client.logout(mBnetToken);
+    mBnetToken.clear();
+    QMessageBox::information(this, tr("Bethesda.net Logout"),
+        tr("You have been logged out."));
+}
+
+void MainWindow::on_actionBnetUpload_triggered()
+{
+    if (mBnetToken.isEmpty())
+    {
+        QMessageBox::information(this, tr("Upload to Bethesda.net"),
+            tr("Please log in first via Plugins > Bethesda.net Login."));
+        return;
+    }
+
+    const QString pluginPath = QFileDialog::getOpenFileName(this,
+        tr("Select Plugin to Upload"), QString(),
+        tr("Plugin files (*.esm *.esp *.esl)"));
+    if (pluginPath.isEmpty())
+        return;
+
+    QFile file(pluginPath);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::warning(this, tr("Upload to Bethesda.net"),
+            tr("Could not read %1.").arg(pluginPath));
+        return;
+    }
+    const QByteArray data = file.readAll();
+    file.close();
+
+    bool titleOk = false;
+    const QString title = QInputDialog::getText(this, tr("Upload to Bethesda.net"),
+        tr("Mod title:"), QLineEdit::Normal, QString(), &titleOk);
+    if (!titleOk || title.trimmed().isEmpty())
+        return;
+
+    BnetClient::Upload upload;
+    upload.title = title.trimmed();
+    upload.pluginPath = QFileInfo(pluginPath).fileName();
+    upload.fileData = data;
+
+    BnetClient client;
+    const BnetClient::UploadResult result = client.upload(upload);
+    if (result.ok)
+    {
+        QMessageBox::information(this, tr("Upload to Bethesda.net"),
+            tr("Upload successful (mod %1, file %2).")
+                .arg(result.modId, result.fileId));
+    }
+    else
+    {
+        QMessageBox::warning(this, tr("Upload to Bethesda.net"),
+            tr("Upload failed: %1").arg(result.error));
+    }
 }
 
 void MainWindow::on_actionSoundEditor_triggered()

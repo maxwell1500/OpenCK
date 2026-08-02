@@ -3,6 +3,9 @@
 #include "../world/data.hpp"
 #include "../world/collection.hpp"
 #include "../world/idcollection.hpp"
+#include "../tools/objectwindowfilter.hpp"
+
+#include <QJsonObject>
 
 ObjectWindowModel::ObjectWindowModel(QObject* parent)
     : QAbstractItemModel(parent),
@@ -798,16 +801,60 @@ void ObjectWindowModel::applyFilter(const QString& text)
     {
         if (lowerFilter.isEmpty())
         {
-            cat.visibleRecords.clear();
-            for (int i = 0; i < cat.totalRecords; i++)
+            rebuildAllRecords();
+        }
+        else
+        {
+            QVector<VisibleRecord> filtered;
+            for (const auto& rec : cat.visibleRecords)
             {
-                VisibleRecord rec;
-                rec.actualIndex = i;
-                rec.editorId = "";
-                rec.formId = "";
-
-                switch (static_cast<CkId::Type>(cat.typeId))
+                if (rec.editorId.toLower().contains(lowerFilter) ||
+                    rec.formId.toLower().contains(lowerFilter))
                 {
+                    filtered.append(rec);
+                }
+            }
+            cat.visibleRecords = filtered;
+        }
+    }
+
+    emit layoutChanged();
+}
+
+void ObjectWindowModel::applyObjectFilter(const ObjectWindowFilter& filter)
+{
+    rebuildAllRecords();
+    for (auto& cat : mCategories)
+    {
+        QVector<VisibleRecord> filtered;
+        for (const auto& rec : cat.visibleRecords)
+        {
+            QJsonObject record;
+            record.insert(QStringLiteral("EditorID"), rec.editorId);
+            record.insert(QStringLiteral("FormID"), rec.formId);
+            record.insert(QStringLiteral("Type"), cat.name);
+            if (filter.matches(record))
+                filtered.append(rec);
+        }
+        cat.visibleRecords = filtered;
+    }
+    emit layoutChanged();
+}
+
+void ObjectWindowModel::rebuildAllRecords()
+{
+    for (auto& cat : mCategories)
+    {
+        cat.visibleRecords.clear();
+        for (int i = 0; i < cat.totalRecords; i++)
+        {
+            VisibleRecord rec;
+            rec.actualIndex = i;
+            rec.editorId = "";
+            rec.formId = "";
+
+            switch (static_cast<CkId::Type>(cat.typeId))
+            {
                 case CkId::Type_Gmst:
                     rec.editorId = mData->getGameSettings().getId(i);
                     break;
@@ -950,22 +997,6 @@ void ObjectWindowModel::applyFilter(const QString& text)
                 cat.visibleRecords.append(rec);
             }
         }
-        else
-        {
-            QVector<VisibleRecord> filtered;
-            for (const auto& rec : cat.visibleRecords)
-            {
-                if (rec.editorId.toLower().contains(lowerFilter) ||
-                    rec.formId.toLower().contains(lowerFilter))
-                {
-                    filtered.append(rec);
-                }
-            }
-            cat.visibleRecords = filtered;
-        }
-    }
-
-    emit layoutChanged();
 }
 
 QModelIndex ObjectWindowModel::index(int row, int column, const QModelIndex& parent) const

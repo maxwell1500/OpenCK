@@ -413,6 +413,18 @@ target_link_libraries(test_btdfile PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_btdfile PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_btdfile)
 
+# Bethesda.net plugin upload client (login/logout/upload)
+add_executable(test_bnetclient test_bnetclient.cpp)
+target_link_libraries(test_bnetclient PRIVATE openck_model test_stubs Qt6::Test Qt6::Network)
+target_include_directories(test_bnetclient PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_bnetclient)
+
+# Object Window .filter file support (data-driven keyword filtering)
+add_executable(test_objectwindowfilter test_objectwindowfilter.cpp)
+target_link_libraries(test_objectwindowfilter PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_objectwindowfilter PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_objectwindowfilter)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

@@ -472,6 +472,8 @@ set(MODEL_SOURCES
     src/model/tools/planetdefinition.cpp
     src/model/tools/creatureattachpoints.cpp
     src/model/tools/btdfile.cpp
+    src/model/tools/bnetclient.cpp
+    src/model/tools/objectwindowfilter.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
     src/model/tools/pluginsignature.cpp
@@ -545,6 +547,8 @@ set(MODEL_HEADERS
     src/model/tools/planetdefinition.hpp
     src/model/tools/creatureattachpoints.hpp
     src/model/tools/btdfile.hpp
+    src/model/tools/bnetclient.hpp
+    src/model/tools/objectwindowfilter.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
     src/model/tools/pluginsignature.hpp

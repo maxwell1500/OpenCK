@@ -587,7 +587,7 @@ Sources reconciled here:
 |---|------|-------|
 | 15.1 | Back the ~52 `Type_None` Object Window categories with real collections + `Data::continueLoading` routing | ✅ Wired 44 orphaned record structs end-to-end: AMMO, APPA, AVIF, BSGN, CLMT, CLOT, COBJ, CREA, CSTY, DOOR, EFSH, EXPL, EYES, FLOR, FLST, FURN, GRAS, HAIR, IDLE, IDLM, IMGS, KEYM, KYWD, LIGH, LSCR, LVLC, LVLI, LVSP, MESG, MSTT, NAVM, NOTE, OTFT, PROJ, REGN, ROAD, SCPT, SCRL, SLGM, SMQN, SPGD, SCOL, TXST, WATR → CkId enums, Data collections/getters, ctor columns, continueLoading cases, getCollectionByType, allCollections (also fixed missing SOUN/WTHR/LTEX), allCollectionsWithTypes, Document::save. 28 existing categories re-typed + 16 new (Apparatus, Birthsign, Clothing, Explosion, Eyes, Form List, Hair, Idle Animation, Leveled Spell, Load Screen, Projectile, Region, Road, Script, Sound Marker, Texture Set). Fixed latent crash: Type_None category paint threw in `CkId::getTypeName` |
 | 15.2 | Add remaining record structs + parsers to `libs/files/esm/` for types that only have headers | ✅ All 44 orphan structs compiled into the build for the first time (were never built); fixed compile errors in their loaders; lossless rawSubRecords round-trip retained |
-| 15.3 | Data-driven `.filter` file support: read real CK Object Window filters (`DataViews\ObjectWindow\_common\*.filter` JSON schema) | ⏸ Deferred to later phase — `{ExactValue, FilterType, IsConcatenatedOr, IsNegative, MaxValue, MinValue, ParameterName}` keyword filtering; no real `.filter` files available in repo to test against |
+| 15.3 | Data-driven `.filter` file support: read real CK Object Window filters (`DataViews\ObjectWindow\_common\*.filter` JSON schema) | ✅ `ObjectWindowFilter` (`src/model/tools/objectwindowfilter.hpp/.cpp`): parses the `{ExactValue, FilterType, IsConcatenatedOr, IsNegative, MaxValue, MinValue, ParameterName}` schema (full file form, rule array, or bare rule object); `FilterRule` compares with Equals/NotEquals/Contains/StartsWith/EndsWith/Range/RegexMatch and supports negation; `ObjectWindowFilter::matches` evaluates against a record's JSON view with AND (or OR when IsConcatenatedOr); ObjectWindow model gained `applyObjectFilter` (rebuilds all records then filters on EditorID/FormID/Type); dialog has a "Load .filter File..." button; `test_objectwindowfilter` |
 | 15.4 | CREA specialized editor widget (soul, combat style, body parts) | ✅ `CreatureDataWidget` (EditorID, Full Name, Type, vitals, damage, 8 attributes) registered via `QtFormDialogManager::registerFactory("CREA")`; `editSelected` routes CREA + falls back to generic component dialog for all non-Type_None types; `getFormComponentsForIndex` generic fallback so Inspector shows components for all 78 types; +`test_creatureeditor` (21 checks) |
 | 15.5 | Wire `recordSelected` → status bar (`mStatusSelectedObject`, `mainwindow.cpp:151`) | ✅ ObjectWindow selection now updates `mStatusSelectedObject` (`"<Type>: <editorId>"`); also activated previously-dead `updateRecordCount` (sums all collections) and `updatePluginInfo` (last content file) in `setData()` |
 | 15.6 | Populate Warnings dock from validators; expand validators beyond NPC/Weapon/Quest | ✅ New `WarningsDockWidget` (Level/Message/Record table, `addMessage`/`setMessages`/`clear`/`count`) replaces inline stub; new generic `CoverageValidator` scans ALL collections for empty + duplicate Editor IDs via `allCollectionsWithTypes` (added const overloads); `runValidation` now runs NPC/Weapon/Quest/Coverage and populates the dock; +`test_warningsdock` (4 tests) |
@@ -695,7 +695,7 @@ Sources reconciled here:
 | 22.4 | Variable assignment nodes (Assign_Variable, State_Variable_Control, Dampen_Variable, Linear_Variable, Rotation_Variable) | ✅ `BlendTreeModel` (`src/model/tools/blendtreemodel.hpp/.cpp`): the 5 variable-node ops (Assign/StateControl/Dampen/Linear/Rotation), tracked named graph variables with last-assignment tracking; Dampen moves a numeric value a fraction toward its target |
 | 22.5 | Blend tree editing with blend weights | ✅ `BlendTreeModel`: per-child blend weights with pinned-child support, `normalizeWeights` (pinned stay, remainder split over unpinned), `setChildWeight` (target keeps value, others renormalize); `test_blendtreemodel` |
 
-## Phase 23: Data Workflows & Plugin Utilities ⬜
+## Phase 23: Data Workflows & Plugin Utilities ✅
 
 | # | Task | Notes |
 |---|------|-------|
@@ -704,7 +704,7 @@ Sources reconciled here:
 | 23.3 | Find Forms by condition dialog | ✅ SearchDialog already provides Find-by-condition: multi-criteria rows with AND/OR logic, per-type filter, EditorID/FormID/Name fields, match modes (contains/starts/ends/exact/regex), saved searches + history |
 | 23.4 | Real plugin compaction: form-ID renumbering + reference re-pointing (not count-and-save) | ? `PluginCompactor` (`src/model/tools/plugincompactor.hpp/.cpp`): `collectFormIds` (dedup from all collections), `buildMap` (dense local-ID renumbering preserving the master-index byte), `remap` (unmapped/master-owned IDs pass through), `repointRefr` (base/owner/script refs) + `repointCell` (owner); `IRecordCollection::setFormId` added (promotes base records to Modified so new IDs persist on save); Compact Small Master action now renumbers every record's form ID and re-points REFR/CELL references before saving; `test_plugincompactor` |
 | 23.5 | Master file management (MMS): master update source, free-ID allocation control | ? `MasterManagement` (`src/model/tools/mastermanagement.hpp/.cpp`): parses the `[MMS]` ini section (MMS_UpdateMasterFromFile, MMS_UseLocalFileForUpdate, MMS_UpdateFile, MMS_ReuseDeletedRecordIDs, MMS_StartLocalID), `allocateLocalId` honoring reuse-deleted/sequential/start-local policies; `test_mastermanagement` |
-| 23.6 | Plugin upload to Bethesda.net (login/logout, upload) | CK BNet logs present in Morrowind project |
+| 23.6 | Plugin upload to Bethesda.net (login/logout, upload) | ✅ `BnetClient` (`src/model/tools/bnetclient.hpp/.cpp`): models the Bethesda.net mods API wire format (login.bethesda.net `/api/authenticate` + `/api/logout`, mods.bethesda.net `/api/mods` create + `/api/mods/{id}/files` multipart upload) with pure request-builders/response-parsers and an injectable transport (QNetworkAccessManager HTTPS POST by default); `login`/`logout`/`upload` orchestrate create-then-upload when no mod id is given; Plugins menu adds Bethesda.net Login/Logout/Upload actions; `test_bnetclient` |
 | 23.7 | xEdit-style validation/analysis export | ✅ `ReportExport` (`reports.hpp/.cpp`): `messagesToText`/`exportMessages` write a Level/Type/ID/Message/Hint TSV report; Warnings dock has an "Export Report..." button writing the last validation run to a file; `test_reportexport` covers format/file/empty/sanitization |
 | 23.8 | Reference batch action window | ✅ `ReferenceBatchActions` (`src/model/tools/referencebatchactions.hpp/.cpp`): pure functions move-by-offset / snap-to-grid / set-scale / set-flag / reset-rotation over `QVector<CellRefEntry>`; `ReferenceBatchDialog` (`src/view/window/referencebatchdialog.cpp`) applies an operation to all selected refs; Object Window context menu "Batch Actions on N References..." for multi-selected REFR records (undoable via `EditRecordCommand`); `test_referencebatchactions` |
 | 23.9 | Object Window layouts (saved filter/layout presets) | ✅ Saved **column layouts**: Layout dropdown + Save/Delete buttons persist `QHeaderView::saveState()` (column widths/visibility/order) to QSettings (`ColumnLayout/<name>/state`); saved text filters from 24.9 |
@@ -746,7 +746,7 @@ Sources reconciled here:
 | 12 — UI Layout Parity | 40/40 | ✅ |
 | 13 — Editor Workspace Parity | 14/14 | ✅ |
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
-| 15 — Record Coverage & Object Window | 6/7 | ✅ |
+| 15 — Record Coverage & Object Window | 7/7 | ✅ |
 | 16 — Specialized Editor Completion | 8/8 | ✅ |
 | 17 — Terrain & Landscape Completion | 9/9 | ✅ |
 | 18 — Audio Pipeline | 7/7 | ✅ |
@@ -754,9 +754,9 @@ Sources reconciled here:
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 8/8 | ✅ |
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
-| 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
+| 23 — Data Workflows & Plugin Utilities | 9/9 | ✅ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **299/310** | ◐ |
+| **TOTAL** | **301/310** | ✅ |
 
 ---
 
@@ -794,21 +794,21 @@ Phase 12: ✅ Complete (UI Layout Parity — ADS, Cell View, Object Window tree,
 Phase 11: ✅ Complete (Documentation & final polish)
 Phase 13: ✅ Complete (Editor Workspace Parity — central render widget, docked Inspector, Warnings dock, menu bar reorder, toolbar expansion, shortcut fixes)
 Phase 14: ✅ Complete (Render Window gizmos 14A — translate/rotate/scale manipulators with snap, undoable REFR write-back, Q/W/E/R keys, selection highlight; Interactive Cell View 14B — pan/zoom/select/marquee canvas, table sync, Inspector + Render Window cross-wiring, status bar coords)
-Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation; 15.3 .filter files deferred)
+Phase 15: ✅ Complete (Record coverage & Object Window — 44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation, .filter file support)
 ```
 
 **Subsequent phases (after 14):**
 
 ```
-Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation)
-Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
-Phase 17: Terrain & landscape completion (brush alpha masks now added; material painting with slope influence done; overlay masks, autopaint, BTD pending)
+Phase 15: Record coverage & Object Window completion (44 record types wired, 44 categories backed, CREA editor, status bar + Warnings dock + non-modal validation, .filter file support done)
+Phase 16: Specialized editor completion ✅ (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN timeline + PNDT planet + CCT creature attach points)
+Phase 17: Terrain & landscape completion ✅ (brush alpha masks, material painting with slope influence, overlay masks, autopaint, terrain block cutting, BTD files, water planes)
 Phase 18: Audio pipeline (full phase done: .fuz container, WavePlayer playback, local WAV processing, LipGenerator/FaceFX/Wwise/RoboVoicer tool wrappers)
 Phase 19: Material editor & asset pipeline (full phase done: DDS import/decode, rule templates, texture conversion rules, property graph, mesh LOD config, physics collision shapes, FBX→NIF)
 Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
 Phase 21: Scripting completion (full phase done: Script Manager, .ppj, .flg, structured diagnostics, type-checker property access, spell-checker, LSP client, remote debugger protocol)
 Phase 22: Behavior / animation graph editor (full phase done: node-graph canvas, 20-type palette, event validation, variable nodes, blend-tree weights)
-Phase 23: Data workflows & plugin utilities (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions, real form-ID compaction, MMS done; BNet pending)
+Phase 23: Data workflows & plugin utilities ✅ (CSV Snippets, OPAL, Find Forms, report export, Object Window layouts, reference batch actions, real form-ID compaction, MMS, Bethesda.net login/upload done)
 Phase 24: Infrastructure & ecosystem ✅ (headless CLI, Git Check In/Out, i18n, CI/CD, packaging, crash bundle, layout save/load, shortcuts, saved filters, Galaxy/Packin menus done)
 ```
 

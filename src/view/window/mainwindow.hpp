@@ -109,6 +109,9 @@ private slots:
     void on_actionPapyrusDebugger_triggered();
     void on_actionLoadOrderOptimizer_triggered();
     void on_actionExternalTools_triggered();
+    void on_actionBnetLogin_triggered();
+    void on_actionBnetLogout_triggered();
+    void on_actionBnetUpload_triggered();
     void on_actionSoundEditor_triggered();
     void on_actionAnimationEditor_triggered();
     void on_actionParticleEffectsEditor_triggered();
@@ -187,6 +190,7 @@ void setupPrimitivePreviewMenu();
     QLabel* mStatusCellCoords;
     QLabel* mStatusSelectedObject;
     QProgressBar* mStatusProgressBar;
+    QString mBnetToken;
     bool mViewportRefsConnected = false;
     bool mCellViewConnected = false;
 };

@@ -1,6 +1,7 @@
 #include "objectwindowdialog.hpp"
 
 #include "../../model/window/objectwindow.hpp"
+#include "../../model/tools/objectwindowfilter.hpp"
 #include "../../model/world/data.hpp"
 #include "../../model/world/collection.hpp"
 #include "../../model/world/idcollection.hpp"
@@ -381,6 +382,11 @@ void ObjectWindowDialog::setupUI()
     filterLayout->addWidget(saveFilterButton);
     filterLayout->addWidget(deleteFilterButton);
 
+    QPushButton* loadFilterFileButton = new QPushButton("Load .filter File...");
+    loadFilterFileButton->setToolTip(
+        "Read an Object Window keyword filter file (DataViews\\ObjectWindow\\*.filter)");
+    filterLayout->addWidget(loadFilterFileButton);
+
     mainLayout->addLayout(filterLayout);
 
     connect(mFilterEdit, &QLineEdit::textChanged, mModel, &ObjectWindowModel::applyFilter);
@@ -388,6 +394,8 @@ void ObjectWindowDialog::setupUI()
     connect(mSavedFilterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &ObjectWindowDialog::loadFilter);
     connect(deleteFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSavedFilter);
+    connect(loadFilterFileButton, &QPushButton::clicked,
+        this, &ObjectWindowDialog::loadFilterFile);
     refreshSavedFilters();
 
     auto* layoutRow = new QHBoxLayout();
@@ -1247,6 +1255,55 @@ void ObjectWindowDialog::deleteSavedFilter()
         mStatusLabel->setText(QString("Deleted filter '%1'").arg(name));
     }
     LOG_INFO(QString("Deleted Object Window filter '%1'").arg(name));
+}
+
+void ObjectWindowDialog::loadFilterFile()
+{
+    const QString path = QFileDialog::getOpenFileName(this,
+        tr("Open Object Window Filter"), QString(),
+        tr("Filter files (*.filter);;JSON files (*.json);;All files (*)"));
+    if (path.isEmpty())
+        return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::warning(this, tr("Open Object Window Filter"),
+            tr("Could not read %1.").arg(path));
+        return;
+    }
+    const QByteArray data = file.readAll();
+    file.close();
+
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
+    if (parseError.error != QJsonParseError::NoError)
+    {
+        QMessageBox::warning(this, tr("Open Object Window Filter"),
+            tr("The file is not valid JSON: %1")
+                .arg(parseError.errorString()));
+        return;
+    }
+    const ObjectWindowFilter filter = ObjectWindowFilter::fromJson(doc.object());
+    if (filter.count() == 0)
+    {
+        QMessageBox::information(this, tr("Open Object Window Filter"),
+            tr("The filter file contains no rules."));
+        return;
+    }
+
+    mModel->applyObjectFilter(filter);
+    if (mFilterEdit)
+        mFilterEdit->setText(QString());
+    if (mStatusLabel)
+    {
+        mStatusLabel->setText(
+            tr("Loaded filter '%1' (%2 rules)")
+                .arg(QFileInfo(path).fileName())
+                .arg(filter.count()));
+    }
+    LOG_INFO(QString("Loaded Object Window filter '%1' with %2 rules")
+        .arg(path).arg(filter.count()));
 }
 
 QByteArray ObjectWindowDialog::captureColumnState() const

@@ -179,19 +179,23 @@
     <addaction name="actionQuestGraph"/>
     <addaction name="actionAIPackages"/>
    </widget>
-   <widget class="QMenu" name="menuPlugins">
-    <property name="title">
-     <string>Plugins</string>
-    </property>
-    <addaction name="actionLoadOrder"/>
-    <addaction name="actionMasterFiles"/>
-    <addaction name="actionConflictDetection"/>
-    <addaction name="actionConflictResolution"/>
-    <addaction name="actionPluginMerge"/>
+    <widget class="QMenu" name="menuPlugins">
+     <property name="title">
+      <string>Plugins</string>
+     </property>
+     <addaction name="actionLoadOrder"/>
+     <addaction name="actionMasterFiles"/>
+     <addaction name="actionConflictDetection"/>
+     <addaction name="actionConflictResolution"/>
+     <addaction name="actionPluginMerge"/>
      <addaction name="actionLoadOrderOptimizer"/>
      <addaction name="actionBashedPatch"/>
      <addaction name="actionExternalTools"/>
-   </widget>
+     <addaction name="separator"/>
+     <addaction name="actionBnetLogin"/>
+     <addaction name="actionBnetLogout"/>
+     <addaction name="actionBnetUpload"/>
+    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>Help</string>
@@ -817,6 +821,21 @@
       <string>External Tools</string>
      </property>
     </action>
+    <action name="actionBnetLogin">
+     <property name="text">
+      <string>Bethesda.net Login...</string>
+     </property>
+    </action>
+    <action name="actionBnetLogout">
+     <property name="text">
+      <string>Bethesda.net Logout</string>
+     </property>
+    </action>
+    <action name="actionBnetUpload">
+     <property name="text">
+      <string>Upload Plugin to Bethesda.net...</string>
+     </property>
+    </action>
     <action name="actionSoundEditor">
      <property name="text">
       <string>Sound Editor...</string>
@@ -1006,6 +1025,24 @@
      <signal>triggered()</signal>
      <receiver>MainWindow</receiver>
      <slot>on_actionExternalTools_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionBnetLogin</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionBnetLogin_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionBnetLogout</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionBnetLogout_triggered()</slot>
+    </connection>
+    <connection>
+     <sender>actionBnetUpload</sender>
+     <signal>triggered()</signal>
+     <receiver>MainWindow</receiver>
+     <slot>on_actionBnetUpload_triggered()</slot>
     </connection>
     <connection>
      <sender>actionExportDialogue</sender>

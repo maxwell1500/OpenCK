@@ -7,6 +7,7 @@
 #include <functional>
 
 class Data;
+class ObjectWindowFilter;
 
 /// Tree model presenting records grouped by category for the Object Window.
 class ObjectWindowModel : public QAbstractItemModel
@@ -37,6 +38,7 @@ public:
 
 public slots:
     void applyFilter(const QString& text);
+    void applyObjectFilter(const ObjectWindowFilter& filter);
 
 private:
     struct VisibleRecord
@@ -64,6 +66,7 @@ private:
 
     void initCategories(Data* data);
     QString formatFormId(quint32 formId) const;
+    void rebuildAllRecords();
 
     bool isGroupNode(const QModelIndex& index) const;
     bool isCategoryNode(const QModelIndex& index) const;
