@@ -624,7 +624,7 @@ Sources reconciled here:
 | 17.5 | Heightmap import (R32) + autopaint + export between cells | ✅ `Import R32...` / `Export R32...` buttons in LandscapeEditor: raw 32-bit-float square-grid heightmaps, auto-detect grid size from file byte count, min/max range display, pushed as `LandscapeEditCommand` for undo; cross-cell export/import via `.r32` + existing copy/paste. Autopaint: `AutoPainter` (`src/model/tools/autopainter.hpp/.cpp`) assigns texture layers per-cell by height/slope bands with priorities; LandscapeEditor has an Auto Paint... button mapping the current layer table (slope threshold/falloff) into rules and reports per-layer cell counts; `test_autopainter` |
 | 17.6 | Terrain blocks + landscape cutting + save landscape menu actions | ✅ Partial: Terrain menu has Save Landscape / Generate Landscape / Landscape Editor actions wired to `LandscapeEditor::saveLandscapeToRecord()`; terrain-block cutting: `TerrainBlock` (`src/model/tools/terrainblock.hpp/.cpp`) cuts rectangular heightmap sub-blocks (grid-aligned) and pastes with edge blending, wired into LandscapeEditor as Cut Region... / Paste Region... (undoable via `LandscapeEditCommand`); `test_terrainblock` |
 | 17.7 | Landscape undo/redo via EditRecordCommand | ✅ Existing `LandscapeEditCommand` (raise/lower/smooth/flat strokes push undo commands, `landscapeeditor.cpp:753`) |
-| 17.8 | BTD land-texture files | Morrowind project reverse-engineered `generate_btd*.py` |
+| 17.8 | BTD land-texture files | ✅ `BtdFile` (`src/model/tools/btdfile.hpp/.cpp`): per-quad texture-index grid + texture names, `build` (validates grid size) and JSON round-trip; legacy binary layout deferred until real samples are available; `test_btdfile` |
 | 17.9 | Water planes (XCLW semantics) + water editor completion | ✅ `CellRecord` now loads/saves `XCLW` (`hasWaterHeight` + `waterHeight`, round-trip test `test_cellrecord`); Water tab has Enable Water checkbox + Apply Water Plane button wired to `saveWaterToCell()` which marks the cell record modified |
 
 ## Phase 18: Audio Pipeline ◐
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **298/310** | ◐ |
+| **TOTAL** | **299/310** | ◐ |
 
 ---
 
