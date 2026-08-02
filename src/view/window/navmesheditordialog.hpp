@@ -13,6 +13,7 @@
 #include <QVector3D>
 #include <QVector>
 #include <QString>
+#include "../../model/tools/navmeshtoolkit.hpp"
 
 struct NavTriangle {
     int v0, v1, v2;
@@ -76,6 +77,9 @@ private slots:
     void onPortalCellChanged(int row, int column);
     void onFindPath();
     void onHighlightPathToggled(bool checked);
+    void onCheckMesh();
+    void onCleanMesh();
+    void onWeldVertices();
 
 private:
     void setupUI();
@@ -85,6 +89,13 @@ private:
     void refreshVerticesTable();
     void refreshEdgesTable();
     void refreshPortalsTable();
+    void refreshAdjacency();
+    void showCheckResults(const QVector<QString>& lines);
+    void convertToToolkit(QVector<QVector3D>& verts,
+                          QVector<::NavMeshTools::MeshTriangle>& tris) const;
+    void convertFromToolkit(const QVector<QVector3D>& verts,
+                            const QVector<::NavMeshTools::MeshTriangle>& tris);
+    void refreshAllTables();
 
     QVector<QVector3D> findPath(const QVector3D& start, const QVector3D& end);
     int findContainingTriangle(const QVector3D& point) const;
@@ -124,6 +135,10 @@ private:
     QPushButton* mFindPathButton;
     QListWidget* mPathResultList;
     QCheckBox* mHighlightPathCheck;
+    QListWidget* mCheckResultList;
+    QPushButton* mCheckButton;
+    QPushButton* mCleanButton;
+    QPushButton* mWeldButton;
 
     QVector<QVector3D> mLastPath;
 };

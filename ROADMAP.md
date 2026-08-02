@@ -110,7 +110,7 @@ Create a fully functional, multi-game Creation Kit replacement that supports edi
 - **16.3 ✅ (partial)**: PACK `PackDataWidget` (EditorID, package/target type, flags, target list) + `"PACK"` factory + editSelected case.
 - **16.4 ✅ (partial)**: WRLD `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) + `"WRLD"` factory + editSelected case.
 - **16.5 ✅ (partial)**: LCTN `LocationDataWidget` (name, parent, X/Y/Z) + `"LCTN"` factory + editSelected case.
-- **16.8 ✅ (partial)**: NAVM `editSelected` case → `NavmeshEditorDialog` seeded from `NavmRecord` + undoable write-back; fixed `NavmRecord` NVTR flag serialization; +`test_navmrecord` round-trip.
+- **16.8 ✅ (partial)**: NAVM `editSelected` case → `NavmeshEditorDialog` seeded from `NavmRecord` + undoable write-back; fixed `NavmRecord` NVTR flag serialization; `NavMeshTools` (`src/model/tools/navmeshtoolkit.hpp/.cpp`) adds adjacency rebuild, mesh check/analyze (degenerate/isolated/out-of-range/non-manifold/duplicate-vertex detection, component + border-edge counts), border-edge connection detection, vertex welding, and T-junction removal — wired into the editor as Check/Clean/Weld buttons; +`test_navmeshtoolkit`, +`test_navmrecord` round-trip.
 - **16.1 ✅ (partial)**: `ScenRecord` struct created + wired end-to-end; "Scene" Object Window category backed; generic dialog with raw-subrecord inspector. Timeline editor pending.
 - **16.2 ✅ (partial)**: EFSH/IMGS raw-subrecord inspector in the generic dialog (unparsed subrecords visible losslessly).
 - **16.6-16.7**: PNDT/CCT Starfield editors (pending)

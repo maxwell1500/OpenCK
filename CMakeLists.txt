@@ -454,6 +454,7 @@ set(MODEL_SOURCES
     src/model/tools/addkeyframecommand.cpp
     src/model/tools/removekeyframecommand.cpp
     src/model/tools/navmeshgenerator.cpp
+    src/model/tools/navmeshtoolkit.cpp
     src/model/tools/nifanimationstate.cpp
     src/model/tools/bashedpatchgenerator.cpp
     src/model/tools/lootwrapper.cpp
@@ -529,6 +530,7 @@ set(MODEL_HEADERS
     src/model/tools/landscapeeditcommand.hpp
     src/model/tools/deleterecordcommandbase.hpp
     src/model/tools/navmeshgenerator.hpp
+    src/model/tools/navmeshtoolkit.hpp
     src/model/tools/nifanimationstate.hpp
     src/model/tools/bashedpatchgenerator.hpp
     src/model/tools/lootwrapper.hpp

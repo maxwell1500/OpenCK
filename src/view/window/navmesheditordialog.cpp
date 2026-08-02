@@ -1,4 +1,5 @@
 #include "navmesheditordialog.hpp"
+#include "../../model/tools/navmeshtoolkit.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -38,7 +39,11 @@ NavmeshEditorDialog::NavmeshEditorDialog(QWidget* parent)
       mEndZ(nullptr),
       mFindPathButton(nullptr),
       mPathResultList(nullptr),
-      mHighlightPathCheck(nullptr)
+      mHighlightPathCheck(nullptr),
+      mCheckResultList(nullptr),
+      mCheckButton(nullptr),
+      mCleanButton(nullptr),
+      mWeldButton(nullptr)
 {
     LOG_INFO("NavmeshEditorDialog created");
     setupUI();
@@ -114,8 +119,25 @@ void NavmeshEditorDialog::setupInfoPanel(QSplitter* splitter)
     infoLayout->addWidget(triangleGroup, 1);
     splitter->addWidget(infoWidget);
 
+    auto* maintenanceGroup = new QGroupBox("Maintenance");
+    auto* maintenanceLayout = new QVBoxLayout(maintenanceGroup);
+    auto* buttonLayout = new QHBoxLayout();
+    mCheckButton = new QPushButton("Check Navmesh");
+    mCleanButton = new QPushButton("Clean Splines");
+    mWeldButton = new QPushButton("Weld Vertices");
+    buttonLayout->addWidget(mCheckButton);
+    buttonLayout->addWidget(mCleanButton);
+    buttonLayout->addWidget(mWeldButton);
+    maintenanceLayout->addLayout(buttonLayout);
+    mCheckResultList = new QListWidget();
+    maintenanceLayout->addWidget(mCheckResultList);
+    infoLayout->addWidget(maintenanceGroup);
+
     connect(mTriangleTable, &QTableWidget::cellClicked,
             this, &NavmeshEditorDialog::onTriangleRowClicked);
+    connect(mCheckButton, &QPushButton::clicked, this, &NavmeshEditorDialog::onCheckMesh);
+    connect(mCleanButton, &QPushButton::clicked, this, &NavmeshEditorDialog::onCleanMesh);
+    connect(mWeldButton, &QPushButton::clicked, this, &NavmeshEditorDialog::onWeldVertices);
 }
 
 void NavmeshEditorDialog::setupEditingTools(QSplitter* splitter)
@@ -696,4 +718,126 @@ QVector3D NavmeshEditorDialog::triangleCenter(const NavTriangle& tri) const
     }
 
     return (mMesh.vertices[tri.v0] + mMesh.vertices[tri.v1] + mMesh.vertices[tri.v2]) / 3.0f;
+}
+
+void NavmeshEditorDialog::convertToToolkit(QVector<QVector3D>& verts,
+                                           QVector<::NavMeshTools::MeshTriangle>& tris) const
+{
+    verts = mMesh.vertices;
+    tris.clear();
+    tris.reserve(mMesh.triangles.size());
+    for (const auto& tri : mMesh.triangles) {
+        ::NavMeshTools::MeshTriangle mt;
+        mt.v0 = tri.v0;
+        mt.v1 = tri.v1;
+        mt.v2 = tri.v2;
+        mt.flags = tri.walkable ? 1 : 0;
+        tris.append(mt);
+    }
+}
+
+void NavmeshEditorDialog::convertFromToolkit(const QVector<QVector3D>& verts,
+                                             const QVector<::NavMeshTools::MeshTriangle>& tris)
+{
+    mMesh.vertices = verts;
+    QVector<NavTriangle> newTris;
+    newTris.reserve(tris.size());
+    for (const auto& mt : tris) {
+        NavTriangle tri;
+        tri.v0 = mt.v0;
+        tri.v1 = mt.v1;
+        tri.v2 = mt.v2;
+        tri.normal = QVector3D();
+        tri.walkable = (mt.flags & 1) != 0;
+        newTris.append(tri);
+    }
+    mMesh.triangles = newTris;
+}
+
+void NavmeshEditorDialog::refreshAllTables()
+{
+    refreshInfoPanel();
+    refreshVerticesTable();
+    refreshEdgesTable();
+    refreshPortalsTable();
+}
+
+void NavmeshEditorDialog::refreshAdjacency()
+{
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+    QVector<QVector<int>> adjacency =
+        ::NavMeshTools::rebuildAdjacency(verts, tris);
+    for (int i = 0; i < adjacency.size() && i < mMesh.triangles.size(); ++i) {
+        mMesh.triangles[i].adjacentTriangles = adjacency[i];
+    }
+}
+
+void NavmeshEditorDialog::showCheckResults(const QVector<QString>& lines)
+{
+    mCheckResultList->clear();
+    if (lines.isEmpty()) {
+        mCheckResultList->addItem("No issues found.");
+        return;
+    }
+    for (const QString& line : lines)
+        mCheckResultList->addItem(line);
+}
+
+void NavmeshEditorDialog::onCheckMesh()
+{
+    refreshAdjacency();
+
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    ::NavMeshTools::CheckResult result = ::NavMeshTools::analyze(verts, tris);
+
+    QVector<QString> lines;
+    lines.append(QString("Components: %1 | Border edges: %2")
+        .arg(result.componentCount).arg(result.borderEdgeCount));
+    if (result.issues.isEmpty()) {
+        lines.append("No issues found.");
+    } else {
+        for (const auto& issue : result.issues)
+            lines.append(issue.detail);
+    }
+    showCheckResults(lines);
+    LOG_INFO(QString("Navmesh check: %1 issues, %2 components")
+        .arg(result.issues.size()).arg(result.componentCount));
+}
+
+void NavmeshEditorDialog::onWeldVertices()
+{
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    int before = verts.size();
+    ::NavMeshTools::weldVertices(verts, tris, 0.01f);
+    convertFromToolkit(verts, tris);
+    refreshAdjacency();
+    refreshAllTables();
+
+    showCheckResults(QVector<QString>()
+        << QString("Welded %1 vertices into %2.").arg(before).arg(verts.size()));
+    LOG_INFO(QString("Welded vertices: %1 -> %2").arg(before).arg(verts.size()));
+}
+
+void NavmeshEditorDialog::onCleanMesh()
+{
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    ::NavMeshTools::removeTjunctions(verts, tris, 1.0f);
+    convertFromToolkit(verts, tris);
+    refreshAdjacency();
+    refreshAllTables();
+
+    showCheckResults(QVector<QString>()
+        << "T-junctions resolved (degenerate vertices welded).");
+    LOG_INFO("Navmesh splines cleaned");
 }

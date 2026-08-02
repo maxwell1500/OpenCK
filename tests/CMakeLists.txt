@@ -244,6 +244,11 @@ add_executable(test_navmrecord test_navmrecord.cpp)
 target_link_libraries(test_navmrecord PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_navmrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_navmrecord)
+# NavMesh toolkit algorithms: adjacency, analyze/check, weld, connect, T-junction removal
+add_executable(test_navmeshtoolkit test_navmeshtoolkit.cpp)
+target_link_libraries(test_navmeshtoolkit PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_navmeshtoolkit PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_navmeshtoolkit)
 
 # ScenRecord load/save round-trip
 add_executable(test_scenrecord test_scenrecord.cpp)
