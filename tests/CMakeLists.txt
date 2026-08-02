@@ -178,6 +178,12 @@ target_link_libraries(test_bsaarchive PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_bsaarchive PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Skyrim SE install.
 
+# AssetResolver: archive-aware asset lookup against the user's install.
+add_executable(test_assetresolver test_assetresolver.cpp)
+target_link_libraries(test_assetresolver PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_assetresolver PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Skyrim SE install.
+
 # XwmaDecoder: decodes a real Skyrim voice .fuz's xWMA audio to PCM via WMF.
 add_executable(test_xwmadecoder test_xwmadecoder.cpp)
 target_link_libraries(test_xwmadecoder PRIVATE openck_model test_stubs Qt6::Test)

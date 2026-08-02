@@ -8,6 +8,8 @@
 #include <QStringList>
 #include <QVector>
 
+class AssetResolver;
+
 class AssetDependencyScanner
 {
 public:
@@ -35,10 +37,10 @@ public:
 
 private:
     static int levenshteinDistance(const QString& s1, const QString& s2);
-    static bool pathExistsInDir(const QString& assetPath, const QString& dataDir);
-    static QStringList buildFileIndex(const QString& dataDir);
+    static QStringList findSimilarPathsFrom(const AssetResolver& resolver, const QString& path,
+                                            int maxResults);
     static void checkPathsForRecord(const QString& recordId, CkId::Type type,
                                     const QString& modelPath, const QString& iconPath,
-                                    const QString& dataDir, const QStringList& fileIndex,
+                                    const QString& dataDir, const AssetResolver& resolver,
                                     ScanResult& result);
 };

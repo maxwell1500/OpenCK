@@ -1,4 +1,5 @@
 #include "assetvalidator.hpp"
+#include "assetresolver.hpp"
 #include "logger.hpp"
 
 #include <QFile>
@@ -716,16 +717,30 @@ AssetValidator::ValidationReport AssetValidator::validateAll(const Data& data, c
     reports.append(validateOrphanedRecords(data));
 
     // 4. Validate NIF files referenced by stat records
-    QDir dataDirectory(dataDir);
+    AssetResolver resolver(dataDir);
     const auto& statCollection = data.getStatCollection();
     for (int i = 0; i < statCollection.size(); i++)
     {
         const auto& stat = statCollection.getRecord(i).get();
-        if (!stat.modelPath.isEmpty())
+        if (stat.modelPath.isEmpty())
+            continue;
+
+        // The asset may live loose or inside a BSA/BA2 archive.
+        if (!resolver.contains(stat.modelPath))
         {
-            QString nifPath = dataDirectory.absoluteFilePath(stat.modelPath);
-            reports.append(validateNif(nifPath));
+            ValidationReport r;
+            r.issues.append({ValidationIssue::Error, "NIF",
+                QString("Referenced NIF does not exist (loose or in any archive): %1")
+                    .arg(stat.modelPath),
+                stat.editorId, stat.modelPath});
+            reports.append(r);
+            continue;
         }
+
+        // Content validation needs a real file; only possible for loose assets.
+        const QString loose = resolver.absoluteLoosePath(stat.modelPath, dataDir);
+        if (!loose.isEmpty())
+            reports.append(validateNif(loose));
     }
 
     // 5. Validate textures referenced by stat records (simplified - check for texture paths)

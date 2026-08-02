@@ -473,6 +473,7 @@ set(MODEL_SOURCES
     src/model/tools/columnvalidator.cpp
     src/model/tools/assetconverter.cpp
     src/model/tools/assetvalidator.cpp
+    src/model/tools/assetresolver.cpp
     src/model/tools/papyrusprevalidator.cpp
     src/model/tools/papyrustypechecker.cpp
     src/model/tools/papyruslanguageserver.cpp
@@ -549,6 +550,7 @@ set(MODEL_HEADERS
     src/model/tools/columnvalidator.hpp
     src/model/tools/assetconverter.hpp
     src/model/tools/assetvalidator.hpp
+    src/model/tools/assetresolver.hpp
     src/model/tools/papyrusprevalidator.hpp
     src/model/tools/papyrustypechecker.hpp
     src/model/tools/papyruslanguageserver.hpp

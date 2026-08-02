@@ -1,8 +1,8 @@
 #include "assetdependencyscanner.hpp"
+#include "assetresolver.hpp"
 #include "logger.hpp"
 
 #include <QDir>
-#include <QDirIterator>
 #include <QFileInfo>
 #include <QSet>
 
@@ -48,44 +48,6 @@ int AssetDependencyScanner::levenshteinDistance(const QString& s1, const QString
     return d[len1][len2];
 }
 
-bool AssetDependencyScanner::pathExistsInDir(const QString& assetPath, const QString& dataDir)
-{
-    if (assetPath.isEmpty())
-        return true;
-
-    QString fullPath = QDir(dataDir).absoluteFilePath(assetPath);
-    QFileInfo fileInfo(fullPath);
-    if (fileInfo.exists())
-        return true;
-
-    // Case-insensitive check
-    QDir dir(dataDir);
-    QStringList filters;
-    QString fileName = QFileInfo(assetPath).fileName();
-    filters << fileName;
-    QFileInfoList matches = dir.entryInfoList(filters, QDir::Files);
-    for (const auto& match : matches)
-    {
-        if (match.filePath().toLower() == fullPath.toLower())
-            return true;
-    }
-
-    return false;
-}
-
-QStringList AssetDependencyScanner::buildFileIndex(const QString& dataDir)
-{
-    QStringList files;
-    QDirIterator it(dataDir, QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext())
-    {
-        it.next();
-        QString relativePath = QDir(dataDir).relativeFilePath(it.filePath());
-        files.append(relativePath);
-    }
-    return files;
-}
-
 QString AssetDependencyScanner::typeName(CkId::Type type)
 {
     switch (type)
@@ -107,7 +69,7 @@ QString AssetDependencyScanner::typeName(CkId::Type type)
 
 void AssetDependencyScanner::checkPathsForRecord(const QString& recordId, CkId::Type type,
                                                  const QString& modelPath, const QString& iconPath,
-                                                 const QString& dataDir, const QStringList& fileIndex,
+                                                 const QString& dataDir, const AssetResolver& resolver,
                                                  ScanResult& result)
 {
     auto checkPath = [&](const QString& path, const QString& assetType) {
@@ -116,14 +78,14 @@ void AssetDependencyScanner::checkPathsForRecord(const QString& recordId, CkId::
 
         result.totalPathsScanned++;
 
-        if (!pathExistsInDir(path, dataDir))
+        if (!resolver.contains(path))
         {
             MissingAsset missing;
             missing.recordId = recordId;
             missing.recordType = type;
             missing.assetPath = path;
             missing.assetType = assetType;
-            missing.suggestions = findSimilarPaths(path, dataDir);
+            missing.suggestions = findSimilarPathsFrom(resolver, path, 5);
             result.missingAssets.append(missing);
             result.totalMissing++;
         }
@@ -142,7 +104,17 @@ QStringList AssetDependencyScanner::findSimilarPaths(const QString& path, const 
     if (path.isEmpty())
         return {};
 
-    QStringList fileIndex = buildFileIndex(dataDir);
+    AssetResolver resolver(dataDir);
+    return findSimilarPathsFrom(resolver, path, maxResults);
+}
+
+QStringList AssetDependencyScanner::findSimilarPathsFrom(const AssetResolver& resolver,
+                                                         const QString& path, int maxResults)
+{
+    if (path.isEmpty())
+        return {};
+
+    const QStringList& fileIndex = resolver.allPaths();
     if (fileIndex.isEmpty())
         return {};
 
@@ -205,7 +177,7 @@ QStringList AssetDependencyScanner::findSimilarPaths(const QString& path, const 
 AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& data, const QString& dataDir)
 {
     ScanResult result;
-    QStringList fileIndex = buildFileIndex(dataDir);
+    AssetResolver resolver(dataDir);
 
     // Scan Stat records
     const auto& statCollection = data.getStatCollection();
@@ -213,7 +185,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = statCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Stat_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Weapon records
@@ -222,7 +194,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = weapCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Weap_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Armor records
@@ -231,7 +203,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = armorCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Armor_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Book records
@@ -240,7 +212,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = bookCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Book_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Misc records
@@ -249,7 +221,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = miscCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Misc_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Ingredient records
@@ -258,7 +230,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = ingrCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Ingr_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Alchemy records
@@ -267,7 +239,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = alchCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Alch_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Container records
@@ -276,7 +248,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = contCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Cont_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Activator records
@@ -285,7 +257,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = actiCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Acti_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     // Scan Tree records
@@ -294,7 +266,7 @@ AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& d
     {
         const auto& rec = treeCollection.getRecord(i).get();
         checkPathsForRecord(rec.editorId, CkId::Type_Tree_, rec.modelPath, rec.iconPath,
-                           dataDir, fileIndex, result);
+                           dataDir, resolver, result);
     }
 
     return result;
