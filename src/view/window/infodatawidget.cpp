@@ -3,6 +3,7 @@
 #include "../libs/files/audio/fuzparser.hpp"
 #include "../libs/components/formcomponents.hpp"
 #include "papyruscompiler.hpp"
+#include "voicepreview.hpp"
 #include "logger.hpp"
 
 #include <QComboBox>
@@ -345,27 +346,23 @@ void InfoDataWidget::onPlayVoiceFile()
 
 #ifdef _WIN32
     QString playPath = path;
-    QString tempFuzWav;
 
-    // .fuz containers embed the audio in an "XWAV" chunk. If that chunk is
-    // a plain WAV (RIFF), extract it to a temp file for playback.
+    // .fuz containers embed the audio as a RIFF stream. When it is plain WAV
+    // it plays directly; xWMA is decoded to PCM first.
     if (path.endsWith(QStringLiteral(".fuz"), Qt::CaseInsensitive))
     {
         FuzParser fuz;
-        if (FuzParser::loadFile(path, fuz) && fuz.hasAudio()
-            && fuz.audioData.startsWith("RIFF"))
+        if (!FuzParser::loadFile(path, fuz) || !fuz.hasAudio())
         {
-            tempFuzWav = QDir::tempPath() + QStringLiteral("/openck_voice_")
-                + QString::number(QDateTime::currentMSecsSinceEpoch())
-                + QStringLiteral(".wav");
-            QFile wavFile(tempFuzWav);
-            if (wavFile.open(QIODevice::WriteOnly))
-            {
-                wavFile.write(fuz.audioData);
-                wavFile.close();
-                playPath = tempFuzWav;
-            }
+            QMessageBox::warning(this, QStringLiteral("Play Voice File"),
+                QStringLiteral("Could not read voice file:\n%1").arg(path));
+            return;
         }
+        if (VoicePreview::playVoiceAudio(fuz.audioData, fuz.audioFourCC, this))
+            return;
+        QMessageBox::warning(this, QStringLiteral("Play Voice File"),
+            QStringLiteral("Could not play voice file (unsupported codec)."));
+        return;
     }
 
     // Win32 PlaySound is async (SND_ASYNC) and supports .wav directly.

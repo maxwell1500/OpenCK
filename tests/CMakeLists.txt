@@ -184,6 +184,13 @@ target_link_libraries(test_xwmadecoder PRIVATE openck_model test_stubs Qt6::Test
 target_include_directories(test_xwmadecoder PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Skyrim SE install.
 
+# ArchiveBrowserDialog: browse a real Skyrim BSA, filter/search entries, and
+# the PCM->WAV writer used by voice preview.
+add_executable(test_archivebrowser test_archivebrowser.cpp)
+target_link_libraries(test_archivebrowser PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_archivebrowser PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Skyrim SE install.
+
 # Header parsing robustness tests
 add_executable(test_headerparsing test_headerparsing.cpp)
 target_link_libraries(test_headerparsing PRIVATE openck_esm Qt6::Test)

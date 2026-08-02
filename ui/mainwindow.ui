@@ -310,6 +310,7 @@
        <addaction name="actionFormIdEditor"/>
        <addaction name="separator"/>
        <addaction name="actionParticleEffectsEditor"/>
+       <addaction name="actionArchiveBrowser"/>
        <addaction name="separator"/>
        <addaction name="actionModManager"/>
        <addaction name="separator"/>
@@ -839,6 +840,11 @@
     <action name="actionSoundEditor">
      <property name="text">
       <string>Sound Editor...</string>
+     </property>
+    </action>
+    <action name="actionArchiveBrowser">
+     <property name="text">
+      <string>Archive Browser...</string>
      </property>
     </action>
     <action name="actionAnimationEditor">

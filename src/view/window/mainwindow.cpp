@@ -41,6 +41,7 @@
 #include "objectpalette.hpp"
 #include "materialeditor.hpp"
 #include "soundeditor.hpp"
+#include "archivebrowserdialog.hpp"
 #include "animationeditor.hpp"
 #include "particleeffectseffecteditor.hpp"
 #include "papyrusdebugger.hpp"
@@ -1695,6 +1696,15 @@ void MainWindow::on_actionBnetUpload_triggered()
 void MainWindow::on_actionSoundEditor_triggered()
 {
     SoundEditor dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::on_actionArchiveBrowser_triggered()
+{
+    LOG_DEBUG("Archive Browser triggered");
+    const QString dataDir = mData
+        ? mData->getPaths().dataDir.absolutePath() : QString();
+    ArchiveBrowserDialog dialog(dataDir, this);
     dialog.exec();
 }
 

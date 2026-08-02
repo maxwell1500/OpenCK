@@ -716,6 +716,8 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/classdatawidget.cpp
     src/view/window/dialdatawidget.cpp
     src/view/window/infodatawidget.cpp
+    src/view/window/voicepreview.cpp
+    src/view/window/archivebrowserdialog.cpp
     src/view/window/celldatawidget.cpp
     src/view/window/questdatawidget.cpp
     src/view/window/creatureeditor.cpp
@@ -824,6 +826,8 @@ set(VIEW_HEADERS
     src/view/window/classdatawidget.hpp
     src/view/window/dialdatawidget.hpp
     src/view/window/infodatawidget.hpp
+    src/view/window/voicepreview.hpp
+    src/view/window/archivebrowserdialog.hpp
     src/view/window/celldatawidget.hpp
     src/view/window/questdatawidget.hpp
     src/view/window/creatureeditor.hpp

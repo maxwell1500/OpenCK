@@ -19,6 +19,7 @@ class AssetBrowserWidget;
 class ObjectWindowDialog;
 class ExportDialog;
 class BatchExportDialog;
+class ArchiveBrowserDialog;
 class ConflictResolutionDialog;
 class DialogueTreeEditor;
 class QuestGraphEditor;
@@ -113,6 +114,7 @@ private slots:
     void on_actionBnetLogout_triggered();
     void on_actionBnetUpload_triggered();
     void on_actionSoundEditor_triggered();
+    void on_actionArchiveBrowser_triggered();
     void on_actionAnimationEditor_triggered();
     void on_actionParticleEffectsEditor_triggered();
     void on_actionSpellWizard_triggered();
