@@ -389,6 +389,12 @@ target_link_libraries(test_collisionshapegenerator PRIVATE openck_model test_stu
 target_include_directories(test_collisionshapegenerator PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_collisionshapegenerator)
 
+# FBX -> NIF import settings + Blender pipeline (AssetWatcher pattern)
+add_executable(test_fbximporter test_fbximporter.cpp)
+target_link_libraries(test_fbximporter PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_fbximporter PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_fbximporter)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

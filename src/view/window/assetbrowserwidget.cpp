@@ -37,6 +37,7 @@
 #include "../../libs/files/nif/nifparser.hpp"
 #include "../../model/tools/blenderlauncher.hpp"
 #include "../../model/tools/iconrenderer.hpp"
+#include "../../model/tools/fbximporter.hpp"
 #include "logger.hpp"
 
 static double parseWavDuration(const QString& filePath)
@@ -818,10 +819,16 @@ void AssetBrowserWidget::onFileContextMenu(const QPoint& pos)
     QAction* openAction = menu.addAction(tr("Open in Editor"));
 
     const bool isNif = filePath.endsWith(QStringLiteral(".nif"), Qt::CaseInsensitive);
+    const bool isFbx = filePath.endsWith(QStringLiteral(".fbx"), Qt::CaseInsensitive);
     QAction* iconAction = nullptr;
+    QAction* fbxImportAction = nullptr;
     if (isNif) {
         menu.addSeparator();
         iconAction = menu.addAction(tr("Generate Icon..."));
+    }
+    if (isFbx) {
+        menu.addSeparator();
+        fbxImportAction = menu.addAction(tr("Import FBX as NIF..."));
     }
 
     QAction* chosen = menu.exec(mFileList->viewport()->mapToGlobal(pos));
@@ -832,6 +839,9 @@ void AssetBrowserWidget::onFileContextMenu(const QPoint& pos)
     } else if (chosen == iconAction && isNif) {
         mPendingIconPath = filePath;
         generateIcon();
+    } else if (chosen == fbxImportAction && isFbx) {
+        mPendingFbxPath = filePath;
+        importFbxAsNif();
     }
 }
 
@@ -906,4 +916,58 @@ void AssetBrowserWidget::runIconRender(const QString& nifPath, IconRenderer::Con
     process->start(args.first(), args.mid(1));
     LOG_INFO(QString("AssetBrowser: generating icon for %1 (%2)")
         .arg(nifPath).arg(IconRenderer::contextName(ctx)));
+}
+
+void AssetBrowserWidget::importFbxAsNif()
+{
+    if (mPendingFbxPath.isEmpty()) {
+        return;
+    }
+
+    if (!QFile::exists(FbxImporter::exportScriptPath())) {
+        QMessageBox::warning(this, tr("Import FBX as NIF"),
+            tr("The NIF export script is missing:\n%1").arg(FbxImporter::exportScriptPath()));
+        return;
+    }
+
+    const QString blender = BlenderLauncher::getRecommendedBlenderPath();
+    if (blender.isEmpty()) {
+        QMessageBox::warning(this, tr("Import FBX as NIF"),
+            tr("Blender was not found. Install Blender to convert FBX to NIF."));
+        return;
+    }
+
+    const QFileInfo fbxInfo(mPendingFbxPath);
+    const QString nifPath = fbxInfo.absolutePath()
+        + QStringLiteral("/%1.nif").arg(fbxInfo.completeBaseName());
+
+    QMessageBox::StandardButton choice = QMessageBox::question(this,
+        tr("Import FBX as NIF"),
+        tr("Convert %1 to NIF?\nOutput: %2\n\n%3")
+            .arg(fbxInfo.fileName(), nifPath,
+                 FbxImporter::summary(FbxImporter::Settings())),
+        QMessageBox::Ok | QMessageBox::Cancel);
+
+    if (choice != QMessageBox::Ok) {
+        return;
+    }
+
+    FbxImporter::Settings settings;
+    auto* process = new QProcess(this);
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, process, nifPath](int exitCode, QProcess::ExitStatus) {
+        process->deleteLater();
+        if (exitCode == 0) {
+            QMessageBox::information(this, tr("Import FBX as NIF"),
+                tr("NIF written to:\n%1").arg(nifPath));
+        } else {
+            QMessageBox::warning(this, tr("Import FBX as NIF"),
+                tr("FBX -> NIF conversion failed."));
+        }
+    });
+
+    const QStringList args = FbxImporter::blenderArguments(
+        blender, mPendingFbxPath, nifPath, settings);
+    process->start(args.first(), args.mid(1));
+    LOG_INFO(QString("AssetBrowser: FBX->NIF conversion for %1").arg(mPendingFbxPath));
 }

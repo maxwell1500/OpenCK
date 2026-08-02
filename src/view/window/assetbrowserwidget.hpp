@@ -43,6 +43,7 @@ private slots:
     void onSearchTextChanged(const QString& text);
     void onFileContextMenu(const QPoint& pos);
     void generateIcon();
+    void importFbxAsNif();
 
 private:
     void setupUI();
@@ -86,6 +87,7 @@ private:
     bool mPreviewGLInitialized;
     QPoint mDragStartPos;
     QString mPendingIconPath;
+    QString mPendingFbxPath;
 };
 
 #endif // ASSETBROWSERWIDGET_HPP

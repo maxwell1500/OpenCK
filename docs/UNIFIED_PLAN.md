@@ -658,7 +658,7 @@ Sources reconciled here:
 | 19.4 | Texture conversion pipeline: BC7/BC4/R8/R8G8B8A8, mipmaps, physically-based mipmaps, distance fields, gamma handling | ? `TextureConversionRules` (`src/model/tools/textureconversionrules.hpp/.cpp`): parses xtexconv-style `Textures_Settings*.json` rules (array, `{"rules":[...]}` or per-key `{"settings":{...}}`), `TextureConversionRule` with path glob, format (BC7/BC5/BC4/R8/R8G8B8A8), mipmaps, sRGB/gamma, distance-field, physically-based mipmaps, max size; `findRule` glob matching + builtin defaults; `AssetConverter::convertTexturesByRules` converts inputs to DDS picking DXT1/DXT5 from the matching rule; `test_textureconversionrules` |
 | 19.5 | Mesh LOD generation (Simplygon-style `GenerationConfig.json` pipeline) | ? `MeshLodConfig` (`src/model/tools/meshlodconfig.hpp/.cpp`): parses the GenerationConfig.json LOD pipeline (array or `{"levels"/"lodLevels":[...]}`), per-level screen-size threshold / reduction / max triangles / UV+normal preservation / collision generation, plus name / output association / LOD name pattern; `levelForScreenSize` + builtin 3-level default; drives the existing in-process NIF decimation; `test_meshlodconfig` |
 | 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | ✅ `CollisionShapeGenerator` (`src/model/tools/collisionshapegenerator.hpp/.cpp`): computes the physics shapes the hknp pipeline encodes — AABB box from interleaved vertices, 2D convex hull (Andrew's monotone chain, CCW, interior/collinear points dropped, shoelace area), compressed-mesh vertex decimation; shape-type naming (Box/Convex/Compressed Mesh); hknp binary encoding remains a follow-up; `test_collisionshapegenerator` |
-| 19.7 | FBX→NIF import (AssetWatcher pattern) | WeldSkin, bones, editor markers, physics LOD settings |
+| 19.7 | FBX→NIF import (AssetWatcher pattern) | ✅ `FbxImporter` (`src/model/tools/fbximporter.hpp/.cpp`): FBX→NIF settings (weld skin, keep bones, keep editor markers, physics LOD) + Blender pipeline arguments through the bundled nif_export.py; Asset Browser has an "Import FBX as NIF..." context action on .fbx files; `test_fbximporter` |
 
 ## Phase 20: Particle Editor & Icon Generation ◐
 
@@ -750,13 +750,13 @@ Sources reconciled here:
 | 16 — Specialized Editor Completion | 7/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 9/9 | ✅ |
 | 18 — Audio Pipeline | 7/7 | ✅ |
-| 19 — Material Editor & Asset Pipeline | 6/7 | ◐ |
+| 19 — Material Editor & Asset Pipeline | 7/7 | ✅ |
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 8/8 | ✅ |
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **295/310** | ◐ |
+| **TOTAL** | **296/310** | ◐ |
 
 ---
 
@@ -804,7 +804,7 @@ Phase 15: Record coverage & Object Window completion (44 record types wired, 44 
 Phase 16: Specialized editor completion (PACK/WRLD/LCTN factory widgets + NavMesh record binding + EFSH/IMGS raw-subrecord inspector + SCEN record struct done; timeline UI, PNDT, CCT next)
 Phase 17: Terrain & landscape completion (brush alpha masks now added; material painting with slope influence done; overlay masks, autopaint, BTD pending)
 Phase 18: Audio pipeline (full phase done: .fuz container, WavePlayer playback, local WAV processing, LipGenerator/FaceFX/Wwise/RoboVoicer tool wrappers)
-Phase 19: Material editor & asset pipeline (DDS import/decode, rule templates, texture conversion rules, property graph, mesh LOD config done; physics-LOD, FBX→NIF pending)
+Phase 19: Material editor & asset pipeline (full phase done: DDS import/decode, rule templates, texture conversion rules, property graph, mesh LOD config, physics collision shapes, FBX→NIF)
 Phase 20: Particle editor & icon generation (full phase done: .pofx bundles, projectile var bindings, LOD presets, preview primitives, icon renderer)
 Phase 21: Scripting completion (full phase done: Script Manager, .ppj, .flg, structured diagnostics, type-checker property access, spell-checker, LSP client, remote debugger protocol)
 Phase 22: Behavior / animation graph editor (full phase done: node-graph canvas, 20-type palette, event validation, variable nodes, blend-tree weights)
