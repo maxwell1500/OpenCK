@@ -208,4 +208,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
 - **Progress**: 301/310 steps complete (97%) — all Phase 14-24 items done. Only legacy phases 1-13 remain.
-- **Phase 15 & 23 (complete)**: `.filter` file support in the Object Window (data-driven keyword filtering); Bethesda.net login/logout/upload client (`BnetClient`). Build clean, 82/82 tests.
+- **Phase 15 & 23 (complete)**: `.filter` file support in the Object Window (data-driven keyword filtering); Bethesda.net login/logout/upload client (`BnetClient`). Build clean, 83/83 tests.
+- **Phase 16 (16.2)**: IMGS typed DATA parsing (48 image-space modifier floats + 6 zone RGBA colors, lossless round-trip via `test_imgsrecord`).

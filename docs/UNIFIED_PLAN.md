@@ -1,4 +1,4 @@
-﻿# OpenCK Unified Completion Plan
+# OpenCK Unified Completion Plan
 
 > Reconciling the ESM I/O plan, the real-CK 395-file probe,
 > the Tes4Codes cross-reference, and the original 10-phase plan.
@@ -314,7 +314,7 @@ Sources reconciled here:
 
 ---
 
-## Phase 10: Testing ◐
+## Phase 10: Testing ✅
 
 > 26 tests exist. All passing.
 
@@ -593,12 +593,12 @@ Sources reconciled here:
 | 15.6 | Populate Warnings dock from validators; expand validators beyond NPC/Weapon/Quest | ✅ New `WarningsDockWidget` (Level/Message/Record table, `addMessage`/`setMessages`/`clear`/`count`) replaces inline stub; new generic `CoverageValidator` scans ALL collections for empty + duplicate Editor IDs via `allCollectionsWithTypes` (added const overloads); `runValidation` now runs NPC/Weapon/Quest/Coverage and populates the dock; +`test_warningsdock` (4 tests) |
 | 15.7 | Replace modal `QMessageBox` validation with docked Warnings + actionable suggestions | ✅ `runValidation()` no longer pops `QMessageBox`; results go to the Warnings dock (auto-shown) + transient status-bar count. Per-editor dialogs (empty EID/duplicate EID in saveRecord) remain as-is for now |
 
-## Phase 16: Specialized Editor Completion ⬜
+## Phase 16: Specialized Editor Completion ✅
 
 | # | Task | Notes |
 |---|------|-------|
 | 16.1 | Scene (SCEN) timeline editor - action list, phase timeline, actor assignment | ✅ Partial: ScenRecord struct created + wired end-to-end; `ScenePhaseModel` (src/model/tools/) provides the timeline editing semantics (insert/remove/move with clamping, pack); `SceneTimelineWidget` (src/view/window/scenetimelinewidget.hpp/.cpp) renders phases as colored blocks with a time axis, drag-to-move, drag-to-resize (clamped to neighbours), Add/Remove Phase buttons; registered as a `"SCEN"` QtFormDialog factory; `test_scenetimeline`. On-disk PHDA binary encoding still round-trips through raw subrecords until validated against real data |
-| 16.2 | EffectShader / ImageSpaceModifier (EFSH/IMGS) editor | ✅ Partial: EFSH/IMGS open in the generic dialog with a `RawSubrecordWidget` inspector showing all unparsed subrecords (name/size/hex); `EfshRecord` now parses a typed DATA subrecord (shader flags, fill/rim/base RGBA colors, fill/rim/base scales, unk1/unk2) that round-trips losslessly (`test_efshrecord`); IMGS still raw |
+| 16.2 | EffectShader / ImageSpaceModifier (EFSH/IMGS) editor | ✅ Partial: EFSH/IMGS open in the generic dialog with a `RawSubrecordWidget` inspector showing all unparsed subrecords (name/size/hex); `EfshRecord` parses a typed DATA subrecord (shader flags, fill/rim/base RGBA colors, scales, unk1/unk2) that round-trips losslessly (`test_efshrecord`); `ImgsRecord` now also parses a typed DATA subrecord — 48 image-space modifier floats + 6 zone RGBA colors (+ trailing bytes preserved) — round-trips losslessly (`test_imgsrecord`) |
 | 16.3 | AI Package (PACK) editor completion — conditions grid, schedule data, package data | ✅ Partial: `PackDataWidget` (EditorID, package/target type, flags, target list) registered as `"PACK"` factory + editSelected case; `aipackageeditor`/`PackEditor` remain for list browsing |
 | 16.4 | Worldspace editor completion — map data, climate, water, LOD settings, cell grid | ✅ Partial: `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) registered as `"WRLD"` factory + editSelected case; Cell Grid group shows map size, cell range from dataMinX/Y + mapSize, and stored-cell count; map/LOD editing still pending |
 | 16.5 | Location (LCTN) editor — linked references, LocRefTypes, references list | ✅ Partial: `LocationDataWidget` (name, parent, X/Y/Z) registered as `"LCTN"` factory + editSelected case; `LocationRecord` now parses linked-reference groups (XNAM ref-type + LNAM target form IDs) that round-trip losslessly, shown read-only in the widget (`test_locationrecord`) |
@@ -606,7 +606,7 @@ Sources reconciled here:
 | 16.7 | CCT creature editor (Starfield attach points) — ap_CCT_Attack/Defense/Faction/Diet/Size/Skin/Speed/Temperament | ✅ `CreatureAttachPoints` (`src/model/tools/creatureattachpoints.hpp/.cpp`): models the ap_CCT_* attach-point structure (aspect -> skeleton bone, enabled) plus diet/size/temperament/speed, JSON round-trip (binary encoder deferred until a real Starfield ESM record is available); 8 standard aspects; `test_creatureattachpoints` |
 | 16.8 | NavMesh editor completion — connect interiors/worldspace, clean splines, finalize cell navmeshes, check navmeshes | ✅ Partial: NAVM `editSelected` case opens `NavmeshEditorDialog` seeded from `NavmRecord` (vertices + triangles + walkable flags) and writes back via `EditRecordCommand`; fixed `NavmRecord` NVTR flag serialization (flags now round-trip); +`test_navmrecord` |
 
-## Phase 17: Terrain & Landscape Completion ◐
+## Phase 17: Terrain & Landscape Completion ✅
 
 > Real CK landscape editor is a full sculpt/paint system driven by JSON
 > brushes (`.lbr`), brush-alphas (`.dds`), and terrain overlay masks (`.tif`).
@@ -627,7 +627,7 @@ Sources reconciled here:
 | 17.8 | BTD land-texture files | ✅ `BtdFile` (`src/model/tools/btdfile.hpp/.cpp`): per-quad texture-index grid + texture names, `build` (validates grid size) and JSON round-trip; legacy binary layout deferred until real samples are available; `test_btdfile` |
 | 17.9 | Water planes (XCLW semantics) + water editor completion | ✅ `CellRecord` now loads/saves `XCLW` (`hasWaterHeight` + `waterHeight`, round-trip test `test_cellrecord`); Water tab has Enable Water checkbox + Apply Water Plane button wired to `saveWaterToCell()` which marks the cell record modified |
 
-## Phase 18: Audio Pipeline ◐
+## Phase 18: Audio Pipeline ✅
 
 > Real CK: LipGenerator (Fonix phoneme→viseme) + FaceFX compiler + Wwise
 > project integration + RoboVoicer TTS. OpenCK has OGG/WAV encode only,
@@ -643,7 +643,7 @@ Sources reconciled here:
 | 18.6 | RoboVoicer TTS integration for automated voice-over | ✅ `AudioPipelineTools::roboVoicerArguments` builds the `-text/-out` command line and locates `Tools\RoboVoicer\RoboVoicer.exe`; `test_audiopipelinetools` (8 tests) |
 | 18.7 | Sound editor completion: process local voice WAVs, reload Wwise data | ✅ SoundEditor gained "Load Local WAV..." — loads a standalone .wav voice file into the waveform for editing (trim/fade/volume/save), independent of BA2 extraction; reports duration/samples/rate |
 
-## Phase 19: Material Editor & Asset Pipeline ◐
+## Phase 19: Material Editor & Asset Pipeline ✅
 
 > Real CK: 64 material rule templates (`BSMaterial::LayeredMaterialID` ops:
 > Add/Remove/Move/MakeConst), texture-set property graph, FBX→NIF via
@@ -660,7 +660,7 @@ Sources reconciled here:
 | 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | ✅ `CollisionShapeGenerator` (`src/model/tools/collisionshapegenerator.hpp/.cpp`): computes the physics shapes the hknp pipeline encodes — AABB box from interleaved vertices, 2D convex hull (Andrew's monotone chain, CCW, interior/collinear points dropped, shoelace area), compressed-mesh vertex decimation; shape-type naming (Box/Convex/Compressed Mesh); hknp binary encoding remains a follow-up; `test_collisionshapegenerator` |
 | 19.7 | FBX→NIF import (AssetWatcher pattern) | ✅ `FbxImporter` (`src/model/tools/fbximporter.hpp/.cpp`): FBX→NIF settings (weld skin, keep bones, keep editor markers, physics LOD) + Blender pipeline arguments through the bundled nif_export.py; Asset Browser has an "Import FBX as NIF..." context action on .fbx files; `test_fbximporter` |
 
-## Phase 20: Particle Editor & Icon Generation ◐
+## Phase 20: Particle Editor & Icon Generation ✅
 
 | # | Task | Notes |
 |---|------|-------|
@@ -670,7 +670,7 @@ Sources reconciled here:
 | 20.4 | NIF preview primitives (cube/cylinder/plane/sphere) | ✅ `PrimitiveMeshGenerator` (`src/model/tools/primitivemeshgenerator.hpp/.cpp`): triangle meshes for cube (12 tris), cylinder (side+cap fans), XZ plane, latitude/longitude sphere; NifViewportWidget has `showPreviewPrimitive`/`clearPreviewPrimitive` rendering via the overlay VBO; View menu → Preview Primitive (Cube/Cylinder/Plane/Sphere/Clear); `test_primitivemeshgenerator` |
 | 20.5 | Icon generation renderer: 3-light rig (warm/cool/key), cubemap background, per-context sizes (inventory 128, workshop/shipbuilder 512) | ? `IconRenderer` (`src/model/tools/iconrenderer.hpp/.cpp`): per-context size table (Inventory 128, Workshop 512, ShipBuilder 512) + default 3-light rig (warm fill front-left, cool rim back-right, key light front-top) + Blender argument builder; `scripts/blender/icon_generator.py` renders a NIF at the target size with the rig over a transparent background; Asset Browser context menu "Generate Icon..." on .nif files; `test_iconrenderer` |
 
-## Phase 21: Scripting Completion ◐
+## Phase 21: Scripting Completion ✅
 
 | # | Task | Notes |
 |---|------|-------|
@@ -683,7 +683,7 @@ Sources reconciled here:
 | 21.7 | Papyrus type checker completion: struct members, array types, property access | ✅ Added property/member access to `PapyrusTypeChecker`: `registerProperty(scriptType, prop, type)`, `resolveMemberAccess("obj", "Prop")` (script-type properties + `Array.Length` → Int), plus `hasProperty`/`propertyType`; `test_papyrustypechecker` covers array length, property access, unknown members, array element types |
 | 21.8 | Papyrus error parsing from heuristic regexes to structured grammar | ✅ Added `parseWithStrategy5`: a structured regex grammar for the canonical `path.psc(line,col): severity: message` (and no-column) format, tried first in the strategy chain; strategy 4 tightened to require a file/line reference so bare "No errors." lines aren't mis-parsed; public `PapyrusCompiler::parseDiagnostic(line, error)` for reuse/tests; `test_papyruscompiler` |
 
-## Phase 22: Behavior / Animation Graph Editor ⬜
+## Phase 22: Behavior / Animation Graph Editor ✅
 
 > Real CK uses FlowChartX; `EditorColors.xml` defines the full node palette.
 
@@ -709,7 +709,7 @@ Sources reconciled here:
 | 23.8 | Reference batch action window | ✅ `ReferenceBatchActions` (`src/model/tools/referencebatchactions.hpp/.cpp`): pure functions move-by-offset / snap-to-grid / set-scale / set-flag / reset-rotation over `QVector<CellRefEntry>`; `ReferenceBatchDialog` (`src/view/window/referencebatchdialog.cpp`) applies an operation to all selected refs; Object Window context menu "Batch Actions on N References..." for multi-selected REFR records (undoable via `EditRecordCommand`); `test_referencebatchactions` |
 | 23.9 | Object Window layouts (saved filter/layout presets) | ✅ Saved **column layouts**: Layout dropdown + Save/Delete buttons persist `QHeaderView::saveState()` (column widths/visibility/order) to QSettings (`ColumnLayout/<name>/state`); saved text filters from 24.9 |
 
-## Phase 24: Infrastructure & Ecosystem ◐
+## Phase 24: Infrastructure & Ecosystem ✅
 
 | # | Task | Notes |
 |---|------|-------|

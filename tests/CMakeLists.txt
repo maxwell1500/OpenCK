@@ -305,6 +305,12 @@ target_link_libraries(test_efshrecord PRIVATE openck_esm test_stubs Qt6::Test)
 target_include_directories(test_efshrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_efshrecord)
 
+# IMGS record typed DATA parsing (48 modifier floats + 6 zone colors)
+add_executable(test_imgsrecord test_imgsrecord.cpp)
+target_link_libraries(test_imgsrecord PRIVATE openck_esm test_stubs Qt6::Test)
+target_include_directories(test_imgsrecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_imgsrecord)
+
 # Dictionary-based spell checker (script/dialogue editors)
 add_executable(test_spellchecker test_spellchecker.cpp)
 target_link_libraries(test_spellchecker PRIVATE openck_model test_stubs Qt6::Test)
