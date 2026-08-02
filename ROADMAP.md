@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 296/310 steps complete (95%) — Phases 14, 15, 17, 18, 19, 20, 21, 22, 24 done. 16 (7/8), 23 (8/9) in progress
-- **Phase 19 (complete)**: FBX→NIF import (settings + Blender pipeline + Asset Browser action). Build clean, 77/77 tests.
+- **Progress**: 297/310 steps complete (96%) — Phases 14-22, 24 done. 23 (8/9) in progress
+- **Phase 16 (complete)**: Planet (PNDT) definition model (biomes/traits/resources). Build clean, 78/78 tests.

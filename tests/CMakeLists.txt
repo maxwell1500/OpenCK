@@ -395,6 +395,12 @@ target_link_libraries(test_fbximporter PRIVATE openck_model test_stubs Qt6::Test
 target_include_directories(test_fbximporter PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_fbximporter)
 
+# Starfield planet (PNDT) definition model (biomes, traits, resources)
+add_executable(test_planetdefinition test_planetdefinition.cpp)
+target_link_libraries(test_planetdefinition PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_planetdefinition PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_planetdefinition)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

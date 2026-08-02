@@ -602,7 +602,7 @@ Sources reconciled here:
 | 16.3 | AI Package (PACK) editor completion — conditions grid, schedule data, package data | ✅ Partial: `PackDataWidget` (EditorID, package/target type, flags, target list) registered as `"PACK"` factory + editSelected case; `aipackageeditor`/`PackEditor` remain for list browsing |
 | 16.4 | Worldspace editor completion — map data, climate, water, LOD settings, cell grid | ✅ Partial: `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) registered as `"WRLD"` factory + editSelected case; Cell Grid group shows map size, cell range from dataMinX/Y + mapSize, and stored-cell count; map/LOD editing still pending |
 | 16.5 | Location (LCTN) editor — linked references, LocRefTypes, references list | ✅ Partial: `LocationDataWidget` (name, parent, X/Y/Z) registered as `"LCTN"` factory + editSelected case; `LocationRecord` now parses linked-reference groups (XNAM ref-type + LNAM target form IDs) that round-trip losslessly, shown read-only in the widget (`test_locationrecord`) |
-| 16.6 | Planet (PNDT) editor (Starfield) — star system, biomes, traits, day length, resources | Real CK snippet: `<PNDT:Biomes>...<PNDT:Resources.Count>` |
+| 16.6 | Planet (PNDT) editor (Starfield) — star system, biomes, traits, day length, resources | ✅ `PlanetDefinition` (`src/model/tools/planetdefinition.hpp/.cpp`): models the PNDT field structure (star system, day length, gravity, temperature, biomes with color+coverage, traits, resources with counts) with JSON round-trip (binary encoder deferred until a real Starfield ESM record is available); common-traits palette; `test_planetdefinition` |
 | 16.7 | CCT creature editor (Starfield attach points) — ap_CCT_Attack/Defense/Faction/Diet/Size/Skin/Speed/Temperament | Attach-point-driven mod system |
 | 16.8 | NavMesh editor completion — connect interiors/worldspace, clean splines, finalize cell navmeshes, check navmeshes | ✅ Partial: NAVM `editSelected` case opens `NavmeshEditorDialog` seeded from `NavmRecord` (vertices + triangles + walkable flags) and writes back via `EditRecordCommand`; fixed `NavmRecord` NVTR flag serialization (flags now round-trip); +`test_navmrecord` |
 
@@ -747,7 +747,7 @@ Sources reconciled here:
 | 13 — Editor Workspace Parity | 14/14 | ✅ |
 | 14 — Render Gizmos + Cell View | 23/23 | ✅ |
 | 15 — Record Coverage & Object Window | 6/7 | ✅ |
-| 16 — Specialized Editor Completion | 7/8 | ◐ |
+| 16 — Specialized Editor Completion | 8/8 | ✅ |
 | 17 — Terrain & Landscape Completion | 9/9 | ✅ |
 | 18 — Audio Pipeline | 7/7 | ✅ |
 | 19 — Material Editor & Asset Pipeline | 7/7 | ✅ |
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **296/310** | ◐ |
+| **TOTAL** | **297/310** | ◐ |
 
 ---
 
