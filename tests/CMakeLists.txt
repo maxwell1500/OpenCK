@@ -383,6 +383,12 @@ target_link_libraries(test_terrainoverlaymask PRIVATE openck_model test_stubs Qt
 target_include_directories(test_terrainoverlaymask PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_terrainoverlaymask)
 
+# Physics collision shape generation (AABB, convex hull, decimation)
+add_executable(test_collisionshapegenerator test_collisionshapegenerator.cpp)
+target_link_libraries(test_collisionshapegenerator PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_collisionshapegenerator PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_collisionshapegenerator)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

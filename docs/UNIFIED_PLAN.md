@@ -657,7 +657,7 @@ Sources reconciled here:
 | 19.3 | DDS texture *import/decode* for UI (BC1/BC3/BC7) | ✅ `DdsDecoder` (`libs/files/nif/ddsdecoder.hpp/.cpp`): decodes BC1/DXT1, BC2/DXT3, BC3/DXT5, BC4, BC5, and uncompressed RGB(A) into ARGB32 QImage (BC7 returns null); the viewport's inline DDS loader replaced by this shared decoder (fixes a header-offset crash and an R/B channel-swap bug it inherited); `test_ddsdecoder` round-trips DXT1/DXT5 through the encoder + decodes a crafted uncompressed DDS |
 | 19.4 | Texture conversion pipeline: BC7/BC4/R8/R8G8B8A8, mipmaps, physically-based mipmaps, distance fields, gamma handling | ? `TextureConversionRules` (`src/model/tools/textureconversionrules.hpp/.cpp`): parses xtexconv-style `Textures_Settings*.json` rules (array, `{"rules":[...]}` or per-key `{"settings":{...}}`), `TextureConversionRule` with path glob, format (BC7/BC5/BC4/R8/R8G8B8A8), mipmaps, sRGB/gamma, distance-field, physically-based mipmaps, max size; `findRule` glob matching + builtin defaults; `AssetConverter::convertTexturesByRules` converts inputs to DDS picking DXT1/DXT5 from the matching rule; `test_textureconversionrules` |
 | 19.5 | Mesh LOD generation (Simplygon-style `GenerationConfig.json` pipeline) | ? `MeshLodConfig` (`src/model/tools/meshlodconfig.hpp/.cpp`): parses the GenerationConfig.json LOD pipeline (array or `{"levels"/"lodLevels":[...]}`), per-level screen-size threshold / reduction / max triangles / UV+normal preservation / collision generation, plus name / output association / LOD name pattern; `levelForScreenSize` + builtin 3-level default; drives the existing in-process NIF decimation; `test_meshlodconfig` |
-| 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | Morrowind project wrote custom hknp encoders — reference |
+| 19.6 | Physics collision generation (Havok hknp box/convex/compressed-mesh, CGO convex decomposition) | ✅ `CollisionShapeGenerator` (`src/model/tools/collisionshapegenerator.hpp/.cpp`): computes the physics shapes the hknp pipeline encodes — AABB box from interleaved vertices, 2D convex hull (Andrew's monotone chain, CCW, interior/collinear points dropped, shoelace area), compressed-mesh vertex decimation; shape-type naming (Box/Convex/Compressed Mesh); hknp binary encoding remains a follow-up; `test_collisionshapegenerator` |
 | 19.7 | FBX→NIF import (AssetWatcher pattern) | WeldSkin, bones, editor markers, physics LOD settings |
 
 ## Phase 20: Particle Editor & Icon Generation ◐
@@ -750,13 +750,13 @@ Sources reconciled here:
 | 16 — Specialized Editor Completion | 7/8 | ◐ |
 | 17 — Terrain & Landscape Completion | 9/9 | ✅ |
 | 18 — Audio Pipeline | 7/7 | ✅ |
-| 19 — Material Editor & Asset Pipeline | 5/7 | ◐ |
+| 19 — Material Editor & Asset Pipeline | 6/7 | ◐ |
 | 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
 | 21 — Scripting Completion | 8/8 | ✅ |
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **294/310** | ◐ |
+| **TOTAL** | **295/310** | ◐ |
 
 ---
 

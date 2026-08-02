@@ -207,5 +207,5 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 8 complete**: Batch Export UI with Record Data and Asset Conversion tabs
 - **Phase 9 complete**: 18 tests building (ThemeManager, NifPyFileWrapper, BlenderLauncher, ObjectWindow, NIF integration)
 - **Documentation updated**: STATUS.md, TECHNICAL_DEBT.md, finalPhases.md reflect current state
-- **Progress**: 294/310 steps complete (95%) — Phases 14, 15, 17, 18, 20, 21, 22, 24 done. 16 (7/8), 19 (5/7), 23 (8/9) in progress
-- **Phase 17 (complete)**: Terrain overlay masks (.tif/.dds biome stencils). Build clean, 75/75 tests.
+- **Progress**: 295/310 steps complete (95%) — Phases 14, 15, 17, 18, 20, 21, 22, 24 done. 16 (7/8), 19 (6/7), 23 (8/9) in progress
+- **Phase 19 (partial)**: Physics collision shape generation (AABB, convex hull, decimation). Build clean, 76/76 tests.
