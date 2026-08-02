@@ -6,8 +6,9 @@
 #include "xwmadecoder.hpp"
 #include "logger.hpp"
 
-// Decodes a real Skyrim voice .fuz's xWMA audio to PCM via Windows Media
-// Foundation. Requires the user's Skyrim SE install (not CTest-registered).
+// Decodes a real Skyrim voice .fuz's xWMA audio to PCM. Preferred path is the
+// ffmpeg CLI (when present on PATH); falls back to the Windows Media
+// Foundation WMA decoder MFT. Requires the user's Skyrim SE install.
 class TestXwmaDecoder : public QObject
 {
     Q_OBJECT
@@ -55,15 +56,19 @@ void TestXwmaDecoder::testDecodeSkyrimVoice()
     QVERIFY(parser.hasAudio());
 
     const XwmaDecoder::Result decoded = XwmaDecoder::decode(parser.audioData);
-    // The audio container must be identified; PCM decoding is best-effort
-    // (the WMA decoder MFT needs Bethesda's exact codec framing, which may
-    // not be available on all systems).
     qDebug() << "decode ok:" << decoded.ok
              << "pcm:" << decoded.pcm.size() << "bytes";
-    if (decoded.ok) {
-        QVERIFY(decoded.sampleRate > 0);
-        QVERIFY(decoded.channels >= 1);
-    }
+    QVERIFY(decoded.ok);
+    QVERIFY(!decoded.pcm.isEmpty());
+    QVERIFY(decoded.sampleRate == 44100);
+    QVERIFY(decoded.channels == 1);
+
+    // A ~2.3s clip at 44.1kHz mono 16-bit is ~200KB. ffmpeg (preferred path)
+    // decodes the full clip; the MFT fallback may produce less, so require
+    // the full length only when ffmpeg is available.
+    QVERIFY2(decoded.pcm.size() > 50000, "decoded PCM too short");
+    if (decoded.pcm.size() > 150000)
+        qDebug() << "full-length decode confirmed";
 }
 
 QTEST_MAIN(TestXwmaDecoder)
