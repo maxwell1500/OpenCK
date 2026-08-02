@@ -347,6 +347,7 @@ set(FILES_SOURCES
     libs/files/audio/wavencoder.cpp
     libs/files/audio/oggencoder.cpp
     libs/files/audio/fuzparser.cpp
+    libs/files/audio/xwmadecoder.cpp
 )
 
 set(FILES_HEADERS
@@ -370,6 +371,7 @@ set(FILES_HEADERS
     libs/files/audio/wavencoder.hpp
     libs/files/audio/oggencoder.hpp
     libs/files/audio/fuzparser.hpp
+    libs/files/audio/xwmadecoder.hpp
 )
 
 add_library(openck_files STATIC
@@ -399,6 +401,12 @@ target_link_libraries(openck_files PUBLIC
     vorbisenc
     ogg
 )
+
+if(WIN32)
+    # Windows Media Foundation xWMA decoder (WMA decoder MFT + WMF plumbing).
+    target_link_libraries(openck_files PRIVATE mfplat mf mfreadwrite mfuuid wmcodecdspuuid ole32)
+    target_compile_definitions(openck_files PRIVATE _WIN32_WINNT=0x0A00)
+endif()
 
 # Expose bundled Blender version/platform to C++ code so BlenderLauncher
 # can locate the bundled binary at runtime. Only Windows is currently
