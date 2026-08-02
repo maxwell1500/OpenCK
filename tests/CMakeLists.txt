@@ -401,6 +401,12 @@ target_link_libraries(test_planetdefinition PRIVATE openck_model test_stubs Qt6:
 target_include_directories(test_planetdefinition PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_planetdefinition)
 
+# Starfield creature (CCT) attach-point model
+add_executable(test_creatureattachpoints test_creatureattachpoints.cpp)
+target_link_libraries(test_creatureattachpoints PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_creatureattachpoints PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_creatureattachpoints)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

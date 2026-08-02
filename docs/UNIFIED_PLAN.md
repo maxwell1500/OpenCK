@@ -603,7 +603,7 @@ Sources reconciled here:
 | 16.4 | Worldspace editor completion — map data, climate, water, LOD settings, cell grid | ✅ Partial: `WorldspaceDataWidget` (name, water/climate/lighting/music/terrain refs) registered as `"WRLD"` factory + editSelected case; Cell Grid group shows map size, cell range from dataMinX/Y + mapSize, and stored-cell count; map/LOD editing still pending |
 | 16.5 | Location (LCTN) editor — linked references, LocRefTypes, references list | ✅ Partial: `LocationDataWidget` (name, parent, X/Y/Z) registered as `"LCTN"` factory + editSelected case; `LocationRecord` now parses linked-reference groups (XNAM ref-type + LNAM target form IDs) that round-trip losslessly, shown read-only in the widget (`test_locationrecord`) |
 | 16.6 | Planet (PNDT) editor (Starfield) — star system, biomes, traits, day length, resources | ✅ `PlanetDefinition` (`src/model/tools/planetdefinition.hpp/.cpp`): models the PNDT field structure (star system, day length, gravity, temperature, biomes with color+coverage, traits, resources with counts) with JSON round-trip (binary encoder deferred until a real Starfield ESM record is available); common-traits palette; `test_planetdefinition` |
-| 16.7 | CCT creature editor (Starfield attach points) — ap_CCT_Attack/Defense/Faction/Diet/Size/Skin/Speed/Temperament | Attach-point-driven mod system |
+| 16.7 | CCT creature editor (Starfield attach points) — ap_CCT_Attack/Defense/Faction/Diet/Size/Skin/Speed/Temperament | ✅ `CreatureAttachPoints` (`src/model/tools/creatureattachpoints.hpp/.cpp`): models the ap_CCT_* attach-point structure (aspect -> skeleton bone, enabled) plus diet/size/temperament/speed, JSON round-trip (binary encoder deferred until a real Starfield ESM record is available); 8 standard aspects; `test_creatureattachpoints` |
 | 16.8 | NavMesh editor completion — connect interiors/worldspace, clean splines, finalize cell navmeshes, check navmeshes | ✅ Partial: NAVM `editSelected` case opens `NavmeshEditorDialog` seeded from `NavmRecord` (vertices + triangles + walkable flags) and writes back via `EditRecordCommand`; fixed `NavmRecord` NVTR flag serialization (flags now round-trip); +`test_navmrecord` |
 
 ## Phase 17: Terrain & Landscape Completion ◐
@@ -756,7 +756,7 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 8/9 | ◐ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **297/310** | ◐ |
+| **TOTAL** | **298/310** | ◐ |
 
 ---
 

@@ -470,6 +470,7 @@ set(MODEL_SOURCES
     src/model/tools/collisionshapegenerator.cpp
     src/model/tools/fbximporter.cpp
     src/model/tools/planetdefinition.cpp
+    src/model/tools/creatureattachpoints.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
     src/model/tools/pluginsignature.cpp
@@ -541,6 +542,7 @@ set(MODEL_HEADERS
     src/model/tools/collisionshapegenerator.hpp
     src/model/tools/fbximporter.hpp
     src/model/tools/planetdefinition.hpp
+    src/model/tools/creatureattachpoints.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
     src/model/tools/pluginsignature.hpp
