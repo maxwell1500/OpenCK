@@ -803,6 +803,14 @@ QJsonObject DataExporter::recordToJSON(const BaseRecord& record, CkId::Type type
         obj["waterType"] = toJV(w.waterType);
         obj["climateId"] = toJV(w.climateId);
         obj["lightingId"] = toJV(w.lightingId);
+        obj["mapWidth"] = toJV(w.mapWidth);
+        obj["mapHeight"] = toJV(w.mapHeight);
+        obj["mapNwX"] = toJV(w.mapNwX);
+        obj["mapNwY"] = toJV(w.mapNwY);
+        obj["mapSeX"] = toJV(w.mapSeX);
+        obj["mapSeY"] = toJV(w.mapSeY);
+        obj["mapScale"] = toJV(w.mapScale());
+        obj["mapLodBias"] = toJV(w.mapLodBias);
         obj["mapSize"] = toJV(w.mapSize);
         obj["template"] = toJV(w.templ);
         obj["terrain"] = toJV(w.terrain);

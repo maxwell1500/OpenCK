@@ -624,9 +624,18 @@ bool DataImporter::importWorldspaceRecord(const QJsonObject& json, WorldspaceRec
     record.editorId = editorId;
     record.formId = parseFormId(extractField(json, "formId"));
     record.flags = extractIntField(json, "flags", 0);
+    record.name = extractField(json, "name");
     record.waterType = extractIntField(json, "waterType", 0);
     record.climateId = extractIntField(json, "climateId", 0);
     record.lightingId = extractIntField(json, "lightingId", 0);
+    record.mapWidth = extractIntField(json, "mapWidth", 0);
+    record.mapHeight = extractIntField(json, "mapHeight", 0);
+    record.mapNwX = extractIntField(json, "mapNwX", 0);
+    record.mapNwY = extractIntField(json, "mapNwY", 0);
+    record.mapSeX = extractIntField(json, "mapSeX", 0);
+    record.mapSeY = extractIntField(json, "mapSeY", 0);
+    record.setMapScale(extractFloatField(json, "mapScale", 1.0f));
+    record.mapLodBias = extractFloatField(json, "mapLodBias", 1.0f);
     record.mapSize = extractIntField(json, "mapSize", 0);
     record.cellIds = extractIntVector(json, "cellIds");
     record.navPointIds = extractIntVector(json, "navPointIds");

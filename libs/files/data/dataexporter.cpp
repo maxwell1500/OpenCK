@@ -725,9 +725,18 @@ QJsonObject DataExporter::recordToJSON(const BaseRecord& record, CkId::Type type
     case CkId::Type_WRLD_: {
         const auto& w = dynamic_cast<const Record<WorldspaceRecord>&>(record).get();
         obj["flags"] = toJV(w.flags);
+        obj["name"] = toJV(w.name);
         obj["waterType"] = toJV(w.waterType);
         obj["climateId"] = toJV(w.climateId);
         obj["lightingId"] = toJV(w.lightingId);
+        obj["mapWidth"] = toJV(w.mapWidth);
+        obj["mapHeight"] = toJV(w.mapHeight);
+        obj["mapNwX"] = toJV(w.mapNwX);
+        obj["mapNwY"] = toJV(w.mapNwY);
+        obj["mapSeX"] = toJV(w.mapSeX);
+        obj["mapSeY"] = toJV(w.mapSeY);
+        obj["mapScale"] = toJV(w.mapScale());
+        obj["mapLodBias"] = toJV(w.mapLodBias);
         obj["mapSize"] = toJV(w.mapSize);
         jsonVecU32(obj, "cellIds", w.cellIds);
         jsonVecU32(obj, "navPointIds", w.navPointIds);

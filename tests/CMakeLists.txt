@@ -172,6 +172,12 @@ target_link_libraries(test_pndrecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_pndrecord PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Starfield.esm.
 
+# WorldspaceRecord binary encoder round-trip against the real Skyrim.esm.
+add_executable(test_worldspacerecord test_worldspacerecord.cpp)
+target_link_libraries(test_worldspacerecord PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_worldspacerecord PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Skyrim SE install.
+
 # BsaArchive (Skyrim SE .bsa) reader against the user's Skyrim install.
 add_executable(test_bsaarchive test_bsaarchive.cpp)
 target_link_libraries(test_bsaarchive PRIVATE openck_model test_stubs Qt6::Test)

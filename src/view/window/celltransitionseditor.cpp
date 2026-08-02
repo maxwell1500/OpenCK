@@ -173,12 +173,14 @@ void CellTransitionsEditor::showWorldspaceDetails(const WorldspaceRecord* ws)
     text += QString("<p><b>Name:</b> %1</p>").arg(ws->name);
     text += QString("<p><b>Icon:</b> %1</p>").arg(ws->iconPath);
     text += QString("<p><b>Water Type:</b> 0x%1</p>").arg(ws->waterType, 8, 16, QChar('0')).toUpper();
-    text += QString("<p><b>Template:</b> 0x%1</p>").arg(ws->templ, 8, 16, QChar('0')).toUpper();
-    text += QString("<p><b>Terrain:</b> 0x%1</p>").arg(ws->terrain, 8, 16, QChar('0')).toUpper();
-    text += QString("<p><b>Map Image:</b> %1</p>").arg(ws->mapImage);
-    text += QString("<p><b>LOD Noise:</b> %1</p>").arg(ws->lodNoise);
-    text += QString("<p><b>Billboard:</b> %1</p>").arg(ws->billboardTexture);
-    text += QString("<p><b>Music:</b> 0x%1</p>").arg(ws->music, 8, 16, QChar('0')).toUpper();
+    text += QString("<p><b>Climate:</b> 0x%1</p>").arg(ws->climateId, 8, 16, QChar('0')).toUpper();
+    text += QString("<p><b>Lighting:</b> 0x%1</p>").arg(ws->lightingId, 8, 16, QChar('0')).toUpper();
+    text += QString("<p><b>Map Size:</b> %1 x %2</p>").arg(ws->mapWidth).arg(ws->mapHeight);
+    text += QString("<p><b>Map Cells:</b> NW (%1, %2) - SE (%3, %4)</p>")
+        .arg(ws->mapNwX).arg(ws->mapNwY).arg(ws->mapSeX).arg(ws->mapSeY);
+    text += QString("<p><b>Map Scale:</b> %1</p>").arg(ws->mapScale(), 0, 'f', 2);
+    text += QString("<p><b>LOD Bias:</b> %1</p>").arg(ws->mapLodBias, 0, 'f', 2);
+    text += QString("<p><b>Stored Cells:</b> %1</p>").arg(ws->cellIds.size());
 
     mDetailEdit->setHtml(text);
 }
