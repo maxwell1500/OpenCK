@@ -20,6 +20,7 @@ struct ESMFile
 
     Strings strings;
     bool localised;
+    bool inCompressedBuffer = false;
 
     ESMFile(QString fileName)
         : file(fileName),
@@ -47,8 +48,9 @@ struct ESMFile
 
     void forward(qint64 offset, bool recHeader = false)
     {
-        left -= offset;
-        
+        if (!inCompressedBuffer)
+            left -= offset;
+
         if (!recHeader)
         {
             recLeft -= offset;

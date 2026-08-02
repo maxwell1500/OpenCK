@@ -159,6 +159,13 @@ target_link_libraries(test_starfieldesm PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_starfieldesm PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Starfield.esm.
 
+# Throwaway record-structure dumper used to validate the PNDT/CCT binary
+# encoders against the real Starfield.esm. Run: test_dumpesm PNDT
+add_executable(test_dumpesm test_dumpesm.cpp)
+target_link_libraries(test_dumpesm PRIVATE openck_esm Qt6::Core)
+target_include_directories(test_dumpesm PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Starfield.esm.
+
 # Header parsing robustness tests
 add_executable(test_headerparsing test_headerparsing.cpp)
 target_link_libraries(test_headerparsing PRIVATE openck_esm Qt6::Test)

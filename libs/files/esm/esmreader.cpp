@@ -62,6 +62,15 @@ void ESMReader::open()
 
 NAME ESMReader::readName()
 {
+    // If a decompression buffer is open but fully consumed, the previous
+    // record is done — switch back to the file stream so this read gets the
+    // next record, regardless of how the caller drained the buffer.
+    if (compressedBuffer && compressedBuffer->isOpen() &&
+        compressedBuffer->atEnd())
+    {
+        restoreStreamFromCompression();
+    }
+
     NAME name = 0;
     buf.resize(sizeof(NAME));
     qint64 bytesRead = stream.readRawData(buf.data(), sizeof(NAME));
@@ -206,10 +215,13 @@ void ESMReader::decompressCurrentRecord(int compressedSize)
     esm.subLeft = 0;
 
     // Switch the stream to read from the decompressed buffer.
+    // While reading the buffer, forward() must not double-count bytes
+    // against esm.left (the compressed payload was already charged above).
     compressedData = actual;
     compressedBuffer.reset(new QBuffer(&compressedData));
     compressedBuffer->open(QIODevice::ReadOnly);
     stream.setDevice(compressedBuffer.get());
+    esm.inCompressedBuffer = true;
 
     LOG_DEBUG(QString("ESMReader: decompressed record: %1 bytes -> %2 bytes")
         .arg(compressedSize)
@@ -226,6 +238,7 @@ void ESMReader::restoreStreamFromCompression()
     compressedBuffer.reset();
     compressedData.clear();
     stream.setDevice(&esm.file);
+    esm.inCompressedBuffer = false;
     // recLeft should be 0 (the entire decompressed buffer was consumed) at
     // this point. If it isn't, the caller didn't fully drain the record,
     // and we've already lost those bytes from the file cursor — the next
@@ -313,6 +326,9 @@ void ESMReader::skipRecord()
 {
     readHeader();
     skip(esm.recLeft);
+    // readHeader may have switched the stream to a decompression buffer;
+    // restore the file stream so the next record is read from the file.
+    restoreStreamFromCompression();
 }
 
 void ESMReader::skipRemainingRecord()
