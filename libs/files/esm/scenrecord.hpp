@@ -5,6 +5,7 @@
 #include "variant.hpp"
 #include "../../components/component.hpp"
 #include "../../components/formcomponents.hpp"
+#include "conditionrecord.hpp"
 
 #include <QString>
 #include <QVector>
@@ -12,15 +13,16 @@
 class ESMReader;
 class ESMWriter;
 
-// Scene (SCEN) record. Only the Editor ID is parsed as a typed field;
-// the scene definition subrecords (VNAM flags, CTDA conditions, PHDA
-// phases, HNAM/SNAM action lists, DATA) round-trip losslessly through
-// rawSubRecords until a proper scene editor lands.
+// Scene (SCEN) record. The Editor ID is a typed field and CTDA conditions
+// are parsed/round-tripped as typed conditions; the remaining scene
+// definition subrecords (VNAM flags, PHDA phases, HNAM/SNAM action lists,
+// DATA) round-trip losslessly through rawSubRecords.
 struct ScenRecord
 {
     QString editorId;
     quint32 formId = 0;
     quint32 flags = 0;
+    QVector<CtdaCondition> conditions;
     QVector<RawSubRecord> rawSubRecords;
 
     openck::FormComponents components;
@@ -33,6 +35,7 @@ struct ScenRecord
 inline bool operator==(const ScenRecord& l, const ScenRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
+        && l.conditions == r.conditions
         && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 inline bool operator!=(const ScenRecord& l, const ScenRecord& r) { return !(l == r); }

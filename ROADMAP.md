@@ -211,3 +211,4 @@ OpenCK is released under the GNU General Public License v3.0. See the [LICENSE](
 - **Phase 15 & 23 (complete)**: `.filter` file support in the Object Window (data-driven keyword filtering); Bethesda.net login/logout/upload client (`BnetClient`). Build clean, 83/83 tests.
 - **Phase 16 (16.2)**: IMGS typed DATA parsing (48 image-space modifier floats + 6 zone RGBA colors, lossless round-trip via `test_imgsrecord`).
 - **Phase 16 (16.3)**: typed CTDA conditions — `CtdaCondition` pack/unpack (28/36-byte layouts) + `PackageRecord` parses/saves conditions (`test_conditionrecord`, `test_packagerecord`). Build clean, 85/85 tests.
+- **Phase 16 (16.1)**: `ScenRecord` now parses/saves typed CTDA conditions alongside the timeline editor.
