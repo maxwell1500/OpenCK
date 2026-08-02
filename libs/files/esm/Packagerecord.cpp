@@ -2,6 +2,7 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier3_components.hpp"
+#include "conditionrecord.hpp"
 
 void PackageRecord::initComponents()
 {
@@ -41,6 +42,30 @@ void PackageRecord::load(ESMReader& esm, bool)
                     targetIds[i] = esm.readType<quint32>();
                 break;
             }
+            case 'CTDA':
+            {
+                QByteArray bytes;
+                esm.readRawSubData(bytes);
+                CtdaCondition condition;
+                if (CtdaCondition::unpack(bytes, condition))
+                {
+                    conditions.append(condition);
+                }
+                else
+                {
+                    const QVector<CtdaCondition> parsed = CtdaCondition::unpackList(bytes);
+                    if (!parsed.isEmpty())
+                        conditions.append(parsed);
+                    else
+                    {
+                        RawSubRecord raw;
+                        raw.name = sub;
+                        raw.data = bytes;
+                        rawSubRecords.push_back(raw);
+                    }
+                }
+                break;
+            }
             default:
             {
                 RawSubRecord raw;
@@ -68,6 +93,14 @@ void PackageRecord::save(ESMWriter& esm) const
         esm.writeType<quint32>(id);
     esm.endSubRecord();
 
+    for (const CtdaCondition& condition : conditions)
+    {
+        const QByteArray bytes = condition.pack();
+        esm.startSubRecord('CTDA');
+        esm.writeRawData(bytes.constData(), bytes.size());
+        esm.endSubRecord();
+    }
+
     for (const auto& raw : rawSubRecords)
     {
         esm.startSubRecord(raw.name);
@@ -85,6 +118,7 @@ void PackageRecord::blank()
     targetType = 0;
     targetIds.clear();
     parameters.clear();
+    conditions.clear();
     rawSubRecords.clear();
     initComponents();
 }

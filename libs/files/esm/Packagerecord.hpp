@@ -4,6 +4,7 @@
 #include "variant.hpp"
 #include "../../components/formcomponents.hpp"
 #include "../../components/tier3_components.hpp"
+#include "conditionrecord.hpp"
 #include <QString>
 #include <QVector>
 class ESMReader;
@@ -17,6 +18,7 @@ struct PackageRecord {
     quint32 targetType = 0;
     QVector<quint32> targetIds;
     QVector<quint32> parameters;
+    QVector<CtdaCondition> conditions;
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
@@ -30,6 +32,7 @@ inline bool operator==(const PackageRecord& l, const PackageRecord& r)
         && l.formId == r.formId && l.flags == r.flags
         && l.packageType == r.packageType && l.targetType == r.targetType
         && l.targetIds == r.targetIds && l.parameters == r.parameters
+        && l.conditions == r.conditions
         && l.rawSubRecords == r.rawSubRecords;
 }
 

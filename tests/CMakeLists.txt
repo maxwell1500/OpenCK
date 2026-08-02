@@ -431,6 +431,18 @@ target_link_libraries(test_objectwindowfilter PRIVATE openck_model test_stubs Qt
 target_include_directories(test_objectwindowfilter PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_objectwindowfilter)
 
+# CTDA conditions (PACK/SCEN/DIAL/INFO/QUST)
+add_executable(test_conditionrecord test_conditionrecord.cpp)
+target_link_libraries(test_conditionrecord PRIVATE openck_esm test_stubs Qt6::Test)
+target_include_directories(test_conditionrecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_conditionrecord)
+
+# PACK record with typed CTDA conditions
+add_executable(test_packagerecord test_packagerecord.cpp)
+target_link_libraries(test_packagerecord PRIVATE openck_esm test_stubs Qt6::Test)
+target_include_directories(test_packagerecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_packagerecord)
+
 # Minimal ZIP writer (crash diagnostics bundles)
 add_executable(test_zipwriter test_zipwriter.cpp)
 target_link_libraries(test_zipwriter PRIVATE openck_files test_stubs Qt6::Test)

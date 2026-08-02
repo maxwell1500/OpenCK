@@ -145,6 +145,7 @@ set(ESM_SOURCES
     libs/files/esm/scenrecord.cpp
     libs/files/esm/texturesetrecord.cpp
     libs/files/esm/waterecord.cpp
+    libs/files/esm/conditionrecord.cpp
     libs/files/data/strings.cpp
 )
 
@@ -222,6 +223,7 @@ set(ESM_HEADERS
     libs/files/esm/idleanimationrecord.hpp
     libs/files/esm/idlemarkerrecord.hpp
     libs/files/esm/imagespacerecord.hpp
+    libs/files/esm/conditionrecord.hpp
     libs/files/esm/keymrecord.hpp
     libs/files/esm/keywordrecord.hpp
     libs/files/esm/lighrecord.hpp
