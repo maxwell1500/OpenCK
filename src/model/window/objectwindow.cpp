@@ -133,6 +133,9 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_LOCT_:
             cat.totalRecords = data->getLocationCollection().size();
             break;
+        case CkId::Type_Plnt_:
+            cat.totalRecords = data->getPlanetCollection().size();
+            break;
         case CkId::Type_Refr_:
             cat.totalRecords = data->getRefrCollection().size();
             break;
@@ -415,6 +418,10 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getLocationCollection().getId(i);
                 formId = formatFormId(data->getLocationCollection().getRecord(i).get().formId);
                 break;
+            case CkId::Type_Plnt_:
+                editorId = data->getPlanetCollection().getId(i);
+                formId = formatFormId(data->getPlanetCollection().getRecord(i).get().formId);
+                break;
             case CkId::Type_Refr_:
                 editorId = data->getRefrCollection().getId(i);
                 formId = formatFormId(data->getRefrCollection().getRecord(i).get().formId);
@@ -656,6 +663,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Cell", CkId::Type_Cel_);
     addCategory("Worldspace", CkId::Type_WRLD_);
     addCategory("Location", CkId::Type_LOCT_);
+    addCategory("Planet", CkId::Type_Plnt_);
     addCategory("Reference", CkId::Type_Refr_);
     addCategory("Material", CkId::Type_Material_);
     addCategory("Landscape", CkId::Type_Land_);

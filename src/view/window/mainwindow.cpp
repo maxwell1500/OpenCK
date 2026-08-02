@@ -530,7 +530,7 @@ void MainWindow::setupEditMenu()
             CkId::Type_Alch_, CkId::Type_Ingr_, CkId::Type_Cont_, CkId::Type_Ench_,
             CkId::Type_Book_, CkId::Type_Misc_, CkId::Type_Acti_, CkId::Type_Stat_,
             CkId::Type_Race_, CkId::Type_Class_, CkId::Type_Fact_, CkId::Type_PerK_,
-            CkId::Type_Cel_, CkId::Type_WRLD_, CkId::Type_LOCT_, CkId::Type_Refr_,
+            CkId::Type_Cel_, CkId::Type_WRLD_, CkId::Type_LOCT_, CkId::Type_Plnt_, CkId::Type_Refr_,
             CkId::Type_Material_
         };
 

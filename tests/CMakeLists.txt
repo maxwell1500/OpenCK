@@ -166,6 +166,12 @@ target_link_libraries(test_dumpesm PRIVATE openck_esm Qt6::Core)
 target_include_directories(test_dumpesm PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Starfield.esm.
 
+# PndRecord binary encoder round-trip against the real Starfield.esm.
+add_executable(test_pndrecord test_pndrecord.cpp)
+target_link_libraries(test_pndrecord PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_pndrecord PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Starfield.esm.
+
 # Header parsing robustness tests
 add_executable(test_headerparsing test_headerparsing.cpp)
 target_link_libraries(test_headerparsing PRIVATE openck_esm Qt6::Test)

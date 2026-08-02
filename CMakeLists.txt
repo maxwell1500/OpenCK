@@ -131,6 +131,7 @@ set(ESM_SOURCES
     libs/files/esm/messagerecord.cpp
     libs/files/esm/msttrecord.cpp
     libs/files/esm/navmrecord.cpp
+    libs/files/esm/pndrecord.cpp
     libs/files/esm/noterecord.cpp
     libs/files/esm/outfitrecord.cpp
     libs/files/esm/projectilerecord.cpp
@@ -234,6 +235,7 @@ set(ESM_HEADERS
     libs/files/esm/messagerecord.hpp
     libs/files/esm/msttrecord.hpp
     libs/files/esm/navmrecord.hpp
+    libs/files/esm/pndrecord.hpp
     libs/files/esm/noterecord.hpp
     libs/files/esm/outfitrecord.hpp
     libs/files/esm/projectilerecord.hpp

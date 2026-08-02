@@ -228,6 +228,17 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     locationCollection.addColumn(new IntColumn<LocationRecord>("Z", &LocationRecord::z));
     addModel(new IdTable(&locationCollection), CkId::Type_LOCT_);
 
+    // PNDT - Planets
+    planetCollection.addColumn(new StringIdColumn<PndRecord>());
+    planetCollection.addColumn(new RecordStateColumn<PndRecord>());
+    planetCollection.addColumn(new IntColumn<PndRecord>("Flags", &PndRecord::flags));
+    planetCollection.addColumn(new StringColumn<PndRecord>("Star System", &PndRecord::starSystem));
+    planetCollection.addColumn(new FloatColumn<PndRecord>("Temperature", &PndRecord::temperature));
+    planetCollection.addColumn(new FloatColumn<PndRecord>("Density", &PndRecord::density));
+    planetCollection.addColumn(new FloatColumn<PndRecord>("Phase", &PndRecord::phase));
+    planetCollection.addColumn(new IntColumn<PndRecord>("Resources", &PndRecord::resources));
+    addModel(new IdTable(&planetCollection), CkId::Type_Plnt_);
+
     // REFR - References
     refrCollection.addColumn(new StringIdColumn<RefrRecord>());
     refrCollection.addColumn(new RecordStateColumn<RefrRecord>());
@@ -663,6 +674,7 @@ bool Data::continueLoading(Messages& messages)
             case 'CELL': cellCollection.load(*reader, base);   break;
             case 'WRLD': worldspaceCollection.load(*reader, base); break;
             case 'LCTN': locationCollection.load(*reader, base); break;
+            case 'PNDT': planetCollection.load(*reader, base); break;
             case 'REFR': refrCollection.load(*reader, base);   break;
             case 'MATL': materialCollection.load(*reader, base); break;
             case 'LAND': landCollection.load(*reader, base); break;
@@ -893,6 +905,11 @@ const IdCollection<LocationRecord>& Data::getLocationCollection() const
     return locationCollection;
 }
 
+const IdCollection<PndRecord>& Data::getPlanetCollection() const
+{
+    return planetCollection;
+}
+
 const IdCollection<RefrRecord>& Data::getRefrCollection() const
 {
     return refrCollection;
@@ -930,6 +947,7 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Cel_:     return &cellCollection;
     case CkId::Type_WRLD_:    return &worldspaceCollection;
     case CkId::Type_LOCT_:    return &locationCollection;
+    case CkId::Type_Plnt_:    return &planetCollection;
     case CkId::Type_Refr_:    return &refrCollection;
     case CkId::Type_Material_: return &materialCollection;
     case CkId::Type_Land_:     return &landCollection;
@@ -1017,6 +1035,7 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Cel_:     return &cellCollection;
     case CkId::Type_WRLD_:    return &worldspaceCollection;
     case CkId::Type_LOCT_:    return &locationCollection;
+    case CkId::Type_Plnt_:    return &planetCollection;
     case CkId::Type_Refr_:    return &refrCollection;
     case CkId::Type_Material_: return &materialCollection;
     case CkId::Type_Land_:     return &landCollection;
@@ -1103,6 +1122,7 @@ IdCollection<PerkRecord>& Data::getPerkCollection() { return perkCollection; }
 IdCollection<CellRecord>& Data::getCellCollection() { return cellCollection; }
 IdCollection<WorldspaceRecord>& Data::getWorldspaceCollection() { return worldspaceCollection; }
 IdCollection<LocationRecord>& Data::getLocationCollection() { return locationCollection; }
+IdCollection<PndRecord>& Data::getPlanetCollection() { return planetCollection; }
 IdCollection<RefrRecord>& Data::getRefrCollection() { return refrCollection; }
 IdCollection<MaterialRecord>& Data::getMaterialCollection() { return materialCollection; }
 IdCollection<LandRecord>& Data::getLandCollection() { return landCollection; }
@@ -1186,6 +1206,7 @@ QVector<IRecordCollection*> Data::allCollections()
         &cellCollection,
         &worldspaceCollection,
         &locationCollection,
+        &planetCollection,
         &refrCollection,
         &materialCollection,
         &landCollection,
@@ -1271,6 +1292,7 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&cellCollection,    CkId::Type_Cel_},
         {&worldspaceCollection, CkId::Type_WRLD_},
         {&locationCollection, CkId::Type_LOCT_},
+        {&planetCollection,    CkId::Type_Plnt_},
         {&refrCollection,    CkId::Type_Refr_},
         {&materialCollection, CkId::Type_Material_},
         {&landCollection,    CkId::Type_Land_},
@@ -1641,6 +1663,14 @@ bool Data::addLocation(LocationRecord& record)
     if (locationCollection.searchId(record.editorId) >= 0)
         return false;
     locationCollection.add(record);
+    return true;
+}
+
+bool Data::addPlanet(PndRecord& record)
+{
+    if (planetCollection.searchId(record.editorId) >= 0)
+        return false;
+    planetCollection.add(record);
     return true;
 }
 

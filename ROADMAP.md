@@ -113,7 +113,7 @@ Create a fully functional, multi-game Creation Kit replacement that supports edi
 - **16.8 ✅ (partial)**: NAVM `editSelected` case → `NavmeshEditorDialog` seeded from `NavmRecord` + undoable write-back; fixed `NavmRecord` NVTR flag serialization; `NavMeshTools` (`src/model/tools/navmeshtoolkit.hpp/.cpp`) adds adjacency rebuild, mesh check/analyze (degenerate/isolated/out-of-range/non-manifold/duplicate-vertex detection, component + border-edge counts), border-edge connection detection, vertex welding, and T-junction removal — wired into the editor as Check/Clean/Weld buttons; +`test_navmeshtoolkit`, +`test_navmrecord` round-trip.
 - **16.1 ✅ (partial)**: `ScenRecord` struct created + wired end-to-end; "Scene" Object Window category backed; generic dialog with raw-subrecord inspector. Timeline editor pending.
 - **16.2 ✅ (partial)**: EFSH/IMGS raw-subrecord inspector in the generic dialog (unparsed subrecords visible losslessly).
-- **16.6-16.7**: PNDT/CCT Starfield editors (pending)
+- **16.6 ✅**: PNDT binary encoder (`PndRecord`, libs/files/esm/) — typed fields + byte-exact raw preservation validated against the real Starfield.esm (`test_pndrecord`, 20 records round-trip); wired into Data as a Planets collection (Object Window category, copy/paste, edit). 16.7 CCT remains model-only (no top-level CCT_ record exists in the real ESM; attach points are ap_CCT_* EDID markers).
 - **16.8**: NavMesh record binding (pending)
 
 ### High Priority

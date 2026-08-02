@@ -83,6 +83,7 @@
 #include "../../../libs/files/esm/soundmarkerrecord.hpp"
 #include "../../../libs/files/esm/shaderparticlerecord.hpp"
 #include "../../../libs/files/esm/staticcollectionrecord.hpp"
+#include "../../../libs/files/esm/pndrecord.hpp"
 #include "../../../libs/files/esm/texturesetrecord.hpp"
 #include "../../../libs/files/esm/waterecord.hpp"
 
@@ -256,6 +257,9 @@ public:
     /// \brief Get location collection (LCTN records)
     /// \return Const reference to the location record collection
     const IdCollection<LocationRecord>& getLocationCollection() const;
+    /// \brief Get planet collection (PNDT records)
+    /// \return Const reference to the planet record collection
+    const IdCollection<PndRecord>& getPlanetCollection() const;
     /// \brief Get reference collection (REFR records)
     /// \return Const reference to the reference record collection
     const IdCollection<RefrRecord>& getRefrCollection() const;
@@ -499,6 +503,9 @@ public:
     /// \brief Get location collection (mutable)
     /// \return Reference to the location record collection for modification
     IdCollection<LocationRecord>& getLocationCollection();
+    /// \brief Get planet collection (mutable)
+    /// \return Reference to the planet record collection for modification
+    IdCollection<PndRecord>& getPlanetCollection();
     /// \brief Get reference collection (mutable)
     /// \return Reference to the reference record collection for modification
     IdCollection<RefrRecord>& getRefrCollection();
@@ -840,6 +847,7 @@ public:
     /// \param record Reference to the location record to add
     /// \return true if record was added successfully
     bool addLocation(LocationRecord& record);
+bool addPlanet(PndRecord& record);
     /// \brief Add reference record to collection
     /// \param record Reference to the reference record to add
     /// \return true if record was added successfully
@@ -925,6 +933,7 @@ private:
     IdCollection<CellRecord> cellCollection;
     IdCollection<WorldspaceRecord> worldspaceCollection;
     IdCollection<LocationRecord> locationCollection;
+    IdCollection<PndRecord> planetCollection;
     IdCollection<RefrRecord> refrCollection;
     IdCollection<MaterialRecord> materialCollection;
     IdCollection<LandRecord> landCollection;

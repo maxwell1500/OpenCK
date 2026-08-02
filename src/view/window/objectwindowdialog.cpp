@@ -913,6 +913,19 @@ void ObjectWindowDialog::editSelected()
         }
         break;
     }
+    case CkId::Type_Plnt_:
+    {
+        auto& collection = mData->getPlanetCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            PndRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("PNDT"), &rec.components, &rec, this);
+        }
+        break;
+    }
     case CkId::Type_Refr_:
     {
         auto& collection = mData->getRefrCollection();
@@ -2125,6 +2138,24 @@ void ObjectWindowDialog::copyRecord()
         }
         break;
     }
+    case CkId::Type_Plnt_:
+    {
+        auto& collection = mData->getPlanetCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            const PndRecord& pndRec = collection.getRecord(recordIndex).get();
+            record.formId = pndRec.formId;
+            record.fields["editorId"] = pndRec.editorId;
+            record.fields["starSystem"] = pndRec.starSystem;
+            record.fields["temperature"] = pndRec.temperature;
+            record.fields["density"] = pndRec.density;
+            record.fields["phase"] = pndRec.phase;
+            record.fields["resources"] = static_cast<int>(pndRec.resources);
+            setClipboardData(record);
+            LOG_INFO(QString("Planet '%1' copied to clipboard").arg(editorId));
+        }
+        break;
+    }
     case CkId::Type_Refr_:
     {
         auto& collection = mData->getRefrCollection();
@@ -2724,6 +2755,31 @@ void ObjectWindowDialog::pasteRecord()
         }
         break;
     }
+    case CkId::Type_Plnt_:
+    {
+        auto& collection = mData->getPlanetCollection();
+        PndRecord newRecord;
+        newRecord.editorId = newId;
+        newRecord.formId = 0;
+        if (clipData.fields.contains("starSystem"))
+            newRecord.starSystem = clipData.fields["starSystem"].toString();
+        if (clipData.fields.contains("temperature"))
+            newRecord.temperature = clipData.fields["temperature"].toDouble();
+        if (clipData.fields.contains("density"))
+            newRecord.density = clipData.fields["density"].toDouble();
+        if (clipData.fields.contains("phase"))
+            newRecord.phase = clipData.fields["phase"].toDouble();
+        if (clipData.fields.contains("resources"))
+            newRecord.resources = static_cast<quint32>(clipData.fields["resources"].toInt());
+        newRecord.mOrder.clear();
+        newRecord.rawSubRecords.clear();
+        if (mData->addPlanet(newRecord))
+        {
+            LOG_INFO(QString("Planet '%1' pasted").arg(newId));
+            created = true;
+        }
+        break;
+    }
     case CkId::Type_Refr_:
     {
         auto& collection = mData->getRefrCollection();
@@ -3068,6 +3124,7 @@ ObjectWindowDialog::RecordLookupResult ObjectWindowDialog::getFormComponentsForI
     CASE_RECORD(CkId::Type_Cel_, getCellCollection, CellRecord)
     CASE_RECORD(CkId::Type_WRLD_, getWorldspaceCollection, WorldspaceRecord)
     CASE_RECORD(CkId::Type_LOCT_, getLocationCollection, LocationRecord)
+    CASE_RECORD(CkId::Type_Plnt_, getPlanetCollection, PndRecord)
     CASE_RECORD(CkId::Type_Refr_, getRefrCollection, RefrRecord)
     CASE_RECORD(CkId::Type_Land_, getLandCollection, LandRecord)
     CASE_RECORD(CkId::Type_Pack_, getPackCollection, PackRecord)

@@ -47,6 +47,7 @@ public:
         Type_Cel_,
         Type_WRLD_,
         Type_LOCT_,
+        Type_Plnt_,
         Type_Refr_,
     Type_Material_,
     Type_Land_,
