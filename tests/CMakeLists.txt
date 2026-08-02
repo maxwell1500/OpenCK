@@ -196,10 +196,22 @@ target_link_libraries(test_scanbtd PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_scanbtd PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — needs a game data dir with archives.
 
+# Diagnostic: probe a Starfield mesh BA2 for hknp markers (test_meshprobe [ba2]).
+add_executable(test_meshprobe test_meshprobe.cpp)
+target_link_libraries(test_meshprobe PRIVATE openck_model test_stubs Qt6::Core)
+target_include_directories(test_meshprobe PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — needs a real Starfield install.
+
 # BtdTerrain: real Starfield .btd (BTDB) reader against the Terrain BA2.
 add_executable(test_btdterrain test_btdterrain.cpp)
 target_link_libraries(test_btdterrain PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_btdterrain PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — requires a real Starfield install.
+
+# HknpPhysicsSystem: decode a real Starfield bhkPhysicsSystem collision block.
+add_executable(test_hknpphysicssystem test_hknpphysicssystem.cpp)
+target_link_libraries(test_hknpphysicssystem PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_hknpphysicssystem PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — requires a real Starfield install.
 
 # XwmaDecoder: decodes a real Skyrim voice .fuz's xWMA audio to PCM via WMF.
