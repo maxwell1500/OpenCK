@@ -174,7 +174,7 @@ Sources reconciled here:
 | # | Record | Specialized Widget | Key Subrecords | Status |
 |---|--------|-------------------|----------------|--------|
 | 5B.1 | NPC_ | **NPC Editor** — actor stats grid (health/magicka/stamina/attributes/skills), faction/race/class dropdowns, AI data panel, spell list, inventory table, face-gen preview | ACBS, SPLO, CNTO, AIDT, DOFT, SOFT, DPLT, CSCR, PKID | ✅ |
-| 5B.2 | CREA | **Creature Editor** — same as NPC but with creature-specific data (soul, combat style, body parts) | ACBS, BNAM, NIFT | ◐ (has components, needs widget) |
+| 5B.2 | CREA | **Creature Editor** — same as NPC but with creature-specific data (soul, combat style, body parts) | ACBS, BNAM, NIFT | ✅ `CreatureDataWidget` (15.4) |
 
 #### Quest & Dialogue Records
 
@@ -183,14 +183,14 @@ Sources reconciled here:
 | 5B.3 | QUST | **Quest Editor** — stage tree (index/flag/text), alias editor, objective editor, script fragment editor | INDX, QSDT, CNAM, SCDA, ANAM, NNAM, CTDA | ✅ |
 | 5B.4 | DIAL | **Topic Editor** — response tree, conditions per response, voice file linking | QSTI, PNAM, CTDA | ✅ |
 | 5B.5 | INFO | **Response Editor** — response text, voice file picker, conditions grid, emotion/anim overrides | CNAM, CTDA, TLOI, SCHR | ✅ |
-| 5B.6 | SCEN | **Scene Editor** (Starfield/Fallout 4) — action list, phase timeline, actor assignment | ⬜ deferred |
+| 5B.6 | SCEN | **Scene Editor** (Starfield/Fallout 4) — action list, phase timeline, actor assignment | ✅ `SceneTimelineWidget` (16.1) |
 
 #### World Records
 
 | # | Record | Specialized Widget | Key Subrecords | Status |
 |---|--------|-------------------|----------------|--------|
 | 5B.7 | CELL | **Cell Editor** — lighting template, water height, music type, interior/exterior flags, cell regions, navmesh preview | XCLL, XCMT, XCLW, XCWT, XOWN, XCIM, LTMP, XCLR | ✅ |
-| 5B.8 | WRLD | **Worldspace Editor** — map data, climate, water, LOD settings, cell grid | WNAM, XNAM, MNAM, CNAM, NAM0-NAM9 | ◐ (has components, needs widget) |
+| 5B.8 | WRLD | **Worldspace Editor** — map data, climate, water, LOD settings, cell grid | WNAM, XNAM, MNAM, CNAM, NAM0-NAM9 | ✅ `WorldspaceDataWidget` (16.4) |
 | 5B.9 | LAND | **Landscape Editor** — heightmap brush, texture layer painting (4 layers), vertex color painting, normal editing | VHGT, VNML, VCLR, VTEX | ✅ |
 | 5B.10 | REFR | **Reference Editor** — position/rotation/scale spinners, owner/lock pickers, enable-state, linked references, script attachment | NAME, DATA, XOWN, DNAM, XESP, XSCL, XPRM, XLKR, XLCM | ✅ |
 
@@ -207,8 +207,8 @@ Sources reconciled here:
 |---|--------|-------------------|----------------|--------|
 | 5B.13 | WTHR | **Weather Editor** — color curve editor (sky/cloud/ambient/fog/sun), precipitation data, sound FX assignment, cloud texture layers | PNAM, NAM0, FNAM, MNAM, CNAM, SNAM, QNAM, INAM, DATA | ✅ |
 | 5B.14 | SOUN | **Sound Editor** — waveform preview, attenuation curves, output model, sound category | FNAM, SNDD, SNDX, ATTN | ✅ |
-| 5B.15 | PACK | **AI Package Editor** — package type selector, target picker, schedule data, conditions grid | PKDT, PLDT, PTDT, PSCT, PKED, PKPT, PSDT, CTDA | ⬜ deferred |
-| 5B.16 | EFSH | **Shaders** (EffectShader, ImageSpaceModifier) | ⬜ deferred |
+| 5B.15 | PACK | **AI Package Editor** — package type selector, target picker, schedule data, conditions grid | PKDT, PLDT, PTDT, PSCT, PKED, PKPT, PSDT, CTDA | ✅ `AIPackageEditor` |
+| 5B.16 | EFSH | **Shaders** (EffectShader, ImageSpaceModifier) | ✅ typed DATA parsing (16.2); IMGS via generic dialog |
 
 ### 5C — Per-Component Table Widgets
 
