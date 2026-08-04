@@ -2209,10 +2209,9 @@ void ObjectWindowDialog::copyRecord()
     }
     default:
     {
-        QMessageBox::information(this, "Copy",
-            QString("Copying %1 records is not yet supported.\nSupported: NPC_, WEAP_, ARMOR_, SPEL_, QUEST_, GLOB_, TREE_, STAT_, ACTI_, MISC_, ALCH_, INGR_, BOOK_, ENCH_, CONT_, RACE_, PERK_, MAGIC_, PACK_, LCRT_, CLASS_, CELL_, WRLD_, LOCT_, REFR_, DIAL_, INFO_")
-            .arg(CkId(type).getTypeName()));
-        return;
+        setClipboardData(record);
+        LOG_INFO(QString("Generic copy: %1 '%2'").arg(CkId(type).getTypeName()).arg(editorId));
+        break;
     }
     }
 
@@ -2849,10 +2848,13 @@ void ObjectWindowDialog::pasteRecord()
     }
     default:
     {
-        QMessageBox::information(this, "Paste",
-            QString("Pasting %1 records is not yet supported.\nSupported: NPC_, WEAP_, ARMOR_, SPEL_, QUEST_, GLOB_, TREE_, STAT_, ACTI_, MISC_, ALCH_, INGR_, BOOK_, ENCH_, CONT_, RACE_, PERK_, MAGIC_, PACK_, LCRT_, CLASS_, CELL_, WRLD_, LOCT_, REFR_, DIAL_, INFO_")
-            .arg(CkId(type).getTypeName()));
-        return;
+        if (mData->cloneRecord(type, clipData.editorId, newId))
+        {
+            LOG_INFO(QString("Generic paste: %1 '%2' -> '%3'")
+                .arg(CkId(type).getTypeName()).arg(clipData.editorId).arg(newId));
+            created = true;
+        }
+        break;
     }
     }
 

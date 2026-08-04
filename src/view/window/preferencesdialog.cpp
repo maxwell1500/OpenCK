@@ -350,7 +350,7 @@ QWidget* PreferencesDialog::createNetworkPage()
     mVcServerEdit->setEnabled(false);
     gform->addRow("VC Server:", mVcServerEdit);
 
-    auto* note = new QLabel("Version control is not yet implemented in OpenCK.");
+    auto* note = new QLabel("Version control: OpenCK uses Git or Perforce for Check In/Out (configured per-project). The VC settings below are reserved for future use.");
     note->setWordWrap(true);
     gform->addRow("", note);
 
