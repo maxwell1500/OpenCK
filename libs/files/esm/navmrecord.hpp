@@ -30,6 +30,7 @@ struct NavmRecord {
     quint32 cellFormId = 0;
     QVector<QVector3D> vertices;
     QVector<NavmTriangle> triangles;
+    QVector<quint8> coverData; // NVCV: per-vertex cover flags
     QVector<quint32> externalConnections;
     QVector<RawSubRecord> rawSubRecords;
 
@@ -44,7 +45,8 @@ inline bool operator==(const NavmRecord& l, const NavmRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.cellFormId == r.cellFormId && l.vertices == r.vertices
-        && l.triangles == r.triangles && l.externalConnections == r.externalConnections
+        && l.triangles == r.triangles && l.coverData == r.coverData
+        && l.externalConnections == r.externalConnections
         && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 inline bool operator!=(const NavmRecord& l, const NavmRecord& r) { return !(l == r); }

@@ -40,6 +40,11 @@ void NavmRecord::load(ESMReader& esm, bool) {
             for (qint64 i = 0; i < count; ++i) externalConnections.append(esm.readType<quint32>());
             handled = true; break;
         }
+        case 'NVCV': {
+            qint64 count = esm.subLeft();
+            for (qint64 i = 0; i < count; ++i) coverData.append(esm.readType<quint8>());
+            handled = true; break;
+        }
         case 'NVMI': cellFormId = esm.readType<quint32>(); handled = true; break;
         default: break;
         }
@@ -70,7 +75,12 @@ void NavmRecord::save(ESMWriter& esm) const {
         esm.endSubRecord();
     }
     if (cellFormId != 0) esm.writeSubData<quint32>('NVMI', cellFormId);
+    if (!coverData.isEmpty()) {
+        esm.startSubRecord('NVCV');
+        for (quint8 c : coverData) esm.writeType<quint8>(c);
+        esm.endSubRecord();
+    }
     components.saveAll(esm);
     for (const auto& raw : rawSubRecords) { esm.startSubRecord(raw.name); esm.writeRawData(raw.data.data(), raw.data.size()); esm.endSubRecord(); }
 }
-void NavmRecord::blank() { editorId = ""; formId = 0; flags = 0; cellFormId = 0; vertices.clear(); triangles.clear(); externalConnections.clear(); rawSubRecords.clear(); components.clear(); }
+void NavmRecord::blank() { editorId = ""; formId = 0; flags = 0; cellFormId = 0; vertices.clear(); triangles.clear(); coverData.clear(); externalConnections.clear(); rawSubRecords.clear(); components.clear(); }

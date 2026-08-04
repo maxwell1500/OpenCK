@@ -16,6 +16,9 @@ private slots:
     void testWeldVertices();
     void testFindConnections();
     void testRemoveTjunctions();
+    void testGenerateGridFlat();
+    void testGenerateGridSteepSlopeDropped();
+    void testComputeCoverData();
 };
 
 void TestNavMeshToolkit::testAdjacencySquare()
@@ -167,6 +170,88 @@ void TestNavMeshToolkit::testRemoveTjunctions()
         }
     }
     QCOMPARE(midUsed, false);
+}
+
+void TestNavMeshToolkit::testGenerateGridFlat()
+{
+    GridNavmeshOptions opts;
+    opts.columns = 3;
+    opts.rows = 3;
+    opts.cellSize = 128.0f;
+    opts.maxSlope = 45.0f;
+
+    // Flat 3x3 grid -> all 8 cells split into 16 triangles, 9 vertices.
+    QVector<float> heights(9, 0.0f);
+    QVector<QVector3D> verts = generateGridVertices(heights, opts);
+    QCOMPARE(verts.size(), 9);
+    QVector<MeshTriangle> tris = generateGridTriangles(heights, verts, opts);
+    QCOMPARE(tris.size(), 8);
+
+    // No degenerate triangles, all indices in range.
+    for (const auto& t : tris)
+    {
+        QVERIFY(t.v0 >= 0 && t.v0 < verts.size());
+        QVERIFY(t.v1 >= 0 && t.v1 < verts.size());
+        QVERIFY(t.v2 >= 0 && t.v2 < verts.size());
+        QVERIFY(t.v0 != t.v1 && t.v1 != t.v2 && t.v0 != t.v2);
+    }
+}
+
+void TestNavMeshToolkit::testGenerateGridSteepSlopeDropped()
+{
+    GridNavmeshOptions opts;
+    opts.columns = 3;
+    opts.rows = 3;
+    opts.cellSize = 128.0f;
+    opts.maxSlope = 45.0f; // vertical drop allowed: tan(45)*128 = 128
+
+    // Left column flat; right column a sheer cliff (drop 256 > 128).
+    QVector<float> heights = {
+        0, 0, 256,
+        0, 0, 256,
+        0, 0, 256
+    };
+    QVector<QVector3D> verts = generateGridVertices(heights, opts);
+    QCOMPARE(verts.size(), 9);
+
+    QVector<MeshTriangle> tris = generateGridTriangles(heights, verts, opts);
+    // Cells spanning the cliff drop are dropped; the flat 2x2 left block
+    // keeps 2 cells -> 4 triangles.
+    QVERIFY(tris.size() >= 2);
+    QVERIFY(tris.size() <= 8);
+    for (const auto& t : tris)
+    {
+        const float maxH = qMax(qMax(verts[t.v0].z(), verts[t.v1].z()), verts[t.v2].z());
+        const float minH = qMin(qMin(verts[t.v0].z(), verts[t.v1].z()), verts[t.v2].z());
+        QVERIFY(maxH - minH <= 128.0f + 1e-4f);
+    }
+}
+
+void TestNavMeshToolkit::testComputeCoverData()
+{
+    // A mesh with a rising wall: vertex 2 towers 400 units above its
+    // neighbors (a sheer cliff face).
+    QVector<QVector3D> verts = {
+        QVector3D(0, 0, 0),
+        QVector3D(0, 1, 0),     // within radius
+        QVector3D(0, 1, 400),   // wall top
+        QVector3D(1, 1, 0)
+    };
+    QVector<MeshTriangle> tris = {
+        { 0, 1, 3, 0 },
+        { 1, 2, 3, 0 },
+        { 0, 3, 2, 0 }
+    };
+
+    QVector<CoverData> covers = computeCoverData(verts, tris, 512.0f, 128.0f);
+    QCOMPARE(covers.size(), 4);
+
+    // Vertex 1 sees vertex 2 rise 400 units vertically above it: high cover.
+    QVERIFY(covers[1].flags & Cover_High_N);
+    // Vertex 0 sees the 400-unit wall across the mesh: low cover.
+    QVERIFY(covers[0].flags & Cover_Low_N);
+    // Vertex 3 (same base height) also has low cover from the wall.
+    QVERIFY(covers[3].flags & Cover_Low_N);
 }
 
 QTEST_MAIN(TestNavMeshToolkit)

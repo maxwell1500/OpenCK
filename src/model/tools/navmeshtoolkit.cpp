@@ -1,6 +1,7 @@
 #include "navmeshtoolkit.hpp"
 
 #include <QMap>
+#include <QSet>
 #include <cmath>
 #include <algorithm>
 
@@ -373,6 +374,141 @@ void removeTjunctions(QVector<QVector3D>& vertices, QVector<MeshTriangle>& trian
     }
 
     weldVertices(vertices, triangles, epsilon);
+}
+
+QVector<QVector3D> generateGridVertices(const QVector<float>& heightGrid,
+                                        const GridNavmeshOptions& options)
+{
+    const int cols = options.columns;
+    const int rows = options.rows;
+    if (cols <= 0 || rows <= 0 || heightGrid.size() < cols * rows)
+        return {};
+
+    QVector<QVector3D> vertices;
+    vertices.reserve(cols * rows);
+    for (int r = 0; r < rows; ++r)
+    {
+        for (int c = 0; c < cols; ++c)
+        {
+            const float h = heightGrid.at(r * cols + c);
+            vertices.append(QVector3D(
+                options.originX + c * options.cellSize,
+                options.originY + r * options.cellSize,
+                h));
+        }
+    }
+    return vertices;
+}
+
+QVector<MeshTriangle> generateGridTriangles(const QVector<float>& heightGrid,
+                                            const QVector<QVector3D>& vertices,
+                                            const GridNavmeshOptions& options)
+{
+    const int cols = options.columns;
+    const int rows = options.rows;
+    if (cols < 2 || rows < 2 || vertices.size() < cols * rows)
+        return {};
+
+    const float maxSlopeRad = qDegreesToRadians(options.maxSlope);
+    const float maxVerticalDrop = std::tan(maxSlopeRad) * options.cellSize;
+
+    QVector<MeshTriangle> triangles;
+    triangles.reserve((cols - 1) * (rows - 1) * 2);
+
+    auto vertexIndex = [cols](int r, int c) { return r * cols + c; };
+    auto addTri = [&](int a, int b, int c) {
+        const QVector3D& va = vertices[a];
+        const QVector3D& vb = vertices[b];
+        const QVector3D& vc = vertices[c];
+        // Skip degenerate triangles (zero area).
+        const QVector3D ab = vb - va;
+        const QVector3D ac = vc - va;
+        if (ab.lengthSquared() < 1e-6f || ac.lengthSquared() < 1e-6f)
+            return;
+        // Drop triangles steeper than maxSlope (measured via height drop
+        // across the cell, a simple proxy for slope on a uniform grid).
+        const float maxH = qMax(qMax(va.z(), vb.z()), vc.z());
+        const float minH = qMin(qMin(va.z(), vb.z()), vc.z());
+        if (maxH - minH > maxVerticalDrop)
+            return;
+        triangles.append(MeshTriangle{ a, b, c });
+    };
+
+    for (int r = 0; r < rows - 1; ++r)
+    {
+        for (int c = 0; c < cols - 1; ++c)
+        {
+            const int tl = vertexIndex(r, c);
+            const int tr = vertexIndex(r, c + 1);
+            const int bl = vertexIndex(r + 1, c);
+            const int br = vertexIndex(r + 1, c + 1);
+            // Split each cell consistently (top-left / bottom-right diagonal).
+            addTri(tl, tr, bl);
+            addTri(bl, tr, br);
+        }
+    }
+    return triangles;
+}
+
+QVector<CoverData> computeCoverData(const QVector<QVector3D>& vertices,
+                                    const QVector<MeshTriangle>& triangles,
+                                    float radius, float minCoverDepth)
+{
+    QVector<CoverData> covers(vertices.size());
+
+    // Build an adjacency list of vertex neighbors from the mesh.
+    QVector<QSet<int>> neighbors(vertices.size());
+    for (const MeshTriangle& tri : triangles)
+    {
+        if (tri.v0 >= 0 && tri.v0 < neighbors.size()) neighbors[tri.v0].insert(tri.v1);
+        if (tri.v1 >= 0 && tri.v1 < neighbors.size()) neighbors[tri.v1].insert(tri.v2);
+        if (tri.v2 >= 0 && tri.v2 < neighbors.size()) neighbors[tri.v2].insert(tri.v0);
+        if (tri.v0 >= 0 && tri.v0 < neighbors.size()) neighbors[tri.v0].insert(tri.v2);
+        if (tri.v1 >= 0 && tri.v1 < neighbors.size()) neighbors[tri.v1].insert(tri.v0);
+        if (tri.v2 >= 0 && tri.v2 < neighbors.size()) neighbors[tri.v2].insert(tri.v1);
+    }
+
+    const float radiusSq = radius * radius;
+    for (int i = 0; i < vertices.size(); ++i)
+    {
+        const QVector3D& v = vertices[i];
+        quint8 flags = 0;
+
+        // A vertex has low cover when a neighbor rises at least minCoverDepth
+        // above it (an embankment / berm an actor can crouch behind).
+        bool hasLowCover = false;
+        for (int n : neighbors[i])
+        {
+            const QVector3D& p = vertices[n];
+            if ((p - v).lengthSquared() > radiusSq) continue;
+            if (p.z() - v.z() >= minCoverDepth) { hasLowCover = true; break; }
+        }
+
+        // High cover requires a near-vertical wall: a neighbor rises at least
+        // minCoverDepth * 2 above the vertex over a small horizontal gap.
+        bool hasHighCover = false;
+        for (int n : neighbors[i])
+        {
+            const QVector3D& p = vertices[n];
+            if ((p - v).lengthSquared() > radiusSq) continue;
+            const float dz = p.z() - v.z();
+            const float dx = std::sqrt(std::max((p - v).x() * (p - v).x()
+                                              + (p - v).y() * (p - v).y(), 0.0f));
+            if (dz >= minCoverDepth * 2.0f && dx < 1e-4f + radius * 0.05f)
+            {
+                hasHighCover = true;
+                break;
+            }
+        }
+
+        if (hasLowCover) flags |= Cover_Low_N;
+        if (hasHighCover) flags |= Cover_High_N;
+        if (flags != 0)
+            covers[i].coverPoints.append(v);
+        covers[i].flags = flags;
+    }
+
+    return covers;
 }
 
 } // namespace NavMeshTools
