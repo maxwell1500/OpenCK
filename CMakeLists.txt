@@ -516,6 +516,7 @@ set(MODEL_SOURCES
     src/model/tools/btdterrain.cpp
     src/model/tools/hknpphysicssystem.cpp
     src/model/tools/formidcompactor.cpp
+    src/model/tools/formcomponentsresolver.cpp
     src/model/tools/bnetclient.cpp
     src/model/tools/objectwindowfilter.cpp
     src/model/tools/assetdependencyscanner.cpp
@@ -596,6 +597,7 @@ set(MODEL_HEADERS
     src/model/tools/btdterrain.hpp
     src/model/tools/hknpphysicssystem.hpp
     src/model/tools/formidcompactor.hpp
+    src/model/tools/formcomponentsresolver.hpp
     src/model/tools/bnetclient.hpp
     src/model/tools/objectwindowfilter.hpp
     src/model/tools/assetdependencyscanner.hpp

@@ -113,6 +113,8 @@
 #include "../../../libs/files/esm/texturesetrecord.hpp"
 #include "../../../libs/files/esm/waterecord.hpp"
 
+#include "../../model/tools/formcomponentsresolver.hpp"
+
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -122,113 +124,6 @@
 #include <QInputDialog>
 #include <QSettings>
 #include <QFileDialog>
-
-namespace {
-template <typename T>
-bool tryResolveComponents(BaseCollection* coll, int recordIndex,
-                          openck::FormComponents*& components, void*& recordPtr)
-{
-    auto* typed = dynamic_cast<Collection<T>*>(coll);
-    if (!typed)
-        return false;
-    if (recordIndex < 0 || recordIndex >= typed->size())
-        return false;
-    auto& record = typed->getRecord(recordIndex).get();
-    components = &record.components;
-    recordPtr = &record;
-    return true;
-}
-
-#define FOR_EACH_COMPONENT_RECORD_TYPE(MACRO) \
-    MACRO(ActiRecord) \
-    MACRO(ActorValueInfoRecord) \
-    MACRO(AlchRecord) \
-    MACRO(AmmoRecord) \
-    MACRO(AnioRecord) \
-    MACRO(AppaRecord) \
-    MACRO(ArmorRecord) \
-    MACRO(BookRecord) \
-    MACRO(BsgnRecord) \
-    MACRO(CellRecord) \
-    MACRO(ClassRecord) \
-    MACRO(ClimateRecord) \
-    MACRO(ClotRecord) \
-    MACRO(CobjRecord) \
-    MACRO(ContRecord) \
-    MACRO(CreatureRecord) \
-    MACRO(CstyRecord) \
-    MACRO(DialRecord) \
-    MACRO(DoorRecord) \
-    MACRO(EfshRecord) \
-    MACRO(EnchRecord) \
-    MACRO(ExplRecord) \
-    MACRO(EyesRecord) \
-    MACRO(FactRecord) \
-    MACRO(FlorRecord) \
-    MACRO(FormListRecord) \
-    MACRO(FurnRecord) \
-    MACRO(GrassRecord) \
-    MACRO(HairRecord) \
-    MACRO(IdleAnimationRecord) \
-    MACRO(IdleMarkerRecord) \
-    MACRO(ImgsRecord) \
-    MACRO(InfoRecord) \
-    MACRO(IngrRecord) \
-    MACRO(KeymRecord) \
-    MACRO(KeywordRecord) \
-    MACRO(LandRecord) \
-    MACRO(LighRecord) \
-    MACRO(LoadScreenRecord) \
-    MACRO(LocationRecord) \
-    MACRO(LtexRecord) \
-    MACRO(LvlcRecord) \
-    MACRO(LvliRecord) \
-    MACRO(LvspRecord) \
-    MACRO(MagicRecord) \
-    MACRO(MaterialRecord) \
-    MACRO(MesgRecord) \
-    MACRO(MiscRecord) \
-    MACRO(MsttRecord) \
-    MACRO(NavmRecord) \
-    MACRO(NpcRecord) \
-    MACRO(NoteRecord) \
-    MACRO(OutfitRecord) \
-    MACRO(PackageRecord) \
-    MACRO(PerkRecord) \
-    MACRO(ProjRecord) \
-    MACRO(QuestRecord) \
-    MACRO(RaceRecord) \
-    MACRO(RefrRecord) \
-    MACRO(RegionRecord) \
-    MACRO(RoadRecord) \
-    MACRO(ScriptRecord) \
-    MACRO(ScrRecord) \
-    MACRO(SlgmRecord) \
-    MACRO(SmqnRecord) \
-    MACRO(SounRecord) \
-    MACRO(SpellRecord) \
-    MACRO(SpgdRecord) \
-    MACRO(StaticCollectionRecord) \
-    MACRO(StatRecord) \
-    MACRO(ScenRecord) \
-    MACRO(TextureSetRecord) \
-    MACRO(TreeRecord) \
-    MACRO(WateRecord) \
-    MACRO(WeaponRecord) \
-    MACRO(WorldspaceRecord) \
-    MACRO(WthrRecord)
-
-bool resolveComponents(BaseCollection* coll, int recordIndex,
-                       openck::FormComponents*& components, void*& recordPtr)
-{
-#define RESOLVE_RECORD_TYPE(recType) \
-    if (tryResolveComponents<recType>(coll, recordIndex, components, recordPtr)) return true;
-    FOR_EACH_COMPONENT_RECORD_TYPE(RESOLVE_RECORD_TYPE)
-#undef RESOLVE_RECORD_TYPE
-#undef FOR_EACH_COMPONENT_RECORD_TYPE
-    return false;
-}
-} // namespace
 
 ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
     : QDockWidget(parent),

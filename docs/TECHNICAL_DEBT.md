@@ -22,7 +22,6 @@
 | H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp:18` (Phase 23.4 follow-up) | Only typed reference fields (RELA parent/child, SHOU words, etc.) are rewritten. References embedded in raw subrecords (XOWN, XPRM, etc.) are left untouched, producing broken refs for many record types. Needs a per-record-type FormID field map. |
 | H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | Starfield.esm has 180 distinct record types; CkId covers ~90. Medium-impact missing types: HDPT (head parts x230), TERM (terminals x368), MATT (material type x249), MOVT (movement x43), MUSC (music track x83). Internal/infrastructure types (RFGP x80584, PKIN x11281, LMSW x12966) are lower priority. |
 | H3 | BA2 DX10 (texture) archives can't be read or written | `ba2archive.cpp:179-186` | `parseBtdxTextures` logs "not yet supported" and fails open. `create()` only writes GNRL regardless of the `archiveType` param. Starfield texture BA2s are unreadable, blocking texture previews. |
-| H4 | Copy/paste restricted to ~29 record types | `objectwindowdialog.cpp:2213, 2853` | 12 types added this session (RELA/DEBR/HAZD/etc.) plus many others fail with "not yet supported". Needs a generic copy/paste path using raw subrecords. |
 
 ---
 
@@ -30,10 +29,9 @@
 
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
-| M1 | Search dialog can't edit most record types | `searchdialog.cpp:1247` | "Editing X records is not yet supported" for non-wired types. |
 | M2 | Export templates incomplete | `exporttemplatesdialog.cpp:922` | Some record types blocked. |
 | M3 | Cell transitions editor disabled | `celltransitionseditor.cpp:218-240` | "Requires cell connection data not yet available in TES4 format." Permanent for Skyrim; may resolve for Starfield. |
-| M4 | Preferences Network page is a stub + stale version-control text | `preferencesdialog.cpp:353` | Text says "Version control is not yet implemented" but git/Perforce are implemented. Network page has no content. |
+| M4 | Preferences Network page is a stub | `preferencesdialog.cpp:353` | Network page has no content. (Version-control text already corrected; git/Perforce in use.) |
 | M5 | QtFormDialog tabs: Properties+Data only | `qtformdialog.cpp` (Phase 12F) | Real CK has Basic/Components/Keywords/Ingest tabs. |
 | M6 | Flat fields kept alongside components for back-compat | Phase 5E.1–5E.3 | `containerItems`, `keywords`, `spells` still have flat mirrors. Audit done; fields intentionally kept. |
 | M7 | NavMesh auto-gen from arbitrary world geometry is partial | `navmeshtoolkit.hpp/.cpp`, `navmeshgenerator.hpp` | Grid-based gen works; NIF-based `NavMeshGenerator` is wired into `navmesheditor.cpp:332` but voxel filter needs tuning against real data. |
@@ -72,6 +70,8 @@
 | R14 | No CMake install target | Done — `cmake --install` + CPack (Phase 24.4). |
 | R15 | No CI/CD pipeline | Done — GitHub Actions (Phase 24.3). |
 | R16 | `readZString` NUL terminator bug | Fixed — strips trailing NULs from returned QStrings (2026-08-03 session). |
+| R17 | Copy/paste restricted to ~29 record types | Done — generic copy/paste via `Data::cloneRecord` (all CkId types with collections) in Object Window; commit `1272c17`. |
+| R18 | Search dialog can't edit most record types | Done — shared `FormComponentsResolver` (`src/model/tools/formcomponentsresolver.hpp/.cpp`) moved `resolveComponents` out of the Object Window; Search dialog's default case now opens component-based records via `QtFormDialogManager::openOrFocus`. |
 
 ---
 

@@ -5,6 +5,8 @@
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/tools/undostack.hpp"
+#include "../../model/tools/formcomponentsresolver.hpp"
+#include "qtformdialogmanager.hpp"
 #include "npceditor.hpp"
 #include "weaponeditor.hpp"
 #include "armor_editor.hpp"
@@ -1243,9 +1245,29 @@ void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
         break;
     }
     default:
+    {
+        if (result.type != CkId::Type_None)
+        {
+            BaseCollection* coll = mData->getCollectionByType(result.type);
+            if (coll && result.recordIndex >= 0 && result.recordIndex < coll->size())
+            {
+                openck::FormComponents* comps = nullptr;
+                void* recPtr = nullptr;
+                if (resolveComponents(coll, result.recordIndex, comps, recPtr) && comps)
+                {
+                    quint32 formId = coll->getFormId(result.recordIndex);
+                    QString formIdKey = formId != 0
+                        ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
+                        : result.editorId;
+                    openck::QtFormDialogManager::instance().openOrFocus(formIdKey, comps, this);
+                    break;
+                }
+            }
+        }
         QMessageBox::information(this, "Edit",
             QString("Editing %1 records is not yet supported.").arg(CkId(result.type).getTypeName()));
         break;
+    }
     }
 }
 
