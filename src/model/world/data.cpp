@@ -553,6 +553,78 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     wateCollection.addColumn(new StringColumn<WateRecord>("Name", &WateRecord::editorId));
     addModel(new IdTable(&wateCollection), CkId::Type_Wate_);
 
+    // ANIO - Animated Object
+    anioCollection.addColumn(new StringIdColumn<AnioRecord>());
+    anioCollection.addColumn(new RecordStateColumn<AnioRecord>());
+    anioCollection.addColumn(new StringColumn<AnioRecord>("Name", &AnioRecord::editorId));
+    addModel(new IdTable(&anioCollection), CkId::Type_Anio_);
+
+    // ARTV - Art Object
+    artvCollection.addColumn(new StringIdColumn<ArtvRecord>());
+    artvCollection.addColumn(new RecordStateColumn<ArtvRecord>());
+    artvCollection.addColumn(new StringColumn<ArtvRecord>("Name", &ArtvRecord::editorId));
+    addModel(new IdTable(&artvCollection), CkId::Type_Artv_);
+
+    // CLFM - Color
+    clfmCollection.addColumn(new StringIdColumn<ClfmRecord>());
+    clfmCollection.addColumn(new RecordStateColumn<ClfmRecord>());
+    clfmCollection.addColumn(new StringColumn<ClfmRecord>("Name", &ClfmRecord::editorId));
+    addModel(new IdTable(&clfmCollection), CkId::Type_Clfm_);
+
+    // DEBR - Debris
+    debrCollection.addColumn(new StringIdColumn<DebrRecord>());
+    debrCollection.addColumn(new RecordStateColumn<DebrRecord>());
+    debrCollection.addColumn(new StringColumn<DebrRecord>("Name", &DebrRecord::editorId));
+    addModel(new IdTable(&debrCollection), CkId::Type_Debr_);
+
+    // ECZN - Encounter Zone
+    ecznCollection.addColumn(new StringIdColumn<EcznRecord>());
+    ecznCollection.addColumn(new RecordStateColumn<EcznRecord>());
+    ecznCollection.addColumn(new StringColumn<EcznRecord>("Name", &EcznRecord::editorId));
+    addModel(new IdTable(&ecznCollection), CkId::Type_Eczn_);
+
+    // HAZD - Hazard
+    hazdCollection.addColumn(new StringIdColumn<HazdRecord>());
+    hazdCollection.addColumn(new RecordStateColumn<HazdRecord>());
+    hazdCollection.addColumn(new StringColumn<HazdRecord>("Name", &HazdRecord::editorId));
+    addModel(new IdTable(&hazdCollection), CkId::Type_Hazd_);
+
+    // IPCT - Impact
+    ipctCollection.addColumn(new StringIdColumn<IpctRecord>());
+    ipctCollection.addColumn(new RecordStateColumn<IpctRecord>());
+    ipctCollection.addColumn(new StringColumn<IpctRecord>("Name", &IpctRecord::editorId));
+    addModel(new IdTable(&ipctCollection), CkId::Type_Ipct_);
+
+    // IPDS - Impact Data Set
+    ipdsCollection.addColumn(new StringIdColumn<IpdsRecord>());
+    ipdsCollection.addColumn(new RecordStateColumn<IpdsRecord>());
+    ipdsCollection.addColumn(new StringColumn<IpdsRecord>("Name", &IpdsRecord::editorId));
+    addModel(new IdTable(&ipdsCollection), CkId::Type_Ipds_);
+
+    // MUST - Music Type
+    mustCollection.addColumn(new StringIdColumn<MustRecord>());
+    mustCollection.addColumn(new RecordStateColumn<MustRecord>());
+    mustCollection.addColumn(new StringColumn<MustRecord>("Name", &MustRecord::editorId));
+    addModel(new IdTable(&mustCollection), CkId::Type_Must_);
+
+    // RELA - Relationship
+    relaCollection.addColumn(new StringIdColumn<RelaRecord>());
+    relaCollection.addColumn(new RecordStateColumn<RelaRecord>());
+    relaCollection.addColumn(new StringColumn<RelaRecord>("Name", &RelaRecord::editorId));
+    addModel(new IdTable(&relaCollection), CkId::Type_Rela_);
+
+    // REVB - Reverb Parameters
+    revbCollection.addColumn(new StringIdColumn<RevbRecord>());
+    revbCollection.addColumn(new RecordStateColumn<RevbRecord>());
+    revbCollection.addColumn(new StringColumn<RevbRecord>("Name", &RevbRecord::editorId));
+    addModel(new IdTable(&revbCollection), CkId::Type_Revb_);
+
+    // SHOU - Shout
+    shouCollection.addColumn(new StringIdColumn<ShouRecord>());
+    shouCollection.addColumn(new RecordStateColumn<ShouRecord>());
+    shouCollection.addColumn(new StringColumn<ShouRecord>("Name", &ShouRecord::editorId));
+    addModel(new IdTable(&shouCollection), CkId::Type_Shou_);
+
     // Loading Log (metadata)
     metaData.addColumn(new StringIdColumn<MetaData>());
     metaData.addColumn(new RecordStateColumn<MetaData>());
@@ -726,6 +798,18 @@ bool Data::continueLoading(Messages& messages)
             case 'SCOL': scolCollection.load(*reader, base); break;
             case 'TXST': txstCollection.load(*reader, base); break;
             case 'WATR': wateCollection.load(*reader, base); break;
+    case 'ANIO': anioCollection.load(*reader, base); break;
+    case 'ARTV': artvCollection.load(*reader, base); break;
+    case 'CLFM': clfmCollection.load(*reader, base); break;
+    case 'DEBR': debrCollection.load(*reader, base); break;
+    case 'ECZN': ecznCollection.load(*reader, base); break;
+    case 'HAZD': hazdCollection.load(*reader, base); break;
+    case 'IPCT': ipctCollection.load(*reader, base); break;
+    case 'IPDS': ipdsCollection.load(*reader, base); break;
+    case 'MUST': mustCollection.load(*reader, base); break;
+    case 'RELA': relaCollection.load(*reader, base); break;
+    case 'REVB': revbCollection.load(*reader, base); break;
+    case 'SHOU': shouCollection.load(*reader, base); break;
             default:
             {
                 if (name == 0)
@@ -999,6 +1083,18 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Scol_:    return &scolCollection;
     case CkId::Type_Txst_:    return &txstCollection;
     case CkId::Type_Wate_:    return &wateCollection;
+    case CkId::Type_Anio_:    return &anioCollection;
+    case CkId::Type_Artv_:    return &artvCollection;
+    case CkId::Type_Clfm_:    return &clfmCollection;
+    case CkId::Type_Debr_:    return &debrCollection;
+    case CkId::Type_Eczn_:    return &ecznCollection;
+    case CkId::Type_Hazd_:    return &hazdCollection;
+    case CkId::Type_Ipct_:    return &ipctCollection;
+    case CkId::Type_Ipds_:    return &ipdsCollection;
+    case CkId::Type_Must_:    return &mustCollection;
+    case CkId::Type_Rela_:    return &relaCollection;
+    case CkId::Type_Revb_:    return &revbCollection;
+    case CkId::Type_Shou_:    return &shouCollection;
     default:                  return nullptr;
     }
 }
@@ -1087,6 +1183,18 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Scol_:    return &scolCollection;
     case CkId::Type_Txst_:    return &txstCollection;
     case CkId::Type_Wate_:    return &wateCollection;
+    case CkId::Type_Anio_:    return &anioCollection;
+    case CkId::Type_Artv_:    return &artvCollection;
+    case CkId::Type_Clfm_:    return &clfmCollection;
+    case CkId::Type_Debr_:    return &debrCollection;
+    case CkId::Type_Eczn_:    return &ecznCollection;
+    case CkId::Type_Hazd_:    return &hazdCollection;
+    case CkId::Type_Ipct_:    return &ipctCollection;
+    case CkId::Type_Ipds_:    return &ipdsCollection;
+    case CkId::Type_Must_:    return &mustCollection;
+    case CkId::Type_Rela_:    return &relaCollection;
+    case CkId::Type_Revb_:    return &revbCollection;
+    case CkId::Type_Shou_:    return &shouCollection;
     default:                  return nullptr;
     }
 }
@@ -1174,6 +1282,18 @@ IdCollection<SpgdRecord>& Data::getSpgdCollection() { return spgdCollection; }
 IdCollection<StaticCollectionRecord>& Data::getScolCollection() { return scolCollection; }
 IdCollection<TextureSetRecord>& Data::getTxstCollection() { return txstCollection; }
 IdCollection<WateRecord>& Data::getWateCollection() { return wateCollection; }
+IdCollection<AnioRecord>& Data::getAnioCollection() { return anioCollection; }
+IdCollection<ArtvRecord>& Data::getArtvCollection() { return artvCollection; }
+IdCollection<ClfmRecord>& Data::getClfmCollection() { return clfmCollection; }
+IdCollection<DebrRecord>& Data::getDebrCollection() { return debrCollection; }
+IdCollection<EcznRecord>& Data::getEcznCollection() { return ecznCollection; }
+IdCollection<HazdRecord>& Data::getHazdCollection() { return hazdCollection; }
+IdCollection<IpctRecord>& Data::getIpctCollection() { return ipctCollection; }
+IdCollection<IpdsRecord>& Data::getIpdsCollection() { return ipdsCollection; }
+IdCollection<MustRecord>& Data::getMustCollection() { return mustCollection; }
+IdCollection<RelaRecord>& Data::getRelaCollection() { return relaCollection; }
+IdCollection<RevbRecord>& Data::getRevbCollection() { return revbCollection; }
+IdCollection<ShouRecord>& Data::getShouCollection() { return shouCollection; }
 
 QVector<IRecordCollection*> Data::allCollections()
 {
@@ -1343,6 +1463,18 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&scolCollection,    CkId::Type_Scol_},
         {&txstCollection,    CkId::Type_Txst_},
         {&wateCollection,    CkId::Type_Wate_},
+        {&anioCollection,    CkId::Type_Anio_},
+        {&artvCollection,    CkId::Type_Artv_},
+        {&clfmCollection,    CkId::Type_Clfm_},
+        {&debrCollection,    CkId::Type_Debr_},
+        {&ecznCollection,    CkId::Type_Eczn_},
+        {&hazdCollection,    CkId::Type_Hazd_},
+        {&ipctCollection,    CkId::Type_Ipct_},
+        {&ipdsCollection,    CkId::Type_Ipds_},
+        {&mustCollection,    CkId::Type_Must_},
+        {&relaCollection,    CkId::Type_Rela_},
+        {&revbCollection,    CkId::Type_Revb_},
+        {&shouCollection,    CkId::Type_Shou_},
         {&scenCollection,    CkId::Type_Scen_},
     };
 }
@@ -1930,6 +2062,54 @@ const IdCollection<TextureSetRecord>& Data::getTxstCollection() const
 const IdCollection<WateRecord>& Data::getWateCollection() const
 {
     return wateCollection;
+}
+const IdCollection<AnioRecord>& Data::getAnioCollection() const
+{
+    return anioCollection;
+}
+const IdCollection<ArtvRecord>& Data::getArtvCollection() const
+{
+    return artvCollection;
+}
+const IdCollection<ClfmRecord>& Data::getClfmCollection() const
+{
+    return clfmCollection;
+}
+const IdCollection<DebrRecord>& Data::getDebrCollection() const
+{
+    return debrCollection;
+}
+const IdCollection<EcznRecord>& Data::getEcznCollection() const
+{
+    return ecznCollection;
+}
+const IdCollection<HazdRecord>& Data::getHazdCollection() const
+{
+    return hazdCollection;
+}
+const IdCollection<IpctRecord>& Data::getIpctCollection() const
+{
+    return ipctCollection;
+}
+const IdCollection<IpdsRecord>& Data::getIpdsCollection() const
+{
+    return ipdsCollection;
+}
+const IdCollection<MustRecord>& Data::getMustCollection() const
+{
+    return mustCollection;
+}
+const IdCollection<RelaRecord>& Data::getRelaCollection() const
+{
+    return relaCollection;
+}
+const IdCollection<RevbRecord>& Data::getRevbCollection() const
+{
+    return revbCollection;
+}
+const IdCollection<ShouRecord>& Data::getShouCollection() const
+{
+    return shouCollection;
 }
 
 bool Data::addMaterial(MaterialRecord& record)

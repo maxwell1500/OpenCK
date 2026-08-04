@@ -86,6 +86,18 @@
 #include "../../../libs/files/esm/pndrecord.hpp"
 #include "../../../libs/files/esm/texturesetrecord.hpp"
 #include "../../../libs/files/esm/waterecord.hpp"
+#include "../../../libs/files/esm/aniorecord.hpp"
+#include "../../../libs/files/esm/artvrecord.hpp"
+#include "../../../libs/files/esm/clfmrecord.hpp"
+#include "../../../libs/files/esm/debrrecord.hpp"
+#include "../../../libs/files/esm/ecznrecord.hpp"
+#include "../../../libs/files/esm/hazdrecord.hpp"
+#include "../../../libs/files/esm/ipctrecord.hpp"
+#include "../../../libs/files/esm/ipdsrecord.hpp"
+#include "../../../libs/files/esm/mustrecord.hpp"
+#include "../../../libs/files/esm/relarecord.hpp"
+#include "../../../libs/files/esm/revbrecord.hpp"
+#include "../../../libs/files/esm/shourecord.hpp"
 
 #include <QObject>
 #include <QStringList>
@@ -413,6 +425,42 @@ public:
     /// \brief Get WATR collection
     /// \return Const reference to the WATR record collection
     const IdCollection<WateRecord>& getWateCollection() const;
+    /// \brief Get ANIO collection
+    /// \return Const reference to the ANIO record collection
+    const IdCollection<AnioRecord>& getAnioCollection() const;
+    /// \brief Get ARTV collection
+    /// \return Const reference to the ARTV record collection
+    const IdCollection<ArtvRecord>& getArtvCollection() const;
+    /// \brief Get CLFM collection
+    /// \return Const reference to the CLFM record collection
+    const IdCollection<ClfmRecord>& getClfmCollection() const;
+    /// \brief Get DEBR collection
+    /// \return Const reference to the DEBR record collection
+    const IdCollection<DebrRecord>& getDebrCollection() const;
+    /// \brief Get ECZN collection
+    /// \return Const reference to the ECZN record collection
+    const IdCollection<EcznRecord>& getEcznCollection() const;
+    /// \brief Get HAZD collection
+    /// \return Const reference to the HAZD record collection
+    const IdCollection<HazdRecord>& getHazdCollection() const;
+    /// \brief Get IPCT collection
+    /// \return Const reference to the IPCT record collection
+    const IdCollection<IpctRecord>& getIpctCollection() const;
+    /// \brief Get IPDS collection
+    /// \return Const reference to the IPDS record collection
+    const IdCollection<IpdsRecord>& getIpdsCollection() const;
+    /// \brief Get MUST collection
+    /// \return Const reference to the MUST record collection
+    const IdCollection<MustRecord>& getMustCollection() const;
+    /// \brief Get RELA collection
+    /// \return Const reference to the RELA record collection
+    const IdCollection<RelaRecord>& getRelaCollection() const;
+    /// \brief Get REVB collection
+    /// \return Const reference to the REVB record collection
+    const IdCollection<RevbRecord>& getRevbCollection() const;
+    /// \brief Get SHOU collection
+    /// \return Const reference to the SHOU record collection
+    const IdCollection<ShouRecord>& getShouCollection() const;
 
     // --- Non-const overloads for mutation ---
 
@@ -659,6 +707,42 @@ public:
     /// \brief Get WATR collection (mutable)
     /// \return Reference to the WATR record collection for modification
     IdCollection<WateRecord>& getWateCollection();
+    /// \brief Get ANIO collection (mutable)
+    /// \return Reference to the ANIO record collection for modification
+    IdCollection<AnioRecord>& getAnioCollection();
+    /// \brief Get ARTV collection (mutable)
+    /// \return Reference to the ARTV record collection for modification
+    IdCollection<ArtvRecord>& getArtvCollection();
+    /// \brief Get CLFM collection (mutable)
+    /// \return Reference to the CLFM record collection for modification
+    IdCollection<ClfmRecord>& getClfmCollection();
+    /// \brief Get DEBR collection (mutable)
+    /// \return Reference to the DEBR record collection for modification
+    IdCollection<DebrRecord>& getDebrCollection();
+    /// \brief Get ECZN collection (mutable)
+    /// \return Reference to the ECZN record collection for modification
+    IdCollection<EcznRecord>& getEcznCollection();
+    /// \brief Get HAZD collection (mutable)
+    /// \return Reference to the HAZD record collection for modification
+    IdCollection<HazdRecord>& getHazdCollection();
+    /// \brief Get IPCT collection (mutable)
+    /// \return Reference to the IPCT record collection for modification
+    IdCollection<IpctRecord>& getIpctCollection();
+    /// \brief Get IPDS collection (mutable)
+    /// \return Reference to the IPDS record collection for modification
+    IdCollection<IpdsRecord>& getIpdsCollection();
+    /// \brief Get MUST collection (mutable)
+    /// \return Reference to the MUST record collection for modification
+    IdCollection<MustRecord>& getMustCollection();
+    /// \brief Get RELA collection (mutable)
+    /// \return Reference to the RELA record collection for modification
+    IdCollection<RelaRecord>& getRelaCollection();
+    /// \brief Get REVB collection (mutable)
+    /// \return Reference to the REVB record collection for modification
+    IdCollection<RevbRecord>& getRevbCollection();
+    /// \brief Get SHOU collection (mutable)
+    /// \return Reference to the SHOU record collection for modification
+    IdCollection<ShouRecord>& getShouCollection();
 
     /// \brief Get collection by record type (const version)
     /// \param type Record type identifier
@@ -985,6 +1069,18 @@ private:
     IdCollection<StaticCollectionRecord> scolCollection;
     IdCollection<TextureSetRecord> txstCollection;
     IdCollection<WateRecord> wateCollection;
+    IdCollection<AnioRecord> anioCollection;
+    IdCollection<ArtvRecord> artvCollection;
+    IdCollection<ClfmRecord> clfmCollection;
+    IdCollection<DebrRecord> debrCollection;
+    IdCollection<EcznRecord> ecznCollection;
+    IdCollection<HazdRecord> hazdCollection;
+    IdCollection<IpctRecord> ipctCollection;
+    IdCollection<IpdsRecord> ipdsCollection;
+    IdCollection<MustRecord> mustCollection;
+    IdCollection<RelaRecord> relaCollection;
+    IdCollection<RevbRecord> revbCollection;
+    IdCollection<ShouRecord> shouCollection;
 
     QVector<QAbstractItemModel*> models;
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;

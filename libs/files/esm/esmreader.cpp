@@ -287,7 +287,10 @@ QString ESMReader::readZString()
     buf.resize(sz);
     stream.readRawData(buf.data(), sz);
     esm.forward(sz);
-    return QString(QByteArray(buf));
+    QString str = QString::fromUtf8(buf.constData(), sz);
+    while (str.endsWith(QChar(0)))
+        str.chop(1);
+    return str;
 }
 
 QString ESMReader::readSubZString(NAME expectedName)

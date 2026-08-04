@@ -91,6 +91,18 @@ static const TypeData typesIdArg[] =
     { CkId::Type_Scen_, "Scene" },
     { CkId::Type_Txst_, "Texture Set" },
     { CkId::Type_Wate_, "Water" },
+    { CkId::Type_Anio_, "Animated Object" },
+    { CkId::Type_Artv_, "Art Object" },
+    { CkId::Type_Clfm_, "Color" },
+    { CkId::Type_Debr_, "Debris" },
+    { CkId::Type_Eczn_, "Encounter Zone" },
+    { CkId::Type_Hazd_, "Hazard" },
+    { CkId::Type_Ipct_, "Impact" },
+    { CkId::Type_Ipds_, "Impact Data Set" },
+    { CkId::Type_Must_, "Music Type" },
+    { CkId::Type_Rela_, "Relationship" },
+    { CkId::Type_Revb_, "Reverb Parameters" },
+    { CkId::Type_Shou_, "Shout" },
     { CkId::Type_None, 0 }
 };
 
@@ -176,6 +188,18 @@ static const TypeData typesNoArg[] =
     { CkId::Type_Scen_, "Scenes" },
     { CkId::Type_Txst_, "Texture Sets" },
     { CkId::Type_Wate_, "Water" },
+    { CkId::Type_Anio_, "Animated Objects" },
+    { CkId::Type_Artv_, "Art Objects" },
+    { CkId::Type_Clfm_, "Colors" },
+    { CkId::Type_Debr_, "Debris" },
+    { CkId::Type_Eczn_, "Encounter Zones" },
+    { CkId::Type_Hazd_, "Hazards" },
+    { CkId::Type_Ipct_, "Impacts" },
+    { CkId::Type_Ipds_, "Impact Data Sets" },
+    { CkId::Type_Must_, "Music Types" },
+    { CkId::Type_Rela_, "Relationships" },
+    { CkId::Type_Revb_, "Reverb Parameters" },
+    { CkId::Type_Shou_, "Shouts" },
     { CkId::Type_None, 0 }
 };
 
@@ -438,6 +462,10 @@ CkId::Type CkId::stringToType(const QString& typeName)
             { Type_Expl_, "EXPL" }, { Type_Eyes_, "EYES" }, { Type_Flor_, "FLOR" },
             { Type_Flst_, "FLST" }, { Type_Furn_, "FURN" }, { Type_Grass_, "GRAS" },
             { Type_Hair_, "HAIR" }, { Type_Idle_, "IDLE" }, { Type_Idlm_, "IDLM" },
+            { Type_Anio_, "ANIO" }, { Type_Artv_, "ARTV" }, { Type_Clfm_, "CLFM" },
+            { Type_Debr_, "DEBR" }, { Type_Eczn_, "ECZN" }, { Type_Hazd_, "HAZD" },
+            { Type_Ipct_, "IPCT" }, { Type_Ipds_, "IPDS" }, { Type_Must_, "MUST" },
+            { Type_Rela_, "RELA" }, { Type_Revb_, "REVB" }, { Type_Shou_, "SHOU" },
         };
         for (const auto& alias : diskAliases)
         {

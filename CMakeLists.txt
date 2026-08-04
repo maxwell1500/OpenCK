@@ -146,6 +146,18 @@ set(ESM_SOURCES
     libs/files/esm/scenrecord.cpp
     libs/files/esm/texturesetrecord.cpp
     libs/files/esm/waterecord.cpp
+    libs/files/esm/aniorecord.cpp
+    libs/files/esm/artvrecord.cpp
+    libs/files/esm/clfmrecord.cpp
+    libs/files/esm/debrrecord.cpp
+    libs/files/esm/ecznrecord.cpp
+    libs/files/esm/hazdrecord.cpp
+    libs/files/esm/ipctrecord.cpp
+    libs/files/esm/ipdsrecord.cpp
+    libs/files/esm/mustrecord.cpp
+    libs/files/esm/relarecord.cpp
+    libs/files/esm/revbrecord.cpp
+    libs/files/esm/shourecord.cpp
     libs/files/esm/conditionrecord.cpp
     libs/files/data/strings.cpp
 )
@@ -250,6 +262,18 @@ set(ESM_HEADERS
     libs/files/esm/scenrecord.hpp
     libs/files/esm/texturesetrecord.hpp
     libs/files/esm/waterecord.hpp
+    libs/files/esm/aniorecord.hpp
+    libs/files/esm/artvrecord.hpp
+    libs/files/esm/clfmrecord.hpp
+    libs/files/esm/debrrecord.hpp
+    libs/files/esm/ecznrecord.hpp
+    libs/files/esm/hazdrecord.hpp
+    libs/files/esm/ipctrecord.hpp
+    libs/files/esm/ipdsrecord.hpp
+    libs/files/esm/mustrecord.hpp
+    libs/files/esm/relarecord.hpp
+    libs/files/esm/revbrecord.hpp
+    libs/files/esm/shourecord.hpp
     libs/components/component.hpp
     libs/components/editorproperty.hpp
     libs/components/formcomponents.hpp

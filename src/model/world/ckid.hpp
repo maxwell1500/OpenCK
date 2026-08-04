@@ -100,6 +100,18 @@ public:
     Type_Scen_,
     Type_Txst_,
     Type_Wate_,
+    Type_Anio_,
+    Type_Artv_,
+    Type_Clfm_,
+    Type_Debr_,
+    Type_Eczn_,
+    Type_Hazd_,
+    Type_Ipct_,
+    Type_Ipds_,
+    Type_Must_,
+    Type_Rela_,
+    Type_Revb_,
+    Type_Shou_,
 
     NumTypes
 };

@@ -1,5 +1,5 @@
-#ifndef AnioRECORD_H
-#define AnioRECORD_H
+#ifndef EcznRECORD_H
+#define EcznRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
 #include "../../components/formcomponents.hpp"
@@ -7,11 +7,14 @@
 #include <QVector>
 class ESMReader;
 class ESMWriter;
-struct AnioRecord {
+struct EcznRecord {
     openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
-    QString modelPath;
+    quint32 zoneFormId = 0;
+    quint32 locationFormId = 0;
+    quint32 unusedFormId = 0;
+    quint8 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
@@ -19,13 +22,15 @@ struct AnioRecord {
     void initComponents();
 };
 
-inline bool operator==(const AnioRecord& l, const AnioRecord& r)
+inline bool operator==(const EcznRecord& l, const EcznRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
-        && l.modelPath == r.modelPath && l.rawSubRecords == r.rawSubRecords;
+        && l.zoneFormId == r.zoneFormId && l.locationFormId == r.locationFormId
+        && l.unusedFormId == r.unusedFormId && l.flags == r.flags
+        && l.rawSubRecords == r.rawSubRecords;
 }
 
-inline bool operator!=(const AnioRecord& l, const AnioRecord& r)
+inline bool operator!=(const EcznRecord& l, const EcznRecord& r)
 {
     return !(l == r);
 }

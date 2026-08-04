@@ -1,5 +1,5 @@
-#ifndef AnioRECORD_H
-#define AnioRECORD_H
+#ifndef ArtvRECORD_H
+#define ArtvRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
 #include "../../components/formcomponents.hpp"
@@ -7,11 +7,12 @@
 #include <QVector>
 class ESMReader;
 class ESMWriter;
-struct AnioRecord {
+struct ArtvRecord {
     openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
     QString modelPath;
+    quint8 category = 0;
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
@@ -19,13 +20,14 @@ struct AnioRecord {
     void initComponents();
 };
 
-inline bool operator==(const AnioRecord& l, const AnioRecord& r)
+inline bool operator==(const ArtvRecord& l, const ArtvRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
-        && l.modelPath == r.modelPath && l.rawSubRecords == r.rawSubRecords;
+        && l.modelPath == r.modelPath && l.category == r.category
+        && l.rawSubRecords == r.rawSubRecords;
 }
 
-inline bool operator!=(const AnioRecord& l, const AnioRecord& r)
+inline bool operator!=(const ArtvRecord& l, const ArtvRecord& r)
 {
     return !(l == r);
 }
