@@ -1,6 +1,6 @@
 # OpenCK — Technical Debt Register
 
-> Last updated: 2026-07-28
+> Last updated: 2026-08-04
 > A living register of all known technical debt items, organized by severity.
 > Source cross-references point to tasks in `docs/UNIFIED_PLAN.md`.
 
@@ -19,12 +19,10 @@
 
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
-| H1 | Render Window transform tools (Select/Move/Rotate/Scale) are placeholder toolbar buttons with no gizmo implementation | `src/view/widgets/nifviewportwidget.cpp:384-476` (12G.1–12G.3) | The core edit-module work (`BGSRenderWindowEditModule` pattern) is deferred. Transform mode is a placeholder enum. |
-| H2 | Cell View 2D map canvas is a basic `paintEvent` placeholder — no interactive selection, no zoom/pan | `src/view/panels/cellsdialog.cpp` (12B.5) | Markers render but the user cannot click-select references or navigate the map. |
-| H3 | CREA (Creature) record type has components but no specialized editor widget | 5B.2 (◐) | Falls back to the generic property grid; creature-specific data (soul, combat style, body parts) is not editable. |
-| H4 | SCEN (Scene), EFSH (EffectShader), PACK (AI Package) editors deferred | 5B.6, 5B.15, 5B.16 (⬜) | No UI for scene timelines, shader parameters, or AI package editing. |
-| H5 | WRLD (Worldspace) editor widget not built (has components) | 5B.8 (◐) | Worldspace-specific subrecords (WNAM, XNAM, MNAM, CNAM, NAM0–NAM9) have no dedicated widget. |
-| H6 | 12D.13: Missing CK File-menu actions (Create Archive, Compile Papyrus Scripts, Compact Master) — stub menus only | `ui/mainwindow.ui`, `mainwindow.cpp` (12D.13 ⬜) | Menu entries exist; no backing implementations. |
+| H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp:18` (Phase 23.4 follow-up) | Only typed reference fields (RELA parent/child, SHOU words, etc.) are rewritten. References embedded in raw subrecords (XOWN, XPRM, etc.) are left untouched, producing broken refs for many record types. Needs a per-record-type FormID field map. |
+| H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | Starfield.esm has 180 distinct record types; CkId covers ~90. Medium-impact missing types: HDPT (head parts x230), TERM (terminals x368), MATT (material type x249), MOVT (movement x43), MUSC (music track x83). Internal/infrastructure types (RFGP x80584, PKIN x11281, LMSW x12966) are lower priority. |
+| H3 | BA2 DX10 (texture) archives can't be read or written | `ba2archive.cpp:179-186` | `parseBtdxTextures` logs "not yet supported" and fails open. `create()` only writes GNRL regardless of the `archiveType` param. Starfield texture BA2s are unreadable, blocking texture previews. |
+| H4 | Copy/paste restricted to ~29 record types | `objectwindowdialog.cpp:2213, 2853` | 12 types added this session (RELA/DEBR/HAZD/etc.) plus many others fail with "not yet supported". Needs a generic copy/paste path using raw subrecords. |
 
 ---
 
@@ -32,12 +30,15 @@
 
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
-| M1 | Flat fields in records kept alongside components for back-compat | 5E.1–5E.3 | `containerItems`, `keywords`, `spells` still have flat mirrors read by `data.cpp`/exporters. Audit (5E.4) is done; most fields intentionally kept. |
-| M2 | Papyrus type checker may have incomplete coverage for array types and struct properties | Phase 9 (9.3) | Basic type checking works; complex composite types may not be fully validated. |
-| M3 | Object Window tree has 7 groups covering 27 record types — real CK has 127 record types | `src/view/windows/objectwindow.cpp` (12C) | ~100 record types not yet exposed in the Object Window tree. |
-| M4 | Preferences Network page is a disabled stub | `preferencesdialog.cpp` (12E.2) | Page exists in the tree sidebar but has no functional content. |
-| M5 | Galaxy / Packin / Theme / Tests menus are empty stubs | `ui/mainwindow.ui` (12D.8) | Top-level menus added for parity but contain no actions. |
-| M6 | QtFormDialog tabs are Properties+Data only (real CK has Basic/Components/Keywords/Ingest tabs) | `src/view/window/qtformdialog.cpp` (12F.3) | Tab structure exists but does not yet split into the real CK's full tab set. |
+| M1 | Search dialog can't edit most record types | `searchdialog.cpp:1247` | "Editing X records is not yet supported" for non-wired types. |
+| M2 | Export templates incomplete | `exporttemplatesdialog.cpp:922` | Some record types blocked. |
+| M3 | Cell transitions editor disabled | `celltransitionseditor.cpp:218-240` | "Requires cell connection data not yet available in TES4 format." Permanent for Skyrim; may resolve for Starfield. |
+| M4 | Preferences Network page is a stub + stale version-control text | `preferencesdialog.cpp:353` | Text says "Version control is not yet implemented" but git/Perforce are implemented. Network page has no content. |
+| M5 | QtFormDialog tabs: Properties+Data only | `qtformdialog.cpp` (Phase 12F) | Real CK has Basic/Components/Keywords/Ingest tabs. |
+| M6 | Flat fields kept alongside components for back-compat | Phase 5E.1–5E.3 | `containerItems`, `keywords`, `spells` still have flat mirrors. Audit done; fields intentionally kept. |
+| M7 | NavMesh auto-gen from arbitrary world geometry is partial | `navmeshtoolkit.hpp/.cpp`, `navmeshgenerator.hpp` | Grid-based gen works; NIF-based `NavMeshGenerator` is wired into `navmesheditor.cpp:332` but voxel filter needs tuning against real data. |
+| M8 | SCEN PHDA binary encoding round-trips through raw subrecords | Phase 16.1 | The timeline widget edits a model, not the on-disk bytes. Needs validation against real Starfield data. |
+| M9 | hknp per-shape payload decode is best-effort | `hknpphysicssystem.hpp` | hknpConvexShape polytope arrays decoded; other shape types undecoded. No hknp encoder exists. |
 
 ---
 
@@ -45,11 +46,9 @@
 
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
-| L1 | CRLF/LF line ending warnings on git commit (Windows checkout) | repo-wide | Cosmetic; git `autocrlf` configuration issue. |
-| L2 | `objectwindow.cpp.bak` backup file exists in source tree | `src/view/windows/` | Should be deleted; tracked by mistake. |
-| L3 | No CMake install target for end-user deployment | `CMakeLists.txt` | No `install()` rules; users build from source. |
-| L4 | `windeployqt` post-build step may not copy the ADS DLL | `CMakeLists.txt` | `qtadvanceddocking-qt6.dll` may need manual placement next to `openck.exe`. |
-| L5 | No CI/CD pipeline | — | No automated build/test/run on push. |
+| L1 | Stale `.bak` files in source tree | `src/view/window/` | `armor_editor.cpp.bak`, `objectwindowdialog.cpp.bak` — tracked by mistake. |
+| L2 | Stale `NewFindings.md` in repo root | `NewFindings.md` | References navmesheditor as a shell (it's not anymore). |
+| L3 | xWMA WMF MFT fallback truncates audio | `XwmaDecoder` (Phase 18.2) | ffmpeg primary path works fully; WMF fallback "valid but truncated". Low priority. |
 
 ---
 
@@ -61,14 +60,26 @@
 | R2 | Cell loader spin bug | Fixed — `readNSubHeader` returning 0 now correctly breaks the load loop. |
 | R3 | `packrecord.hpp` dead code | Deleted (unused duplicate `PackageRecord` struct). |
 | R4 | 26 dead bespoke editor includes | Removed from `objectwindowdialog.cpp` after migration to `QtFormDialogManager`. |
+| R5 | Render Window transform tools placeholder | Done — gizmo system (translate/rotate/scale) implemented in Phase 14A. |
+| R6 | Cell View 2D map canvas placeholder | Done — interactive pan/zoom/select/marquee in Phase 14B. |
+| R7 | CREA no specialized editor widget | Done — `CreatureDataWidget` registered in Phase 15.4. |
+| R8 | SCEN/EFSH/PACK editors deferred | Partially done — SCEN timeline (16.1), EFSH/IMGS typed DATA (16.2), PACK conditions (16.3). |
+| R9 | WRLD editor widget not built | Done — `WorldspaceDataWidget` in Phase 16.4. |
+| R10 | Missing CK File actions (Create Archive, etc.) | Done — real archive writers now exist: `Ba2Archive::create` (BTDX v2 GNRL) and `BsaArchive::create` (SSE v0x69, hash-validated). |
+| R11 | Flat fields in records alongside components | Audit done (5E.4); most fields intentionally kept. |
+| R12 | Object Window tree structure | Done — 3-level hierarchical tree (Phase 12C). |
+| R13 | Galaxy/Packin stub menus | Removed (Phase 24.10). |
+| R14 | No CMake install target | Done — `cmake --install` + CPack (Phase 24.4). |
+| R15 | No CI/CD pipeline | Done — GitHub Actions (Phase 24.3). |
+| R16 | `readZString` NUL terminator bug | Fixed — strips trailing NULs from returned QStrings (2026-08-03 session). |
 
 ---
 
 ## How to Update This Register
 
 - When a debt item is paid off, **move** it from its severity section to
-  **Resolved** with a one-line summary of the resolution. Do not delete
-  the row — the history is useful.
+  **Resolved** with a one-line summary of the resolution. Do not delete the
+  row — the history is useful.
 - When adding a new item, assign the lowest severity that accurately
   reflects user impact, and cross-reference the relevant task ID in
   `docs/UNIFIED_PLAN.md` if one exists.
