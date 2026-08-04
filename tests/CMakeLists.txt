@@ -214,6 +214,12 @@ target_link_libraries(test_bsawrite PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_bsawrite PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — hash check requires Skyrim SE.
 
+# ESL support: FormIdCompactor remap + LightMaster file-flag round-trip.
+add_executable(test_esl test_esl.cpp)
+target_link_libraries(test_esl PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_esl PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_esl)
+
 # BtdTerrain: real Starfield .btd (BTDB) reader against the Terrain BA2.
 add_executable(test_btdterrain test_btdterrain.cpp)
 target_link_libraries(test_btdterrain PRIVATE openck_model test_stubs Qt6::Test)

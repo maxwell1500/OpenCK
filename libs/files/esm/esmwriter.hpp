@@ -22,6 +22,12 @@ public:
 
     void save(QFile& file);
 
+    // Record flags for the TES4 header (FileFlag::Master, FileFlag::LightMaster).
+    // Defaults to 0 (a plain .esp). Preserved on save so an ESL/ESM keeps its
+    // master type when round-tripped.
+    void setFileFlags(quint32 flags);
+    quint32 fileFlags() const { return mFileFlags; }
+
     void startRecord(NAME name, RecHeader header = RecHeader());
     void endRecord();
     void startSubRecord(NAME name);
@@ -67,6 +73,7 @@ private:
 
     QByteArray buf;
     QDataStream stream;
+    quint32 mFileFlags = 0;
 };
 
 #endif // ESMWRITER_H

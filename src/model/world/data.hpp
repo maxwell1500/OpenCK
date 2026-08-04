@@ -156,7 +156,10 @@ public:
     /// Reads TES4 header, master list, and file metadata.
     /// Does not load individual records — call continueLoading() for that.
     int preload(const QString& filename, bool base);
-    
+
+    /// \brief TES4 header of the last preloaded plugin (for flag preservation).
+    const Header& getReaderHeader() const { return reader ? reader->getHeader() : m_fallbackHeader; }
+
     /// \brief Continue loading records from preloaded files
     /// \param messages Reference to messages container for progress reporting
     /// \return True if loading complete, false if more data needed
@@ -982,6 +985,7 @@ signals:
 
 private:
     std::unique_ptr<ESMReader> reader;
+    Header m_fallbackHeader;
 
     QStringList contentFiles;
     FilePaths paths;

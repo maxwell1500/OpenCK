@@ -38,13 +38,20 @@ void ESMWriter::addMaster(QString name, quint64 size)
     header.masters.push_back(master);
 }
 
+void ESMWriter::setFileFlags(quint32 flags)
+{
+    mFileFlags = flags;
+}
+
 void ESMWriter::save(QFile& file)
 {
     stream.setDevice(&file);
     stream.setByteOrder(QDataStream::LittleEndian);
     recordsWritten = 0;
 
-    startRecord('TES4');
+    RecHeader tes4Header;
+    tes4Header.flags.val = mFileFlags;
+    startRecord('TES4', tes4Header);
     header.save(*this);
     endRecord();
 }

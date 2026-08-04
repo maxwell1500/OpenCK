@@ -28,6 +28,14 @@ public:
     const QString getSavePath() const;
     QStringList getContentFiles() const;
 
+    // TES4 file flags (FileFlag::Master, FileFlag::LightMaster, ...). These
+    // control whether the saved plugin is an ESM, an ESL (light master), or a
+    // plain ESP. Preserved from the loaded header; settable for new files.
+    quint32 fileFlags() const { return mFileFlags; }
+    void setFileFlags(quint32 flags) { mFileFlags = flags; }
+    bool isLightMaster() const { return (mFileFlags & 0x200) != 0; }
+    void setLightMaster(bool on) { on ? (mFileFlags |= 0x200) : (mFileFlags &= ~0x200u); }
+
     std::shared_ptr<ReportModel> getReport();
 
     const Data& getData() const;
@@ -41,6 +49,7 @@ private:
     QString savePath;
     bool newFile;
     bool base;
+    quint32 mFileFlags = 0;
 
     std::shared_ptr<ReportModel> reports;
 

@@ -31,6 +31,14 @@ Document::Document(const QStringList& contentFiles, const QString& savePath, boo
             createNew();
         }
     }
+    else
+    {
+        // Preserve the TES4 header flags (Master / LightMaster) from the
+        // loaded plugin so a round-trip save keeps its file type.
+        const auto& header = data->getReaderHeader();
+        if (header.recHeader.id != 0 || header.recHeader.size != 0)
+            mFileFlags = header.recHeader.flags.val;
+    }
 
     reports.reset(new ReportModel());
 }
@@ -48,6 +56,7 @@ void Document::save(const QString& savePath)
     QFile saveFile{ savePath };
     if (saveFile.open(QIODevice::WriteOnly))
     {
+        writer.setFileFlags(mFileFlags);
         writer.save(saveFile);
 
         LOG_DEBUG("Writing TES4 header");
