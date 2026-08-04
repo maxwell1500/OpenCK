@@ -315,13 +315,12 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
     QDataStream out(&outFile);
     out.setByteOrder(QDataStream::LittleEndian);
 
-    // Determine a base directory for computing relative paths
     QFileInfo outInfo(outputPath);
     QString baseDir = outInfo.absolutePath();
 
-    // Collect file data and relative paths
     struct InputFile {
-        QString relativePath;
+        QString relativePath; // forward-slash, lowercased for CRC
+        QString onDiskPath;
         QByteArray data;
     };
     QVector<InputFile> inputs;
@@ -330,8 +329,6 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
     for (const QString& filePath : filePaths) {
         QFileInfo fi(filePath);
         QString relPath = fi.fileName();
-
-        // Try to compute a relative path from the base dir
         QString absPath = fi.absoluteFilePath();
         if (absPath.startsWith(baseDir, Qt::CaseInsensitive)) {
             relPath = absPath.mid(baseDir.length() + 1).replace('\\', '/');
@@ -342,17 +339,15 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
             LOG_WARNING(QString("BA2 create: skipping unreadable file: %1").arg(filePath));
             continue;
         }
-
         InputFile input;
         input.relativePath = relPath;
+        input.onDiskPath = filePath;
         input.data = inFile.readAll();
         inFile.close();
-
         if (input.data.isEmpty()) {
             LOG_WARNING(QString("BA2 create: skipping empty file: %1").arg(filePath));
             continue;
         }
-
         inputs.append(input);
     }
 
@@ -362,93 +357,119 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
         return false;
     }
 
-    // --- BA2 Header (24 bytes) ---
-    // Magic: 'BA2 ' (0x20424132 big-endian, but we write little-endian 0x20584142 is wrong)
-    // Actual BA2 magic is 0x42413220 ("BA2 " as bytes, little-endian read gives 0x20324142)
-    // The correct magic bytes are: 0x42 0x41 0x32 0x20 ("BA2 ")
-    out.writeRawData("BA2 ", 4);
+    const quint32 n = static_cast<quint32>(inputs.size());
+    constexpr quint32 HDR_SIZE = 32;
+    constexpr quint32 RECORD_SIZE = 36;
+    const quint32 recordsSize = n * RECORD_SIZE;
+    const quint32 nameTableOffset = HDR_SIZE + recordsSize;
 
-    // Version (4 bytes)
-    quint32 version = 1;
-    out << version;
-
-    // Archive type (4 bytes): "GNRL" or "DX10"
-    QByteArray typeBytes = archiveType.toLatin1().leftJustified(4, ' ', true);
-    out.writeRawData(typeBytes.data(), 4);
-
-    // --- File table ---
-    // For each file: nameLen(4) + name(nameLen) + compressedSize(4) + uncompressedSize(4) + flags(4) + offset(8)
-    // We write the file table first, then data after it.
-
-    quint32 fileCount = static_cast<quint32>(inputs.size());
-
-    // Calculate table size to know where file data starts
-    quint64 tableSize = 0;
+    // Name table: u16 length (incl NUL) + bytes, per file.
+    QVector<QByteArray> nameBytes;
+    nameBytes.reserve(n);
+    quint32 nameTableSize = 0;
     for (const auto& input : inputs) {
-        tableSize += 4 + input.relativePath.length() + 4 + 4 + 4 + 8;
+        QByteArray nb = input.relativePath.toLower().toUtf8();
+        nb.append('\0');
+        nameBytes.append(nb);
+        nameTableSize += 2 + static_cast<quint32>(nb.size());
     }
 
-    quint64 dataOffset = 24 + tableSize; // header (24) + table
-    quint64 currentDataOffset = dataOffset;
+    // Data section follows the name table.
+    quint64 dataOffset = static_cast<quint64>(nameTableOffset) + nameTableSize;
 
-    // Write file table entries and collect compressed data
     struct TableEntry {
-        QString relativePath;
-        quint32 compressedSize;
-        quint32 uncompressedSize;
-        quint32 flags;
-        quint64 fileOffset;
+        QByteArray name;       // on-disk table name (incl NUL)
+        QByteArray dirLower;
+        QByteArray baseLower;
+        QByteArray extLower;
+        quint32 flags = 0;
+        quint64 fileOffset = 0;
+        quint32 packedSize = 0;
+        quint32 unpackedSize = 0;
         QByteArray fileData;
     };
     QVector<TableEntry> tableEntries;
+    tableEntries.reserve(n);
 
-    for (const auto& input : inputs) {
+    for (int i = 0; i < inputs.size(); ++i) {
+        const InputFile& input = inputs[i];
         TableEntry entry;
-        entry.relativePath = input.relativePath;
-        entry.uncompressedSize = static_cast<quint32>(input.data.size());
-        entry.flags = compress ? 0x01 : 0x00;
+        entry.name = nameBytes[i];
+        entry.unpackedSize = static_cast<quint32>(input.data.size());
+
+        const QByteArray lower = input.relativePath.toLower().toUtf8();
+        int slash = lower.lastIndexOf('/');
+        entry.dirLower = slash >= 0 ? lower.left(slash) : QByteArray();
+        QByteArray fileName = slash >= 0 ? lower.mid(slash + 1) : lower;
+        int dot = fileName.lastIndexOf('.');
+        entry.baseLower = dot > 0 ? fileName.left(dot) : fileName;
+        entry.extLower = dot > 0 ? fileName.mid(dot + 1) : QByteArray();
 
         if (compress) {
-            // Compress with zlib
             QByteArray compressed;
             compressed.resize(input.data.size() + input.data.size() / 100 + 600);
             uLongf destLen = compressed.size();
             int ret = compress2(reinterpret_cast<Bytef*>(compressed.data()), &destLen,
-                               reinterpret_cast<const Bytef*>(input.data.constData()),
-                               input.data.size(), Z_DEFAULT_COMPRESSION);
+                                reinterpret_cast<const Bytef*>(input.data.constData()),
+                                input.data.size(), Z_DEFAULT_COMPRESSION);
             if (ret == Z_OK && destLen < static_cast<uLongf>(input.data.size())) {
                 compressed.resize(destLen);
                 entry.fileData = compressed;
-                entry.compressedSize = static_cast<quint32>(destLen);
+                entry.packedSize = static_cast<quint32>(destLen);
+                entry.flags = 0; // stored-compressed: packedSize != 0 signals zlib
             } else {
-                // Compression failed or didn't help — store uncompressed
                 entry.fileData = input.data;
-                entry.compressedSize = entry.uncompressedSize;
-                entry.flags = 0x00;
+                entry.packedSize = 0; // stored uncompressed
+                entry.flags = 0;
             }
         } else {
             entry.fileData = input.data;
-            entry.compressedSize = entry.uncompressedSize;
+            entry.packedSize = 0;
+            entry.flags = 0;
         }
 
-        entry.fileOffset = currentDataOffset;
-        currentDataOffset += entry.compressedSize;
+        entry.fileOffset = dataOffset;
+        dataOffset += (entry.packedSize != 0) ? entry.packedSize : entry.unpackedSize;
         tableEntries.append(entry);
     }
 
-    // Write file table
+    // --- BTDX v2 header (32 bytes) ---
+    out.writeRawData("BTDX", 4);                 // magic
+    quint32 version = 2;
+    out << version;
+    QByteArray typeBytes = archiveType.toLatin1().leftJustified(4, ' ', true);
+    out.writeRawData(typeBytes.data(), 4);       // GNRL
+    out << n;                                    // file count
+    out << static_cast<quint64>(nameTableOffset);
+    quint32 one = 1;
+    out << one;
+    quint32 zero = 0;
+    out << zero;
+
+    // File records.
     for (const auto& entry : tableEntries) {
-        QByteArray nameBytes = entry.relativePath.toLatin1();
-        quint32 nameLen = static_cast<quint32>(nameBytes.size());
-        out << nameLen;
-        out.writeRawData(nameBytes.data(), nameLen);
-        out << entry.compressedSize;
-        out << entry.uncompressedSize;
+        out << static_cast<quint32>(crc32(0, reinterpret_cast<const Bytef*>(entry.baseLower.constData()),
+                     static_cast<uInt>(entry.baseLower.size())));
+        QByteArray ext = entry.extLower;
+        ext.resize(4, '\0');
+        out.writeRawData(ext.constData(), 4);
+        out << static_cast<quint32>(crc32(0, reinterpret_cast<const Bytef*>(entry.dirLower.constData()),
+                     static_cast<uInt>(entry.dirLower.size())));
         out << entry.flags;
         out << entry.fileOffset;
+        out << entry.packedSize;
+        out << entry.unpackedSize;
+        out << static_cast<quint32>(BAADF00D);
     }
 
-    // Write file data
+    // Name table.
+    for (const auto& entry : tableEntries) {
+        quint16 len = static_cast<quint16>(entry.name.size());
+        out << len;
+        out.writeRawData(entry.name.constData(), entry.name.size());
+    }
+
+    // File data.
     for (const auto& entry : tableEntries) {
         outFile.write(entry.fileData);
     }
@@ -456,6 +477,6 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
     outFile.close();
 
     LOG_INFO(QString("BA2 create: wrote %1 files to %2 (type=%3, compressed=%4)")
-                .arg(fileCount).arg(outputPath).arg(archiveType).arg(compress));
+                .arg(n).arg(outputPath).arg(archiveType).arg(compress));
     return true;
 }

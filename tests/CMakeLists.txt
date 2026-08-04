@@ -202,6 +202,12 @@ target_link_libraries(test_meshprobe PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_meshprobe PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — needs a real Starfield install.
 
+# BTDX v2 GNRL writer round-trip (create -> open/extract).
+add_executable(test_ba2write test_ba2write.cpp)
+target_link_libraries(test_ba2write PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_ba2write PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_ba2write)
+
 # BtdTerrain: real Starfield .btd (BTDB) reader against the Terrain BA2.
 add_executable(test_btdterrain test_btdterrain.cpp)
 target_link_libraries(test_btdterrain PRIVATE openck_model test_stubs Qt6::Test)
