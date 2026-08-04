@@ -208,6 +208,12 @@ target_link_libraries(test_ba2write PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_ba2write PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_ba2write)
 
+# SSE BSA writer round-trip + name-hash validation against the real archive.
+add_executable(test_bsawrite test_bsawrite.cpp)
+target_link_libraries(test_bsawrite PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_bsawrite PRIVATE ${TEST_INCLUDE_DIRS})
+# Not registered with CTest by default — hash check requires Skyrim SE.
+
 # BtdTerrain: real Starfield .btd (BTDB) reader against the Terrain BA2.
 add_executable(test_btdterrain test_btdterrain.cpp)
 target_link_libraries(test_btdterrain PRIVATE openck_model test_stubs Qt6::Test)

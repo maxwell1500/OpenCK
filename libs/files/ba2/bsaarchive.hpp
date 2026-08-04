@@ -59,6 +59,16 @@ public:
     // Read a file's data by index into a byte array.
     bool readData(quint32 index, QByteArray& out) const;
 
+    // Create a new Skyrim SE (v0x69) BSA archive from a list of files.
+    // Files are stored uncompressed with folder/file name tables, matching
+    // the format Bethesda's archive tools and the game read. Returns true
+    // on success.
+    bool create(const QStringList& filePaths, const QString& outputPath);
+
+    // Compute the 64-bit name hash Bethesda stores in TES4-family BSA file
+    // records for a file's stem + extension. Exposed for validation.
+    static quint64 hashName(const QString& stem, const QString& extension = QString());
+
 private:
     bool readCompressed(quint32 index, QByteArray& out) const;
     bool readUncompressed(quint32 index, QByteArray& out) const;

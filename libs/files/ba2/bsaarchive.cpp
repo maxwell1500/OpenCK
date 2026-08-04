@@ -486,3 +486,236 @@ bool BsaArchive::extract(quint32 index, const QString& outputPath) const
     outFile.close();
     return true;
 }
+
+namespace {
+
+// Skyrim SE / FO4 BSA name hash, matching the algorithm Bethesda uses for
+// the 64-bit folder/file name hashes in TES4-family archives. Implemented
+// from the format reverse-engineering used by xEdit and OpenMW
+// (components/bsa/compressedbsafile.cpp generateHash).
+quint64 bsaGenerateHash(const QString& str, const QString& extension = QString())
+{
+    if (str.isEmpty())
+        return 0;
+
+    auto at = [&str](int i) -> quint32 {
+        QChar c = str.at(i);
+        return c == QLatin1Char('/') ? static_cast<quint32>('\\') : c.unicode();
+    };
+
+    const int len = str.size();
+    quint64 result = at(len - 1);
+    if (len >= 3)
+        result |= static_cast<quint64>(at(len - 2)) << 8;
+    result |= static_cast<quint64>(len) << 16;
+    result |= static_cast<quint64>(at(0)) << 24;
+    if (len >= 4)
+    {
+        quint32 hash = 0;
+        for (int i = 1; i <= len - 3; ++i)
+            hash = hash * 0x1003Fu + at(i);
+        result += static_cast<quint64>(hash) << 32;
+    }
+
+    if (extension.isEmpty())
+        return result;
+
+    if (extension == QLatin1String(".kf"))
+        result |= 0x80;
+    else if (extension == QLatin1String(".nif"))
+        result |= 0x8000;
+    else if (extension == QLatin1String(".dds"))
+        result |= 0x8080;
+    else if (extension == QLatin1String(".wav"))
+        result |= 0x80000000u;
+
+    quint32 hash = 0;
+    for (const QChar& c : extension)
+        hash = hash * 0x1003Fu + c.unicode();
+    result += static_cast<quint64>(hash) << 32;
+    return result;
+}
+
+} // namespace
+
+quint64 BsaArchive::hashName(const QString& stem, const QString& extension)
+{
+    return bsaGenerateHash(stem, extension);
+}
+
+bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath)
+{
+    if (filePaths.isEmpty()) {
+        LOG_ERROR("BSA create: no files to archive");
+        return false;
+    }
+
+    QFile outFile(outputPath);
+    if (!outFile.open(QIODevice::WriteOnly)) {
+        LOG_ERROR(QString("BSA create: cannot open output file: %1").arg(outputPath));
+        return false;
+    }
+
+    QFileInfo outInfo(outputPath);
+    const QString baseDir = outInfo.absolutePath();
+
+    struct InputFile {
+        QString fullPath; // lowercased, backslash separators
+        QByteArray data;
+        quint64 nameHash = 0;
+    };
+    QVector<InputFile> inputs;
+
+    for (const QString& filePath : filePaths) {
+        QFileInfo fi(filePath);
+        QString relPath = fi.fileName();
+        const QString absPath = fi.absoluteFilePath();
+        if (absPath.startsWith(baseDir, Qt::CaseInsensitive)) {
+            relPath = absPath.mid(baseDir.length() + 1).replace('\\', '/');
+        }
+
+        QFile inFile(filePath);
+        if (!inFile.open(QIODevice::ReadOnly)) {
+            LOG_WARNING(QString("BSA create: skipping unreadable file: %1").arg(filePath));
+            continue;
+        }
+        InputFile input;
+        input.fullPath = relPath.toLower().replace('/', '\\');
+        input.data = inFile.readAll();
+        inFile.close();
+        if (input.data.isEmpty()) {
+            LOG_WARNING(QString("BSA create: skipping empty file: %1").arg(filePath));
+            continue;
+        }
+
+        // Split into folder + stem + extension for the hash.
+        const int slash = input.fullPath.lastIndexOf('\\');
+        QString folder = slash >= 0 ? input.fullPath.left(slash) : QString();
+        QString fileName = slash >= 0 ? input.fullPath.mid(slash + 1) : input.fullPath;
+        const int dot = fileName.lastIndexOf('.');
+        const QString stem = dot > 0 ? fileName.left(dot) : fileName;
+        const QString ext = dot > 0 ? fileName.mid(dot) : QString();
+        input.nameHash = bsaGenerateHash(stem, ext);
+
+        // Folder hash uses the folder path with a trailing backslash.
+        inputs.append(input);
+    }
+
+    if (inputs.isEmpty()) {
+        LOG_ERROR("BSA create: no valid files to archive");
+        outFile.close();
+        return false;
+    }
+
+    // Group files by folder, preserving order.
+    struct FolderGroup {
+        QString name;
+        QVector<InputFile> files;
+    };
+    QVector<FolderGroup> folders;
+    for (const InputFile& input : inputs) {
+        const int slash = input.fullPath.lastIndexOf('\\');
+        const QString folderName = slash >= 0 ? input.fullPath.left(slash) : QString();
+        bool found = false;
+        for (FolderGroup& g : folders) {
+            if (g.name == folderName) { g.files.append(input); found = true; break; }
+        }
+        if (!found) {
+            FolderGroup g;
+            g.name = folderName;
+            g.files.append(input);
+            folders.append(g);
+        }
+    }
+
+    // Sizes for the header.
+    const quint32 folderCount = static_cast<quint32>(folders.size());
+    quint32 fileCount = 0;
+    quint32 folderNamesLength = 0;
+    quint32 fileNamesLength = 0;
+    for (const FolderGroup& g : folders) {
+        fileCount += static_cast<quint32>(g.files.size());
+        folderNamesLength += 1 + static_cast<quint32>(g.name.size()); // len byte + name
+        for (const InputFile& f : g.files) {
+            const int slash = f.fullPath.lastIndexOf('\\');
+            fileNamesLength += 1 + static_cast<quint32>(f.fullPath.mid(slash + 1).size()); // name + NUL
+        }
+    }
+
+    constexpr quint32 HEADER_SIZE = 36;                 // magic + version + 28 bytes
+    constexpr quint32 SSE_FOLDER_RECORD = 24;
+    constexpr quint32 FILE_RECORD = 16;
+
+    // Layout: header, folder records, then per folder: name + file records,
+    // then all file names, then data.
+    quint64 foldersOffset = HEADER_SIZE;
+    quint64 dataOffset = HEADER_SIZE
+                       + static_cast<quint64>(folderCount) * SSE_FOLDER_RECORD;
+    for (const FolderGroup& g : folders)
+        dataOffset += 1 + static_cast<quint64>(g.name.size())
+                    + static_cast<quint64>(g.files.size()) * FILE_RECORD;
+    dataOffset += fileNamesLength;
+
+    // Flags: FolderNames (0x1) | FileNames (0x2). Uncompressed (no 0x4).
+    constexpr quint32 BSA_FLAGS = 0x3;
+
+    // Header.
+    outFile.write("BSA\x00", 4);
+    quint32 version = 0x69; // SSE
+    outFile.write(reinterpret_cast<const char*>(&version), 4);
+    outFile.write(reinterpret_cast<const char*>(&foldersOffset), 4);
+    outFile.write(reinterpret_cast<const char*>(&BSA_FLAGS), 4);
+    outFile.write(reinterpret_cast<const char*>(&folderCount), 4);
+    outFile.write(reinterpret_cast<const char*>(&fileCount), 4);
+    outFile.write(reinterpret_cast<const char*>(&folderNamesLength), 4);
+    outFile.write(reinterpret_cast<const char*>(&fileNamesLength), 4);
+    quint32 fileFlags = 0;
+    outFile.write(reinterpret_cast<const char*>(&fileFlags), 4);
+
+    // Folder records (SSE: hash u64, count u32, unk u32, offset i64).
+    for (const FolderGroup& g : folders) {
+        const quint64 folderHash = bsaGenerateHash(g.name + QLatin1String("\\"));
+        outFile.write(reinterpret_cast<const char*>(&folderHash), 8);
+        const quint32 count = static_cast<quint32>(g.files.size());
+        outFile.write(reinterpret_cast<const char*>(&count), 4);
+        const quint32 unk = 0;
+        outFile.write(reinterpret_cast<const char*>(&unk), 4);
+        outFile.write(reinterpret_cast<const char*>(&dataOffset), 8); // placeholder
+    }
+
+    // Per folder: name (u8 len + bytes) then file records.
+    for (const FolderGroup& g : folders) {
+        const quint8 nameLen = static_cast<quint8>(g.name.size());
+        outFile.write(reinterpret_cast<const char*>(&nameLen), 1);
+        outFile.write(g.name.toUtf8().constData(), g.name.size());
+        for (const InputFile& f : g.files) {
+            outFile.write(reinterpret_cast<const char*>(&f.nameHash), 8);
+            const quint32 size = static_cast<quint32>(f.data.size());
+            outFile.write(reinterpret_cast<const char*>(&size), 4);
+            const quint32 off = static_cast<quint32>(dataOffset);
+            outFile.write(reinterpret_cast<const char*>(&off), 4);
+            dataOffset += size;
+        }
+    }
+
+    // File names (null-terminated).
+    for (const FolderGroup& g : folders) {
+        for (const InputFile& f : g.files) {
+            const int slash = f.fullPath.lastIndexOf('\\');
+            const QByteArray name = f.fullPath.mid(slash + 1).toUtf8();
+            outFile.write(name.constData(), name.size());
+            outFile.write("\x00", 1);
+        }
+    }
+
+    // Data.
+    for (const FolderGroup& g : folders) {
+        for (const InputFile& f : g.files)
+            outFile.write(f.data);
+    }
+
+    outFile.close();
+    LOG_INFO(QString("BSA create: wrote %1 files in %2 folders to %3")
+                .arg(fileCount).arg(folderCount).arg(outputPath));
+    return true;
+}
