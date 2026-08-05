@@ -120,20 +120,20 @@
 #include "../../../libs/files/esm/bmmorecord.hpp"
 #include "../../../libs/files/esm/bmodrecord.hpp"
 #include "../../../libs/files/esm/bndsrecord.hpp"
-#include "../../../libs/files/esm/bpttrecord.hpp"
+#include "../../../libs/files/esm/bptdrecord.hpp"
 #include "../../../libs/files/esm/camsrecord.hpp"
 #include "../../../libs/files/esm/chalrecord.hpp"
-#include "../../../libs/files/esm/ciftrecord.hpp"
-#include "../../../libs/files/esm/cndarecord.hpp"
+#include "../../../libs/files/esm/cldfrecord.hpp"
+#include "../../../libs/files/esm/cndfrecord.hpp"
 #include "../../../libs/files/esm/collrecord.hpp"
 #include "../../../libs/files/esm/cpthrecord.hpp"
-#include "../../../libs/files/esm/culkrecord.hpp"
+#include "../../../libs/files/esm/dlbrrecord.hpp"
 #include "../../../libs/files/esm/cur3record.hpp"
 #include "../../../libs/files/esm/curvrecord.hpp"
 #include "../../../libs/files/esm/dfobrecord.hpp"
 #include "../../../libs/files/esm/dmgtrecord.hpp"
 #include "../../../libs/files/esm/dobjrecord.hpp"
-#include "../../../libs/files/esm/efsrrecord.hpp"
+#include "../../../libs/files/esm/efsqrecord.hpp"
 #include "../../../libs/files/esm/equprecord.hpp"
 
 namespace {
@@ -182,24 +182,24 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(BmmoRecord) \
     MACRO(BmodRecord) \
     MACRO(BndsRecord) \
-    MACRO(BpttRecord) \
+    MACRO(BptdRecord) \
     MACRO(BsgnRecord) \
     MACRO(CamsRecord) \
     MACRO(CellRecord) \
     MACRO(ChalRecord) \
-    MACRO(CiftRecord) \
+    MACRO(CldfRecord) \
     MACRO(ClassRecord) \
     MACRO(ClfmRecord) \
     MACRO(ClimateRecord) \
     MACRO(ClotRecord) \
-    MACRO(CndaRecord) \
+    MACRO(CndfRecord) \
     MACRO(CobjRecord) \
     MACRO(CollRecord) \
     MACRO(ContRecord) \
     MACRO(CpthRecord) \
     MACRO(CreatureRecord) \
     MACRO(CstyRecord) \
-    MACRO(CulkRecord) \
+    MACRO(DlbrRecord) \
     MACRO(Cur3Record) \
     MACRO(CurvRecord) \
     MACRO(DebrRecord) \
@@ -210,7 +210,7 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(DoorRecord) \
     MACRO(EcznRecord) \
     MACRO(EfshRecord) \
-    MACRO(EfsrRecord) \
+    MACRO(EfsqRecord) \
     MACRO(EnchRecord) \
     MACRO(EqupRecord) \
     MACRO(ExplRecord) \

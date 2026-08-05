@@ -1,5 +1,5 @@
-#ifndef BpttRECORD_H
-#define BpttRECORD_H
+#ifndef EfsqRECORD_H
+#define EfsqRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
 #include "../../components/formcomponents.hpp"
@@ -7,7 +7,7 @@
 #include <QVector>
 class ESMReader;
 class ESMWriter;
-struct BpttRecord {
+struct EfsqRecord {
     openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
@@ -18,13 +18,13 @@ struct BpttRecord {
     void initComponents();
 };
 
-inline bool operator==(const BpttRecord& l, const BpttRecord& r)
+inline bool operator==(const EfsqRecord& l, const EfsqRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
         && l.rawSubRecords == r.rawSubRecords;
 }
 
-inline bool operator!=(const BpttRecord& l, const BpttRecord& r)
+inline bool operator!=(const EfsqRecord& l, const EfsqRecord& r)
 {
     return !(l == r);
 }

@@ -1,14 +1,14 @@
-#include "efsrrecord.hpp"
+#include "cldfrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
 
-void EfsrRecord::initComponents()
+void CldfRecord::initComponents()
 {
     components.clear();
 }
 
-void EfsrRecord::load(ESMReader& esm, bool)
+void CldfRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
@@ -42,7 +42,7 @@ void EfsrRecord::load(ESMReader& esm, bool)
     }
 }
 
-void EfsrRecord::save(ESMWriter& esm) const
+void CldfRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
 
@@ -54,7 +54,7 @@ void EfsrRecord::save(ESMWriter& esm) const
     }
 }
 
-void EfsrRecord::blank()
+void CldfRecord::blank()
 {
     editorId.clear();
     formId = 0;

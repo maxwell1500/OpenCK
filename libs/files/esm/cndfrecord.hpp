@@ -1,5 +1,5 @@
-#ifndef CndaRECORD_H
-#define CndaRECORD_H
+#ifndef CndfRECORD_H
+#define CndfRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
 #include "../../components/formcomponents.hpp"
@@ -7,7 +7,7 @@
 #include <QVector>
 class ESMReader;
 class ESMWriter;
-struct CndaRecord {
+struct CndfRecord {
     openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
@@ -18,13 +18,13 @@ struct CndaRecord {
     void initComponents();
 };
 
-inline bool operator==(const CndaRecord& l, const CndaRecord& r)
+inline bool operator==(const CndfRecord& l, const CndfRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
         && l.rawSubRecords == r.rawSubRecords;
 }
 
-inline bool operator!=(const CndaRecord& l, const CndaRecord& r)
+inline bool operator!=(const CndfRecord& l, const CndfRecord& r)
 {
     return !(l == r);
 }

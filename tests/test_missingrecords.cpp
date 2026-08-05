@@ -40,20 +40,20 @@
 #include "../../libs/files/esm/bmmorecord.hpp"
 #include "../../libs/files/esm/bmodrecord.hpp"
 #include "../../libs/files/esm/bndsrecord.hpp"
-#include "../../libs/files/esm/bpttrecord.hpp"
+#include "../../libs/files/esm/bptdrecord.hpp"
 #include "../../libs/files/esm/camsrecord.hpp"
 #include "../../libs/files/esm/chalrecord.hpp"
-#include "../../libs/files/esm/ciftrecord.hpp"
-#include "../../libs/files/esm/cndarecord.hpp"
+#include "../../libs/files/esm/cldfrecord.hpp"
+#include "../../libs/files/esm/cndfrecord.hpp"
 #include "../../libs/files/esm/collrecord.hpp"
 #include "../../libs/files/esm/cpthrecord.hpp"
-#include "../../libs/files/esm/culkrecord.hpp"
+#include "../../libs/files/esm/dlbrrecord.hpp"
 #include "../../libs/files/esm/cur3record.hpp"
 #include "../../libs/files/esm/curvrecord.hpp"
 #include "../../libs/files/esm/dfobrecord.hpp"
 #include "../../libs/files/esm/dmgtrecord.hpp"
 #include "../../libs/files/esm/dobjrecord.hpp"
-#include "../../libs/files/esm/efsrrecord.hpp"
+#include "../../libs/files/esm/efsqrecord.hpp"
 #include "../../libs/files/esm/equprecord.hpp"
 #include "../../libs/files/esm/esmreader.hpp"
 #include "../../libs/files/esm/esmwriter.hpp"
@@ -102,20 +102,20 @@ private slots:
     void testBmmoRoundTrip();
     void testBmodRoundTrip();
     void testBndsRoundTrip();
-    void testBpttRoundTrip();
+    void testBptdRoundTrip();
     void testCamsRoundTrip();
     void testChalRoundTrip();
-    void testCiftRoundTrip();
-    void testCndaRoundTrip();
+    void testCldfRoundTrip();
+    void testCndfRoundTrip();
     void testCollRoundTrip();
     void testCpthRoundTrip();
-    void testCulkRoundTrip();
+    void testDlbrRoundTrip();
     void testCur3RoundTrip();
     void testCurvRoundTrip();
     void testDfobRoundTrip();
     void testDmgtRoundTrip();
     void testDobjRoundTrip();
-    void testEfsrRoundTrip();
+    void testEfsqRoundTrip();
     void testEqupRoundTrip();
 };
 
@@ -708,18 +708,18 @@ void TestMissingRecords::testBndsRoundTrip()
     QCOMPARE(loaded, rec);
 }
 
-void TestMissingRecords::testBpttRoundTrip()
+void TestMissingRecords::testBptdRoundTrip()
 {
-    BpttRecord rec;
-    rec.editorId = QStringLiteral("TestBPTT");
+    BptdRecord rec;
+    rec.editorId = QStringLiteral("TestBPTD");
     rec.formId = 0xE015;
     RawSubRecord data;
     data.name = 'DATA';
     data.data = QByteArray("\x01\x00\x00\x00", 4);
     rec.rawSubRecords.push_back(data);
 
-    BpttRecord loaded;
-    roundTrip<BpttRecord>('BPTT', rec, loaded);
+    BptdRecord loaded;
+    roundTrip<BptdRecord>('BPTD', rec, loaded);
     QCOMPARE(loaded, rec);
 }
 
@@ -753,33 +753,33 @@ void TestMissingRecords::testChalRoundTrip()
     QCOMPARE(loaded, rec);
 }
 
-void TestMissingRecords::testCiftRoundTrip()
+void TestMissingRecords::testCldfRoundTrip()
 {
-    CiftRecord rec;
-    rec.editorId = QStringLiteral("TestCIFT");
+    CldfRecord rec;
+    rec.editorId = QStringLiteral("TestCLDF");
     rec.formId = 0xE018;
     RawSubRecord data;
     data.name = 'DATA';
     data.data = QByteArray("\x01\x00\x00\x00", 4);
     rec.rawSubRecords.push_back(data);
 
-    CiftRecord loaded;
-    roundTrip<CiftRecord>('CIFT', rec, loaded);
+    CldfRecord loaded;
+    roundTrip<CldfRecord>('CLDF', rec, loaded);
     QCOMPARE(loaded, rec);
 }
 
-void TestMissingRecords::testCndaRoundTrip()
+void TestMissingRecords::testCndfRoundTrip()
 {
-    CndaRecord rec;
-    rec.editorId = QStringLiteral("TestCNDA");
+    CndfRecord rec;
+    rec.editorId = QStringLiteral("TestCNDF");
     rec.formId = 0xE019;
     RawSubRecord data;
     data.name = 'DATA';
     data.data = QByteArray("\x01\x00\x00\x00", 4);
     rec.rawSubRecords.push_back(data);
 
-    CndaRecord loaded;
-    roundTrip<CndaRecord>('CNDA', rec, loaded);
+    CndfRecord loaded;
+    roundTrip<CndfRecord>('CNDF', rec, loaded);
     QCOMPARE(loaded, rec);
 }
 
@@ -813,18 +813,18 @@ void TestMissingRecords::testCpthRoundTrip()
     QCOMPARE(loaded, rec);
 }
 
-void TestMissingRecords::testCulkRoundTrip()
+void TestMissingRecords::testDlbrRoundTrip()
 {
-    CulkRecord rec;
-    rec.editorId = QStringLiteral("TestCULK");
+    DlbrRecord rec;
+    rec.editorId = QStringLiteral("TestDLBR");
     rec.formId = 0xE01C;
     RawSubRecord data;
     data.name = 'DATA';
     data.data = QByteArray("\x01\x00\x00\x00", 4);
     rec.rawSubRecords.push_back(data);
 
-    CulkRecord loaded;
-    roundTrip<CulkRecord>('CULK', rec, loaded);
+    DlbrRecord loaded;
+    roundTrip<DlbrRecord>('DLBR', rec, loaded);
     QCOMPARE(loaded, rec);
 }
 
@@ -903,18 +903,18 @@ void TestMissingRecords::testDobjRoundTrip()
     QCOMPARE(loaded, rec);
 }
 
-void TestMissingRecords::testEfsrRoundTrip()
+void TestMissingRecords::testEfsqRoundTrip()
 {
-    EfsrRecord rec;
-    rec.editorId = QStringLiteral("TestEFSR");
+    EfsqRecord rec;
+    rec.editorId = QStringLiteral("TestEFSQ");
     rec.formId = 0xE022;
     RawSubRecord data;
     data.name = 'DATA';
     data.data = QByteArray("\x01\x00\x00\x00", 4);
     rec.rawSubRecords.push_back(data);
 
-    EfsrRecord loaded;
-    roundTrip<EfsrRecord>('EFSR', rec, loaded);
+    EfsqRecord loaded;
+    roundTrip<EfsqRecord>('EFSQ', rec, loaded);
     QCOMPARE(loaded, rec);
 }
 

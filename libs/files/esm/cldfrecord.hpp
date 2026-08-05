@@ -1,5 +1,5 @@
-#ifndef CiftRECORD_H
-#define CiftRECORD_H
+#ifndef CldfRECORD_H
+#define CldfRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
 #include "../../components/formcomponents.hpp"
@@ -7,7 +7,7 @@
 #include <QVector>
 class ESMReader;
 class ESMWriter;
-struct CiftRecord {
+struct CldfRecord {
     openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
@@ -18,13 +18,13 @@ struct CiftRecord {
     void initComponents();
 };
 
-inline bool operator==(const CiftRecord& l, const CiftRecord& r)
+inline bool operator==(const CldfRecord& l, const CldfRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
         && l.rawSubRecords == r.rawSubRecords;
 }
 
-inline bool operator!=(const CiftRecord& l, const CiftRecord& r)
+inline bool operator!=(const CldfRecord& l, const CldfRecord& r)
 {
     return !(l == r);
 }

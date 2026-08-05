@@ -1,4 +1,4 @@
-﻿#include "objectwindow.hpp"
+#include "objectwindow.hpp"
 
 #include "../world/data.hpp"
 #include "../world/collection.hpp"
@@ -388,8 +388,8 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Bnds_:
             cat.totalRecords = data->getBndsCollection().size();
             break;
-        case CkId::Type_Bptt_:
-            cat.totalRecords = data->getBpttCollection().size();
+        case CkId::Type_Bptd_:
+            cat.totalRecords = data->getBptdCollection().size();
             break;
         case CkId::Type_Cams_:
             cat.totalRecords = data->getCamsCollection().size();
@@ -397,11 +397,11 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Chal_:
             cat.totalRecords = data->getChalCollection().size();
             break;
-        case CkId::Type_Cift_:
-            cat.totalRecords = data->getCiftCollection().size();
+        case CkId::Type_Cldf_:
+            cat.totalRecords = data->getCldfCollection().size();
             break;
-        case CkId::Type_Cnda_:
-            cat.totalRecords = data->getCndaCollection().size();
+        case CkId::Type_Cndf_:
+            cat.totalRecords = data->getCndfCollection().size();
             break;
         case CkId::Type_Coll_:
             cat.totalRecords = data->getCollCollection().size();
@@ -409,8 +409,8 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Cpth_:
             cat.totalRecords = data->getCpthCollection().size();
             break;
-        case CkId::Type_Culk_:
-            cat.totalRecords = data->getCulkCollection().size();
+        case CkId::Type_Dlbr_:
+            cat.totalRecords = data->getDlbrCollection().size();
             break;
         case CkId::Type_Cur3_:
             cat.totalRecords = data->getCur3Collection().size();
@@ -427,8 +427,8 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Dobj_:
             cat.totalRecords = data->getDobjCollection().size();
             break;
-        case CkId::Type_Efsr_:
-            cat.totalRecords = data->getEfsrCollection().size();
+        case CkId::Type_Efsq_:
+            cat.totalRecords = data->getEfsqCollection().size();
             break;
         case CkId::Type_Equp_:
             cat.totalRecords = data->getEqupCollection().size();
@@ -911,9 +911,9 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getBndsCollection().getId(i);
                 formId = formatFormId(data->getBndsCollection().getRecord(i).get().formId);
                 break;
-            case CkId::Type_Bptt_:
-                editorId = data->getBpttCollection().getId(i);
-                formId = formatFormId(data->getBpttCollection().getRecord(i).get().formId);
+            case CkId::Type_Bptd_:
+                editorId = data->getBptdCollection().getId(i);
+                formId = formatFormId(data->getBptdCollection().getRecord(i).get().formId);
                 break;
             case CkId::Type_Cams_:
                 editorId = data->getCamsCollection().getId(i);
@@ -923,13 +923,13 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getChalCollection().getId(i);
                 formId = formatFormId(data->getChalCollection().getRecord(i).get().formId);
                 break;
-            case CkId::Type_Cift_:
-                editorId = data->getCiftCollection().getId(i);
-                formId = formatFormId(data->getCiftCollection().getRecord(i).get().formId);
+            case CkId::Type_Cldf_:
+                editorId = data->getCldfCollection().getId(i);
+                formId = formatFormId(data->getCldfCollection().getRecord(i).get().formId);
                 break;
-            case CkId::Type_Cnda_:
-                editorId = data->getCndaCollection().getId(i);
-                formId = formatFormId(data->getCndaCollection().getRecord(i).get().formId);
+            case CkId::Type_Cndf_:
+                editorId = data->getCndfCollection().getId(i);
+                formId = formatFormId(data->getCndfCollection().getRecord(i).get().formId);
                 break;
             case CkId::Type_Coll_:
                 editorId = data->getCollCollection().getId(i);
@@ -939,9 +939,9 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getCpthCollection().getId(i);
                 formId = formatFormId(data->getCpthCollection().getRecord(i).get().formId);
                 break;
-            case CkId::Type_Culk_:
-                editorId = data->getCulkCollection().getId(i);
-                formId = formatFormId(data->getCulkCollection().getRecord(i).get().formId);
+            case CkId::Type_Dlbr_:
+                editorId = data->getDlbrCollection().getId(i);
+                formId = formatFormId(data->getDlbrCollection().getRecord(i).get().formId);
                 break;
             case CkId::Type_Cur3_:
                 editorId = data->getCur3Collection().getId(i);
@@ -963,9 +963,9 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getDobjCollection().getId(i);
                 formId = formatFormId(data->getDobjCollection().getRecord(i).get().formId);
                 break;
-            case CkId::Type_Efsr_:
-                editorId = data->getEfsrCollection().getId(i);
-                formId = formatFormId(data->getEfsrCollection().getRecord(i).get().formId);
+            case CkId::Type_Efsq_:
+                editorId = data->getEfsqCollection().getId(i);
+                formId = formatFormId(data->getEfsqCollection().getRecord(i).get().formId);
                 break;
             case CkId::Type_Equp_:
                 editorId = data->getEqupCollection().getId(i);
@@ -1087,20 +1087,20 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Behavior", CkId::Type_Bmmo_);
     addCategory("Behavior Mod", CkId::Type_Bmod_);
     addCategory("Bounds", CkId::Type_Bnds_);
-    addCategory("Behavior Pattern", CkId::Type_Bptt_);
+    addCategory("Behavior Pattern", CkId::Type_Bptd_);
     addCategory("Camera Shot", CkId::Type_Cams_);
     addCategory("Challenge", CkId::Type_Chal_);
-    addCategory("Character Float Table", CkId::Type_Cift_);
-    addCategory("Character Data", CkId::Type_Cnda_);
+    addCategory("Character Float Table", CkId::Type_Cldf_);
+    addCategory("Character Data", CkId::Type_Cndf_);
     addCategory("Collision", CkId::Type_Coll_);
     addCategory("Camera Path", CkId::Type_Cpth_);
-    addCategory("Culling Data", CkId::Type_Culk_);
+    addCategory("Culling Data", CkId::Type_Dlbr_);
     addCategory("Curve Table 3", CkId::Type_Cur3_);
     addCategory("Curve Table", CkId::Type_Curv_);
     addCategory("Debris Object", CkId::Type_Dfob_);
     addCategory("Damage Type", CkId::Type_Dmgt_);
     addCategory("Default Object", CkId::Type_Dobj_);
-    addCategory("Effect Shader 2", CkId::Type_Efsr_);
+    addCategory("Effect Shader 2", CkId::Type_Efsq_);
     addCategory("Equipment Slot", CkId::Type_Equp_);
 
     addCategory("Voice Type", CkId::Type_None);
@@ -1503,9 +1503,9 @@ void ObjectWindowModel::rebuildAllRecords()
                     rec.editorId = mData->getBndsCollection().getId(i);
                     rec.formId = formatFormId(mData->getBndsCollection().getRecord(i).get().formId);
                     break;
-                case CkId::Type_Bptt_:
-                    rec.editorId = mData->getBpttCollection().getId(i);
-                    rec.formId = formatFormId(mData->getBpttCollection().getRecord(i).get().formId);
+                case CkId::Type_Bptd_:
+                    rec.editorId = mData->getBptdCollection().getId(i);
+                    rec.formId = formatFormId(mData->getBptdCollection().getRecord(i).get().formId);
                     break;
                 case CkId::Type_Cams_:
                     rec.editorId = mData->getCamsCollection().getId(i);
@@ -1515,13 +1515,13 @@ void ObjectWindowModel::rebuildAllRecords()
                     rec.editorId = mData->getChalCollection().getId(i);
                     rec.formId = formatFormId(mData->getChalCollection().getRecord(i).get().formId);
                     break;
-                case CkId::Type_Cift_:
-                    rec.editorId = mData->getCiftCollection().getId(i);
-                    rec.formId = formatFormId(mData->getCiftCollection().getRecord(i).get().formId);
+                case CkId::Type_Cldf_:
+                    rec.editorId = mData->getCldfCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCldfCollection().getRecord(i).get().formId);
                     break;
-                case CkId::Type_Cnda_:
-                    rec.editorId = mData->getCndaCollection().getId(i);
-                    rec.formId = formatFormId(mData->getCndaCollection().getRecord(i).get().formId);
+                case CkId::Type_Cndf_:
+                    rec.editorId = mData->getCndfCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCndfCollection().getRecord(i).get().formId);
                     break;
                 case CkId::Type_Coll_:
                     rec.editorId = mData->getCollCollection().getId(i);
@@ -1531,9 +1531,9 @@ void ObjectWindowModel::rebuildAllRecords()
                     rec.editorId = mData->getCpthCollection().getId(i);
                     rec.formId = formatFormId(mData->getCpthCollection().getRecord(i).get().formId);
                     break;
-                case CkId::Type_Culk_:
-                    rec.editorId = mData->getCulkCollection().getId(i);
-                    rec.formId = formatFormId(mData->getCulkCollection().getRecord(i).get().formId);
+                case CkId::Type_Dlbr_:
+                    rec.editorId = mData->getDlbrCollection().getId(i);
+                    rec.formId = formatFormId(mData->getDlbrCollection().getRecord(i).get().formId);
                     break;
                 case CkId::Type_Cur3_:
                     rec.editorId = mData->getCur3Collection().getId(i);
@@ -1555,9 +1555,9 @@ void ObjectWindowModel::rebuildAllRecords()
                     rec.editorId = mData->getDobjCollection().getId(i);
                     rec.formId = formatFormId(mData->getDobjCollection().getRecord(i).get().formId);
                     break;
-                case CkId::Type_Efsr_:
-                    rec.editorId = mData->getEfsrCollection().getId(i);
-                    rec.formId = formatFormId(mData->getEfsrCollection().getRecord(i).get().formId);
+                case CkId::Type_Efsq_:
+                    rec.editorId = mData->getEfsqCollection().getId(i);
+                    rec.formId = formatFormId(mData->getEfsqCollection().getRecord(i).get().formId);
                     break;
                 case CkId::Type_Equp_:
                     rec.editorId = mData->getEqupCollection().getId(i);

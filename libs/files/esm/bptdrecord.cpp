@@ -1,14 +1,14 @@
-#include "bpttrecord.hpp"
+#include "bptdrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
 
-void BpttRecord::initComponents()
+void BptdRecord::initComponents()
 {
     components.clear();
 }
 
-void BpttRecord::load(ESMReader& esm, bool)
+void BptdRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
@@ -42,7 +42,7 @@ void BpttRecord::load(ESMReader& esm, bool)
     }
 }
 
-void BpttRecord::save(ESMWriter& esm) const
+void BptdRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
 
@@ -54,7 +54,7 @@ void BpttRecord::save(ESMWriter& esm) const
     }
 }
 
-void BpttRecord::blank()
+void BptdRecord::blank()
 {
     editorId.clear();
     formId = 0;

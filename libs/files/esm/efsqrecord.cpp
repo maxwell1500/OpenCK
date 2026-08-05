@@ -1,14 +1,14 @@
-#include "culkrecord.hpp"
+#include "efsqrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
 
-void CulkRecord::initComponents()
+void EfsqRecord::initComponents()
 {
     components.clear();
 }
 
-void CulkRecord::load(ESMReader& esm, bool)
+void EfsqRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
@@ -42,7 +42,7 @@ void CulkRecord::load(ESMReader& esm, bool)
     }
 }
 
-void CulkRecord::save(ESMWriter& esm) const
+void EfsqRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
 
@@ -54,7 +54,7 @@ void CulkRecord::save(ESMWriter& esm) const
     }
 }
 
-void CulkRecord::blank()
+void EfsqRecord::blank()
 {
     editorId.clear();
     formId = 0;

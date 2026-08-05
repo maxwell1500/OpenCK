@@ -1,4 +1,4 @@
-﻿#include "document.hpp"
+#include "document.hpp"
 
 #include "../doc/messages.hpp"
 #include "../world/metadata.hpp"
@@ -193,20 +193,20 @@ void Document::save(const QString& savePath)
             {&data->getBmmoCollection(),  'BMMO'},
             {&data->getBmodCollection(),  'BMOD'},
             {&data->getBndsCollection(),  'BNDS'},
-            {&data->getBpttCollection(),  'BPTT'},
+            {&data->getBptdCollection(),  'BPTD'},
             {&data->getCamsCollection(),  'CAMS'},
             {&data->getChalCollection(),  'CHAL'},
-            {&data->getCiftCollection(),  'CIFT'},
-            {&data->getCndaCollection(),  'CNDA'},
+            {&data->getCldfCollection(),  'CLDF'},
+            {&data->getCndfCollection(),  'CNDF'},
             {&data->getCollCollection(),  'COLL'},
             {&data->getCpthCollection(),  'CPTH'},
-            {&data->getCulkCollection(),  'CULK'},
+            {&data->getDlbrCollection(),  'DLBR'},
             {&data->getCur3Collection(),  'CUR3'},
             {&data->getCurvCollection(),  'CURV'},
             {&data->getDfobCollection(),  'DFOB'},
             {&data->getDmgtCollection(),  'DMGT'},
             {&data->getDobjCollection(),  'DOBJ'},
-            {&data->getEfsrCollection(),  'EFSR'},
+            {&data->getEfsqCollection(),  'EFSQ'},
             {&data->getEqupCollection(),  'EQUP'},
         };
 

@@ -1,4 +1,4 @@
-ï»¿#ifndef WORLDDATA_H
+#ifndef WORLDDATA_H
 #define WORLDDATA_H
 
 #include "idcollection.hpp"
@@ -123,20 +123,20 @@
 #include "../../../libs/files/esm/bmmorecord.hpp"
 #include "../../../libs/files/esm/bmodrecord.hpp"
 #include "../../../libs/files/esm/bndsrecord.hpp"
-#include "../../../libs/files/esm/bpttrecord.hpp"
+#include "../../../libs/files/esm/bptdrecord.hpp"
 #include "../../../libs/files/esm/camsrecord.hpp"
 #include "../../../libs/files/esm/chalrecord.hpp"
-#include "../../../libs/files/esm/ciftrecord.hpp"
-#include "../../../libs/files/esm/cndarecord.hpp"
+#include "../../../libs/files/esm/cldfrecord.hpp"
+#include "../../../libs/files/esm/cndfrecord.hpp"
 #include "../../../libs/files/esm/collrecord.hpp"
 #include "../../../libs/files/esm/cpthrecord.hpp"
-#include "../../../libs/files/esm/culkrecord.hpp"
+#include "../../../libs/files/esm/dlbrrecord.hpp"
 #include "../../../libs/files/esm/cur3record.hpp"
 #include "../../../libs/files/esm/curvrecord.hpp"
 #include "../../../libs/files/esm/dfobrecord.hpp"
 #include "../../../libs/files/esm/dmgtrecord.hpp"
 #include "../../../libs/files/esm/dobjrecord.hpp"
-#include "../../../libs/files/esm/efsrrecord.hpp"
+#include "../../../libs/files/esm/efsqrecord.hpp"
 #include "../../../libs/files/esm/equprecord.hpp"
 
 #include <QObject>
@@ -181,7 +181,7 @@ public:
     /// 
     /// Initializes all record collections with column definitions
     /// and registers Qt models for UI binding. Does not load data
-    /// yet â€” call preload() and continueLoading() to load files.
+    /// yet — call preload() and continueLoading() to load files.
     Data(const QStringList& files, const FilePaths& paths);
     ~Data();
 
@@ -194,7 +194,7 @@ public:
     /// \return Number of records found in file
     /// 
     /// Reads TES4 header, master list, and file metadata.
-    /// Does not load individual records â€” call continueLoading() for that.
+    /// Does not load individual records — call continueLoading() for that.
     int preload(const QString& filename, bool base);
 
     /// \brief TES4 header of the last preloaded plugin (for flag preservation).
@@ -579,30 +579,30 @@ public:
     /// \brief Get BNDS collection
     /// \return Const reference to the BNDS record collection
     const IdCollection<BndsRecord>& getBndsCollection() const;
-    /// \brief Get BPTT collection
-    /// \return Const reference to the BPTT record collection
-    const IdCollection<BpttRecord>& getBpttCollection() const;
+    /// \brief Get BPTD collection
+    /// \return Const reference to the BPTD record collection
+    const IdCollection<BptdRecord>& getBptdCollection() const;
     /// \brief Get CAMS collection
     /// \return Const reference to the CAMS record collection
     const IdCollection<CamsRecord>& getCamsCollection() const;
     /// \brief Get CHAL collection
     /// \return Const reference to the CHAL record collection
     const IdCollection<ChalRecord>& getChalCollection() const;
-    /// \brief Get CIFT collection
-    /// \return Const reference to the CIFT record collection
-    const IdCollection<CiftRecord>& getCiftCollection() const;
-    /// \brief Get CNDA collection
-    /// \return Const reference to the CNDA record collection
-    const IdCollection<CndaRecord>& getCndaCollection() const;
+    /// \brief Get CLDF collection
+    /// \return Const reference to the CLDF record collection
+    const IdCollection<CldfRecord>& getCldfCollection() const;
+    /// \brief Get CNDF collection
+    /// \return Const reference to the CNDF record collection
+    const IdCollection<CndfRecord>& getCndfCollection() const;
     /// \brief Get COLL collection
     /// \return Const reference to the COLL record collection
     const IdCollection<CollRecord>& getCollCollection() const;
     /// \brief Get CPTH collection
     /// \return Const reference to the CPTH record collection
     const IdCollection<CpthRecord>& getCpthCollection() const;
-    /// \brief Get CULK collection
-    /// \return Const reference to the CULK record collection
-    const IdCollection<CulkRecord>& getCulkCollection() const;
+    /// \brief Get DLBR collection
+    /// \return Const reference to the DLBR record collection
+    const IdCollection<DlbrRecord>& getDlbrCollection() const;
     /// \brief Get CUR3 collection
     /// \return Const reference to the CUR3 record collection
     const IdCollection<Cur3Record>& getCur3Collection() const;
@@ -618,9 +618,9 @@ public:
     /// \brief Get DOBJ collection
     /// \return Const reference to the DOBJ record collection
     const IdCollection<DobjRecord>& getDobjCollection() const;
-    /// \brief Get EFSR collection
-    /// \return Const reference to the EFSR record collection
-    const IdCollection<EfsrRecord>& getEfsrCollection() const;
+    /// \brief Get EFSQ collection
+    /// \return Const reference to the EFSQ record collection
+    const IdCollection<EfsqRecord>& getEfsqCollection() const;
     /// \brief Get EQUP collection
     /// \return Const reference to the EQUP record collection
     const IdCollection<EqupRecord>& getEqupCollection() const;
@@ -941,20 +941,20 @@ public:
     IdCollection<BmmoRecord>& getBmmoCollection();
     IdCollection<BmodRecord>& getBmodCollection();
     IdCollection<BndsRecord>& getBndsCollection();
-    IdCollection<BpttRecord>& getBpttCollection();
+    IdCollection<BptdRecord>& getBptdCollection();
     IdCollection<CamsRecord>& getCamsCollection();
     IdCollection<ChalRecord>& getChalCollection();
-    IdCollection<CiftRecord>& getCiftCollection();
-    IdCollection<CndaRecord>& getCndaCollection();
+    IdCollection<CldfRecord>& getCldfCollection();
+    IdCollection<CndfRecord>& getCndfCollection();
     IdCollection<CollRecord>& getCollCollection();
     IdCollection<CpthRecord>& getCpthCollection();
-    IdCollection<CulkRecord>& getCulkCollection();
+    IdCollection<DlbrRecord>& getDlbrCollection();
     IdCollection<Cur3Record>& getCur3Collection();
     IdCollection<CurvRecord>& getCurvCollection();
     IdCollection<DfobRecord>& getDfobCollection();
     IdCollection<DmgtRecord>& getDmgtCollection();
     IdCollection<DobjRecord>& getDobjCollection();
-    IdCollection<EfsrRecord>& getEfsrCollection();
+    IdCollection<EfsqRecord>& getEfsqCollection();
     IdCollection<EqupRecord>& getEqupCollection();
 
     /// \brief Get collection by record type (const version)
@@ -1320,20 +1320,20 @@ private:
     IdCollection<BmmoRecord> bmmoCollection;
     IdCollection<BmodRecord> bmodCollection;
     IdCollection<BndsRecord> bndsCollection;
-    IdCollection<BpttRecord> bpttCollection;
+    IdCollection<BptdRecord> bptdCollection;
     IdCollection<CamsRecord> camsCollection;
     IdCollection<ChalRecord> chalCollection;
-    IdCollection<CiftRecord> ciftCollection;
-    IdCollection<CndaRecord> cndaCollection;
+    IdCollection<CldfRecord> cldfCollection;
+    IdCollection<CndfRecord> cndfCollection;
     IdCollection<CollRecord> collCollection;
     IdCollection<CpthRecord> cpthCollection;
-    IdCollection<CulkRecord> culkCollection;
+    IdCollection<DlbrRecord> dlbrCollection;
     IdCollection<Cur3Record> cur3Collection;
     IdCollection<CurvRecord> curvCollection;
     IdCollection<DfobRecord> dfobCollection;
     IdCollection<DmgtRecord> dmgtCollection;
     IdCollection<DobjRecord> dobjCollection;
-    IdCollection<EfsrRecord> efsrCollection;
+    IdCollection<EfsqRecord> efsqCollection;
     IdCollection<EqupRecord> equpCollection;
 
     QVector<QAbstractItemModel*> models;

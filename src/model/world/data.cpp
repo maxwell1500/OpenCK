@@ -1,4 +1,4 @@
-﻿#include "data.hpp"
+#include "data.hpp"
 #include "collection_impl.hpp"
 
 #include "../tools/undostack.hpp"
@@ -755,11 +755,11 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     bndsCollection.addColumn(new RecordStateColumn<BndsRecord>());
     bndsCollection.addColumn(new StringColumn<BndsRecord>("Name", &BndsRecord::editorId));
     addModel(new IdTable(&bndsCollection), CkId::Type_Bnds_);
-    // BPTT - Behavior Pattern
-    bpttCollection.addColumn(new StringIdColumn<BpttRecord>());
-    bpttCollection.addColumn(new RecordStateColumn<BpttRecord>());
-    bpttCollection.addColumn(new StringColumn<BpttRecord>("Name", &BpttRecord::editorId));
-    addModel(new IdTable(&bpttCollection), CkId::Type_Bptt_);
+    // BPTD - Behavior Pattern
+    bptdCollection.addColumn(new StringIdColumn<BptdRecord>());
+    bptdCollection.addColumn(new RecordStateColumn<BptdRecord>());
+    bptdCollection.addColumn(new StringColumn<BptdRecord>("Name", &BptdRecord::editorId));
+    addModel(new IdTable(&bptdCollection), CkId::Type_Bptd_);
     // CAMS - Camera Shot
     camsCollection.addColumn(new StringIdColumn<CamsRecord>());
     camsCollection.addColumn(new RecordStateColumn<CamsRecord>());
@@ -770,16 +770,16 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     chalCollection.addColumn(new RecordStateColumn<ChalRecord>());
     chalCollection.addColumn(new StringColumn<ChalRecord>("Name", &ChalRecord::editorId));
     addModel(new IdTable(&chalCollection), CkId::Type_Chal_);
-    // CIFT - Character Float Table
-    ciftCollection.addColumn(new StringIdColumn<CiftRecord>());
-    ciftCollection.addColumn(new RecordStateColumn<CiftRecord>());
-    ciftCollection.addColumn(new StringColumn<CiftRecord>("Name", &CiftRecord::editorId));
-    addModel(new IdTable(&ciftCollection), CkId::Type_Cift_);
-    // CNDA - Character Data
-    cndaCollection.addColumn(new StringIdColumn<CndaRecord>());
-    cndaCollection.addColumn(new RecordStateColumn<CndaRecord>());
-    cndaCollection.addColumn(new StringColumn<CndaRecord>("Name", &CndaRecord::editorId));
-    addModel(new IdTable(&cndaCollection), CkId::Type_Cnda_);
+    // CLDF - Character Float Table
+    cldfCollection.addColumn(new StringIdColumn<CldfRecord>());
+    cldfCollection.addColumn(new RecordStateColumn<CldfRecord>());
+    cldfCollection.addColumn(new StringColumn<CldfRecord>("Name", &CldfRecord::editorId));
+    addModel(new IdTable(&cldfCollection), CkId::Type_Cldf_);
+    // CNDF - Character Data
+    cndfCollection.addColumn(new StringIdColumn<CndfRecord>());
+    cndfCollection.addColumn(new RecordStateColumn<CndfRecord>());
+    cndfCollection.addColumn(new StringColumn<CndfRecord>("Name", &CndfRecord::editorId));
+    addModel(new IdTable(&cndfCollection), CkId::Type_Cndf_);
     // COLL - Collision
     collCollection.addColumn(new StringIdColumn<CollRecord>());
     collCollection.addColumn(new RecordStateColumn<CollRecord>());
@@ -790,11 +790,11 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     cpthCollection.addColumn(new RecordStateColumn<CpthRecord>());
     cpthCollection.addColumn(new StringColumn<CpthRecord>("Name", &CpthRecord::editorId));
     addModel(new IdTable(&cpthCollection), CkId::Type_Cpth_);
-    // CULK - Culling Data
-    culkCollection.addColumn(new StringIdColumn<CulkRecord>());
-    culkCollection.addColumn(new RecordStateColumn<CulkRecord>());
-    culkCollection.addColumn(new StringColumn<CulkRecord>("Name", &CulkRecord::editorId));
-    addModel(new IdTable(&culkCollection), CkId::Type_Culk_);
+    // DLBR - Culling Data
+    dlbrCollection.addColumn(new StringIdColumn<DlbrRecord>());
+    dlbrCollection.addColumn(new RecordStateColumn<DlbrRecord>());
+    dlbrCollection.addColumn(new StringColumn<DlbrRecord>("Name", &DlbrRecord::editorId));
+    addModel(new IdTable(&dlbrCollection), CkId::Type_Dlbr_);
     // CUR3 - Curve Table 3
     cur3Collection.addColumn(new StringIdColumn<Cur3Record>());
     cur3Collection.addColumn(new RecordStateColumn<Cur3Record>());
@@ -820,11 +820,11 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     dobjCollection.addColumn(new RecordStateColumn<DobjRecord>());
     dobjCollection.addColumn(new StringColumn<DobjRecord>("Name", &DobjRecord::editorId));
     addModel(new IdTable(&dobjCollection), CkId::Type_Dobj_);
-    // EFSR - Effect Shader 2
-    efsrCollection.addColumn(new StringIdColumn<EfsrRecord>());
-    efsrCollection.addColumn(new RecordStateColumn<EfsrRecord>());
-    efsrCollection.addColumn(new StringColumn<EfsrRecord>("Name", &EfsrRecord::editorId));
-    addModel(new IdTable(&efsrCollection), CkId::Type_Efsr_);
+    // EFSQ - Effect Shader 2
+    efsqCollection.addColumn(new StringIdColumn<EfsqRecord>());
+    efsqCollection.addColumn(new RecordStateColumn<EfsqRecord>());
+    efsqCollection.addColumn(new StringColumn<EfsqRecord>("Name", &EfsqRecord::editorId));
+    addModel(new IdTable(&efsqCollection), CkId::Type_Efsq_);
     // EQUP - Equipment Slot
     equpCollection.addColumn(new StringIdColumn<EqupRecord>());
     equpCollection.addColumn(new RecordStateColumn<EqupRecord>());
@@ -1041,20 +1041,20 @@ bool Data::continueLoading(Messages& messages)
             case 'BMMO': bmmoCollection.load(*reader, base); break;
             case 'BMOD': bmodCollection.load(*reader, base); break;
             case 'BNDS': bndsCollection.load(*reader, base); break;
-            case 'BPTT': bpttCollection.load(*reader, base); break;
+            case 'BPTD': bptdCollection.load(*reader, base); break;
             case 'CAMS': camsCollection.load(*reader, base); break;
             case 'CHAL': chalCollection.load(*reader, base); break;
-            case 'CIFT': ciftCollection.load(*reader, base); break;
-            case 'CNDA': cndaCollection.load(*reader, base); break;
+            case 'CLDF': cldfCollection.load(*reader, base); break;
+            case 'CNDF': cndfCollection.load(*reader, base); break;
             case 'COLL': collCollection.load(*reader, base); break;
             case 'CPTH': cpthCollection.load(*reader, base); break;
-            case 'CULK': culkCollection.load(*reader, base); break;
+            case 'DLBR': dlbrCollection.load(*reader, base); break;
             case 'CUR3': cur3Collection.load(*reader, base); break;
             case 'CURV': curvCollection.load(*reader, base); break;
             case 'DFOB': dfobCollection.load(*reader, base); break;
             case 'DMGT': dmgtCollection.load(*reader, base); break;
             case 'DOBJ': dobjCollection.load(*reader, base); break;
-            case 'EFSR': efsrCollection.load(*reader, base); break;
+            case 'EFSQ': efsqCollection.load(*reader, base); break;
             case 'EQUP': equpCollection.load(*reader, base); break;
             default:
             {
@@ -1366,20 +1366,20 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Bmmo_:    return &bmmoCollection;
     case CkId::Type_Bmod_:    return &bmodCollection;
     case CkId::Type_Bnds_:    return &bndsCollection;
-    case CkId::Type_Bptt_:    return &bpttCollection;
+    case CkId::Type_Bptd_:    return &bptdCollection;
     case CkId::Type_Cams_:    return &camsCollection;
     case CkId::Type_Chal_:    return &chalCollection;
-    case CkId::Type_Cift_:    return &ciftCollection;
-    case CkId::Type_Cnda_:    return &cndaCollection;
+    case CkId::Type_Cldf_:    return &cldfCollection;
+    case CkId::Type_Cndf_:    return &cndfCollection;
     case CkId::Type_Coll_:    return &collCollection;
     case CkId::Type_Cpth_:    return &cpthCollection;
-    case CkId::Type_Culk_:    return &culkCollection;
+    case CkId::Type_Dlbr_:    return &dlbrCollection;
     case CkId::Type_Cur3_:    return &cur3Collection;
     case CkId::Type_Curv_:    return &curvCollection;
     case CkId::Type_Dfob_:    return &dfobCollection;
     case CkId::Type_Dmgt_:    return &dmgtCollection;
     case CkId::Type_Dobj_:    return &dobjCollection;
-    case CkId::Type_Efsr_:    return &efsrCollection;
+    case CkId::Type_Efsq_:    return &efsqCollection;
     case CkId::Type_Equp_:    return &equpCollection;
     default:                  return nullptr;
     }
@@ -1506,20 +1506,20 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Bmmo_:    return &bmmoCollection;
     case CkId::Type_Bmod_:    return &bmodCollection;
     case CkId::Type_Bnds_:    return &bndsCollection;
-    case CkId::Type_Bptt_:    return &bpttCollection;
+    case CkId::Type_Bptd_:    return &bptdCollection;
     case CkId::Type_Cams_:    return &camsCollection;
     case CkId::Type_Chal_:    return &chalCollection;
-    case CkId::Type_Cift_:    return &ciftCollection;
-    case CkId::Type_Cnda_:    return &cndaCollection;
+    case CkId::Type_Cldf_:    return &cldfCollection;
+    case CkId::Type_Cndf_:    return &cndfCollection;
     case CkId::Type_Coll_:    return &collCollection;
     case CkId::Type_Cpth_:    return &cpthCollection;
-    case CkId::Type_Culk_:    return &culkCollection;
+    case CkId::Type_Dlbr_:    return &dlbrCollection;
     case CkId::Type_Cur3_:    return &cur3Collection;
     case CkId::Type_Curv_:    return &curvCollection;
     case CkId::Type_Dfob_:    return &dfobCollection;
     case CkId::Type_Dmgt_:    return &dmgtCollection;
     case CkId::Type_Dobj_:    return &dobjCollection;
-    case CkId::Type_Efsr_:    return &efsrCollection;
+    case CkId::Type_Efsq_:    return &efsqCollection;
     case CkId::Type_Equp_:    return &equpCollection;
     default:                  return nullptr;
     }
@@ -1645,20 +1645,20 @@ IdCollection<BiomRecord>& Data::getBiomCollection() { return biomCollection; }
 IdCollection<BmmoRecord>& Data::getBmmoCollection() { return bmmoCollection; }
 IdCollection<BmodRecord>& Data::getBmodCollection() { return bmodCollection; }
 IdCollection<BndsRecord>& Data::getBndsCollection() { return bndsCollection; }
-IdCollection<BpttRecord>& Data::getBpttCollection() { return bpttCollection; }
+IdCollection<BptdRecord>& Data::getBptdCollection() { return bptdCollection; }
 IdCollection<CamsRecord>& Data::getCamsCollection() { return camsCollection; }
 IdCollection<ChalRecord>& Data::getChalCollection() { return chalCollection; }
-IdCollection<CiftRecord>& Data::getCiftCollection() { return ciftCollection; }
-IdCollection<CndaRecord>& Data::getCndaCollection() { return cndaCollection; }
+IdCollection<CldfRecord>& Data::getCldfCollection() { return cldfCollection; }
+IdCollection<CndfRecord>& Data::getCndfCollection() { return cndfCollection; }
 IdCollection<CollRecord>& Data::getCollCollection() { return collCollection; }
 IdCollection<CpthRecord>& Data::getCpthCollection() { return cpthCollection; }
-IdCollection<CulkRecord>& Data::getCulkCollection() { return culkCollection; }
+IdCollection<DlbrRecord>& Data::getDlbrCollection() { return dlbrCollection; }
 IdCollection<Cur3Record>& Data::getCur3Collection() { return cur3Collection; }
 IdCollection<CurvRecord>& Data::getCurvCollection() { return curvCollection; }
 IdCollection<DfobRecord>& Data::getDfobCollection() { return dfobCollection; }
 IdCollection<DmgtRecord>& Data::getDmgtCollection() { return dmgtCollection; }
 IdCollection<DobjRecord>& Data::getDobjCollection() { return dobjCollection; }
-IdCollection<EfsrRecord>& Data::getEfsrCollection() { return efsrCollection; }
+IdCollection<EfsqRecord>& Data::getEfsqCollection() { return efsqCollection; }
 IdCollection<EqupRecord>& Data::getEqupCollection() { return equpCollection; }
 
 QVector<IRecordCollection*> Data::allCollections()
@@ -1769,20 +1769,20 @@ QVector<IRecordCollection*> Data::allCollections()
         &bmmoCollection,
         &bmodCollection,
         &bndsCollection,
-        &bpttCollection,
+        &bptdCollection,
         &camsCollection,
         &chalCollection,
-        &ciftCollection,
-        &cndaCollection,
+        &cldfCollection,
+        &cndfCollection,
         &collCollection,
         &cpthCollection,
-        &culkCollection,
+        &dlbrCollection,
         &cur3Collection,
         &curvCollection,
         &dfobCollection,
         &dmgtCollection,
         &dobjCollection,
-        &efsrCollection,
+        &efsqCollection,
         &equpCollection,
     };
 }
@@ -1906,20 +1906,20 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&bmmoCollection,    CkId::Type_Bmmo_},
         {&bmodCollection,    CkId::Type_Bmod_},
         {&bndsCollection,    CkId::Type_Bnds_},
-        {&bpttCollection,    CkId::Type_Bptt_},
+        {&bptdCollection,    CkId::Type_Bptd_},
         {&camsCollection,    CkId::Type_Cams_},
         {&chalCollection,    CkId::Type_Chal_},
-        {&ciftCollection,    CkId::Type_Cift_},
-        {&cndaCollection,    CkId::Type_Cnda_},
+        {&cldfCollection,    CkId::Type_Cldf_},
+        {&cndfCollection,    CkId::Type_Cndf_},
         {&collCollection,    CkId::Type_Coll_},
         {&cpthCollection,    CkId::Type_Cpth_},
-        {&culkCollection,    CkId::Type_Culk_},
+        {&dlbrCollection,    CkId::Type_Dlbr_},
         {&cur3Collection,    CkId::Type_Cur3_},
         {&curvCollection,    CkId::Type_Curv_},
         {&dfobCollection,    CkId::Type_Dfob_},
         {&dmgtCollection,    CkId::Type_Dmgt_},
         {&dobjCollection,    CkId::Type_Dobj_},
-        {&efsrCollection,    CkId::Type_Efsr_},
+        {&efsqCollection,    CkId::Type_Efsq_},
         {&equpCollection,    CkId::Type_Equp_},
         {&scenCollection,    CkId::Type_Scen_},
     };
@@ -2657,9 +2657,9 @@ const IdCollection<BndsRecord>& Data::getBndsCollection() const
 {
     return bndsCollection;
 }
-const IdCollection<BpttRecord>& Data::getBpttCollection() const
+const IdCollection<BptdRecord>& Data::getBptdCollection() const
 {
-    return bpttCollection;
+    return bptdCollection;
 }
 const IdCollection<CamsRecord>& Data::getCamsCollection() const
 {
@@ -2669,13 +2669,13 @@ const IdCollection<ChalRecord>& Data::getChalCollection() const
 {
     return chalCollection;
 }
-const IdCollection<CiftRecord>& Data::getCiftCollection() const
+const IdCollection<CldfRecord>& Data::getCldfCollection() const
 {
-    return ciftCollection;
+    return cldfCollection;
 }
-const IdCollection<CndaRecord>& Data::getCndaCollection() const
+const IdCollection<CndfRecord>& Data::getCndfCollection() const
 {
-    return cndaCollection;
+    return cndfCollection;
 }
 const IdCollection<CollRecord>& Data::getCollCollection() const
 {
@@ -2685,9 +2685,9 @@ const IdCollection<CpthRecord>& Data::getCpthCollection() const
 {
     return cpthCollection;
 }
-const IdCollection<CulkRecord>& Data::getCulkCollection() const
+const IdCollection<DlbrRecord>& Data::getDlbrCollection() const
 {
-    return culkCollection;
+    return dlbrCollection;
 }
 const IdCollection<Cur3Record>& Data::getCur3Collection() const
 {
@@ -2709,9 +2709,9 @@ const IdCollection<DobjRecord>& Data::getDobjCollection() const
 {
     return dobjCollection;
 }
-const IdCollection<EfsrRecord>& Data::getEfsrCollection() const
+const IdCollection<EfsqRecord>& Data::getEfsqCollection() const
 {
-    return efsrCollection;
+    return efsqCollection;
 }
 const IdCollection<EqupRecord>& Data::getEqupCollection() const
 {

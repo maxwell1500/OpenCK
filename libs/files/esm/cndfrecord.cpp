@@ -1,14 +1,14 @@
-#include "cndarecord.hpp"
+#include "cndfrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
 
-void CndaRecord::initComponents()
+void CndfRecord::initComponents()
 {
     components.clear();
 }
 
-void CndaRecord::load(ESMReader& esm, bool)
+void CndfRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
@@ -42,7 +42,7 @@ void CndaRecord::load(ESMReader& esm, bool)
     }
 }
 
-void CndaRecord::save(ESMWriter& esm) const
+void CndfRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
 
@@ -54,7 +54,7 @@ void CndaRecord::save(ESMWriter& esm) const
     }
 }
 
-void CndaRecord::blank()
+void CndfRecord::blank()
 {
     editorId.clear();
     formId = 0;

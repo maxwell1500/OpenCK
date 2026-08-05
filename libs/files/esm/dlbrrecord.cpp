@@ -1,14 +1,14 @@
-#include "ciftrecord.hpp"
+#include "dlbrrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
 
-void CiftRecord::initComponents()
+void DlbrRecord::initComponents()
 {
     components.clear();
 }
 
-void CiftRecord::load(ESMReader& esm, bool)
+void DlbrRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
@@ -42,7 +42,7 @@ void CiftRecord::load(ESMReader& esm, bool)
     }
 }
 
-void CiftRecord::save(ESMWriter& esm) const
+void DlbrRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
 
@@ -54,7 +54,7 @@ void CiftRecord::save(ESMWriter& esm) const
     }
 }
 
-void CiftRecord::blank()
+void DlbrRecord::blank()
 {
     editorId.clear();
     formId = 0;

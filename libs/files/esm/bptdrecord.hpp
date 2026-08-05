@@ -1,5 +1,5 @@
-#ifndef CulkRECORD_H
-#define CulkRECORD_H
+#ifndef BptdRECORD_H
+#define BptdRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
 #include "../../components/formcomponents.hpp"
@@ -7,7 +7,7 @@
 #include <QVector>
 class ESMReader;
 class ESMWriter;
-struct CulkRecord {
+struct BptdRecord {
     openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
@@ -18,13 +18,13 @@ struct CulkRecord {
     void initComponents();
 };
 
-inline bool operator==(const CulkRecord& l, const CulkRecord& r)
+inline bool operator==(const BptdRecord& l, const BptdRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
         && l.rawSubRecords == r.rawSubRecords;
 }
 
-inline bool operator!=(const CulkRecord& l, const CulkRecord& r)
+inline bool operator!=(const BptdRecord& l, const BptdRecord& r)
 {
     return !(l == r);
 }

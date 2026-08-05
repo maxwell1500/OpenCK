@@ -183,20 +183,20 @@ set(ESM_SOURCES
     libs/files/esm/bmmorecord.cpp
     libs/files/esm/bmodrecord.cpp
     libs/files/esm/bndsrecord.cpp
-    libs/files/esm/bpttrecord.cpp
+    libs/files/esm/bptdrecord.cpp
     libs/files/esm/camsrecord.cpp
     libs/files/esm/chalrecord.cpp
-    libs/files/esm/ciftrecord.cpp
-    libs/files/esm/cndarecord.cpp
+    libs/files/esm/cldfrecord.cpp
+    libs/files/esm/cndfrecord.cpp
     libs/files/esm/collrecord.cpp
     libs/files/esm/cpthrecord.cpp
-    libs/files/esm/culkrecord.cpp
+    libs/files/esm/dlbrrecord.cpp
     libs/files/esm/cur3record.cpp
     libs/files/esm/curvrecord.cpp
     libs/files/esm/dfobrecord.cpp
     libs/files/esm/dmgtrecord.cpp
     libs/files/esm/dobjrecord.cpp
-    libs/files/esm/efsrrecord.cpp
+    libs/files/esm/efsqrecord.cpp
     libs/files/esm/equprecord.cpp
     libs/files/esm/conditionrecord.cpp
     libs/files/data/strings.cpp
@@ -339,20 +339,20 @@ set(ESM_HEADERS
     libs/files/esm/bmmorecord.hpp
     libs/files/esm/bmodrecord.hpp
     libs/files/esm/bndsrecord.hpp
-    libs/files/esm/bpttrecord.hpp
+    libs/files/esm/bptdrecord.hpp
     libs/files/esm/camsrecord.hpp
     libs/files/esm/chalrecord.hpp
-    libs/files/esm/ciftrecord.hpp
-    libs/files/esm/cndarecord.hpp
+    libs/files/esm/cldfrecord.hpp
+    libs/files/esm/cndfrecord.hpp
     libs/files/esm/collrecord.hpp
     libs/files/esm/cpthrecord.hpp
-    libs/files/esm/culkrecord.hpp
+    libs/files/esm/dlbrrecord.hpp
     libs/files/esm/cur3record.hpp
     libs/files/esm/curvrecord.hpp
     libs/files/esm/dfobrecord.hpp
     libs/files/esm/dmgtrecord.hpp
     libs/files/esm/dobjrecord.hpp
-    libs/files/esm/efsrrecord.hpp
+    libs/files/esm/efsqrecord.hpp
     libs/files/esm/equprecord.hpp
     libs/components/component.hpp
     libs/components/editorproperty.hpp
