@@ -15,6 +15,11 @@
 #include "../../libs/files/esm/relarecord.hpp"
 #include "../../libs/files/esm/revbrecord.hpp"
 #include "../../libs/files/esm/shourecord.hpp"
+#include "../../libs/files/esm/hdptrecord.hpp"
+#include "../../libs/files/esm/termrecord.hpp"
+#include "../../libs/files/esm/mattrecord.hpp"
+#include "../../libs/files/esm/movtrecord.hpp"
+#include "../../libs/files/esm/muscrecord.hpp"
 #include "../../libs/files/esm/esmreader.hpp"
 #include "../../libs/files/esm/esmwriter.hpp"
 #include "../../libs/files/log/logger.hpp"
@@ -37,6 +42,11 @@ private slots:
     void testIpdsRoundTrip();
     void testMustRoundTrip();
     void testRevbRoundTrip();
+    void testHdptRoundTrip();
+    void testTermRoundTrip();
+    void testMattRoundTrip();
+    void testMovtRoundTrip();
+    void testMuscRoundTrip();
 };
 
 void TestMissingRecords::initTestCase()
@@ -250,6 +260,81 @@ void TestMissingRecords::testRevbRoundTrip()
 
     RevbRecord loaded;
     roundTrip<RevbRecord>('REVB', rec, loaded);
+    QCOMPARE(loaded, rec);
+}
+
+void TestMissingRecords::testHdptRoundTrip()
+{
+    HdptRecord rec;
+    rec.editorId = QStringLiteral("TestHDPT");
+    rec.formId = 0xD001;
+    RawSubRecord full;
+    full.name = 'FULL';
+    full.data = QByteArray("Test Head Part", 15);
+    rec.rawSubRecords.push_back(full);
+
+    HdptRecord loaded;
+    roundTrip<HdptRecord>('HDPT', rec, loaded);
+    QCOMPARE(loaded, rec);
+}
+
+void TestMissingRecords::testTermRoundTrip()
+{
+    TermRecord rec;
+    rec.editorId = QStringLiteral("TestTERM");
+    rec.formId = 0xD002;
+    RawSubRecord full;
+    full.name = 'FULL';
+    full.data = QByteArray("Test Terminal", 14);
+    rec.rawSubRecords.push_back(full);
+
+    TermRecord loaded;
+    roundTrip<TermRecord>('TERM', rec, loaded);
+    QCOMPARE(loaded, rec);
+}
+
+void TestMissingRecords::testMattRoundTrip()
+{
+    MattRecord rec;
+    rec.editorId = QStringLiteral("TestMATT");
+    rec.formId = 0xD003;
+    RawSubRecord data;
+    data.name = 'DATA';
+    data.data = QByteArray("\x01\x00\x00\x00", 4);
+    rec.rawSubRecords.push_back(data);
+
+    MattRecord loaded;
+    roundTrip<MattRecord>('MATT', rec, loaded);
+    QCOMPARE(loaded, rec);
+}
+
+void TestMissingRecords::testMovtRoundTrip()
+{
+    MovtRecord rec;
+    rec.editorId = QStringLiteral("TestMOVT");
+    rec.formId = 0xD004;
+    RawSubRecord dnam;
+    dnam.name = 'DNAM';
+    dnam.data = QByteArray("\x00\x00\x80\x3F", 4);
+    rec.rawSubRecords.push_back(dnam);
+
+    MovtRecord loaded;
+    roundTrip<MovtRecord>('MOVT', rec, loaded);
+    QCOMPARE(loaded, rec);
+}
+
+void TestMissingRecords::testMuscRoundTrip()
+{
+    MuscRecord rec;
+    rec.editorId = QStringLiteral("TestMUSC");
+    rec.formId = 0xD005;
+    RawSubRecord wnam;
+    wnam.name = 'WNAM';
+    wnam.data = QByteArray("music/test.xwm", 14);
+    rec.rawSubRecords.push_back(wnam);
+
+    MuscRecord loaded;
+    roundTrip<MuscRecord>('MUSC', rec, loaded);
     QCOMPARE(loaded, rec);
 }
 

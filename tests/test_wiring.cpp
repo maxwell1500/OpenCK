@@ -42,6 +42,9 @@ static const TypeDisk kMacroAdded[] = {
     { CkId::Type_Ipds_, "IPDS" }, { CkId::Type_Must_, "MUST" },
     { CkId::Type_Plnt_, "PNDT" }, { CkId::Type_Rela_, "RELA" },
     { CkId::Type_Revb_, "REVB" }, { CkId::Type_Shou_, "SHOU" },
+    { CkId::Type_Hdpt_, "HDPT" }, { CkId::Type_Term_, "TERM" },
+    { CkId::Type_Matt_, "MATT" }, { CkId::Type_Movt_, "MOVT" },
+    { CkId::Type_Musc_, "MUSC" },
 };
 
 // The 13 types wired into the Document::save dispatch array.
@@ -53,9 +56,12 @@ static const TypeDisk kSaveWired[] = {
     { CkId::Type_Ipds_, "IPDS" }, { CkId::Type_Must_, "MUST" },
     { CkId::Type_Rela_, "RELA" }, { CkId::Type_Revb_, "REVB" },
     { CkId::Type_Shou_, "SHOU" },
+    { CkId::Type_Hdpt_, "HDPT" }, { CkId::Type_Term_, "TERM" },
+    { CkId::Type_Matt_, "MATT" }, { CkId::Type_Movt_, "MOVT" },
+    { CkId::Type_Musc_, "MUSC" },
 };
 
-// All 92 record types. Excludes GameSetting (GMST), GlobalVariable (GLOB)
+// All 97 record types. Excludes GameSetting (GMST), GlobalVariable (GLOB)
 // and LocationRefType (LCRT), whose structs carry no FormComponents member
 // and must stay out of the resolver macro.
 static const TypeDisk kComponentCapable[] = {
@@ -104,6 +110,9 @@ static const TypeDisk kComponentCapable[] = {
     { CkId::Type_Ipds_, "IPDS" },       { CkId::Type_Must_, "MUST" },
     { CkId::Type_Rela_, "RELA" },       { CkId::Type_Revb_, "REVB" },
     { CkId::Type_Shou_, "SHOU" },
+    { CkId::Type_Hdpt_, "HDPT" },       { CkId::Type_Term_, "TERM" },
+    { CkId::Type_Matt_, "MATT" },       { CkId::Type_Movt_, "MOVT" },
+    { CkId::Type_Musc_, "MUSC" },
 };
 
 } // namespace

@@ -98,6 +98,11 @@
 #include "../../../libs/files/esm/relarecord.hpp"
 #include "../../../libs/files/esm/revbrecord.hpp"
 #include "../../../libs/files/esm/shourecord.hpp"
+#include "../../../libs/files/esm/hdptrecord.hpp"
+#include "../../../libs/files/esm/termrecord.hpp"
+#include "../../../libs/files/esm/mattrecord.hpp"
+#include "../../../libs/files/esm/movtrecord.hpp"
+#include "../../../libs/files/esm/muscrecord.hpp"
 
 #include <QObject>
 #include <QStringList>
@@ -464,6 +469,21 @@ public:
     /// \brief Get SHOU collection
     /// \return Const reference to the SHOU record collection
     const IdCollection<ShouRecord>& getShouCollection() const;
+    /// \brief Get HDPT collection
+    /// \return Const reference to the HDPT record collection
+    const IdCollection<HdptRecord>& getHdptCollection() const;
+    /// \brief Get TERM collection
+    /// \return Const reference to the TERM record collection
+    const IdCollection<TermRecord>& getTermCollection() const;
+    /// \brief Get MATT collection
+    /// \return Const reference to the MATT record collection
+    const IdCollection<MattRecord>& getMattCollection() const;
+    /// \brief Get MOVT collection
+    /// \return Const reference to the MOVT record collection
+    const IdCollection<MovtRecord>& getMovtCollection() const;
+    /// \brief Get MUSC collection
+    /// \return Const reference to the MUSC record collection
+    const IdCollection<MuscRecord>& getMuscCollection() const;
 
     // --- Non-const overloads for mutation ---
 
@@ -746,6 +766,21 @@ public:
     /// \brief Get SHOU collection (mutable)
     /// \return Reference to the SHOU record collection for modification
     IdCollection<ShouRecord>& getShouCollection();
+    /// \brief Get HDPT collection (mutable)
+    /// \return Reference to the HDPT record collection for modification
+    IdCollection<HdptRecord>& getHdptCollection();
+    /// \brief Get TERM collection (mutable)
+    /// \return Reference to the TERM record collection for modification
+    IdCollection<TermRecord>& getTermCollection();
+    /// \brief Get MATT collection (mutable)
+    /// \return Reference to the MATT record collection for modification
+    IdCollection<MattRecord>& getMattCollection();
+    /// \brief Get MOVT collection (mutable)
+    /// \return Reference to the MOVT record collection for modification
+    IdCollection<MovtRecord>& getMovtCollection();
+    /// \brief Get MUSC collection (mutable)
+    /// \return Reference to the MUSC record collection for modification
+    IdCollection<MuscRecord>& getMuscCollection();
 
     /// \brief Get collection by record type (const version)
     /// \param type Record type identifier
@@ -1085,6 +1120,11 @@ private:
     IdCollection<RelaRecord> relaCollection;
     IdCollection<RevbRecord> revbCollection;
     IdCollection<ShouRecord> shouCollection;
+    IdCollection<HdptRecord> hdptCollection;
+    IdCollection<TermRecord> termCollection;
+    IdCollection<MattRecord> mattCollection;
+    IdCollection<MovtRecord> movtCollection;
+    IdCollection<MuscRecord> muscCollection;
 
     QVector<QAbstractItemModel*> models;
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;

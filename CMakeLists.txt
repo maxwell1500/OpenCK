@@ -158,6 +158,11 @@ set(ESM_SOURCES
     libs/files/esm/relarecord.cpp
     libs/files/esm/revbrecord.cpp
     libs/files/esm/shourecord.cpp
+    libs/files/esm/hdptrecord.cpp
+    libs/files/esm/termrecord.cpp
+    libs/files/esm/mattrecord.cpp
+    libs/files/esm/movtrecord.cpp
+    libs/files/esm/muscrecord.cpp
     libs/files/esm/conditionrecord.cpp
     libs/files/data/strings.cpp
 )
@@ -274,6 +279,11 @@ set(ESM_HEADERS
     libs/files/esm/relarecord.hpp
     libs/files/esm/revbrecord.hpp
     libs/files/esm/shourecord.hpp
+    libs/files/esm/hdptrecord.hpp
+    libs/files/esm/termrecord.hpp
+    libs/files/esm/mattrecord.hpp
+    libs/files/esm/movtrecord.hpp
+    libs/files/esm/muscrecord.hpp
     libs/components/component.hpp
     libs/components/editorproperty.hpp
     libs/components/formcomponents.hpp

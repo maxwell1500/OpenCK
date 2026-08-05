@@ -168,6 +168,11 @@ void Document::save(const QString& savePath)
             {&data->getRelaCollection(),  'RELA'},
             {&data->getRevbCollection(),  'REVB'},
             {&data->getShouCollection(),  'SHOU'},
+            {&data->getHdptCollection(),  'HDPT'},
+            {&data->getTermCollection(),  'TERM'},
+            {&data->getMattCollection(),  'MATT'},
+            {&data->getMovtCollection(),  'MOVT'},
+            {&data->getMuscCollection(),  'MUSC'},
         };
 
         for (const auto& entry : saveableCollections)

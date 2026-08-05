@@ -112,6 +112,11 @@ public:
     Type_Rela_,
     Type_Revb_,
     Type_Shou_,
+    Type_Hdpt_,
+    Type_Term_,
+    Type_Matt_,
+    Type_Movt_,
+    Type_Musc_,
 
     NumTypes
 };

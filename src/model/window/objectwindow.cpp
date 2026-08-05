@@ -313,6 +313,21 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Shou_:
             cat.totalRecords = data->getShouCollection().size();
             break;
+        case CkId::Type_Hdpt_:
+            cat.totalRecords = data->getHdptCollection().size();
+            break;
+        case CkId::Type_Term_:
+            cat.totalRecords = data->getTermCollection().size();
+            break;
+        case CkId::Type_Matt_:
+            cat.totalRecords = data->getMattCollection().size();
+            break;
+        case CkId::Type_Movt_:
+            cat.totalRecords = data->getMovtCollection().size();
+            break;
+        case CkId::Type_Musc_:
+            cat.totalRecords = data->getMuscCollection().size();
+            break;
         default:
             break;
         }
@@ -691,6 +706,26 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getShouCollection().getId(i);
                 formId = formatFormId(data->getShouCollection().getRecord(i).get().formId);
                 break;
+            case CkId::Type_Hdpt_:
+                editorId = data->getHdptCollection().getId(i);
+                formId = formatFormId(data->getHdptCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Term_:
+                editorId = data->getTermCollection().getId(i);
+                formId = formatFormId(data->getTermCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Matt_:
+                editorId = data->getMattCollection().getId(i);
+                formId = formatFormId(data->getMattCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Movt_:
+                editorId = data->getMovtCollection().getId(i);
+                formId = formatFormId(data->getMovtCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Musc_:
+                editorId = data->getMuscCollection().getId(i);
+                formId = formatFormId(data->getMuscCollection().getRecord(i).get().formId);
+                break;
             default:
                 break;
             }
@@ -776,7 +811,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Combat Style", CkId::Type_Csty_);
     addCategory("Encounter Zone", CkId::Type_Eczn_);
     addCategory("Body Part", CkId::Type_None);
-    addCategory("Head Part", CkId::Type_None);
+    addCategory("Head Part", CkId::Type_Hdpt_);
     addCategory("Keyword", CkId::Type_Kywd_);
     addCategory("Camera Path", CkId::Type_None);
     addCategory("Camera Shot", CkId::Type_None);
@@ -785,7 +820,10 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Speech Challenge", CkId::Type_None);
 
     addCategory("Music Type", CkId::Type_Must_);
+    addCategory("Music Track", CkId::Type_Musc_);
     addCategory("Voice Type", CkId::Type_None);
+    addCategory("Material Type", CkId::Type_Matt_);
+    addCategory("Movement Type", CkId::Type_Movt_);
 
     addCategory("Animated Object", CkId::Type_Anio_);
     addCategory("Color", CkId::Type_Clfm_);
@@ -797,7 +835,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Scene", CkId::Type_Scen_);
     addCategory("Message", CkId::Type_Mesg_);
     addCategory("Note", CkId::Type_Note_);
-    addCategory("Terminal", CkId::Type_None);
+    addCategory("Terminal", CkId::Type_Term_);
 
     addCategory("Navmesh", CkId::Type_Navm_);
     addCategory("Climate", CkId::Type_Clmt_);
@@ -868,14 +906,14 @@ void ObjectWindowModel::initCategories(Data* data)
     addGroupNamed("Gameplay", {"Quest", "Package", "Global", "Game Setting", "Perk", "Class", "Faction",
                                "Race", "Combat Style", "Encounter Zone", "Body Part", "Head Part", "Location",
                                "Keyword", "Camera Path", "Camera Shot", "Impact Data", "Lens Flare",
-                               "Speech Challenge", "Birthsign", "Relationship", "Shout"});
-    addGroupNamed("Audio", {"Sound", "Music Type", "Voice Type", "Sound Marker", "Reverb"});
+                               "Speech Challenge", "Birthsign", "Relationship", "Shout", "Movement Type"});
+    addGroupNamed("Audio", {"Sound", "Music Type", "Music Track", "Voice Type", "Sound Marker", "Reverb"});
     addGroupNamed("Dialogue", {"Dialogue", "Info", "Topic", "Scene", "Message", "Note", "Terminal"});
     addGroupNamed("World", {"Cell", "Worldspace", "Navmesh", "Landscape", "Reference", "Weather",
                             "Land Texture", "Climate", "Region", "Road"});
     addGroupNamed("Miscellaneous", {"Location Reference Type", "Effect Shader", "Art Object", "Water Shader",
                                     "Weather Shader", "Power", "Default Object", "Association Type",
-                                    "Biome", "Snap Template", "Material", "Load Screen", "Script",
+                                    "Biome", "Snap Template", "Material", "Material Type", "Load Screen", "Script",
                                     "Animated Object", "Color"});
 }
 
@@ -1082,6 +1120,26 @@ void ObjectWindowModel::rebuildAllRecords()
                 case CkId::Type_Land_:
                     rec.editorId = mData->getLandCollection().getId(i);
                     rec.formId = formatFormId(mData->getLandCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Hdpt_:
+                    rec.editorId = mData->getHdptCollection().getId(i);
+                    rec.formId = formatFormId(mData->getHdptCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Term_:
+                    rec.editorId = mData->getTermCollection().getId(i);
+                    rec.formId = formatFormId(mData->getTermCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Matt_:
+                    rec.editorId = mData->getMattCollection().getId(i);
+                    rec.formId = formatFormId(mData->getMattCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Movt_:
+                    rec.editorId = mData->getMovtCollection().getId(i);
+                    rec.formId = formatFormId(mData->getMovtCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Musc_:
+                    rec.editorId = mData->getMuscCollection().getId(i);
+                    rec.formId = formatFormId(mData->getMuscCollection().getRecord(i).get().formId);
                     break;
                 default:
                     break;

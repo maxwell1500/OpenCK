@@ -625,6 +625,36 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     shouCollection.addColumn(new StringColumn<ShouRecord>("Name", &ShouRecord::editorId));
     addModel(new IdTable(&shouCollection), CkId::Type_Shou_);
 
+    // HDPT - Head Part
+    hdptCollection.addColumn(new StringIdColumn<HdptRecord>());
+    hdptCollection.addColumn(new RecordStateColumn<HdptRecord>());
+    hdptCollection.addColumn(new StringColumn<HdptRecord>("Name", &HdptRecord::editorId));
+    addModel(new IdTable(&hdptCollection), CkId::Type_Hdpt_);
+
+    // TERM - Terminal
+    termCollection.addColumn(new StringIdColumn<TermRecord>());
+    termCollection.addColumn(new RecordStateColumn<TermRecord>());
+    termCollection.addColumn(new StringColumn<TermRecord>("Name", &TermRecord::editorId));
+    addModel(new IdTable(&termCollection), CkId::Type_Term_);
+
+    // MATT - Material Type
+    mattCollection.addColumn(new StringIdColumn<MattRecord>());
+    mattCollection.addColumn(new RecordStateColumn<MattRecord>());
+    mattCollection.addColumn(new StringColumn<MattRecord>("Name", &MattRecord::editorId));
+    addModel(new IdTable(&mattCollection), CkId::Type_Matt_);
+
+    // MOVT - Movement Type
+    movtCollection.addColumn(new StringIdColumn<MovtRecord>());
+    movtCollection.addColumn(new RecordStateColumn<MovtRecord>());
+    movtCollection.addColumn(new StringColumn<MovtRecord>("Name", &MovtRecord::editorId));
+    addModel(new IdTable(&movtCollection), CkId::Type_Movt_);
+
+    // MUSC - Music Track
+    muscCollection.addColumn(new StringIdColumn<MuscRecord>());
+    muscCollection.addColumn(new RecordStateColumn<MuscRecord>());
+    muscCollection.addColumn(new StringColumn<MuscRecord>("Name", &MuscRecord::editorId));
+    addModel(new IdTable(&muscCollection), CkId::Type_Musc_);
+
     // Loading Log (metadata)
     metaData.addColumn(new StringIdColumn<MetaData>());
     metaData.addColumn(new RecordStateColumn<MetaData>());
@@ -810,6 +840,11 @@ bool Data::continueLoading(Messages& messages)
     case 'RELA': relaCollection.load(*reader, base); break;
     case 'REVB': revbCollection.load(*reader, base); break;
     case 'SHOU': shouCollection.load(*reader, base); break;
+    case 'HDPT': hdptCollection.load(*reader, base); break;
+    case 'TERM': termCollection.load(*reader, base); break;
+    case 'MATT': mattCollection.load(*reader, base); break;
+    case 'MOVT': movtCollection.load(*reader, base); break;
+    case 'MUSC': muscCollection.load(*reader, base); break;
             default:
             {
                 if (name == 0)
@@ -1095,6 +1130,11 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Rela_:    return &relaCollection;
     case CkId::Type_Revb_:    return &revbCollection;
     case CkId::Type_Shou_:    return &shouCollection;
+    case CkId::Type_Hdpt_:    return &hdptCollection;
+    case CkId::Type_Term_:    return &termCollection;
+    case CkId::Type_Matt_:    return &mattCollection;
+    case CkId::Type_Movt_:    return &movtCollection;
+    case CkId::Type_Musc_:    return &muscCollection;
     default:                  return nullptr;
     }
 }
@@ -1195,6 +1235,11 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Rela_:    return &relaCollection;
     case CkId::Type_Revb_:    return &revbCollection;
     case CkId::Type_Shou_:    return &shouCollection;
+    case CkId::Type_Hdpt_:    return &hdptCollection;
+    case CkId::Type_Term_:    return &termCollection;
+    case CkId::Type_Matt_:    return &mattCollection;
+    case CkId::Type_Movt_:    return &movtCollection;
+    case CkId::Type_Musc_:    return &muscCollection;
     default:                  return nullptr;
     }
 }
@@ -1294,6 +1339,11 @@ IdCollection<MustRecord>& Data::getMustCollection() { return mustCollection; }
 IdCollection<RelaRecord>& Data::getRelaCollection() { return relaCollection; }
 IdCollection<RevbRecord>& Data::getRevbCollection() { return revbCollection; }
 IdCollection<ShouRecord>& Data::getShouCollection() { return shouCollection; }
+IdCollection<HdptRecord>& Data::getHdptCollection() { return hdptCollection; }
+IdCollection<TermRecord>& Data::getTermCollection() { return termCollection; }
+IdCollection<MattRecord>& Data::getMattCollection() { return mattCollection; }
+IdCollection<MovtRecord>& Data::getMovtCollection() { return movtCollection; }
+IdCollection<MuscRecord>& Data::getMuscCollection() { return muscCollection; }
 
 QVector<IRecordCollection*> Data::allCollections()
 {
@@ -1378,6 +1428,11 @@ QVector<IRecordCollection*> Data::allCollections()
         &txstCollection,
         &wateCollection,
         &scenCollection,
+        &hdptCollection,
+        &termCollection,
+        &mattCollection,
+        &movtCollection,
+        &muscCollection,
     };
 }
 
@@ -1475,6 +1530,11 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&relaCollection,    CkId::Type_Rela_},
         {&revbCollection,    CkId::Type_Revb_},
         {&shouCollection,    CkId::Type_Shou_},
+        {&hdptCollection,    CkId::Type_Hdpt_},
+        {&termCollection,    CkId::Type_Term_},
+        {&mattCollection,    CkId::Type_Matt_},
+        {&movtCollection,    CkId::Type_Movt_},
+        {&muscCollection,    CkId::Type_Musc_},
         {&scenCollection,    CkId::Type_Scen_},
     };
 }
@@ -2110,6 +2170,26 @@ const IdCollection<RevbRecord>& Data::getRevbCollection() const
 const IdCollection<ShouRecord>& Data::getShouCollection() const
 {
     return shouCollection;
+}
+const IdCollection<HdptRecord>& Data::getHdptCollection() const
+{
+    return hdptCollection;
+}
+const IdCollection<TermRecord>& Data::getTermCollection() const
+{
+    return termCollection;
+}
+const IdCollection<MattRecord>& Data::getMattCollection() const
+{
+    return mattCollection;
+}
+const IdCollection<MovtRecord>& Data::getMovtCollection() const
+{
+    return movtCollection;
+}
+const IdCollection<MuscRecord>& Data::getMuscCollection() const
+{
+    return muscCollection;
 }
 
 bool Data::addMaterial(MaterialRecord& record)

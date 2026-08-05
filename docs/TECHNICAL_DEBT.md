@@ -19,8 +19,8 @@
 
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
-| H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp:18` (Phase 23.4 follow-up) | Only typed reference fields (RELA parent/child, SHOU words, etc.) are rewritten. References embedded in raw subrecords (XOWN, XPRM, etc.) are left untouched, producing broken refs for many record types. Needs a per-record-type FormID field map. |
-| H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | Starfield.esm has 180 distinct record types; CkId covers ~90. Medium-impact missing types: HDPT (head parts x230), TERM (terminals x368), MATT (material type x249), MOVT (movement x43), MUSC (music track x83). Internal/infrastructure types (RFGP x80584, PKIN x11281, LMSW x12966) are lower priority. |
+| H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp` | Partially resolved — see R21 (raw-subrecord + component refs for the known layouts; XPRM and opaque Starfield payloads remain). |
+| H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | 109 types missing (precise scan, not ~90). First batch wired: HDPT, TERM, MATT, MOVT, MUSC (see R22). Wiring drift in the existing 92 types also fixed (diskAliases 67→92, FOR_EACH macro 77→89, save array +13, categories). Remaining: ACHR, ARMA, AFFE, ASPC, ATMO, BIOM, CAMS, CPTH, DFOB, EQUP, FSTP, FSTS, IRES, KSSM, LENS, LVLB, LVLN, MRPH, PDCL, PGRE, PHZD, SPCH, TRNS, TMLM, VTYP, WKMF, WWED + ~80 more incl. infrastructure types (RFGP, PKIN, LMSW, LAYR, OMOD, GBFM). |
 | H3 | BA2 DX10 (texture) archives can't be read or written | `ba2archive.cpp` | Resolved — see R20. |
 
 ---
@@ -73,6 +73,8 @@
 | R18 | Search dialog can't edit most record types | Done — shared `FormComponentsResolver` (`src/model/tools/formcomponentsresolver.hpp/.cpp`) moved `resolveComponents` out of the Object Window; Search dialog's default case now opens component-based records via `QtFormDialogManager::openOrFocus`. |
 | R19 | Export templates incomplete | Done — `fieldsForType` field lists corrected for all 22 types, `recordFieldValue` getters added for INGR_/ENCH_/CONT_/MISC_/ACTI_/STAT_/RACE_/CLASS_/FACT_/INFO_/CELL/WRLD_/LOCT_, and the export if/else chain replaced with a generic `exportRecords<T>` template so every template type exports. |
 | R20 | BA2 DX10 (texture) archives can't be read or written | Done — `parseBtdxTextures` now parses 24-byte DX10 records + mip chunks (v1/2/3, zlib + Starfield v3 LZ4); `extract()` rebuilds a DDS (with DX10 extended header) from the chunk payloads; `create()` now writes real DX10 archives when `archiveType == "DX10"`. `DdsDecoder` gained DX10-extended-header support (BC1-5) so the Archive Browser texture preview works. `test_ba2dx10` covers real Starfield v2/v3 archives (via `OPENCK_TEST_BA2_DIR`) + a synthetic write→read round-trip. |
+| R21 | FormIdCompactor raw-subrecord refs | Done (partial) — rewrites FormIDs in raw subrecords for known layouts (CELL XEZN/XLCN/LTMP/XWEM/XCLR, REFR XNAM/XEMI/XLTW/XMBO/XCNT/XPRD/XTEL/XLKR, NPC VOIC/HDPT/LVLD, DIAL/QUST QNAM, ALCH/INGR/ENCH/SPELL/MAGIC EFID, KWDA arrays) and component-owned refs (enchantment, pickup/putdown sounds). XPRM and opaque Starfield payloads remain a documented limitation. `test_esl` covers it. |
+| R22 | 5 medium-impact record types added | Done — HDPT, TERM, MATT, MOVT, MUSC fully wired (struct, CkId + disk alias, collection, load/save, generic edit, save dispatch, Object Window category, round-trip tests). Unknown subrecords preserved losslessly as raw. |
 
 ---
 

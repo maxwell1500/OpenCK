@@ -40,6 +40,7 @@
 #include "../../../libs/files/esm/grassrecord.hpp"
 #include "../../../libs/files/esm/hairrecord.hpp"
 #include "../../../libs/files/esm/hazdrecord.hpp"
+#include "../../../libs/files/esm/hdptrecord.hpp"
 #include "../../../libs/files/esm/idleanimationrecord.hpp"
 #include "../../../libs/files/esm/idlemarkerrecord.hpp"
 #include "../../../libs/files/esm/imagespacerecord.hpp"
@@ -59,6 +60,9 @@
 #include "../../../libs/files/esm/lvspellrecord.hpp"
 #include "../../../libs/files/esm/magicrecord.hpp"
 #include "../../../libs/files/esm/materialrecord.hpp"
+#include "../../../libs/files/esm/mattrecord.hpp"
+#include "../../../libs/files/esm/movtrecord.hpp"
+#include "../../../libs/files/esm/muscrecord.hpp"
 #include "../../../libs/files/esm/messagerecord.hpp"
 #include "../../../libs/files/esm/miscrecord.hpp"
 #include "../../../libs/files/esm/msttrecord.hpp"
@@ -89,6 +93,7 @@
 #include "../../../libs/files/esm/spellrecord.hpp"
 #include "../../../libs/files/esm/staticcollectionrecord.hpp"
 #include "../../../libs/files/esm/statrecord.hpp"
+#include "../../../libs/files/esm/termrecord.hpp"
 #include "../../../libs/files/esm/texturesetrecord.hpp"
 #include "../../../libs/files/esm/treerecord.hpp"
 #include "../../../libs/files/esm/waterecord.hpp"
@@ -147,6 +152,7 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(GrassRecord) \
     MACRO(HairRecord) \
     MACRO(HazdRecord) \
+    MACRO(HdptRecord) \
     MACRO(IdleAnimationRecord) \
     MACRO(IdleMarkerRecord) \
     MACRO(ImgsRecord) \
@@ -166,6 +172,9 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(LvspRecord) \
     MACRO(MagicRecord) \
     MACRO(MaterialRecord) \
+    MACRO(MattRecord) \
+    MACRO(MovtRecord) \
+    MACRO(MuscRecord) \
     MACRO(MesgRecord) \
     MACRO(MiscRecord) \
     MACRO(MsttRecord) \
@@ -196,6 +205,7 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(StaticCollectionRecord) \
     MACRO(StatRecord) \
     MACRO(ScenRecord) \
+    MACRO(TermRecord) \
     MACRO(TextureSetRecord) \
     MACRO(TreeRecord) \
     MACRO(WateRecord) \

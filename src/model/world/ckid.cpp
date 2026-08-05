@@ -103,6 +103,11 @@ static const TypeData typesIdArg[] =
     { CkId::Type_Rela_, "Relationship" },
     { CkId::Type_Revb_, "Reverb Parameters" },
     { CkId::Type_Shou_, "Shout" },
+    { CkId::Type_Hdpt_, "Head Part" },
+    { CkId::Type_Term_, "Terminal" },
+    { CkId::Type_Matt_, "Material Type" },
+    { CkId::Type_Movt_, "Movement Type" },
+    { CkId::Type_Musc_, "Music Track" },
     { CkId::Type_None, 0 }
 };
 
@@ -200,6 +205,11 @@ static const TypeData typesNoArg[] =
     { CkId::Type_Rela_, "Relationships" },
     { CkId::Type_Revb_, "Reverb Parameters" },
     { CkId::Type_Shou_, "Shouts" },
+    { CkId::Type_Hdpt_, "Head Parts" },
+    { CkId::Type_Term_, "Terminals" },
+    { CkId::Type_Matt_, "Material Types" },
+    { CkId::Type_Movt_, "Movement Types" },
+    { CkId::Type_Musc_, "Music Tracks" },
     { CkId::Type_None, 0 }
 };
 
@@ -484,6 +494,8 @@ CkId::Type CkId::stringToType(const QString& typeName)
             { Type_Debr_, "DEBR" }, { Type_Eczn_, "ECZN" }, { Type_Hazd_, "HAZD" },
             { Type_Ipct_, "IPCT" }, { Type_Ipds_, "IPDS" }, { Type_Must_, "MUST" },
             { Type_Rela_, "RELA" }, { Type_Revb_, "REVB" }, { Type_Shou_, "SHOU" },
+            { Type_Hdpt_, "HDPT" }, { Type_Term_, "TERM" }, { Type_Matt_, "MATT" },
+            { Type_Movt_, "MOVT" }, { Type_Musc_, "MUSC" },
         };
         for (const auto& alias : diskAliases)
         {
