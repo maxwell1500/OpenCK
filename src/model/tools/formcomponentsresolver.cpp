@@ -100,6 +100,41 @@
 #include "../../../libs/files/esm/weaprecord.hpp"
 #include "../../../libs/files/esm/worldspacerecord.hpp"
 #include "../../../libs/files/esm/wthrrecord.hpp"
+#include "../../../libs/files/esm/aactrecord.hpp"
+#include "../../../libs/files/esm/aamdrecord.hpp"
+#include "../../../libs/files/esm/aapdrecord.hpp"
+#include "../../../libs/files/esm/achrrecord.hpp"
+#include "../../../libs/files/esm/addnrecord.hpp"
+#include "../../../libs/files/esm/afferecord.hpp"
+#include "../../../libs/files/esm/ambsrecord.hpp"
+#include "../../../libs/files/esm/amdlrecord.hpp"
+#include "../../../libs/files/esm/aopfrecord.hpp"
+#include "../../../libs/files/esm/aopsrecord.hpp"
+#include "../../../libs/files/esm/aorurecord.hpp"
+#include "../../../libs/files/esm/armarecord.hpp"
+#include "../../../libs/files/esm/artorecord.hpp"
+#include "../../../libs/files/esm/aspcrecord.hpp"
+#include "../../../libs/files/esm/atmrecord.hpp"
+#include "../../../libs/files/esm/avmdrecord.hpp"
+#include "../../../libs/files/esm/biomrecord.hpp"
+#include "../../../libs/files/esm/bmmorecord.hpp"
+#include "../../../libs/files/esm/bmodrecord.hpp"
+#include "../../../libs/files/esm/bndsrecord.hpp"
+#include "../../../libs/files/esm/bpttrecord.hpp"
+#include "../../../libs/files/esm/camsrecord.hpp"
+#include "../../../libs/files/esm/chalrecord.hpp"
+#include "../../../libs/files/esm/ciftrecord.hpp"
+#include "../../../libs/files/esm/cndarecord.hpp"
+#include "../../../libs/files/esm/collrecord.hpp"
+#include "../../../libs/files/esm/cpthrecord.hpp"
+#include "../../../libs/files/esm/culkrecord.hpp"
+#include "../../../libs/files/esm/cur3record.hpp"
+#include "../../../libs/files/esm/curvrecord.hpp"
+#include "../../../libs/files/esm/dfobrecord.hpp"
+#include "../../../libs/files/esm/dmgtrecord.hpp"
+#include "../../../libs/files/esm/dobjrecord.hpp"
+#include "../../../libs/files/esm/efsrrecord.hpp"
+#include "../../../libs/files/esm/equprecord.hpp"
 
 namespace {
 template <typename T>
@@ -118,31 +153,66 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
 }
 
 #define FOR_EACH_COMPONENT_RECORD_TYPE(MACRO) \
+    MACRO(AactRecord) \
+    MACRO(AamdRecord) \
+    MACRO(AapdRecord) \
+    MACRO(AchrRecord) \
     MACRO(ActiRecord) \
     MACRO(ActorValueInfoRecord) \
+    MACRO(AddnRecord) \
+    MACRO(AffeRecord) \
     MACRO(AlchRecord) \
+    MACRO(AmbsRecord) \
+    MACRO(AmdlRecord) \
     MACRO(AmmoRecord) \
     MACRO(AnioRecord) \
+    MACRO(AopfRecord) \
+    MACRO(AopsRecord) \
+    MACRO(AoruRecord) \
     MACRO(AppaRecord) \
+    MACRO(ArmaRecord) \
     MACRO(ArmorRecord) \
+    MACRO(ArtoRecord) \
     MACRO(ArtvRecord) \
+    MACRO(AspcRecord) \
+    MACRO(AtmoRecord) \
+    MACRO(AvmdRecord) \
+    MACRO(BiomRecord) \
     MACRO(BookRecord) \
+    MACRO(BmmoRecord) \
+    MACRO(BmodRecord) \
+    MACRO(BndsRecord) \
+    MACRO(BpttRecord) \
     MACRO(BsgnRecord) \
+    MACRO(CamsRecord) \
     MACRO(CellRecord) \
+    MACRO(ChalRecord) \
+    MACRO(CiftRecord) \
     MACRO(ClassRecord) \
     MACRO(ClfmRecord) \
     MACRO(ClimateRecord) \
     MACRO(ClotRecord) \
+    MACRO(CndaRecord) \
     MACRO(CobjRecord) \
+    MACRO(CollRecord) \
     MACRO(ContRecord) \
+    MACRO(CpthRecord) \
     MACRO(CreatureRecord) \
     MACRO(CstyRecord) \
+    MACRO(CulkRecord) \
+    MACRO(Cur3Record) \
+    MACRO(CurvRecord) \
     MACRO(DebrRecord) \
+    MACRO(DfobRecord) \
     MACRO(DialRecord) \
+    MACRO(DmgtRecord) \
+    MACRO(DobjRecord) \
     MACRO(DoorRecord) \
     MACRO(EcznRecord) \
     MACRO(EfshRecord) \
+    MACRO(EfsrRecord) \
     MACRO(EnchRecord) \
+    MACRO(EqupRecord) \
     MACRO(ExplRecord) \
     MACRO(EyesRecord) \
     MACRO(FactRecord) \

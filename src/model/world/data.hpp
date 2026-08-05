@@ -103,6 +103,41 @@
 #include "../../../libs/files/esm/mattrecord.hpp"
 #include "../../../libs/files/esm/movtrecord.hpp"
 #include "../../../libs/files/esm/muscrecord.hpp"
+#include "../../../libs/files/esm/aactrecord.hpp"
+#include "../../../libs/files/esm/aamdrecord.hpp"
+#include "../../../libs/files/esm/aapdrecord.hpp"
+#include "../../../libs/files/esm/achrrecord.hpp"
+#include "../../../libs/files/esm/addnrecord.hpp"
+#include "../../../libs/files/esm/afferecord.hpp"
+#include "../../../libs/files/esm/ambsrecord.hpp"
+#include "../../../libs/files/esm/amdlrecord.hpp"
+#include "../../../libs/files/esm/aopfrecord.hpp"
+#include "../../../libs/files/esm/aopsrecord.hpp"
+#include "../../../libs/files/esm/aorurecord.hpp"
+#include "../../../libs/files/esm/armarecord.hpp"
+#include "../../../libs/files/esm/artorecord.hpp"
+#include "../../../libs/files/esm/aspcrecord.hpp"
+#include "../../../libs/files/esm/atmrecord.hpp"
+#include "../../../libs/files/esm/avmdrecord.hpp"
+#include "../../../libs/files/esm/biomrecord.hpp"
+#include "../../../libs/files/esm/bmmorecord.hpp"
+#include "../../../libs/files/esm/bmodrecord.hpp"
+#include "../../../libs/files/esm/bndsrecord.hpp"
+#include "../../../libs/files/esm/bpttrecord.hpp"
+#include "../../../libs/files/esm/camsrecord.hpp"
+#include "../../../libs/files/esm/chalrecord.hpp"
+#include "../../../libs/files/esm/ciftrecord.hpp"
+#include "../../../libs/files/esm/cndarecord.hpp"
+#include "../../../libs/files/esm/collrecord.hpp"
+#include "../../../libs/files/esm/cpthrecord.hpp"
+#include "../../../libs/files/esm/culkrecord.hpp"
+#include "../../../libs/files/esm/cur3record.hpp"
+#include "../../../libs/files/esm/curvrecord.hpp"
+#include "../../../libs/files/esm/dfobrecord.hpp"
+#include "../../../libs/files/esm/dmgtrecord.hpp"
+#include "../../../libs/files/esm/dobjrecord.hpp"
+#include "../../../libs/files/esm/efsrrecord.hpp"
+#include "../../../libs/files/esm/equprecord.hpp"
 
 #include <QObject>
 #include <QStringList>
@@ -484,6 +519,111 @@ public:
     /// \brief Get MUSC collection
     /// \return Const reference to the MUSC record collection
     const IdCollection<MuscRecord>& getMuscCollection() const;
+    /// \brief Get AACT collection
+    /// \return Const reference to the AACT record collection
+    const IdCollection<AactRecord>& getAactCollection() const;
+    /// \brief Get AAMD collection
+    /// \return Const reference to the AAMD record collection
+    const IdCollection<AamdRecord>& getAamdCollection() const;
+    /// \brief Get AAPD collection
+    /// \return Const reference to the AAPD record collection
+    const IdCollection<AapdRecord>& getAapdCollection() const;
+    /// \brief Get ACHR collection
+    /// \return Const reference to the ACHR record collection
+    const IdCollection<AchrRecord>& getAchrCollection() const;
+    /// \brief Get ADDN collection
+    /// \return Const reference to the ADDN record collection
+    const IdCollection<AddnRecord>& getAddnCollection() const;
+    /// \brief Get AFFE collection
+    /// \return Const reference to the AFFE record collection
+    const IdCollection<AffeRecord>& getAffeCollection() const;
+    /// \brief Get AMBS collection
+    /// \return Const reference to the AMBS record collection
+    const IdCollection<AmbsRecord>& getAmbsCollection() const;
+    /// \brief Get AMDL collection
+    /// \return Const reference to the AMDL record collection
+    const IdCollection<AmdlRecord>& getAmdlCollection() const;
+    /// \brief Get AOPF collection
+    /// \return Const reference to the AOPF record collection
+    const IdCollection<AopfRecord>& getAopfCollection() const;
+    /// \brief Get AOPS collection
+    /// \return Const reference to the AOPS record collection
+    const IdCollection<AopsRecord>& getAopsCollection() const;
+    /// \brief Get AORU collection
+    /// \return Const reference to the AORU record collection
+    const IdCollection<AoruRecord>& getAoruCollection() const;
+    /// \brief Get ARMA collection
+    /// \return Const reference to the ARMA record collection
+    const IdCollection<ArmaRecord>& getArmaCollection() const;
+    /// \brief Get ARTO collection
+    /// \return Const reference to the ARTO record collection
+    const IdCollection<ArtoRecord>& getArtoCollection() const;
+    /// \brief Get ASPC collection
+    /// \return Const reference to the ASPC record collection
+    const IdCollection<AspcRecord>& getAspcCollection() const;
+    /// \brief Get ATMO collection
+    /// \return Const reference to the ATMO record collection
+    const IdCollection<AtmoRecord>& getAtmoCollection() const;
+    /// \brief Get AVMD collection
+    /// \return Const reference to the AVMD record collection
+    const IdCollection<AvmdRecord>& getAvmdCollection() const;
+    /// \brief Get BIOM collection
+    /// \return Const reference to the BIOM record collection
+    const IdCollection<BiomRecord>& getBiomCollection() const;
+    /// \brief Get BMMO collection
+    /// \return Const reference to the BMMO record collection
+    const IdCollection<BmmoRecord>& getBmmoCollection() const;
+    /// \brief Get BMOD collection
+    /// \return Const reference to the BMOD record collection
+    const IdCollection<BmodRecord>& getBmodCollection() const;
+    /// \brief Get BNDS collection
+    /// \return Const reference to the BNDS record collection
+    const IdCollection<BndsRecord>& getBndsCollection() const;
+    /// \brief Get BPTT collection
+    /// \return Const reference to the BPTT record collection
+    const IdCollection<BpttRecord>& getBpttCollection() const;
+    /// \brief Get CAMS collection
+    /// \return Const reference to the CAMS record collection
+    const IdCollection<CamsRecord>& getCamsCollection() const;
+    /// \brief Get CHAL collection
+    /// \return Const reference to the CHAL record collection
+    const IdCollection<ChalRecord>& getChalCollection() const;
+    /// \brief Get CIFT collection
+    /// \return Const reference to the CIFT record collection
+    const IdCollection<CiftRecord>& getCiftCollection() const;
+    /// \brief Get CNDA collection
+    /// \return Const reference to the CNDA record collection
+    const IdCollection<CndaRecord>& getCndaCollection() const;
+    /// \brief Get COLL collection
+    /// \return Const reference to the COLL record collection
+    const IdCollection<CollRecord>& getCollCollection() const;
+    /// \brief Get CPTH collection
+    /// \return Const reference to the CPTH record collection
+    const IdCollection<CpthRecord>& getCpthCollection() const;
+    /// \brief Get CULK collection
+    /// \return Const reference to the CULK record collection
+    const IdCollection<CulkRecord>& getCulkCollection() const;
+    /// \brief Get CUR3 collection
+    /// \return Const reference to the CUR3 record collection
+    const IdCollection<Cur3Record>& getCur3Collection() const;
+    /// \brief Get CURV collection
+    /// \return Const reference to the CURV record collection
+    const IdCollection<CurvRecord>& getCurvCollection() const;
+    /// \brief Get DFOB collection
+    /// \return Const reference to the DFOB record collection
+    const IdCollection<DfobRecord>& getDfobCollection() const;
+    /// \brief Get DMGT collection
+    /// \return Const reference to the DMGT record collection
+    const IdCollection<DmgtRecord>& getDmgtCollection() const;
+    /// \brief Get DOBJ collection
+    /// \return Const reference to the DOBJ record collection
+    const IdCollection<DobjRecord>& getDobjCollection() const;
+    /// \brief Get EFSR collection
+    /// \return Const reference to the EFSR record collection
+    const IdCollection<EfsrRecord>& getEfsrCollection() const;
+    /// \brief Get EQUP collection
+    /// \return Const reference to the EQUP record collection
+    const IdCollection<EqupRecord>& getEqupCollection() const;
 
     // --- Non-const overloads for mutation ---
 
@@ -781,6 +921,41 @@ public:
     /// \brief Get MUSC collection (mutable)
     /// \return Reference to the MUSC record collection for modification
     IdCollection<MuscRecord>& getMuscCollection();
+    IdCollection<AactRecord>& getAactCollection();
+    IdCollection<AamdRecord>& getAamdCollection();
+    IdCollection<AapdRecord>& getAapdCollection();
+    IdCollection<AchrRecord>& getAchrCollection();
+    IdCollection<AddnRecord>& getAddnCollection();
+    IdCollection<AffeRecord>& getAffeCollection();
+    IdCollection<AmbsRecord>& getAmbsCollection();
+    IdCollection<AmdlRecord>& getAmdlCollection();
+    IdCollection<AopfRecord>& getAopfCollection();
+    IdCollection<AopsRecord>& getAopsCollection();
+    IdCollection<AoruRecord>& getAoruCollection();
+    IdCollection<ArmaRecord>& getArmaCollection();
+    IdCollection<ArtoRecord>& getArtoCollection();
+    IdCollection<AspcRecord>& getAspcCollection();
+    IdCollection<AtmoRecord>& getAtmoCollection();
+    IdCollection<AvmdRecord>& getAvmdCollection();
+    IdCollection<BiomRecord>& getBiomCollection();
+    IdCollection<BmmoRecord>& getBmmoCollection();
+    IdCollection<BmodRecord>& getBmodCollection();
+    IdCollection<BndsRecord>& getBndsCollection();
+    IdCollection<BpttRecord>& getBpttCollection();
+    IdCollection<CamsRecord>& getCamsCollection();
+    IdCollection<ChalRecord>& getChalCollection();
+    IdCollection<CiftRecord>& getCiftCollection();
+    IdCollection<CndaRecord>& getCndaCollection();
+    IdCollection<CollRecord>& getCollCollection();
+    IdCollection<CpthRecord>& getCpthCollection();
+    IdCollection<CulkRecord>& getCulkCollection();
+    IdCollection<Cur3Record>& getCur3Collection();
+    IdCollection<CurvRecord>& getCurvCollection();
+    IdCollection<DfobRecord>& getDfobCollection();
+    IdCollection<DmgtRecord>& getDmgtCollection();
+    IdCollection<DobjRecord>& getDobjCollection();
+    IdCollection<EfsrRecord>& getEfsrCollection();
+    IdCollection<EqupRecord>& getEqupCollection();
 
     /// \brief Get collection by record type (const version)
     /// \param type Record type identifier
@@ -1125,6 +1300,41 @@ private:
     IdCollection<MattRecord> mattCollection;
     IdCollection<MovtRecord> movtCollection;
     IdCollection<MuscRecord> muscCollection;
+    IdCollection<AactRecord> aactCollection;
+    IdCollection<AamdRecord> aamdCollection;
+    IdCollection<AapdRecord> aapdCollection;
+    IdCollection<AchrRecord> achrCollection;
+    IdCollection<AddnRecord> addnCollection;
+    IdCollection<AffeRecord> affeCollection;
+    IdCollection<AmbsRecord> ambsCollection;
+    IdCollection<AmdlRecord> amdlCollection;
+    IdCollection<AopfRecord> aopfCollection;
+    IdCollection<AopsRecord> aopsCollection;
+    IdCollection<AoruRecord> aoruCollection;
+    IdCollection<ArmaRecord> armaCollection;
+    IdCollection<ArtoRecord> artoCollection;
+    IdCollection<AspcRecord> aspcCollection;
+    IdCollection<AtmoRecord> atmoCollection;
+    IdCollection<AvmdRecord> avmdCollection;
+    IdCollection<BiomRecord> biomCollection;
+    IdCollection<BmmoRecord> bmmoCollection;
+    IdCollection<BmodRecord> bmodCollection;
+    IdCollection<BndsRecord> bndsCollection;
+    IdCollection<BpttRecord> bpttCollection;
+    IdCollection<CamsRecord> camsCollection;
+    IdCollection<ChalRecord> chalCollection;
+    IdCollection<CiftRecord> ciftCollection;
+    IdCollection<CndaRecord> cndaCollection;
+    IdCollection<CollRecord> collCollection;
+    IdCollection<CpthRecord> cpthCollection;
+    IdCollection<CulkRecord> culkCollection;
+    IdCollection<Cur3Record> cur3Collection;
+    IdCollection<CurvRecord> curvCollection;
+    IdCollection<DfobRecord> dfobCollection;
+    IdCollection<DmgtRecord> dmgtCollection;
+    IdCollection<DobjRecord> dobjCollection;
+    IdCollection<EfsrRecord> efsrCollection;
+    IdCollection<EqupRecord> equpCollection;
 
     QVector<QAbstractItemModel*> models;
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;
