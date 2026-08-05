@@ -11,8 +11,34 @@
 #include "libs/files/esm/ecznrecord.hpp"
 #include "libs/files/esm/ipdsrecord.hpp"
 #include "libs/files/esm/statrecord.hpp"
+#include "libs/files/esm/cellrecord.hpp"
+#include "libs/files/esm/npcrecord.hpp"
+#include "libs/files/esm/alchrecord.hpp"
+#include "libs/components/tier2_components.hpp"
 #include "libs/files/filepaths.hpp"
 #include "logger.hpp"
+
+namespace {
+
+QByteArray rawFormId(quint32 id)
+{
+    QByteArray b(4, '\0');
+    b[0] = static_cast<char>(id & 0xFF);
+    b[1] = static_cast<char>((id >> 8) & 0xFF);
+    b[2] = static_cast<char>((id >> 16) & 0xFF);
+    b[3] = static_cast<char>((id >> 24) & 0xFF);
+    return b;
+}
+
+quint32 rawU32(const QByteArray& b, int offset)
+{
+    return (static_cast<quint32>(static_cast<unsigned char>(b.at(offset))))
+        | (static_cast<quint32>(static_cast<unsigned char>(b.at(offset + 1))) << 8)
+        | (static_cast<quint32>(static_cast<unsigned char>(b.at(offset + 2))) << 16)
+        | (static_cast<quint32>(static_cast<unsigned char>(b.at(offset + 3))) << 24);
+}
+
+} // namespace
 
 // Validates ESL support:
 //  - FormIdCompactor remaps a plugin's own (modified) records into the
@@ -28,6 +54,7 @@ private slots:
     void initTestCase();
     void testCompactorRemapsFormIds();
     void testCompactorRewritesTypedReferences();
+    void testCompactorRewritesRawAndComponentReferences();
     void testCompactorTooManyRecords();
     void testLightMasterFlagRoundTrip();
 };
@@ -99,6 +126,132 @@ void TestEsl::testCompactorRewritesTypedReferences()
     const quint32 newParent = 0x00100000u; // StatA is the only stat -> local 0
     QCOMPARE(saved.parentFormId, newParent);
     QCOMPARE(saved.childFormId, static_cast<quint32>(0x00200001));
+}
+
+void TestEsl::testCompactorRewritesRawAndComponentReferences()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& statCol = data.getStatCollection();
+    auto& cellCol = data.getCellCollection();
+    auto& npcCol = data.getNpcCollection();
+    auto& alchCol = data.getAlchCollection();
+
+    // Owned target record the raw refs below point at.
+    StatRecord target;
+    target.editorId = "Target";
+    target.formId = 0x00100050;
+    statCol.add(target);
+
+    // Cell: raw XEZN (encounter zone) and an XCLR region list holding one
+    // owned ref and one foreign ref.
+    CellRecord cell;
+    cell.editorId = "CellA";
+    cell.formId = 0x00100030;
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XEZN');
+        raw.data = rawFormId(0x00100050);
+        cell.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XCLR');
+        raw.data = rawFormId(0x00100050) + rawFormId(0x00200001);
+        cell.rawSubRecords.push_back(raw);
+    }
+    cellCol.add(cell);
+
+    // Npc: raw VOIC, HDPT (u32 count then FormIDs), LVLD (template at byte
+    // 12), and KWDA (owned ref + foreign ref).
+    NpcRecord npc;
+    npc.editorId = "NpcA";
+    npc.formId = 0x00100080;
+    {
+        RawSubRecord raw;
+        raw.name = NAME('VOIC');
+        raw.data = rawFormId(0x00100050);
+        npc.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('HDPT');
+        raw.data = rawFormId(1) + rawFormId(0x00100050);
+        npc.rawSubRecords.push_back(raw);
+    }
+    {
+        QByteArray lvld(20, '\0');
+        lvld.replace(12, 4, rawFormId(0x00100050));
+        RawSubRecord raw;
+        raw.name = NAME('LVLD');
+        raw.data = lvld;
+        npc.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('KWDA');
+        raw.data = rawFormId(0x00100050) + rawFormId(0x00200001);
+        npc.rawSubRecords.push_back(raw);
+    }
+    npcCol.add(npc);
+
+    // Alch: raw EFID plus enchantment and pickup/putdown component FormIDs.
+    AlchRecord alch;
+    alch.editorId = "AlchA";
+    alch.formId = 0x00100090;
+    alch.initComponents();
+    alch.components.add<tescomponents::TESEnchantableForm_Component>();
+    if (auto* enc = static_cast<tescomponents::TESEnchantableForm_Component*>(
+            alch.components.findByName(QStringLiteral("TESEnchantableForm"))))
+        enc->enchantmentFormId = 0x00100050;
+    if (auto* snd = static_cast<tescomponents::BGSPickupPutdownSounds_Component*>(
+            alch.components.findByName(QStringLiteral("BGSPickupPutdownSounds"))))
+    {
+        snd->pickupSound = 0x00100050;
+        snd->putdownSound = 0x00100050;
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('EFID');
+        raw.data = rawFormId(0x00100050);
+        alch.rawSubRecords.push_back(raw);
+    }
+    alchCol.add(alch);
+
+    FormIdCompactor compactor(data);
+    QCOMPARE(compactor.compact(), 4);
+
+    // Owned IDs 0x00100030/0x50/0x80/0x90 sort to locals 0/1/2/3, so the
+    // target (0x00100050) becomes 0x00100001.
+    const quint32 newTarget = 0x00100001u;
+
+    const CellRecord& savedCell = cellCol.getRecord(0).get();
+    QCOMPARE(savedCell.rawSubRecords.size(), 2);
+    QCOMPARE(rawU32(savedCell.rawSubRecords.at(0).data, 0), newTarget);
+    QCOMPARE(rawU32(savedCell.rawSubRecords.at(1).data, 0), newTarget);
+    QCOMPARE(rawU32(savedCell.rawSubRecords.at(1).data, 4), static_cast<quint32>(0x00200001));
+
+    const NpcRecord& savedNpc = npcCol.getRecord(0).get();
+    QCOMPARE(savedNpc.rawSubRecords.size(), 4);
+    QCOMPARE(rawU32(savedNpc.rawSubRecords.at(0).data, 0), newTarget);  // VOIC
+    QCOMPARE(rawU32(savedNpc.rawSubRecords.at(1).data, 0), 1u);         // HDPT count
+    QCOMPARE(rawU32(savedNpc.rawSubRecords.at(1).data, 4), newTarget);  // HDPT ref
+    QCOMPARE(rawU32(savedNpc.rawSubRecords.at(2).data, 12), newTarget); // LVLD template
+    QCOMPARE(rawU32(savedNpc.rawSubRecords.at(3).data, 0), newTarget);  // KWDA
+    QCOMPARE(rawU32(savedNpc.rawSubRecords.at(3).data, 4), static_cast<quint32>(0x00200001));
+
+    const AlchRecord& savedAlch = alchCol.getRecord(0).get();
+    QCOMPARE(savedAlch.rawSubRecords.size(), 1);
+    QCOMPARE(savedAlch.rawSubRecords.at(0).data, rawFormId(newTarget)); // EFID
+    if (const auto* enc = static_cast<const tescomponents::TESEnchantableForm_Component*>(
+            savedAlch.components.findByName(QStringLiteral("TESEnchantableForm"))))
+        QCOMPARE(enc->enchantmentFormId, newTarget);
+    if (const auto* snd = static_cast<const tescomponents::BGSPickupPutdownSounds_Component*>(
+            savedAlch.components.findByName(QStringLiteral("BGSPickupPutdownSounds"))))
+    {
+        QCOMPARE(snd->pickupSound, newTarget);
+        QCOMPARE(snd->putdownSound, newTarget);
+    }
 }
 
 void TestEsl::testCompactorTooManyRecords()

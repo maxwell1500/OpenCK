@@ -280,6 +280,39 @@ void ObjectWindowModel::initCategories(Data* data)
         case CkId::Type_Scen_:
             cat.totalRecords = data->getScenCollection().size();
             break;
+        case CkId::Type_Anio_:
+            cat.totalRecords = data->getAnioCollection().size();
+            break;
+        case CkId::Type_Artv_:
+            cat.totalRecords = data->getArtvCollection().size();
+            break;
+        case CkId::Type_Clfm_:
+            cat.totalRecords = data->getClfmCollection().size();
+            break;
+        case CkId::Type_Debr_:
+            cat.totalRecords = data->getDebrCollection().size();
+            break;
+        case CkId::Type_Eczn_:
+            cat.totalRecords = data->getEcznCollection().size();
+            break;
+        case CkId::Type_Hazd_:
+            cat.totalRecords = data->getHazdCollection().size();
+            break;
+        case CkId::Type_Ipct_:
+            cat.totalRecords = data->getIpctCollection().size();
+            break;
+        case CkId::Type_Must_:
+            cat.totalRecords = data->getMustCollection().size();
+            break;
+        case CkId::Type_Rela_:
+            cat.totalRecords = data->getRelaCollection().size();
+            break;
+        case CkId::Type_Revb_:
+            cat.totalRecords = data->getRevbCollection().size();
+            break;
+        case CkId::Type_Shou_:
+            cat.totalRecords = data->getShouCollection().size();
+            break;
         default:
             break;
         }
@@ -614,6 +647,50 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getScenCollection().getId(i);
                 formId = formatFormId(data->getScenCollection().getRecord(i).get().formId);
                 break;
+            case CkId::Type_Anio_:
+                editorId = data->getAnioCollection().getId(i);
+                formId = formatFormId(data->getAnioCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Artv_:
+                editorId = data->getArtvCollection().getId(i);
+                formId = formatFormId(data->getArtvCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Clfm_:
+                editorId = data->getClfmCollection().getId(i);
+                formId = formatFormId(data->getClfmCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Debr_:
+                editorId = data->getDebrCollection().getId(i);
+                formId = formatFormId(data->getDebrCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Eczn_:
+                editorId = data->getEcznCollection().getId(i);
+                formId = formatFormId(data->getEcznCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Hazd_:
+                editorId = data->getHazdCollection().getId(i);
+                formId = formatFormId(data->getHazdCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Ipct_:
+                editorId = data->getIpctCollection().getId(i);
+                formId = formatFormId(data->getIpctCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Must_:
+                editorId = data->getMustCollection().getId(i);
+                formId = formatFormId(data->getMustCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Rela_:
+                editorId = data->getRelaCollection().getId(i);
+                formId = formatFormId(data->getRelaCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Revb_:
+                editorId = data->getRevbCollection().getId(i);
+                formId = formatFormId(data->getRevbCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Shou_:
+                editorId = data->getShouCollection().getId(i);
+                formId = formatFormId(data->getShouCollection().getRecord(i).get().formId);
+                break;
             default:
                 break;
             }
@@ -689,26 +766,32 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Furniture", CkId::Type_Furn_);
     addCategory("Flora", CkId::Type_Flor_);
     addCategory("Grass", CkId::Type_Grass_);
-    addCategory("Debris", CkId::Type_None);
-    addCategory("Hazard", CkId::Type_None);
+    addCategory("Debris", CkId::Type_Debr_);
+    addCategory("Hazard", CkId::Type_Hazd_);
     addCategory("Idle Marker", CkId::Type_Idlm_);
     addCategory("Light", CkId::Type_Ligh_);
     addCategory("Acoustic Space", CkId::Type_None);
     addCategory("Image Space", CkId::Type_Imgs_);
 
     addCategory("Combat Style", CkId::Type_Csty_);
-    addCategory("Encounter Zone", CkId::Type_None);
+    addCategory("Encounter Zone", CkId::Type_Eczn_);
     addCategory("Body Part", CkId::Type_None);
     addCategory("Head Part", CkId::Type_None);
     addCategory("Keyword", CkId::Type_Kywd_);
     addCategory("Camera Path", CkId::Type_None);
     addCategory("Camera Shot", CkId::Type_None);
-    addCategory("Impact Data", CkId::Type_None);
+    addCategory("Impact Data", CkId::Type_Ipct_);
     addCategory("Lens Flare", CkId::Type_None);
     addCategory("Speech Challenge", CkId::Type_None);
 
-    addCategory("Music Type", CkId::Type_None);
+    addCategory("Music Type", CkId::Type_Must_);
     addCategory("Voice Type", CkId::Type_None);
+
+    addCategory("Animated Object", CkId::Type_Anio_);
+    addCategory("Color", CkId::Type_Clfm_);
+    addCategory("Relationship", CkId::Type_Rela_);
+    addCategory("Reverb", CkId::Type_Revb_);
+    addCategory("Shout", CkId::Type_Shou_);
 
     addCategory("Topic", CkId::Type_None);
     addCategory("Scene", CkId::Type_Scen_);
@@ -720,7 +803,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Climate", CkId::Type_Clmt_);
 
     addCategory("Effect Shader", CkId::Type_Efsh_);
-    addCategory("Art Object", CkId::Type_None);
+    addCategory("Art Object", CkId::Type_Artv_);
     addCategory("Water Shader", CkId::Type_Wate_);
     addCategory("Weather Shader", CkId::Type_None);
     addCategory("Power", CkId::Type_None);
@@ -785,14 +868,15 @@ void ObjectWindowModel::initCategories(Data* data)
     addGroupNamed("Gameplay", {"Quest", "Package", "Global", "Game Setting", "Perk", "Class", "Faction",
                                "Race", "Combat Style", "Encounter Zone", "Body Part", "Head Part", "Location",
                                "Keyword", "Camera Path", "Camera Shot", "Impact Data", "Lens Flare",
-                               "Speech Challenge", "Birthsign"});
-    addGroupNamed("Audio", {"Sound", "Music Type", "Voice Type", "Sound Marker"});
+                               "Speech Challenge", "Birthsign", "Relationship", "Shout"});
+    addGroupNamed("Audio", {"Sound", "Music Type", "Voice Type", "Sound Marker", "Reverb"});
     addGroupNamed("Dialogue", {"Dialogue", "Info", "Topic", "Scene", "Message", "Note", "Terminal"});
     addGroupNamed("World", {"Cell", "Worldspace", "Navmesh", "Landscape", "Reference", "Weather",
                             "Land Texture", "Climate", "Region", "Road"});
     addGroupNamed("Miscellaneous", {"Location Reference Type", "Effect Shader", "Art Object", "Water Shader",
                                     "Weather Shader", "Power", "Default Object", "Association Type",
-                                    "Biome", "Snap Template", "Material", "Load Screen", "Script"});
+                                    "Biome", "Snap Template", "Material", "Load Screen", "Script",
+                                    "Animated Object", "Color"});
 }
 
 QString ObjectWindowModel::formatFormId(quint32 formId) const

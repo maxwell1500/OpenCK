@@ -155,6 +155,19 @@ void Document::save(const QString& savePath)
             {&data->getScolCollection(), 'SCOL'},
             {&data->getTxstCollection(), 'TXST'},
             {&data->getWateCollection(), 'WATR'},
+            {&data->getPlanetCollection(), 'PNDT'},
+            {&data->getAnioCollection(),  'ANIO'},
+            {&data->getArtvCollection(),  'ARTV'},
+            {&data->getClfmCollection(),  'CLFM'},
+            {&data->getDebrCollection(),  'DEBR'},
+            {&data->getEcznCollection(),  'ECZN'},
+            {&data->getHazdCollection(),  'HAZD'},
+            {&data->getIpctCollection(),  'IPCT'},
+            {&data->getIpdsCollection(),  'IPDS'},
+            {&data->getMustCollection(),  'MUST'},
+            {&data->getRelaCollection(),  'RELA'},
+            {&data->getRevbCollection(),  'REVB'},
+            {&data->getShouCollection(),  'SHOU'},
         };
 
         for (const auto& entry : saveableCollections)

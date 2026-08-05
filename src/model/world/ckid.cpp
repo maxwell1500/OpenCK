@@ -432,6 +432,15 @@ CkId::Type CkId::stringToType(const QString& typeName)
             return typesNoArg[i].type;
         }
     }
+    // Also accept the singular friendly names (e.g. "Weapon") so that
+    // getTypeName() output round-trips through stringToType().
+    for (int i = 0; typesIdArg[i].name; ++i)
+    {
+        if (typeName == typesIdArg[i].name)
+        {
+            return typesIdArg[i].type;
+        }
+    }
     // Fall back to the on-disk record name (e.g. "NPC_", "WEAP_", "MGEF").
     // These are not in the friendly-name tables but correspond 1:1 to the
     // Type_ enum constant suffix.
@@ -462,6 +471,15 @@ CkId::Type CkId::stringToType(const QString& typeName)
             { Type_Expl_, "EXPL" }, { Type_Eyes_, "EYES" }, { Type_Flor_, "FLOR" },
             { Type_Flst_, "FLST" }, { Type_Furn_, "FURN" }, { Type_Grass_, "GRAS" },
             { Type_Hair_, "HAIR" }, { Type_Idle_, "IDLE" }, { Type_Idlm_, "IDLM" },
+            { Type_Imgs_, "IMGS" }, { Type_Keym_, "KEYM" }, { Type_Kywd_, "KYWD" },
+            { Type_Ligh_, "LIGH" }, { Type_Lscr_, "LSCR" }, { Type_Lvlc_, "LVLC" },
+            { Type_Lvli_, "LVLI" }, { Type_Lvsp_, "LVSP" }, { Type_Mesg_, "MESG" },
+            { Type_Mstt_, "MSTT" }, { Type_Navm_, "NAVM" }, { Type_Note_, "NOTE" },
+            { Type_Otft_, "OTFT" }, { Type_Proj_, "PROJ" }, { Type_Regn_, "REGN" },
+            { Type_Road_, "ROAD" }, { Type_Scpt_, "SCPT" }, { Type_Scrl_, "SCRL" },
+            { Type_Slgm_, "SLGM" }, { Type_Smqn_, "SMQN" }, { Type_Spgd_, "SPGD" },
+            { Type_Scol_, "SCOL" }, { Type_Scen_, "SCEN" }, { Type_Txst_, "TXST" },
+            { Type_Wate_, "WATR" },
             { Type_Anio_, "ANIO" }, { Type_Artv_, "ARTV" }, { Type_Clfm_, "CLFM" },
             { Type_Debr_, "DEBR" }, { Type_Eczn_, "ECZN" }, { Type_Hazd_, "HAZD" },
             { Type_Ipct_, "IPCT" }, { Type_Ipds_, "IPDS" }, { Type_Must_, "MUST" },

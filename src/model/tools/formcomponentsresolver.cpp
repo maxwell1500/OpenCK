@@ -11,20 +11,24 @@
 #include "../../../libs/files/esm/ammorecord.hpp"
 #include "../../../libs/files/esm/aniorecord.hpp"
 #include "../../../libs/files/esm/apparatusrecord.hpp"
+#include "../../../libs/files/esm/artvrecord.hpp"
 #include "../../../libs/files/esm/armorrecord.hpp"
 #include "../../../libs/files/esm/birthsignrecord.hpp"
 #include "../../../libs/files/esm/bookrecord.hpp"
 #include "../../../libs/files/esm/cellrecord.hpp"
 #include "../../../libs/files/esm/classrecord.hpp"
+#include "../../../libs/files/esm/clfmrecord.hpp"
 #include "../../../libs/files/esm/climaterecord.hpp"
 #include "../../../libs/files/esm/clothrecord.hpp"
 #include "../../../libs/files/esm/constructibleobjectrecord.hpp"
 #include "../../../libs/files/esm/combatstylerecord.hpp"
 #include "../../../libs/files/esm/contrecord.hpp"
 #include "../../../libs/files/esm/creaturerecord.hpp"
+#include "../../../libs/files/esm/debrrecord.hpp"
 #include "../../../libs/files/esm/dialrecord.hpp"
 #include "../../../libs/files/esm/doorrecord.hpp"
 #include "../../../libs/files/esm/effectshaderrecord.hpp"
+#include "../../../libs/files/esm/ecznrecord.hpp"
 #include "../../../libs/files/esm/enchrecord.hpp"
 #include "../../../libs/files/esm/explosionrecord.hpp"
 #include "../../../libs/files/esm/eyesrecord.hpp"
@@ -35,11 +39,14 @@
 #include "../../../libs/files/esm/glob.hpp"
 #include "../../../libs/files/esm/grassrecord.hpp"
 #include "../../../libs/files/esm/hairrecord.hpp"
+#include "../../../libs/files/esm/hazdrecord.hpp"
 #include "../../../libs/files/esm/idleanimationrecord.hpp"
 #include "../../../libs/files/esm/idlemarkerrecord.hpp"
 #include "../../../libs/files/esm/imagespacerecord.hpp"
 #include "../../../libs/files/esm/inforecord.hpp"
 #include "../../../libs/files/esm/ingrrecord.hpp"
+#include "../../../libs/files/esm/ipctrecord.hpp"
+#include "../../../libs/files/esm/ipdsrecord.hpp"
 #include "../../../libs/files/esm/keymrecord.hpp"
 #include "../../../libs/files/esm/keywordrecord.hpp"
 #include "../../../libs/files/esm/landrecord.hpp"
@@ -55,22 +62,27 @@
 #include "../../../libs/files/esm/messagerecord.hpp"
 #include "../../../libs/files/esm/miscrecord.hpp"
 #include "../../../libs/files/esm/msttrecord.hpp"
+#include "../../../libs/files/esm/mustrecord.hpp"
 #include "../../../libs/files/esm/navmrecord.hpp"
 #include "../../../libs/files/esm/npcrecord.hpp"
 #include "../../../libs/files/esm/noterecord.hpp"
 #include "../../../libs/files/esm/outfitrecord.hpp"
 #include "../../../libs/files/esm/packagerecord.hpp"
 #include "../../../libs/files/esm/perkrecord.hpp"
+#include "../../../libs/files/esm/pndrecord.hpp"
 #include "../../../libs/files/esm/projectilerecord.hpp"
 #include "../../../libs/files/esm/questrecord.hpp"
 #include "../../../libs/files/esm/racerecord.hpp"
 #include "../../../libs/files/esm/refrecord.hpp"
 #include "../../../libs/files/esm/regionrecord.hpp"
+#include "../../../libs/files/esm/relarecord.hpp"
+#include "../../../libs/files/esm/revbrecord.hpp"
 #include "../../../libs/files/esm/roadrecord.hpp"
 #include "../../../libs/files/esm/scenrecord.hpp"
 #include "../../../libs/files/esm/scriptrecord.hpp"
 #include "../../../libs/files/esm/scrollrecord.hpp"
 #include "../../../libs/files/esm/shaderparticlerecord.hpp"
+#include "../../../libs/files/esm/shourecord.hpp"
 #include "../../../libs/files/esm/slgmrecord.hpp"
 #include "../../../libs/files/esm/sounrecord.hpp"
 #include "../../../libs/files/esm/soundmarkerrecord.hpp"
@@ -108,18 +120,22 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(AnioRecord) \
     MACRO(AppaRecord) \
     MACRO(ArmorRecord) \
+    MACRO(ArtvRecord) \
     MACRO(BookRecord) \
     MACRO(BsgnRecord) \
     MACRO(CellRecord) \
     MACRO(ClassRecord) \
+    MACRO(ClfmRecord) \
     MACRO(ClimateRecord) \
     MACRO(ClotRecord) \
     MACRO(CobjRecord) \
     MACRO(ContRecord) \
     MACRO(CreatureRecord) \
     MACRO(CstyRecord) \
+    MACRO(DebrRecord) \
     MACRO(DialRecord) \
     MACRO(DoorRecord) \
+    MACRO(EcznRecord) \
     MACRO(EfshRecord) \
     MACRO(EnchRecord) \
     MACRO(ExplRecord) \
@@ -130,11 +146,14 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(FurnRecord) \
     MACRO(GrassRecord) \
     MACRO(HairRecord) \
+    MACRO(HazdRecord) \
     MACRO(IdleAnimationRecord) \
     MACRO(IdleMarkerRecord) \
     MACRO(ImgsRecord) \
     MACRO(InfoRecord) \
     MACRO(IngrRecord) \
+    MACRO(IpctRecord) \
+    MACRO(IpdsRecord) \
     MACRO(KeymRecord) \
     MACRO(KeywordRecord) \
     MACRO(LandRecord) \
@@ -150,20 +169,25 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(MesgRecord) \
     MACRO(MiscRecord) \
     MACRO(MsttRecord) \
+    MACRO(MustRecord) \
     MACRO(NavmRecord) \
     MACRO(NpcRecord) \
     MACRO(NoteRecord) \
     MACRO(OutfitRecord) \
     MACRO(PackageRecord) \
     MACRO(PerkRecord) \
+    MACRO(PndRecord) \
     MACRO(ProjRecord) \
     MACRO(QuestRecord) \
     MACRO(RaceRecord) \
     MACRO(RefrRecord) \
     MACRO(RegionRecord) \
+    MACRO(RelaRecord) \
+    MACRO(RevbRecord) \
     MACRO(RoadRecord) \
     MACRO(ScriptRecord) \
     MACRO(ScrRecord) \
+    MACRO(ShouRecord) \
     MACRO(SlgmRecord) \
     MACRO(SmqnRecord) \
     MACRO(SounRecord) \

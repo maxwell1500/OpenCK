@@ -62,6 +62,12 @@ target_link_libraries(test_datamodel PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_datamodel PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_datamodel)
 
+# Wiring regression tests (CkId disk aliases / component macro / save array)
+add_executable(test_wiring test_wiring.cpp)
+target_link_libraries(test_wiring PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_wiring PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_wiring)
+
 # Search algorithm tests
 add_executable(test_searchalgorithm test_searchalgorithm.cpp)
 target_link_libraries(test_searchalgorithm PRIVATE Qt6::Test)

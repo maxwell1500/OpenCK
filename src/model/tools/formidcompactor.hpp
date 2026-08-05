@@ -14,8 +14,13 @@ class Data;
 /// Scope: rewrites each owned record's own formId plus the FormID reference
 /// fields that record types expose as typed members (e.g. RELA parent/child,
 /// SHOU words, ECZN zone/location, IPDS impact list, HAZD image space, IPCT
-/// effect). Arbitrary FormID references embedded in opaque raw subrecords are
-/// left untouched; production compaction of those is the documented follow-up.
+/// effect). It also rewrites the known FormID-bearing raw subrecords of the
+/// common record types (cell, refr, npc, dial, quest, alch/ingr/ench/spell/
+/// magic EFID, and the KWDA keyword arrays on the keyword-using records) and
+/// the simple FormID members of the TESEnchantableForm and
+/// BGSPickupPutdownSounds components. Raw payloads whose FormID layout is
+/// unknown or Starfield-specific (e.g. XPRM placement) are left untouched;
+/// production compaction of those is the documented follow-up.
 class FormIdCompactor
 {
 public:
@@ -33,7 +38,8 @@ public:
     /// Number of records whose FormID changed.
     int remappedCount() const { return mRemapped; }
 
-    /// Number of typed reference fields rewritten.
+    /// Number of reference fields rewritten (typed members, raw subrecords,
+    /// and component-held FormIDs).
     int rewrittenReferences() const { return mRewritten; }
 
 private:
