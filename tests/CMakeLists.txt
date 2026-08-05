@@ -208,6 +208,13 @@ target_link_libraries(test_ba2write PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_ba2write PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_ba2write)
 
+# BTDX DX10 (texture) reader: real Starfield v2 (zlib) and v3 (LZ4) archives.
+# Archive tests skip unless OPENCK_TEST_BA2_DIR points at a texture BA2 folder.
+add_executable(test_ba2dx10 test_ba2dx10.cpp)
+target_link_libraries(test_ba2dx10 PRIVATE openck_model test_stubs Qt6::Test Qt6::Gui)
+target_include_directories(test_ba2dx10 PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_ba2dx10)
+
 # SSE BSA writer round-trip + name-hash validation against the real archive.
 add_executable(test_bsawrite test_bsawrite.cpp)
 target_link_libraries(test_bsawrite PRIVATE openck_model test_stubs Qt6::Test)

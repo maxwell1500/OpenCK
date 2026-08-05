@@ -15,8 +15,9 @@ public:
     // the file is not a supported DDS.
     static QImage decodeFile(const QString& path);
 
-    // Decodes DDS bytes (including the 128-byte header) into an ARGB32
-    // QImage. Returns a null image on unsupported input.
+    // Decodes DDS bytes (including the header) into an ARGB32 QImage.
+    // Handles legacy 128-byte headers and the DX10 extended header (BC1-5).
+    // Returns a null image on unsupported input.
     static QImage decode(const QByteArray& data);
 
     // The FourCC format identifier of the data, or empty for uncompressed.
@@ -24,7 +25,7 @@ public:
 
 private:
     static QImage decodeBlockCompressed(const QByteArray& data, quint32 width, quint32 height,
-                                        int format); // 0=BC1 1=BC2 2=BC3 3=BC4 4=BC5
+                                        int format, int dataOffset); // 0=BC1 1=BC2 2=BC3 3=BC4 4=BC5
     static QImage decodeUncompressed(const QByteArray& data, quint32 width, quint32 height,
                                      quint32 bitCount, quint32 rMask, quint32 gMask,
                                      quint32 bMask, quint32 aMask);

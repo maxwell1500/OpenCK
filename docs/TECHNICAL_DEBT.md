@@ -21,7 +21,7 @@
 |----|------|----------------|-------|
 | H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp:18` (Phase 23.4 follow-up) | Only typed reference fields (RELA parent/child, SHOU words, etc.) are rewritten. References embedded in raw subrecords (XOWN, XPRM, etc.) are left untouched, producing broken refs for many record types. Needs a per-record-type FormID field map. |
 | H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | Starfield.esm has 180 distinct record types; CkId covers ~90. Medium-impact missing types: HDPT (head parts x230), TERM (terminals x368), MATT (material type x249), MOVT (movement x43), MUSC (music track x83). Internal/infrastructure types (RFGP x80584, PKIN x11281, LMSW x12966) are lower priority. |
-| H3 | BA2 DX10 (texture) archives can't be read or written | `ba2archive.cpp:179-186` | `parseBtdxTextures` logs "not yet supported" and fails open. `create()` only writes GNRL regardless of the `archiveType` param. Starfield texture BA2s are unreadable, blocking texture previews. |
+| H3 | BA2 DX10 (texture) archives can't be read or written | `ba2archive.cpp` | Resolved — see R20. |
 
 ---
 
@@ -72,6 +72,7 @@
 | R17 | Copy/paste restricted to ~29 record types | Done — generic copy/paste via `Data::cloneRecord` (all CkId types with collections) in Object Window; commit `1272c17`. |
 | R18 | Search dialog can't edit most record types | Done — shared `FormComponentsResolver` (`src/model/tools/formcomponentsresolver.hpp/.cpp`) moved `resolveComponents` out of the Object Window; Search dialog's default case now opens component-based records via `QtFormDialogManager::openOrFocus`. |
 | R19 | Export templates incomplete | Done — `fieldsForType` field lists corrected for all 22 types, `recordFieldValue` getters added for INGR_/ENCH_/CONT_/MISC_/ACTI_/STAT_/RACE_/CLASS_/FACT_/INFO_/CELL/WRLD_/LOCT_, and the export if/else chain replaced with a generic `exportRecords<T>` template so every template type exports. |
+| R20 | BA2 DX10 (texture) archives can't be read or written | Done — `parseBtdxTextures` now parses 24-byte DX10 records + mip chunks (v1/2/3, zlib + Starfield v3 LZ4); `extract()` rebuilds a DDS (with DX10 extended header) from the chunk payloads; `create()` now writes real DX10 archives when `archiveType == "DX10"`. `DdsDecoder` gained DX10-extended-header support (BC1-5) so the Archive Browser texture preview works. `test_ba2dx10` covers real Starfield v2/v3 archives (via `OPENCK_TEST_BA2_DIR`) + a synthetic write→read round-trip. |
 
 ---
 

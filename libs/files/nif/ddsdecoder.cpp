@@ -63,6 +63,23 @@ QImage DdsDecoder::decode(const QByteArray& data)
     const quint32 rgbBitCount = pf[2];
     const quint32 rMask = pf[3], gMask = pf[4], bMask = pf[5], aMask = pf[6];
 
+    // DX10 extended header: the pixel format fourCC is 'DX10' and the DXGI
+    // format code lives at offset 0x80, after the 20-byte DDS_HEADER_DXT10.
+    const bool isDx10 = (pfFlags & 0x4) && data.mid(4 + 20 * 4, 4) == QByteArray("DX10", 4);
+    if (isDx10 && data.size() >= 148)
+    {
+        const quint32 dxgi = *reinterpret_cast<const quint32*>(data.constData() + 0x80);
+        int format = -1;
+        if (dxgi >= 70 && dxgi <= 72) format = 0;               // BC1
+        else if (dxgi >= 73 && dxgi <= 75) format = 1;          // BC2
+        else if (dxgi >= 76 && dxgi <= 78) format = 2;          // BC3
+        else if (dxgi >= 79 && dxgi <= 81) format = 3;          // BC4
+        else if (dxgi >= 82 && dxgi <= 84) format = 4;          // BC5
+        if (format >= 0)
+            return decodeBlockCompressed(data, width, height, format, /*dataOffset=*/148);
+        return QImage();
+    }
+
     if (pfFlags & 0x4)
     {
         const QByteArray cc(reinterpret_cast<const char*>(fourCC), 4);
@@ -74,15 +91,15 @@ QImage DdsDecoder::decode(const QByteArray& data)
         else if (cc == "BC5U" || cc == "ATI2") format = 4;
         if (format < 0)
             return QImage();
-        return decodeBlockCompressed(data, width, height, format);
+        return decodeBlockCompressed(data, width, height, format, /*dataOffset=*/128);
     }
 
     return decodeUncompressed(data, width, height, rgbBitCount, rMask, gMask, bMask, aMask);
 }
 
-QImage DdsDecoder::decodeBlockCompressed(const QByteArray& data, quint32 width, quint32 height, int format)
+QImage DdsDecoder::decodeBlockCompressed(const QByteArray& data, quint32 width, quint32 height, int format, int dataOffset)
 {
-    const quint8* pixels = reinterpret_cast<const quint8*>(data.constData()) + 128;
+    const quint8* pixels = reinterpret_cast<const quint8*>(data.constData()) + dataOffset;
     const int blockSize = (format == 0 || format == 3) ? 8 : 16; // BC1/BC4 = 8 bytes
 
     QImage img(width, height, QImage::Format_ARGB32);
