@@ -29,7 +29,6 @@
 
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
-| M2 | Export templates incomplete | `exporttemplatesdialog.cpp:922` | Some record types blocked. |
 | M3 | Cell transitions editor disabled | `celltransitionseditor.cpp:218-240` | "Requires cell connection data not yet available in TES4 format." Permanent for Skyrim; may resolve for Starfield. |
 | M4 | Preferences Network page is a stub | `preferencesdialog.cpp:353` | Network page has no content. (Version-control text already corrected; git/Perforce in use.) |
 | M5 | QtFormDialog tabs: Properties+Data only | `qtformdialog.cpp` (Phase 12F) | Real CK has Basic/Components/Keywords/Ingest tabs. |
@@ -72,6 +71,7 @@
 | R16 | `readZString` NUL terminator bug | Fixed — strips trailing NULs from returned QStrings (2026-08-03 session). |
 | R17 | Copy/paste restricted to ~29 record types | Done — generic copy/paste via `Data::cloneRecord` (all CkId types with collections) in Object Window; commit `1272c17`. |
 | R18 | Search dialog can't edit most record types | Done — shared `FormComponentsResolver` (`src/model/tools/formcomponentsresolver.hpp/.cpp`) moved `resolveComponents` out of the Object Window; Search dialog's default case now opens component-based records via `QtFormDialogManager::openOrFocus`. |
+| R19 | Export templates incomplete | Done — `fieldsForType` field lists corrected for all 22 types, `recordFieldValue` getters added for INGR_/ENCH_/CONT_/MISC_/ACTI_/STAT_/RACE_/CLASS_/FACT_/INFO_/CELL/WRLD_/LOCT_, and the export if/else chain replaced with a generic `exportRecords<T>` template so every template type exports. |
 
 ---
 

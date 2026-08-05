@@ -177,48 +177,61 @@ static QVector<QPair<QString, QString>> fieldsForType(const QString& recordType)
     }
     else if (recordType == "INGR_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
         fields.append(qMakePair(QString("weight"), QString("Weight")));
         fields.append(qMakePair(QString("value"), QString("Value")));
         fields.append(qMakePair(QString("flags"), QString("Flags")));
+        fields.append(qMakePair(QString("iconPath"), QString("Icon Path")));
+        fields.append(qMakePair(QString("modelPath"), QString("Model Path")));
     }
     else if (recordType == "ENCH_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
-        fields.append(qMakePair(QString("enchantmentType"), QString("Enchantment Type")));
-        fields.append(qMakePair(QString("cost"), QString("Cost")));
+        fields.append(qMakePair(QString("name"), QString("Name")));
+        fields.append(qMakePair(QString("costLimit"), QString("Cost Limit")));
         fields.append(qMakePair(QString("charges"), QString("Charges")));
+        fields.append(qMakePair(QString("type"), QString("Type")));
+        fields.append(qMakePair(QString("soulGem"), QString("Soul Gem")));
     }
     else if (recordType == "CONT_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("weight"), QString("Weight")));
+        fields.append(qMakePair(QString("value"), QString("Value")));
+        fields.append(qMakePair(QString("contents"), QString("Contents")));
+        fields.append(qMakePair(QString("inventoryControl"), QString("Inventory Control")));
         fields.append(qMakePair(QString("flags"), QString("Flags")));
     }
     else if (recordType == "MISC_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
         fields.append(qMakePair(QString("weight"), QString("Weight")));
         fields.append(qMakePair(QString("value"), QString("Value")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+        fields.append(qMakePair(QString("iconPath"), QString("Icon Path")));
+        fields.append(qMakePair(QString("modelPath"), QString("Model Path")));
     }
     else if (recordType == "ACTI_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("modelPath"), QString("Model Path")));
+        fields.append(qMakePair(QString("iconPath"), QString("Icon Path")));
     }
     else if (recordType == "STAT_")
     {
-        fields.append(qMakePair(QString("materialPath"), QString("Material Path")));
+        fields.append(qMakePair(QString("modelPath"), QString("Model Path")));
+        fields.append(qMakePair(QString("lodModelPath"), QString("LOD Model Path")));
+        fields.append(qMakePair(QString("iconPath"), QString("Icon Path")));
     }
     else if (recordType == "RACE_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("raceFlags"), QString("Race Flags")));
     }
     else if (recordType == "CLASS_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("className"), QString("Class Name")));
+        fields.append(qMakePair(QString("description"), QString("Description")));
+        fields.append(qMakePair(QString("serviceFlags"), QString("Service Flags")));
     }
     else if (recordType == "FACT_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("factionName"), QString("Faction Name")));
+        fields.append(qMakePair(QString("description"), QString("Description")));
     }
     else if (recordType == "QUST_")
     {
@@ -243,16 +256,27 @@ static QVector<QPair<QString, QString>> fieldsForType(const QString& recordType)
     }
     else if (recordType == "CELL")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("cellName"), QString("Cell Name")));
         fields.append(qMakePair(QString("flags"), QString("Flags")));
+        fields.append(qMakePair(QString("cellX"), QString("Cell X")));
+        fields.append(qMakePair(QString("cellY"), QString("Cell Y")));
+        fields.append(qMakePair(QString("owner"), QString("Owner")));
+        fields.append(qMakePair(QString("lockLevel"), QString("Lock Level")));
     }
     else if (recordType == "WRLD_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("name"), QString("Name")));
+        fields.append(qMakePair(QString("mapWidth"), QString("Map Width")));
+        fields.append(qMakePair(QString("mapHeight"), QString("Map Height")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
     }
     else if (recordType == "LOCT_")
     {
-        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("locationName"), QString("Location Name")));
+        fields.append(qMakePair(QString("parentId"), QString("Parent ID")));
+        fields.append(qMakePair(QString("x"), QString("X")));
+        fields.append(qMakePair(QString("y"), QString("Y")));
+        fields.append(qMakePair(QString("z"), QString("Z")));
     }
     return fields;
 }
@@ -379,6 +403,153 @@ static QString recordFieldValue(const PackageRecord& pack, const QString& field)
     if (field == "packageType") return QString::number(pack.packageType);
     if (field == "targetType") return QString::number(pack.targetType);
     if (field == "flags") return "0x" + QString::number(pack.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const IngrRecord& ingr, const QString& field)
+{
+    if (field == "editorId") return ingr.editorId;
+    if (field == "formId") return "0x" + QString::number(ingr.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "weight") return QString::number(ingr.weight);
+    if (field == "value") return QString::number(ingr.value);
+    if (field == "flags") return "0x" + QString::number(ingr.flags, 16);
+    if (field == "iconPath") return ingr.iconPath;
+    if (field == "modelPath") return ingr.modelPath;
+    return {};
+}
+
+static QString recordFieldValue(const EnchRecord& ench, const QString& field)
+{
+    if (field == "editorId") return ench.editorId;
+    if (field == "formId") return "0x" + QString::number(ench.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "name") return ench.name;
+    if (field == "costLimit") return QString::number(ench.costLimit);
+    if (field == "charges") return QString::number(ench.charges);
+    if (field == "type") return QString::number(ench.type);
+    if (field == "soulGem") return QString::number(ench.soulGem);
+    if (field == "flags") return "0x" + QString::number(ench.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const ContRecord& cont, const QString& field)
+{
+    if (field == "editorId") return cont.editorId;
+    if (field == "formId") return "0x" + QString::number(cont.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "weight") return QString::number(cont.weight);
+    if (field == "value") return QString::number(cont.value);
+    if (field == "contents") return QString::number(cont.contents);
+    if (field == "inventoryControl") return QString::number(cont.inventoryControl);
+    if (field == "flags") return "0x" + QString::number(cont.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const MiscRecord& misc, const QString& field)
+{
+    if (field == "editorId") return misc.editorId;
+    if (field == "formId") return "0x" + QString::number(misc.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "weight") return QString::number(misc.weight);
+    if (field == "value") return QString::number(misc.value);
+    if (field == "flags") return "0x" + QString::number(misc.flags, 16);
+    if (field == "iconPath") return misc.iconPath;
+    if (field == "modelPath") return misc.modelPath;
+    return {};
+}
+
+static QString recordFieldValue(const ActiRecord& acti, const QString& field)
+{
+    if (field == "editorId") return acti.editorId;
+    if (field == "formId") return "0x" + QString::number(acti.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "modelPath") return acti.modelPath;
+    if (field == "iconPath") return acti.iconPath;
+    if (field == "flags") return "0x" + QString::number(acti.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const StatRecord& stat, const QString& field)
+{
+    if (field == "editorId") return stat.editorId;
+    if (field == "formId") return "0x" + QString::number(stat.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "modelPath") return stat.modelPath;
+    if (field == "lodModelPath") return stat.lodModelPath;
+    if (field == "iconPath") return stat.iconPath;
+    if (field == "flags") return "0x" + QString::number(stat.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const RaceRecord& race, const QString& field)
+{
+    if (field == "editorId") return race.editorId;
+    if (field == "formId") return "0x" + QString::number(race.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "raceFlags") return "0x" + QString::number(race.raceFlags, 16);
+    if (field == "flags") return "0x" + QString::number(race.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const ClassRecord& cls, const QString& field)
+{
+    if (field == "editorId") return cls.editorId;
+    if (field == "formId") return "0x" + QString::number(cls.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "className") return cls.className;
+    if (field == "description") return cls.description;
+    if (field == "serviceFlags") return "0x" + QString::number(cls.serviceFlags, 16);
+    if (field == "flags") return "0x" + QString::number(cls.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const FactRecord& fact, const QString& field)
+{
+    if (field == "editorId") return fact.editorId;
+    if (field == "formId") return "0x" + QString::number(fact.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "factionName") return fact.factionName;
+    if (field == "description") return fact.description;
+    if (field == "flags") return "0x" + QString::number(fact.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const InfoRecord& info, const QString& field)
+{
+    if (field == "editorId") return info.editorId;
+    if (field == "formId") return "0x" + QString::number(info.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "responseText") return info.responseText;
+    if (field == "voiceFile") return info.voiceFile;
+    if (field == "flags") return "0x" + QString::number(info.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const CellRecord& cell, const QString& field)
+{
+    if (field == "editorId") return cell.editorId;
+    if (field == "formId") return "0x" + QString::number(cell.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "cellName") return cell.cellName;
+    if (field == "flags") return "0x" + QString::number(cell.flags, 16);
+    if (field == "cellX") return QString::number(cell.cellX);
+    if (field == "cellY") return QString::number(cell.cellY);
+    if (field == "owner") return "0x" + QString::number(cell.owner, 16).toUpper().rightJustified(8, '0');
+    if (field == "lockLevel") return QString::number(cell.lockLevel);
+    return {};
+}
+
+static QString recordFieldValue(const WorldspaceRecord& wrld, const QString& field)
+{
+    if (field == "editorId") return wrld.editorId;
+    if (field == "formId") return "0x" + QString::number(wrld.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "name") return wrld.name;
+    if (field == "mapWidth") return QString::number(wrld.mapWidth);
+    if (field == "mapHeight") return QString::number(wrld.mapHeight);
+    if (field == "flags") return "0x" + QString::number(wrld.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const LocationRecord& loc, const QString& field)
+{
+    if (field == "editorId") return loc.editorId;
+    if (field == "formId") return "0x" + QString::number(loc.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "locationName") return loc.locationName;
+    if (field == "parentId") return "0x" + QString::number(loc.parentId, 16).toUpper().rightJustified(8, '0');
+    if (field == "x") return QString::number(loc.x);
+    if (field == "y") return QString::number(loc.y);
+    if (field == "z") return QString::number(loc.z);
+    if (field == "flags") return "0x" + QString::number(loc.flags, 16);
     return {};
 }
 
@@ -759,6 +930,23 @@ void ExportTemplatesDialog::onExportClicked()
     exportWithTemplate(mTemplates[idx]);
 }
 
+template <typename CollectionT>
+void exportRecords(QTextStream& out, const ExportTemplate& tmplt,
+                   const CollectionT& coll, int& count)
+{
+    const QString& delim = tmplt.delimiter;
+    const QString& quote = tmplt.quoteChar;
+    for (int i = 0; i < coll.size(); ++i)
+    {
+        const auto& rec = coll.getRecord(i).get();
+        QStringList values;
+        for (const auto& f : tmplt.fields)
+            values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
+        out << values.join(delim) << "\n";
+        count++;
+    }
+}
+
 void ExportTemplatesDialog::exportWithTemplate(const ExportTemplate& tmplt)
 {
     if (!mData)
@@ -799,123 +987,28 @@ void ExportTemplatesDialog::exportWithTemplate(const ExportTemplate& tmplt)
 
     int count = 0;
 
-    if (tmplt.recordType == "NPC_")
-    {
-        const auto& coll = mData->getNpcCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const NpcRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "WEAP_")
-    {
-        const auto& coll = mData->getWeaponCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const WeaponRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "ARMOR_")
-    {
-        const auto& coll = mData->getArmorCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const ArmorRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "SPEL_")
-    {
-        const auto& coll = mData->getSpellCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const SpellRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "BOOK_")
-    {
-        const auto& coll = mData->getBookCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const BookRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "ALCH_")
-    {
-        const auto& coll = mData->getAlchCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const AlchRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "QUST_")
-    {
-        const auto& coll = mData->getQuestCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const QuestRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "DIAL_")
-    {
-        const auto& coll = mData->getDialCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const DialRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
-    else if (tmplt.recordType == "PACK_")
-    {
-        const auto& coll = mData->getPackCollection();
-        for (int i = 0; i < coll.size(); ++i)
-        {
-            const PackageRecord& rec = coll.getRecord(i).get();
-            QStringList values;
-            for (const auto& f : tmplt.fields)
-                values.append(quoteField(recordFieldValue(rec, f.first), quote, delim));
-            out << values.join(delim) << "\n";
-            count++;
-        }
-    }
+    if (tmplt.recordType == "NPC_")       exportRecords(out, tmplt, mData->getNpcCollection(), count);
+    else if (tmplt.recordType == "WEAP_") exportRecords(out, tmplt, mData->getWeaponCollection(), count);
+    else if (tmplt.recordType == "ARMOR_") exportRecords(out, tmplt, mData->getArmorCollection(), count);
+    else if (tmplt.recordType == "SPEL_") exportRecords(out, tmplt, mData->getSpellCollection(), count);
+    else if (tmplt.recordType == "BOOK_") exportRecords(out, tmplt, mData->getBookCollection(), count);
+    else if (tmplt.recordType == "ALCH_") exportRecords(out, tmplt, mData->getAlchCollection(), count);
+    else if (tmplt.recordType == "INGR_") exportRecords(out, tmplt, mData->getIngrCollection(), count);
+    else if (tmplt.recordType == "ENCH_") exportRecords(out, tmplt, mData->getEnchCollection(), count);
+    else if (tmplt.recordType == "CONT_") exportRecords(out, tmplt, mData->getContCollection(), count);
+    else if (tmplt.recordType == "MISC_") exportRecords(out, tmplt, mData->getMiscCollection(), count);
+    else if (tmplt.recordType == "ACTI_") exportRecords(out, tmplt, mData->getActiCollection(), count);
+    else if (tmplt.recordType == "STAT_") exportRecords(out, tmplt, mData->getStatCollection(), count);
+    else if (tmplt.recordType == "RACE_") exportRecords(out, tmplt, mData->getRaceCollection(), count);
+    else if (tmplt.recordType == "CLASS_") exportRecords(out, tmplt, mData->getClassCollection(), count);
+    else if (tmplt.recordType == "FACT_") exportRecords(out, tmplt, mData->getFactCollection(), count);
+    else if (tmplt.recordType == "QUST_") exportRecords(out, tmplt, mData->getQuestCollection(), count);
+    else if (tmplt.recordType == "DIAL_") exportRecords(out, tmplt, mData->getDialCollection(), count);
+    else if (tmplt.recordType == "INFO_") exportRecords(out, tmplt, mData->getInfoCollection(), count);
+    else if (tmplt.recordType == "PACK_") exportRecords(out, tmplt, mData->getPackCollection(), count);
+    else if (tmplt.recordType == "CELL")  exportRecords(out, tmplt, mData->getCellCollection(), count);
+    else if (tmplt.recordType == "WRLD_") exportRecords(out, tmplt, mData->getWorldspaceCollection(), count);
+    else if (tmplt.recordType == "LOCT_") exportRecords(out, tmplt, mData->getLocationCollection(), count);
     else
     {
         QMessageBox::information(this, "Export",
