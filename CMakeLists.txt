@@ -163,6 +163,41 @@ set(ESM_SOURCES
     libs/files/esm/mattrecord.cpp
     libs/files/esm/movtrecord.cpp
     libs/files/esm/muscrecord.cpp
+    libs/files/esm/ffkwrecord.cpp
+    libs/files/esm/fogvrecord.cpp
+    libs/files/esm/forcrecord.cpp
+    libs/files/esm/fstprecord.cpp
+    libs/files/esm/fstsrecord.cpp
+    libs/files/esm/fxpdrecord.cpp
+    libs/files/esm/gbfmrecord.cpp
+    libs/files/esm/gbftrecord.cpp
+    libs/files/esm/gcvrrecord.cpp
+    libs/files/esm/imadrecord.cpp
+    libs/files/esm/innrrecord.cpp
+    libs/files/esm/iresrecord.cpp
+    libs/files/esm/kssmrecord.cpp
+    libs/files/esm/layrrecord.cpp
+    libs/files/esm/lensrecord.cpp
+    libs/files/esm/lgdirecord.cpp
+    libs/files/esm/lgtmrecord.cpp
+    libs/files/esm/lmswrecord.cpp
+    libs/files/esm/lvlbrecord.cpp
+    libs/files/esm/lvlnrecord.cpp
+    libs/files/esm/lvlprecord.cpp
+    libs/files/esm/lvscrecord.cpp
+    libs/files/esm/maamrecord.cpp
+    libs/files/esm/mrhprecord.cpp
+    libs/files/esm/mtptrecord.cpp
+    libs/files/esm/navirecord.cpp
+    libs/files/esm/nocmrecord.cpp
+    libs/files/esm/omodrecord.cpp
+    libs/files/esm/oswprecord.cpp
+    libs/files/esm/ovisrecord.cpp
+    libs/files/esm/pcbnrecord.cpp
+    libs/files/esm/pccnrecord.cpp
+    libs/files/esm/pcmtrecord.cpp
+    libs/files/esm/pdclrecord.cpp
+    libs/files/esm/pgrerecord.cpp
     libs/files/esm/conditionrecord.cpp
     libs/files/data/strings.cpp
 )
@@ -284,6 +319,41 @@ set(ESM_HEADERS
     libs/files/esm/mattrecord.hpp
     libs/files/esm/movtrecord.hpp
     libs/files/esm/muscrecord.hpp
+    libs/files/esm/ffkwrecord.hpp
+    libs/files/esm/fogvrecord.hpp
+    libs/files/esm/forcrecord.hpp
+    libs/files/esm/fstprecord.hpp
+    libs/files/esm/fstsrecord.hpp
+    libs/files/esm/fxpdrecord.hpp
+    libs/files/esm/gbfmrecord.hpp
+    libs/files/esm/gbftrecord.hpp
+    libs/files/esm/gcvrrecord.hpp
+    libs/files/esm/imadrecord.hpp
+    libs/files/esm/innrrecord.hpp
+    libs/files/esm/iresrecord.hpp
+    libs/files/esm/kssmrecord.hpp
+    libs/files/esm/layrrecord.hpp
+    libs/files/esm/lensrecord.hpp
+    libs/files/esm/lgdirecord.hpp
+    libs/files/esm/lgtmrecord.hpp
+    libs/files/esm/lmswrecord.hpp
+    libs/files/esm/lvlbrecord.hpp
+    libs/files/esm/lvlnrecord.hpp
+    libs/files/esm/lvlprecord.hpp
+    libs/files/esm/lvscrecord.hpp
+    libs/files/esm/maamrecord.hpp
+    libs/files/esm/mrhprecord.hpp
+    libs/files/esm/mtptrecord.hpp
+    libs/files/esm/navirecord.hpp
+    libs/files/esm/nocmrecord.hpp
+    libs/files/esm/omodrecord.hpp
+    libs/files/esm/oswprecord.hpp
+    libs/files/esm/ovisrecord.hpp
+    libs/files/esm/pcbnrecord.hpp
+    libs/files/esm/pccnrecord.hpp
+    libs/files/esm/pcmtrecord.hpp
+    libs/files/esm/pdclrecord.hpp
+    libs/files/esm/pgrerecord.hpp
     libs/components/component.hpp
     libs/components/editorproperty.hpp
     libs/components/formcomponents.hpp
