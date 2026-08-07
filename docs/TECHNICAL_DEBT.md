@@ -20,7 +20,7 @@
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
 | H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp` | Partially resolved — see R21 (raw-subrecord + component refs for the known layouts; XPRM and opaque Starfield payloads remain). |
-| H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | 109 types missing (precise scan, not ~90). First batch wired: HDPT, TERM, MATT, MOVT, MUSC (see R22). Wiring drift in the existing 92 types also fixed (diskAliases 67→92, FOR_EACH macro 77→89, save array +13, categories). Remaining: ACHR, ARMA, AFFE, ASPC, ATMO, BIOM, CAMS, CPTH, DFOB, EQUP, FSTP, FSTS, IRES, KSSM, LENS, LVLB, LVLN, MRPH, PDCL, PGRE, PHZD, SPCH, TRNS, TMLM, VTYP, WKMF, WWED + ~80 more incl. infrastructure types (RFGP, PKIN, LMSW, LAYR, OMOD, GBFM). |
+| H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | Resolved - all 180 distinct record types in Starfield.esm now have structs, CkId enum entries, collections, resolver wiring, save array entries, object-window categories, and round-trip tests (verified by test_dumpesm scan; 103/104 suite tests green, pre-existing test_specialized_widgets failure). Wired via batches A/B/C plus pre-existing drift fixes. |
 | H3 | BA2 DX10 (texture) archives can't be read or written | `ba2archive.cpp` | Resolved — see R20. |
 
 ---
