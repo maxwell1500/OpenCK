@@ -830,6 +830,181 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     equpCollection.addColumn(new RecordStateColumn<EqupRecord>());
     equpCollection.addColumn(new StringColumn<EqupRecord>("Name", &EqupRecord::editorId));
     addModel(new IdTable(&equpCollection), CkId::Type_Equp_);
+    // FFKW - Furnishing Keyword
+    ffkwCollection.addColumn(new StringIdColumn<FfkwRecord>());
+    ffkwCollection.addColumn(new RecordStateColumn<FfkwRecord>());
+    ffkwCollection.addColumn(new StringColumn<FfkwRecord>("Name", &FfkwRecord::editorId));
+    addModel(new IdTable(&ffkwCollection), CkId::Type_Ffkw_);
+    // FOGV - Fog Volume
+    fogvCollection.addColumn(new StringIdColumn<FogvRecord>());
+    fogvCollection.addColumn(new RecordStateColumn<FogvRecord>());
+    fogvCollection.addColumn(new StringColumn<FogvRecord>("Name", &FogvRecord::editorId));
+    addModel(new IdTable(&fogvCollection), CkId::Type_Fogv_);
+    // FORC - Force Field
+    forcCollection.addColumn(new StringIdColumn<ForcRecord>());
+    forcCollection.addColumn(new RecordStateColumn<ForcRecord>());
+    forcCollection.addColumn(new StringColumn<ForcRecord>("Name", &ForcRecord::editorId));
+    addModel(new IdTable(&forcCollection), CkId::Type_Forc_);
+    // FSTP - Footstep Set
+    fstpCollection.addColumn(new StringIdColumn<FstpRecord>());
+    fstpCollection.addColumn(new RecordStateColumn<FstpRecord>());
+    fstpCollection.addColumn(new StringColumn<FstpRecord>("Name", &FstpRecord::editorId));
+    addModel(new IdTable(&fstpCollection), CkId::Type_Fstp_);
+    // FSTS - Footstep Sound
+    fstsCollection.addColumn(new StringIdColumn<FstsRecord>());
+    fstsCollection.addColumn(new RecordStateColumn<FstsRecord>());
+    fstsCollection.addColumn(new StringColumn<FstsRecord>("Name", &FstsRecord::editorId));
+    addModel(new IdTable(&fstsCollection), CkId::Type_Fsts_);
+    // FXPD - FX Particle
+    fxpdCollection.addColumn(new StringIdColumn<FxpdRecord>());
+    fxpdCollection.addColumn(new RecordStateColumn<FxpdRecord>());
+    fxpdCollection.addColumn(new StringColumn<FxpdRecord>("Name", &FxpdRecord::editorId));
+    addModel(new IdTable(&fxpdCollection), CkId::Type_Fxpd_);
+    // GBFM - Biome Mask
+    gbfmCollection.addColumn(new StringIdColumn<GbfmRecord>());
+    gbfmCollection.addColumn(new RecordStateColumn<GbfmRecord>());
+    gbfmCollection.addColumn(new StringColumn<GbfmRecord>("Name", &GbfmRecord::editorId));
+    addModel(new IdTable(&gbfmCollection), CkId::Type_Gbfm_);
+    // GBFT - Biome Type
+    gbftCollection.addColumn(new StringIdColumn<GbftRecord>());
+    gbftCollection.addColumn(new RecordStateColumn<GbftRecord>());
+    gbftCollection.addColumn(new StringColumn<GbftRecord>("Name", &GbftRecord::editorId));
+    addModel(new IdTable(&gbftCollection), CkId::Type_Gbft_);
+    // GCVR - Gravity Camera
+    gcvrCollection.addColumn(new StringIdColumn<GcvrRecord>());
+    gcvrCollection.addColumn(new RecordStateColumn<GcvrRecord>());
+    gcvrCollection.addColumn(new StringColumn<GcvrRecord>("Name", &GcvrRecord::editorId));
+    addModel(new IdTable(&gcvrCollection), CkId::Type_Gcvr_);
+    // IMAD - Image Space Adapter
+    imadCollection.addColumn(new StringIdColumn<ImadRecord>());
+    imadCollection.addColumn(new RecordStateColumn<ImadRecord>());
+    imadCollection.addColumn(new StringColumn<ImadRecord>("Name", &ImadRecord::editorId));
+    addModel(new IdTable(&imadCollection), CkId::Type_Imad_);
+    // INNR - Interior Data
+    innrCollection.addColumn(new StringIdColumn<InnrRecord>());
+    innrCollection.addColumn(new RecordStateColumn<InnrRecord>());
+    innrCollection.addColumn(new StringColumn<InnrRecord>("Name", &InnrRecord::editorId));
+    addModel(new IdTable(&innrCollection), CkId::Type_Innr_);
+    // IRES - Resource Property
+    iresCollection.addColumn(new StringIdColumn<IresRecord>());
+    iresCollection.addColumn(new RecordStateColumn<IresRecord>());
+    iresCollection.addColumn(new StringColumn<IresRecord>("Name", &IresRecord::editorId));
+    addModel(new IdTable(&iresCollection), CkId::Type_Ires_);
+    // KSSM - Keyword Set
+    kssmCollection.addColumn(new StringIdColumn<KssmRecord>());
+    kssmCollection.addColumn(new RecordStateColumn<KssmRecord>());
+    kssmCollection.addColumn(new StringColumn<KssmRecord>("Name", &KssmRecord::editorId));
+    addModel(new IdTable(&kssmCollection), CkId::Type_Kssm_);
+    // LAYR - Layer
+    layrCollection.addColumn(new StringIdColumn<LayrRecord>());
+    layrCollection.addColumn(new RecordStateColumn<LayrRecord>());
+    layrCollection.addColumn(new StringColumn<LayrRecord>("Name", &LayrRecord::editorId));
+    addModel(new IdTable(&layrCollection), CkId::Type_Layr_);
+    // LENS - Lens
+    lensCollection.addColumn(new StringIdColumn<LensRecord>());
+    lensCollection.addColumn(new RecordStateColumn<LensRecord>());
+    lensCollection.addColumn(new StringColumn<LensRecord>("Name", &LensRecord::editorId));
+    addModel(new IdTable(&lensCollection), CkId::Type_Lens_);
+    // LGDI - Landscape Grid Data
+    lgdiCollection.addColumn(new StringIdColumn<LgdiRecord>());
+    lgdiCollection.addColumn(new RecordStateColumn<LgdiRecord>());
+    lgdiCollection.addColumn(new StringColumn<LgdiRecord>("Name", &LgdiRecord::editorId));
+    addModel(new IdTable(&lgdiCollection), CkId::Type_Lgdi_);
+    // LGTM - Light Template
+    lgtmCollection.addColumn(new StringIdColumn<LgtmRecord>());
+    lgtmCollection.addColumn(new RecordStateColumn<LgtmRecord>());
+    lgtmCollection.addColumn(new StringColumn<LgtmRecord>("Name", &LgtmRecord::editorId));
+    addModel(new IdTable(&lgtmCollection), CkId::Type_Lgtm_);
+    // LMSW - Lens Modifier Set
+    lmswCollection.addColumn(new StringIdColumn<LmswRecord>());
+    lmswCollection.addColumn(new RecordStateColumn<LmswRecord>());
+    lmswCollection.addColumn(new StringColumn<LmswRecord>("Name", &LmswRecord::editorId));
+    addModel(new IdTable(&lmswCollection), CkId::Type_Lmsw_);
+    // LVLB - Leveled Biome
+    lvlbCollection.addColumn(new StringIdColumn<LvlbRecord>());
+    lvlbCollection.addColumn(new RecordStateColumn<LvlbRecord>());
+    lvlbCollection.addColumn(new StringColumn<LvlbRecord>("Name", &LvlbRecord::editorId));
+    addModel(new IdTable(&lvlbCollection), CkId::Type_Lvlb_);
+    // LVLN - Leveled Node
+    lvlnCollection.addColumn(new StringIdColumn<LvlnRecord>());
+    lvlnCollection.addColumn(new RecordStateColumn<LvlnRecord>());
+    lvlnCollection.addColumn(new StringColumn<LvlnRecord>("Name", &LvlnRecord::editorId));
+    addModel(new IdTable(&lvlnCollection), CkId::Type_Lvln_);
+    // LVLP - Leveled Perk
+    lvlpCollection.addColumn(new StringIdColumn<LvlpRecord>());
+    lvlpCollection.addColumn(new RecordStateColumn<LvlpRecord>());
+    lvlpCollection.addColumn(new StringColumn<LvlpRecord>("Name", &LvlpRecord::editorId));
+    addModel(new IdTable(&lvlpCollection), CkId::Type_Lvlp_);
+    // LVSC - Leveled Structure
+    lvscCollection.addColumn(new StringIdColumn<LvscRecord>());
+    lvscCollection.addColumn(new RecordStateColumn<LvscRecord>());
+    lvscCollection.addColumn(new StringColumn<LvscRecord>("Name", &LvscRecord::editorId));
+    addModel(new IdTable(&lvscCollection), CkId::Type_Lvsc_);
+    // MAAM - Material Attachment
+    maamCollection.addColumn(new StringIdColumn<MaamRecord>());
+    maamCollection.addColumn(new RecordStateColumn<MaamRecord>());
+    maamCollection.addColumn(new StringColumn<MaamRecord>("Name", &MaamRecord::editorId));
+    addModel(new IdTable(&maamCollection), CkId::Type_Maam_);
+    // MRPH - Morph
+    mrhpCollection.addColumn(new StringIdColumn<MrhpRecord>());
+    mrhpCollection.addColumn(new RecordStateColumn<MrhpRecord>());
+    mrhpCollection.addColumn(new StringColumn<MrhpRecord>("Name", &MrhpRecord::editorId));
+    addModel(new IdTable(&mrhpCollection), CkId::Type_Mrhp_);
+    // MTPT - Mount Point
+    mtptCollection.addColumn(new StringIdColumn<MtptRecord>());
+    mtptCollection.addColumn(new RecordStateColumn<MtptRecord>());
+    mtptCollection.addColumn(new StringColumn<MtptRecord>("Name", &MtptRecord::editorId));
+    addModel(new IdTable(&mtptCollection), CkId::Type_Mtpt_);
+    // NAVI - Navigation Island
+    naviCollection.addColumn(new StringIdColumn<NaviRecord>());
+    naviCollection.addColumn(new RecordStateColumn<NaviRecord>());
+    naviCollection.addColumn(new StringColumn<NaviRecord>("Name", &NaviRecord::editorId));
+    addModel(new IdTable(&naviCollection), CkId::Type_Navi_);
+    // NOCM - Navigation Component
+    nocmCollection.addColumn(new StringIdColumn<NocmRecord>());
+    nocmCollection.addColumn(new RecordStateColumn<NocmRecord>());
+    nocmCollection.addColumn(new StringColumn<NocmRecord>("Name", &NocmRecord::editorId));
+    addModel(new IdTable(&nocmCollection), CkId::Type_Nocm_);
+    // OMOD - Object Mod
+    omodCollection.addColumn(new StringIdColumn<OmodRecord>());
+    omodCollection.addColumn(new RecordStateColumn<OmodRecord>());
+    omodCollection.addColumn(new StringColumn<OmodRecord>("Name", &OmodRecord::editorId));
+    addModel(new IdTable(&omodCollection), CkId::Type_Omod_);
+    // OSWP - Object Swap Set
+    oswpCollection.addColumn(new StringIdColumn<OswpRecord>());
+    oswpCollection.addColumn(new RecordStateColumn<OswpRecord>());
+    oswpCollection.addColumn(new StringColumn<OswpRecord>("Name", &OswpRecord::editorId));
+    addModel(new IdTable(&oswpCollection), CkId::Type_Oswp_);
+    // OVIS - Object Visual
+    ovisCollection.addColumn(new StringIdColumn<OvisRecord>());
+    ovisCollection.addColumn(new RecordStateColumn<OvisRecord>());
+    ovisCollection.addColumn(new StringColumn<OvisRecord>("Name", &OvisRecord::editorId));
+    addModel(new IdTable(&ovisCollection), CkId::Type_Ovis_);
+    // PCBN - Placement Configuration
+    pcbnCollection.addColumn(new StringIdColumn<PcbnRecord>());
+    pcbnCollection.addColumn(new RecordStateColumn<PcbnRecord>());
+    pcbnCollection.addColumn(new StringColumn<PcbnRecord>("Name", &PcbnRecord::editorId));
+    addModel(new IdTable(&pcbnCollection), CkId::Type_Pcbn_);
+    // PCCN - Placement Collision Node
+    pccnCollection.addColumn(new StringIdColumn<PccnRecord>());
+    pccnCollection.addColumn(new RecordStateColumn<PccnRecord>());
+    pccnCollection.addColumn(new StringColumn<PccnRecord>("Name", &PccnRecord::editorId));
+    addModel(new IdTable(&pccnCollection), CkId::Type_Pccn_);
+    // PCMT - Placement Material
+    pcmtCollection.addColumn(new StringIdColumn<PcmtRecord>());
+    pcmtCollection.addColumn(new RecordStateColumn<PcmtRecord>());
+    pcmtCollection.addColumn(new StringColumn<PcmtRecord>("Name", &PcmtRecord::editorId));
+    addModel(new IdTable(&pcmtCollection), CkId::Type_Pcmt_);
+    // PDCL - Particle Decal
+    pdclCollection.addColumn(new StringIdColumn<PdclRecord>());
+    pdclCollection.addColumn(new RecordStateColumn<PdclRecord>());
+    pdclCollection.addColumn(new StringColumn<PdclRecord>("Name", &PdclRecord::editorId));
+    addModel(new IdTable(&pdclCollection), CkId::Type_Pdcl_);
+    // PGRE - Particle Emitter
+    pgreCollection.addColumn(new StringIdColumn<PgreRecord>());
+    pgreCollection.addColumn(new RecordStateColumn<PgreRecord>());
+    pgreCollection.addColumn(new StringColumn<PgreRecord>("Name", &PgreRecord::editorId));
+    addModel(new IdTable(&pgreCollection), CkId::Type_Pgre_);
 
     // Loading Log (metadata)
     metaData.addColumn(new StringIdColumn<MetaData>());
@@ -1056,6 +1231,41 @@ bool Data::continueLoading(Messages& messages)
             case 'DOBJ': dobjCollection.load(*reader, base); break;
             case 'EFSQ': efsqCollection.load(*reader, base); break;
             case 'EQUP': equpCollection.load(*reader, base); break;
+    case 'FFKW': ffkwCollection.load(*reader, base); break;
+    case 'FOGV': fogvCollection.load(*reader, base); break;
+    case 'FORC': forcCollection.load(*reader, base); break;
+    case 'FSTP': fstpCollection.load(*reader, base); break;
+    case 'FSTS': fstsCollection.load(*reader, base); break;
+    case 'FXPD': fxpdCollection.load(*reader, base); break;
+    case 'GBFM': gbfmCollection.load(*reader, base); break;
+    case 'GBFT': gbftCollection.load(*reader, base); break;
+    case 'GCVR': gcvrCollection.load(*reader, base); break;
+    case 'IMAD': imadCollection.load(*reader, base); break;
+    case 'INNR': innrCollection.load(*reader, base); break;
+    case 'IRES': iresCollection.load(*reader, base); break;
+    case 'KSSM': kssmCollection.load(*reader, base); break;
+    case 'LAYR': layrCollection.load(*reader, base); break;
+    case 'LENS': lensCollection.load(*reader, base); break;
+    case 'LGDI': lgdiCollection.load(*reader, base); break;
+    case 'LGTM': lgtmCollection.load(*reader, base); break;
+    case 'LMSW': lmswCollection.load(*reader, base); break;
+    case 'LVLB': lvlbCollection.load(*reader, base); break;
+    case 'LVLN': lvlnCollection.load(*reader, base); break;
+    case 'LVLP': lvlpCollection.load(*reader, base); break;
+    case 'LVSC': lvscCollection.load(*reader, base); break;
+    case 'MAAM': maamCollection.load(*reader, base); break;
+    case 'MRPH': mrhpCollection.load(*reader, base); break;
+    case 'MTPT': mtptCollection.load(*reader, base); break;
+    case 'NAVI': naviCollection.load(*reader, base); break;
+    case 'NOCM': nocmCollection.load(*reader, base); break;
+    case 'OMOD': omodCollection.load(*reader, base); break;
+    case 'OSWP': oswpCollection.load(*reader, base); break;
+    case 'OVIS': ovisCollection.load(*reader, base); break;
+    case 'PCBN': pcbnCollection.load(*reader, base); break;
+    case 'PCCN': pccnCollection.load(*reader, base); break;
+    case 'PCMT': pcmtCollection.load(*reader, base); break;
+    case 'PDCL': pdclCollection.load(*reader, base); break;
+    case 'PGRE': pgreCollection.load(*reader, base); break;
             default:
             {
                 if (name == 0)
@@ -1381,6 +1591,41 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Dobj_:    return &dobjCollection;
     case CkId::Type_Efsq_:    return &efsqCollection;
     case CkId::Type_Equp_:    return &equpCollection;
+    case CkId::Type_Ffkw_:    return &ffkwCollection;
+    case CkId::Type_Fogv_:    return &fogvCollection;
+    case CkId::Type_Forc_:    return &forcCollection;
+    case CkId::Type_Fstp_:    return &fstpCollection;
+    case CkId::Type_Fsts_:    return &fstsCollection;
+    case CkId::Type_Fxpd_:    return &fxpdCollection;
+    case CkId::Type_Gbfm_:    return &gbfmCollection;
+    case CkId::Type_Gbft_:    return &gbftCollection;
+    case CkId::Type_Gcvr_:    return &gcvrCollection;
+    case CkId::Type_Imad_:    return &imadCollection;
+    case CkId::Type_Innr_:    return &innrCollection;
+    case CkId::Type_Ires_:    return &iresCollection;
+    case CkId::Type_Kssm_:    return &kssmCollection;
+    case CkId::Type_Layr_:    return &layrCollection;
+    case CkId::Type_Lens_:    return &lensCollection;
+    case CkId::Type_Lgdi_:    return &lgdiCollection;
+    case CkId::Type_Lgtm_:    return &lgtmCollection;
+    case CkId::Type_Lmsw_:    return &lmswCollection;
+    case CkId::Type_Lvlb_:    return &lvlbCollection;
+    case CkId::Type_Lvln_:    return &lvlnCollection;
+    case CkId::Type_Lvlp_:    return &lvlpCollection;
+    case CkId::Type_Lvsc_:    return &lvscCollection;
+    case CkId::Type_Maam_:    return &maamCollection;
+    case CkId::Type_Mrhp_:    return &mrhpCollection;
+    case CkId::Type_Mtpt_:    return &mtptCollection;
+    case CkId::Type_Navi_:    return &naviCollection;
+    case CkId::Type_Nocm_:    return &nocmCollection;
+    case CkId::Type_Omod_:    return &omodCollection;
+    case CkId::Type_Oswp_:    return &oswpCollection;
+    case CkId::Type_Ovis_:    return &ovisCollection;
+    case CkId::Type_Pcbn_:    return &pcbnCollection;
+    case CkId::Type_Pccn_:    return &pccnCollection;
+    case CkId::Type_Pcmt_:    return &pcmtCollection;
+    case CkId::Type_Pdcl_:    return &pdclCollection;
+    case CkId::Type_Pgre_:    return &pgreCollection;
     default:                  return nullptr;
     }
 }
@@ -1521,6 +1766,41 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Dobj_:    return &dobjCollection;
     case CkId::Type_Efsq_:    return &efsqCollection;
     case CkId::Type_Equp_:    return &equpCollection;
+    case CkId::Type_Ffkw_:    return &ffkwCollection;
+    case CkId::Type_Fogv_:    return &fogvCollection;
+    case CkId::Type_Forc_:    return &forcCollection;
+    case CkId::Type_Fstp_:    return &fstpCollection;
+    case CkId::Type_Fsts_:    return &fstsCollection;
+    case CkId::Type_Fxpd_:    return &fxpdCollection;
+    case CkId::Type_Gbfm_:    return &gbfmCollection;
+    case CkId::Type_Gbft_:    return &gbftCollection;
+    case CkId::Type_Gcvr_:    return &gcvrCollection;
+    case CkId::Type_Imad_:    return &imadCollection;
+    case CkId::Type_Innr_:    return &innrCollection;
+    case CkId::Type_Ires_:    return &iresCollection;
+    case CkId::Type_Kssm_:    return &kssmCollection;
+    case CkId::Type_Layr_:    return &layrCollection;
+    case CkId::Type_Lens_:    return &lensCollection;
+    case CkId::Type_Lgdi_:    return &lgdiCollection;
+    case CkId::Type_Lgtm_:    return &lgtmCollection;
+    case CkId::Type_Lmsw_:    return &lmswCollection;
+    case CkId::Type_Lvlb_:    return &lvlbCollection;
+    case CkId::Type_Lvln_:    return &lvlnCollection;
+    case CkId::Type_Lvlp_:    return &lvlpCollection;
+    case CkId::Type_Lvsc_:    return &lvscCollection;
+    case CkId::Type_Maam_:    return &maamCollection;
+    case CkId::Type_Mrhp_:    return &mrhpCollection;
+    case CkId::Type_Mtpt_:    return &mtptCollection;
+    case CkId::Type_Navi_:    return &naviCollection;
+    case CkId::Type_Nocm_:    return &nocmCollection;
+    case CkId::Type_Omod_:    return &omodCollection;
+    case CkId::Type_Oswp_:    return &oswpCollection;
+    case CkId::Type_Ovis_:    return &ovisCollection;
+    case CkId::Type_Pcbn_:    return &pcbnCollection;
+    case CkId::Type_Pccn_:    return &pccnCollection;
+    case CkId::Type_Pcmt_:    return &pcmtCollection;
+    case CkId::Type_Pdcl_:    return &pdclCollection;
+    case CkId::Type_Pgre_:    return &pgreCollection;
     default:                  return nullptr;
     }
 }
@@ -1660,6 +1940,41 @@ IdCollection<DmgtRecord>& Data::getDmgtCollection() { return dmgtCollection; }
 IdCollection<DobjRecord>& Data::getDobjCollection() { return dobjCollection; }
 IdCollection<EfsqRecord>& Data::getEfsqCollection() { return efsqCollection; }
 IdCollection<EqupRecord>& Data::getEqupCollection() { return equpCollection; }
+IdCollection<FfkwRecord>& Data::getFfkwCollection() { return ffkwCollection; }
+IdCollection<FogvRecord>& Data::getFogvCollection() { return fogvCollection; }
+IdCollection<ForcRecord>& Data::getForcCollection() { return forcCollection; }
+IdCollection<FstpRecord>& Data::getFstpCollection() { return fstpCollection; }
+IdCollection<FstsRecord>& Data::getFstsCollection() { return fstsCollection; }
+IdCollection<FxpdRecord>& Data::getFxpdCollection() { return fxpdCollection; }
+IdCollection<GbfmRecord>& Data::getGbfmCollection() { return gbfmCollection; }
+IdCollection<GbftRecord>& Data::getGbftCollection() { return gbftCollection; }
+IdCollection<GcvrRecord>& Data::getGcvrCollection() { return gcvrCollection; }
+IdCollection<ImadRecord>& Data::getImadCollection() { return imadCollection; }
+IdCollection<InnrRecord>& Data::getInnrCollection() { return innrCollection; }
+IdCollection<IresRecord>& Data::getIresCollection() { return iresCollection; }
+IdCollection<KssmRecord>& Data::getKssmCollection() { return kssmCollection; }
+IdCollection<LayrRecord>& Data::getLayrCollection() { return layrCollection; }
+IdCollection<LensRecord>& Data::getLensCollection() { return lensCollection; }
+IdCollection<LgdiRecord>& Data::getLgdiCollection() { return lgdiCollection; }
+IdCollection<LgtmRecord>& Data::getLgtmCollection() { return lgtmCollection; }
+IdCollection<LmswRecord>& Data::getLmswCollection() { return lmswCollection; }
+IdCollection<LvlbRecord>& Data::getLvlbCollection() { return lvlbCollection; }
+IdCollection<LvlnRecord>& Data::getLvlnCollection() { return lvlnCollection; }
+IdCollection<LvlpRecord>& Data::getLvlpCollection() { return lvlpCollection; }
+IdCollection<LvscRecord>& Data::getLvscCollection() { return lvscCollection; }
+IdCollection<MaamRecord>& Data::getMaamCollection() { return maamCollection; }
+IdCollection<MrhpRecord>& Data::getMrhpCollection() { return mrhpCollection; }
+IdCollection<MtptRecord>& Data::getMtptCollection() { return mtptCollection; }
+IdCollection<NaviRecord>& Data::getNaviCollection() { return naviCollection; }
+IdCollection<NocmRecord>& Data::getNocmCollection() { return nocmCollection; }
+IdCollection<OmodRecord>& Data::getOmodCollection() { return omodCollection; }
+IdCollection<OswpRecord>& Data::getOswpCollection() { return oswpCollection; }
+IdCollection<OvisRecord>& Data::getOvisCollection() { return ovisCollection; }
+IdCollection<PcbnRecord>& Data::getPcbnCollection() { return pcbnCollection; }
+IdCollection<PccnRecord>& Data::getPccnCollection() { return pccnCollection; }
+IdCollection<PcmtRecord>& Data::getPcmtCollection() { return pcmtCollection; }
+IdCollection<PdclRecord>& Data::getPdclCollection() { return pdclCollection; }
+IdCollection<PgreRecord>& Data::getPgreCollection() { return pgreCollection; }
 
 QVector<IRecordCollection*> Data::allCollections()
 {
@@ -1784,6 +2099,41 @@ QVector<IRecordCollection*> Data::allCollections()
         &dobjCollection,
         &efsqCollection,
         &equpCollection,
+        &ffkwCollection,
+        &fogvCollection,
+        &forcCollection,
+        &fstpCollection,
+        &fstsCollection,
+        &fxpdCollection,
+        &gbfmCollection,
+        &gbftCollection,
+        &gcvrCollection,
+        &imadCollection,
+        &innrCollection,
+        &iresCollection,
+        &kssmCollection,
+        &layrCollection,
+        &lensCollection,
+        &lgdiCollection,
+        &lgtmCollection,
+        &lmswCollection,
+        &lvlbCollection,
+        &lvlnCollection,
+        &lvlpCollection,
+        &lvscCollection,
+        &maamCollection,
+        &mrhpCollection,
+        &mtptCollection,
+        &naviCollection,
+        &nocmCollection,
+        &omodCollection,
+        &oswpCollection,
+        &ovisCollection,
+        &pcbnCollection,
+        &pccnCollection,
+        &pcmtCollection,
+        &pdclCollection,
+        &pgreCollection,
     };
 }
 
@@ -1921,6 +2271,41 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&dobjCollection,    CkId::Type_Dobj_},
         {&efsqCollection,    CkId::Type_Efsq_},
         {&equpCollection,    CkId::Type_Equp_},
+        {&ffkwCollection,    CkId::Type_Ffkw_},
+        {&fogvCollection,    CkId::Type_Fogv_},
+        {&forcCollection,    CkId::Type_Forc_},
+        {&fstpCollection,    CkId::Type_Fstp_},
+        {&fstsCollection,    CkId::Type_Fsts_},
+        {&fxpdCollection,    CkId::Type_Fxpd_},
+        {&gbfmCollection,    CkId::Type_Gbfm_},
+        {&gbftCollection,    CkId::Type_Gbft_},
+        {&gcvrCollection,    CkId::Type_Gcvr_},
+        {&imadCollection,    CkId::Type_Imad_},
+        {&innrCollection,    CkId::Type_Innr_},
+        {&iresCollection,    CkId::Type_Ires_},
+        {&kssmCollection,    CkId::Type_Kssm_},
+        {&layrCollection,    CkId::Type_Layr_},
+        {&lensCollection,    CkId::Type_Lens_},
+        {&lgdiCollection,    CkId::Type_Lgdi_},
+        {&lgtmCollection,    CkId::Type_Lgtm_},
+        {&lmswCollection,    CkId::Type_Lmsw_},
+        {&lvlbCollection,    CkId::Type_Lvlb_},
+        {&lvlnCollection,    CkId::Type_Lvln_},
+        {&lvlpCollection,    CkId::Type_Lvlp_},
+        {&lvscCollection,    CkId::Type_Lvsc_},
+        {&maamCollection,    CkId::Type_Maam_},
+        {&mrhpCollection,    CkId::Type_Mrhp_},
+        {&mtptCollection,    CkId::Type_Mtpt_},
+        {&naviCollection,    CkId::Type_Navi_},
+        {&nocmCollection,    CkId::Type_Nocm_},
+        {&omodCollection,    CkId::Type_Omod_},
+        {&oswpCollection,    CkId::Type_Oswp_},
+        {&ovisCollection,    CkId::Type_Ovis_},
+        {&pcbnCollection,    CkId::Type_Pcbn_},
+        {&pccnCollection,    CkId::Type_Pccn_},
+        {&pcmtCollection,    CkId::Type_Pcmt_},
+        {&pdclCollection,    CkId::Type_Pdcl_},
+        {&pgreCollection,    CkId::Type_Pgre_},
         {&scenCollection,    CkId::Type_Scen_},
     };
 }
@@ -2717,6 +3102,181 @@ const IdCollection<EqupRecord>& Data::getEqupCollection() const
 {
     return equpCollection;
 }
+const IdCollection<FfkwRecord>& Data::getFfkwCollection() const
+{
+    return ffkwCollection;
+}
+
+const IdCollection<FogvRecord>& Data::getFogvCollection() const
+{
+    return fogvCollection;
+}
+
+const IdCollection<ForcRecord>& Data::getForcCollection() const
+{
+    return forcCollection;
+}
+
+const IdCollection<FstpRecord>& Data::getFstpCollection() const
+{
+    return fstpCollection;
+}
+
+const IdCollection<FstsRecord>& Data::getFstsCollection() const
+{
+    return fstsCollection;
+}
+
+const IdCollection<FxpdRecord>& Data::getFxpdCollection() const
+{
+    return fxpdCollection;
+}
+
+const IdCollection<GbfmRecord>& Data::getGbfmCollection() const
+{
+    return gbfmCollection;
+}
+
+const IdCollection<GbftRecord>& Data::getGbftCollection() const
+{
+    return gbftCollection;
+}
+
+const IdCollection<GcvrRecord>& Data::getGcvrCollection() const
+{
+    return gcvrCollection;
+}
+
+const IdCollection<ImadRecord>& Data::getImadCollection() const
+{
+    return imadCollection;
+}
+
+const IdCollection<InnrRecord>& Data::getInnrCollection() const
+{
+    return innrCollection;
+}
+
+const IdCollection<IresRecord>& Data::getIresCollection() const
+{
+    return iresCollection;
+}
+
+const IdCollection<KssmRecord>& Data::getKssmCollection() const
+{
+    return kssmCollection;
+}
+
+const IdCollection<LayrRecord>& Data::getLayrCollection() const
+{
+    return layrCollection;
+}
+
+const IdCollection<LensRecord>& Data::getLensCollection() const
+{
+    return lensCollection;
+}
+
+const IdCollection<LgdiRecord>& Data::getLgdiCollection() const
+{
+    return lgdiCollection;
+}
+
+const IdCollection<LgtmRecord>& Data::getLgtmCollection() const
+{
+    return lgtmCollection;
+}
+
+const IdCollection<LmswRecord>& Data::getLmswCollection() const
+{
+    return lmswCollection;
+}
+
+const IdCollection<LvlbRecord>& Data::getLvlbCollection() const
+{
+    return lvlbCollection;
+}
+
+const IdCollection<LvlnRecord>& Data::getLvlnCollection() const
+{
+    return lvlnCollection;
+}
+
+const IdCollection<LvlpRecord>& Data::getLvlpCollection() const
+{
+    return lvlpCollection;
+}
+
+const IdCollection<LvscRecord>& Data::getLvscCollection() const
+{
+    return lvscCollection;
+}
+
+const IdCollection<MaamRecord>& Data::getMaamCollection() const
+{
+    return maamCollection;
+}
+
+const IdCollection<MrhpRecord>& Data::getMrhpCollection() const
+{
+    return mrhpCollection;
+}
+
+const IdCollection<MtptRecord>& Data::getMtptCollection() const
+{
+    return mtptCollection;
+}
+
+const IdCollection<NaviRecord>& Data::getNaviCollection() const
+{
+    return naviCollection;
+}
+
+const IdCollection<NocmRecord>& Data::getNocmCollection() const
+{
+    return nocmCollection;
+}
+
+const IdCollection<OmodRecord>& Data::getOmodCollection() const
+{
+    return omodCollection;
+}
+
+const IdCollection<OswpRecord>& Data::getOswpCollection() const
+{
+    return oswpCollection;
+}
+
+const IdCollection<OvisRecord>& Data::getOvisCollection() const
+{
+    return ovisCollection;
+}
+
+const IdCollection<PcbnRecord>& Data::getPcbnCollection() const
+{
+    return pcbnCollection;
+}
+
+const IdCollection<PccnRecord>& Data::getPccnCollection() const
+{
+    return pccnCollection;
+}
+
+const IdCollection<PcmtRecord>& Data::getPcmtCollection() const
+{
+    return pcmtCollection;
+}
+
+const IdCollection<PdclRecord>& Data::getPdclCollection() const
+{
+    return pdclCollection;
+}
+
+const IdCollection<PgreRecord>& Data::getPgreCollection() const
+{
+    return pgreCollection;
+}
+
 
 bool Data::addMaterial(MaterialRecord& record)
 {

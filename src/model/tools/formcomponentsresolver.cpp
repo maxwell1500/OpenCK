@@ -63,6 +63,41 @@
 #include "../../../libs/files/esm/mattrecord.hpp"
 #include "../../../libs/files/esm/movtrecord.hpp"
 #include "../../../libs/files/esm/muscrecord.hpp"
+#include "../../../libs/files/esm/ffkwrecord.hpp"
+#include "../../../libs/files/esm/fogvrecord.hpp"
+#include "../../../libs/files/esm/forcrecord.hpp"
+#include "../../../libs/files/esm/fstprecord.hpp"
+#include "../../../libs/files/esm/fstsrecord.hpp"
+#include "../../../libs/files/esm/fxpdrecord.hpp"
+#include "../../../libs/files/esm/gbfmrecord.hpp"
+#include "../../../libs/files/esm/gbftrecord.hpp"
+#include "../../../libs/files/esm/gcvrrecord.hpp"
+#include "../../../libs/files/esm/imadrecord.hpp"
+#include "../../../libs/files/esm/innrrecord.hpp"
+#include "../../../libs/files/esm/iresrecord.hpp"
+#include "../../../libs/files/esm/kssmrecord.hpp"
+#include "../../../libs/files/esm/layrrecord.hpp"
+#include "../../../libs/files/esm/lensrecord.hpp"
+#include "../../../libs/files/esm/lgdirecord.hpp"
+#include "../../../libs/files/esm/lgtmrecord.hpp"
+#include "../../../libs/files/esm/lmswrecord.hpp"
+#include "../../../libs/files/esm/lvlbrecord.hpp"
+#include "../../../libs/files/esm/lvlnrecord.hpp"
+#include "../../../libs/files/esm/lvlprecord.hpp"
+#include "../../../libs/files/esm/lvscrecord.hpp"
+#include "../../../libs/files/esm/maamrecord.hpp"
+#include "../../../libs/files/esm/mrhprecord.hpp"
+#include "../../../libs/files/esm/mtptrecord.hpp"
+#include "../../../libs/files/esm/navirecord.hpp"
+#include "../../../libs/files/esm/nocmrecord.hpp"
+#include "../../../libs/files/esm/omodrecord.hpp"
+#include "../../../libs/files/esm/oswprecord.hpp"
+#include "../../../libs/files/esm/ovisrecord.hpp"
+#include "../../../libs/files/esm/pcbnrecord.hpp"
+#include "../../../libs/files/esm/pccnrecord.hpp"
+#include "../../../libs/files/esm/pcmtrecord.hpp"
+#include "../../../libs/files/esm/pdclrecord.hpp"
+#include "../../../libs/files/esm/pgrerecord.hpp"
 #include "../../../libs/files/esm/messagerecord.hpp"
 #include "../../../libs/files/esm/miscrecord.hpp"
 #include "../../../libs/files/esm/msttrecord.hpp"
@@ -245,6 +280,41 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(MattRecord) \
     MACRO(MovtRecord) \
     MACRO(MuscRecord) \
+    MACRO(FfkwRecord) \
+    MACRO(FogvRecord) \
+    MACRO(ForcRecord) \
+    MACRO(FstpRecord) \
+    MACRO(FstsRecord) \
+    MACRO(FxpdRecord) \
+    MACRO(GbfmRecord) \
+    MACRO(GbftRecord) \
+    MACRO(GcvrRecord) \
+    MACRO(ImadRecord) \
+    MACRO(InnrRecord) \
+    MACRO(IresRecord) \
+    MACRO(KssmRecord) \
+    MACRO(LayrRecord) \
+    MACRO(LensRecord) \
+    MACRO(LgdiRecord) \
+    MACRO(LgtmRecord) \
+    MACRO(LmswRecord) \
+    MACRO(LvlbRecord) \
+    MACRO(LvlnRecord) \
+    MACRO(LvlpRecord) \
+    MACRO(LvscRecord) \
+    MACRO(MaamRecord) \
+    MACRO(MrhpRecord) \
+    MACRO(MtptRecord) \
+    MACRO(NaviRecord) \
+    MACRO(NocmRecord) \
+    MACRO(OmodRecord) \
+    MACRO(OswpRecord) \
+    MACRO(OvisRecord) \
+    MACRO(PcbnRecord) \
+    MACRO(PccnRecord) \
+    MACRO(PcmtRecord) \
+    MACRO(PdclRecord) \
+    MACRO(PgreRecord) \
     MACRO(MesgRecord) \
     MACRO(MiscRecord) \
     MACRO(MsttRecord) \

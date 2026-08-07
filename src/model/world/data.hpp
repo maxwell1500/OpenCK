@@ -138,6 +138,41 @@
 #include "../../../libs/files/esm/dobjrecord.hpp"
 #include "../../../libs/files/esm/efsqrecord.hpp"
 #include "../../../libs/files/esm/equprecord.hpp"
+#include "../../../libs/files/esm/ffkwrecord.hpp"
+#include "../../../libs/files/esm/fogvrecord.hpp"
+#include "../../../libs/files/esm/forcrecord.hpp"
+#include "../../../libs/files/esm/fstprecord.hpp"
+#include "../../../libs/files/esm/fstsrecord.hpp"
+#include "../../../libs/files/esm/fxpdrecord.hpp"
+#include "../../../libs/files/esm/gbfmrecord.hpp"
+#include "../../../libs/files/esm/gbftrecord.hpp"
+#include "../../../libs/files/esm/gcvrrecord.hpp"
+#include "../../../libs/files/esm/imadrecord.hpp"
+#include "../../../libs/files/esm/innrrecord.hpp"
+#include "../../../libs/files/esm/iresrecord.hpp"
+#include "../../../libs/files/esm/kssmrecord.hpp"
+#include "../../../libs/files/esm/layrrecord.hpp"
+#include "../../../libs/files/esm/lensrecord.hpp"
+#include "../../../libs/files/esm/lgdirecord.hpp"
+#include "../../../libs/files/esm/lgtmrecord.hpp"
+#include "../../../libs/files/esm/lmswrecord.hpp"
+#include "../../../libs/files/esm/lvlbrecord.hpp"
+#include "../../../libs/files/esm/lvlnrecord.hpp"
+#include "../../../libs/files/esm/lvlprecord.hpp"
+#include "../../../libs/files/esm/lvscrecord.hpp"
+#include "../../../libs/files/esm/maamrecord.hpp"
+#include "../../../libs/files/esm/mrhprecord.hpp"
+#include "../../../libs/files/esm/mtptrecord.hpp"
+#include "../../../libs/files/esm/navirecord.hpp"
+#include "../../../libs/files/esm/nocmrecord.hpp"
+#include "../../../libs/files/esm/omodrecord.hpp"
+#include "../../../libs/files/esm/oswprecord.hpp"
+#include "../../../libs/files/esm/ovisrecord.hpp"
+#include "../../../libs/files/esm/pcbnrecord.hpp"
+#include "../../../libs/files/esm/pccnrecord.hpp"
+#include "../../../libs/files/esm/pcmtrecord.hpp"
+#include "../../../libs/files/esm/pdclrecord.hpp"
+#include "../../../libs/files/esm/pgrerecord.hpp"
 
 #include <QObject>
 #include <QStringList>
@@ -624,6 +659,111 @@ public:
     /// \brief Get EQUP collection
     /// \return Const reference to the EQUP record collection
     const IdCollection<EqupRecord>& getEqupCollection() const;
+    /// \brief Get FFKW collection
+    /// \return Const reference to the FFKW record collection
+    const IdCollection<FfkwRecord>& getFfkwCollection() const;
+    /// \brief Get FOGV collection
+    /// \return Const reference to the FOGV record collection
+    const IdCollection<FogvRecord>& getFogvCollection() const;
+    /// \brief Get FORC collection
+    /// \return Const reference to the FORC record collection
+    const IdCollection<ForcRecord>& getForcCollection() const;
+    /// \brief Get FSTP collection
+    /// \return Const reference to the FSTP record collection
+    const IdCollection<FstpRecord>& getFstpCollection() const;
+    /// \brief Get FSTS collection
+    /// \return Const reference to the FSTS record collection
+    const IdCollection<FstsRecord>& getFstsCollection() const;
+    /// \brief Get FXPD collection
+    /// \return Const reference to the FXPD record collection
+    const IdCollection<FxpdRecord>& getFxpdCollection() const;
+    /// \brief Get GBFM collection
+    /// \return Const reference to the GBFM record collection
+    const IdCollection<GbfmRecord>& getGbfmCollection() const;
+    /// \brief Get GBFT collection
+    /// \return Const reference to the GBFT record collection
+    const IdCollection<GbftRecord>& getGbftCollection() const;
+    /// \brief Get GCVR collection
+    /// \return Const reference to the GCVR record collection
+    const IdCollection<GcvrRecord>& getGcvrCollection() const;
+    /// \brief Get IMAD collection
+    /// \return Const reference to the IMAD record collection
+    const IdCollection<ImadRecord>& getImadCollection() const;
+    /// \brief Get INNR collection
+    /// \return Const reference to the INNR record collection
+    const IdCollection<InnrRecord>& getInnrCollection() const;
+    /// \brief Get IRES collection
+    /// \return Const reference to the IRES record collection
+    const IdCollection<IresRecord>& getIresCollection() const;
+    /// \brief Get KSSM collection
+    /// \return Const reference to the KSSM record collection
+    const IdCollection<KssmRecord>& getKssmCollection() const;
+    /// \brief Get LAYR collection
+    /// \return Const reference to the LAYR record collection
+    const IdCollection<LayrRecord>& getLayrCollection() const;
+    /// \brief Get LENS collection
+    /// \return Const reference to the LENS record collection
+    const IdCollection<LensRecord>& getLensCollection() const;
+    /// \brief Get LGDI collection
+    /// \return Const reference to the LGDI record collection
+    const IdCollection<LgdiRecord>& getLgdiCollection() const;
+    /// \brief Get LGTM collection
+    /// \return Const reference to the LGTM record collection
+    const IdCollection<LgtmRecord>& getLgtmCollection() const;
+    /// \brief Get LMSW collection
+    /// \return Const reference to the LMSW record collection
+    const IdCollection<LmswRecord>& getLmswCollection() const;
+    /// \brief Get LVLB collection
+    /// \return Const reference to the LVLB record collection
+    const IdCollection<LvlbRecord>& getLvlbCollection() const;
+    /// \brief Get LVLN collection
+    /// \return Const reference to the LVLN record collection
+    const IdCollection<LvlnRecord>& getLvlnCollection() const;
+    /// \brief Get LVLP collection
+    /// \return Const reference to the LVLP record collection
+    const IdCollection<LvlpRecord>& getLvlpCollection() const;
+    /// \brief Get LVSC collection
+    /// \return Const reference to the LVSC record collection
+    const IdCollection<LvscRecord>& getLvscCollection() const;
+    /// \brief Get MAAM collection
+    /// \return Const reference to the MAAM record collection
+    const IdCollection<MaamRecord>& getMaamCollection() const;
+    /// \brief Get MRPH collection
+    /// \return Const reference to the MRPH record collection
+    const IdCollection<MrhpRecord>& getMrhpCollection() const;
+    /// \brief Get MTPT collection
+    /// \return Const reference to the MTPT record collection
+    const IdCollection<MtptRecord>& getMtptCollection() const;
+    /// \brief Get NAVI collection
+    /// \return Const reference to the NAVI record collection
+    const IdCollection<NaviRecord>& getNaviCollection() const;
+    /// \brief Get NOCM collection
+    /// \return Const reference to the NOCM record collection
+    const IdCollection<NocmRecord>& getNocmCollection() const;
+    /// \brief Get OMOD collection
+    /// \return Const reference to the OMOD record collection
+    const IdCollection<OmodRecord>& getOmodCollection() const;
+    /// \brief Get OSWP collection
+    /// \return Const reference to the OSWP record collection
+    const IdCollection<OswpRecord>& getOswpCollection() const;
+    /// \brief Get OVIS collection
+    /// \return Const reference to the OVIS record collection
+    const IdCollection<OvisRecord>& getOvisCollection() const;
+    /// \brief Get PCBN collection
+    /// \return Const reference to the PCBN record collection
+    const IdCollection<PcbnRecord>& getPcbnCollection() const;
+    /// \brief Get PCCN collection
+    /// \return Const reference to the PCCN record collection
+    const IdCollection<PccnRecord>& getPccnCollection() const;
+    /// \brief Get PCMT collection
+    /// \return Const reference to the PCMT record collection
+    const IdCollection<PcmtRecord>& getPcmtCollection() const;
+    /// \brief Get PDCL collection
+    /// \return Const reference to the PDCL record collection
+    const IdCollection<PdclRecord>& getPdclCollection() const;
+    /// \brief Get PGRE collection
+    /// \return Const reference to the PGRE record collection
+    const IdCollection<PgreRecord>& getPgreCollection() const;
 
     // --- Non-const overloads for mutation ---
 
@@ -956,6 +1096,111 @@ public:
     IdCollection<DobjRecord>& getDobjCollection();
     IdCollection<EfsqRecord>& getEfsqCollection();
     IdCollection<EqupRecord>& getEqupCollection();
+    /// \brief Get FFKW collection (mutable)
+    /// \return Reference to the FFKW record collection for modification
+    IdCollection<FfkwRecord>& getFfkwCollection();
+    /// \brief Get FOGV collection (mutable)
+    /// \return Reference to the FOGV record collection for modification
+    IdCollection<FogvRecord>& getFogvCollection();
+    /// \brief Get FORC collection (mutable)
+    /// \return Reference to the FORC record collection for modification
+    IdCollection<ForcRecord>& getForcCollection();
+    /// \brief Get FSTP collection (mutable)
+    /// \return Reference to the FSTP record collection for modification
+    IdCollection<FstpRecord>& getFstpCollection();
+    /// \brief Get FSTS collection (mutable)
+    /// \return Reference to the FSTS record collection for modification
+    IdCollection<FstsRecord>& getFstsCollection();
+    /// \brief Get FXPD collection (mutable)
+    /// \return Reference to the FXPD record collection for modification
+    IdCollection<FxpdRecord>& getFxpdCollection();
+    /// \brief Get GBFM collection (mutable)
+    /// \return Reference to the GBFM record collection for modification
+    IdCollection<GbfmRecord>& getGbfmCollection();
+    /// \brief Get GBFT collection (mutable)
+    /// \return Reference to the GBFT record collection for modification
+    IdCollection<GbftRecord>& getGbftCollection();
+    /// \brief Get GCVR collection (mutable)
+    /// \return Reference to the GCVR record collection for modification
+    IdCollection<GcvrRecord>& getGcvrCollection();
+    /// \brief Get IMAD collection (mutable)
+    /// \return Reference to the IMAD record collection for modification
+    IdCollection<ImadRecord>& getImadCollection();
+    /// \brief Get INNR collection (mutable)
+    /// \return Reference to the INNR record collection for modification
+    IdCollection<InnrRecord>& getInnrCollection();
+    /// \brief Get IRES collection (mutable)
+    /// \return Reference to the IRES record collection for modification
+    IdCollection<IresRecord>& getIresCollection();
+    /// \brief Get KSSM collection (mutable)
+    /// \return Reference to the KSSM record collection for modification
+    IdCollection<KssmRecord>& getKssmCollection();
+    /// \brief Get LAYR collection (mutable)
+    /// \return Reference to the LAYR record collection for modification
+    IdCollection<LayrRecord>& getLayrCollection();
+    /// \brief Get LENS collection (mutable)
+    /// \return Reference to the LENS record collection for modification
+    IdCollection<LensRecord>& getLensCollection();
+    /// \brief Get LGDI collection (mutable)
+    /// \return Reference to the LGDI record collection for modification
+    IdCollection<LgdiRecord>& getLgdiCollection();
+    /// \brief Get LGTM collection (mutable)
+    /// \return Reference to the LGTM record collection for modification
+    IdCollection<LgtmRecord>& getLgtmCollection();
+    /// \brief Get LMSW collection (mutable)
+    /// \return Reference to the LMSW record collection for modification
+    IdCollection<LmswRecord>& getLmswCollection();
+    /// \brief Get LVLB collection (mutable)
+    /// \return Reference to the LVLB record collection for modification
+    IdCollection<LvlbRecord>& getLvlbCollection();
+    /// \brief Get LVLN collection (mutable)
+    /// \return Reference to the LVLN record collection for modification
+    IdCollection<LvlnRecord>& getLvlnCollection();
+    /// \brief Get LVLP collection (mutable)
+    /// \return Reference to the LVLP record collection for modification
+    IdCollection<LvlpRecord>& getLvlpCollection();
+    /// \brief Get LVSC collection (mutable)
+    /// \return Reference to the LVSC record collection for modification
+    IdCollection<LvscRecord>& getLvscCollection();
+    /// \brief Get MAAM collection (mutable)
+    /// \return Reference to the MAAM record collection for modification
+    IdCollection<MaamRecord>& getMaamCollection();
+    /// \brief Get MRPH collection (mutable)
+    /// \return Reference to the MRPH record collection for modification
+    IdCollection<MrhpRecord>& getMrhpCollection();
+    /// \brief Get MTPT collection (mutable)
+    /// \return Reference to the MTPT record collection for modification
+    IdCollection<MtptRecord>& getMtptCollection();
+    /// \brief Get NAVI collection (mutable)
+    /// \return Reference to the NAVI record collection for modification
+    IdCollection<NaviRecord>& getNaviCollection();
+    /// \brief Get NOCM collection (mutable)
+    /// \return Reference to the NOCM record collection for modification
+    IdCollection<NocmRecord>& getNocmCollection();
+    /// \brief Get OMOD collection (mutable)
+    /// \return Reference to the OMOD record collection for modification
+    IdCollection<OmodRecord>& getOmodCollection();
+    /// \brief Get OSWP collection (mutable)
+    /// \return Reference to the OSWP record collection for modification
+    IdCollection<OswpRecord>& getOswpCollection();
+    /// \brief Get OVIS collection (mutable)
+    /// \return Reference to the OVIS record collection for modification
+    IdCollection<OvisRecord>& getOvisCollection();
+    /// \brief Get PCBN collection (mutable)
+    /// \return Reference to the PCBN record collection for modification
+    IdCollection<PcbnRecord>& getPcbnCollection();
+    /// \brief Get PCCN collection (mutable)
+    /// \return Reference to the PCCN record collection for modification
+    IdCollection<PccnRecord>& getPccnCollection();
+    /// \brief Get PCMT collection (mutable)
+    /// \return Reference to the PCMT record collection for modification
+    IdCollection<PcmtRecord>& getPcmtCollection();
+    /// \brief Get PDCL collection (mutable)
+    /// \return Reference to the PDCL record collection for modification
+    IdCollection<PdclRecord>& getPdclCollection();
+    /// \brief Get PGRE collection (mutable)
+    /// \return Reference to the PGRE record collection for modification
+    IdCollection<PgreRecord>& getPgreCollection();
 
     /// \brief Get collection by record type (const version)
     /// \param type Record type identifier
@@ -1335,6 +1580,41 @@ private:
     IdCollection<DobjRecord> dobjCollection;
     IdCollection<EfsqRecord> efsqCollection;
     IdCollection<EqupRecord> equpCollection;
+    IdCollection<FfkwRecord> ffkwCollection;
+    IdCollection<FogvRecord> fogvCollection;
+    IdCollection<ForcRecord> forcCollection;
+    IdCollection<FstpRecord> fstpCollection;
+    IdCollection<FstsRecord> fstsCollection;
+    IdCollection<FxpdRecord> fxpdCollection;
+    IdCollection<GbfmRecord> gbfmCollection;
+    IdCollection<GbftRecord> gbftCollection;
+    IdCollection<GcvrRecord> gcvrCollection;
+    IdCollection<ImadRecord> imadCollection;
+    IdCollection<InnrRecord> innrCollection;
+    IdCollection<IresRecord> iresCollection;
+    IdCollection<KssmRecord> kssmCollection;
+    IdCollection<LayrRecord> layrCollection;
+    IdCollection<LensRecord> lensCollection;
+    IdCollection<LgdiRecord> lgdiCollection;
+    IdCollection<LgtmRecord> lgtmCollection;
+    IdCollection<LmswRecord> lmswCollection;
+    IdCollection<LvlbRecord> lvlbCollection;
+    IdCollection<LvlnRecord> lvlnCollection;
+    IdCollection<LvlpRecord> lvlpCollection;
+    IdCollection<LvscRecord> lvscCollection;
+    IdCollection<MaamRecord> maamCollection;
+    IdCollection<MrhpRecord> mrhpCollection;
+    IdCollection<MtptRecord> mtptCollection;
+    IdCollection<NaviRecord> naviCollection;
+    IdCollection<NocmRecord> nocmCollection;
+    IdCollection<OmodRecord> omodCollection;
+    IdCollection<OswpRecord> oswpCollection;
+    IdCollection<OvisRecord> ovisCollection;
+    IdCollection<PcbnRecord> pcbnCollection;
+    IdCollection<PccnRecord> pccnCollection;
+    IdCollection<PcmtRecord> pcmtCollection;
+    IdCollection<PdclRecord> pdclCollection;
+    IdCollection<PgreRecord> pgreCollection;
 
     QVector<QAbstractItemModel*> models;
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;
