@@ -1,4 +1,4 @@
-﻿#include "document.hpp"
+#include "document.hpp"
 
 #include "../doc/messages.hpp"
 #include "../world/metadata.hpp"
@@ -173,6 +173,41 @@ void Document::save(const QString& savePath)
             {&data->getMattCollection(),  'MATT'},
             {&data->getMovtCollection(),  'MOVT'},
             {&data->getMuscCollection(),  'MUSC'},
+            {&data->getAactCollection(),  'AACT'},
+            {&data->getAamdCollection(),  'AAMD'},
+            {&data->getAapdCollection(),  'AAPD'},
+            {&data->getAchrCollection(),  'ACHR'},
+            {&data->getAddnCollection(),  'ADDN'},
+            {&data->getAffeCollection(),  'AFFE'},
+            {&data->getAmbsCollection(),  'AMBS'},
+            {&data->getAmdlCollection(),  'AMDL'},
+            {&data->getAopfCollection(),  'AOPF'},
+            {&data->getAopsCollection(),  'AOPS'},
+            {&data->getAoruCollection(),  'AORU'},
+            {&data->getArmaCollection(),  'ARMA'},
+            {&data->getArtoCollection(),  'ARTO'},
+            {&data->getAspcCollection(),  'ASPC'},
+            {&data->getAtmoCollection(),  'ATMO'},
+            {&data->getAvmdCollection(),  'AVMD'},
+            {&data->getBiomCollection(),  'BIOM'},
+            {&data->getBmmoCollection(),  'BMMO'},
+            {&data->getBmodCollection(),  'BMOD'},
+            {&data->getBndsCollection(),  'BNDS'},
+            {&data->getBptdCollection(),  'BPTD'},
+            {&data->getCamsCollection(),  'CAMS'},
+            {&data->getChalCollection(),  'CHAL'},
+            {&data->getCldfCollection(),  'CLDF'},
+            {&data->getCndfCollection(),  'CNDF'},
+            {&data->getCollCollection(),  'COLL'},
+            {&data->getCpthCollection(),  'CPTH'},
+            {&data->getDlbrCollection(),  'DLBR'},
+            {&data->getCur3Collection(),  'CUR3'},
+            {&data->getCurvCollection(),  'CURV'},
+            {&data->getDfobCollection(),  'DFOB'},
+            {&data->getDmgtCollection(),  'DMGT'},
+            {&data->getDobjCollection(),  'DOBJ'},
+            {&data->getEfsqCollection(),  'EFSQ'},
+            {&data->getEqupCollection(),  'EQUP'},
         };
 
         for (const auto& entry : saveableCollections)

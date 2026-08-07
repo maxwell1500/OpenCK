@@ -163,6 +163,41 @@ set(ESM_SOURCES
     libs/files/esm/mattrecord.cpp
     libs/files/esm/movtrecord.cpp
     libs/files/esm/muscrecord.cpp
+    libs/files/esm/aactrecord.cpp
+    libs/files/esm/aamdrecord.cpp
+    libs/files/esm/aapdrecord.cpp
+    libs/files/esm/achrrecord.cpp
+    libs/files/esm/addnrecord.cpp
+    libs/files/esm/afferecord.cpp
+    libs/files/esm/ambsrecord.cpp
+    libs/files/esm/amdlrecord.cpp
+    libs/files/esm/aopfrecord.cpp
+    libs/files/esm/aopsrecord.cpp
+    libs/files/esm/aorurecord.cpp
+    libs/files/esm/armarecord.cpp
+    libs/files/esm/artorecord.cpp
+    libs/files/esm/aspcrecord.cpp
+    libs/files/esm/atmrecord.cpp
+    libs/files/esm/avmdrecord.cpp
+    libs/files/esm/biomrecord.cpp
+    libs/files/esm/bmmorecord.cpp
+    libs/files/esm/bmodrecord.cpp
+    libs/files/esm/bndsrecord.cpp
+    libs/files/esm/bptdrecord.cpp
+    libs/files/esm/camsrecord.cpp
+    libs/files/esm/chalrecord.cpp
+    libs/files/esm/cldfrecord.cpp
+    libs/files/esm/cndfrecord.cpp
+    libs/files/esm/collrecord.cpp
+    libs/files/esm/cpthrecord.cpp
+    libs/files/esm/dlbrrecord.cpp
+    libs/files/esm/cur3record.cpp
+    libs/files/esm/curvrecord.cpp
+    libs/files/esm/dfobrecord.cpp
+    libs/files/esm/dmgtrecord.cpp
+    libs/files/esm/dobjrecord.cpp
+    libs/files/esm/efsqrecord.cpp
+    libs/files/esm/equprecord.cpp
     libs/files/esm/conditionrecord.cpp
     libs/files/data/strings.cpp
 )
@@ -284,6 +319,41 @@ set(ESM_HEADERS
     libs/files/esm/mattrecord.hpp
     libs/files/esm/movtrecord.hpp
     libs/files/esm/muscrecord.hpp
+    libs/files/esm/aactrecord.hpp
+    libs/files/esm/aamdrecord.hpp
+    libs/files/esm/aapdrecord.hpp
+    libs/files/esm/achrrecord.hpp
+    libs/files/esm/addnrecord.hpp
+    libs/files/esm/afferecord.hpp
+    libs/files/esm/ambsrecord.hpp
+    libs/files/esm/amdlrecord.hpp
+    libs/files/esm/aopfrecord.hpp
+    libs/files/esm/aopsrecord.hpp
+    libs/files/esm/aorurecord.hpp
+    libs/files/esm/armarecord.hpp
+    libs/files/esm/artorecord.hpp
+    libs/files/esm/aspcrecord.hpp
+    libs/files/esm/atmrecord.hpp
+    libs/files/esm/avmdrecord.hpp
+    libs/files/esm/biomrecord.hpp
+    libs/files/esm/bmmorecord.hpp
+    libs/files/esm/bmodrecord.hpp
+    libs/files/esm/bndsrecord.hpp
+    libs/files/esm/bptdrecord.hpp
+    libs/files/esm/camsrecord.hpp
+    libs/files/esm/chalrecord.hpp
+    libs/files/esm/cldfrecord.hpp
+    libs/files/esm/cndfrecord.hpp
+    libs/files/esm/collrecord.hpp
+    libs/files/esm/cpthrecord.hpp
+    libs/files/esm/dlbrrecord.hpp
+    libs/files/esm/cur3record.hpp
+    libs/files/esm/curvrecord.hpp
+    libs/files/esm/dfobrecord.hpp
+    libs/files/esm/dmgtrecord.hpp
+    libs/files/esm/dobjrecord.hpp
+    libs/files/esm/efsqrecord.hpp
+    libs/files/esm/equprecord.hpp
     libs/components/component.hpp
     libs/components/editorproperty.hpp
     libs/components/formcomponents.hpp

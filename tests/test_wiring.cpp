@@ -15,7 +15,7 @@ struct TypeDisk
     const char* disk;
 };
 
-// The 25 record types that previously had no disk alias in
+// The 65 record types that previously had no disk alias in
 // CkId::stringToType. Each 4-char code matches the on-disk record name.
 static const TypeDisk kNewlyAliased[] = {
     { CkId::Type_Imgs_, "IMGS" }, { CkId::Type_Keym_, "KEYM" },
@@ -31,9 +31,27 @@ static const TypeDisk kNewlyAliased[] = {
     { CkId::Type_Spgd_, "SPGD" }, { CkId::Type_Scol_, "SCOL" },
     { CkId::Type_Scen_, "SCEN" }, { CkId::Type_Txst_, "TXST" },
     { CkId::Type_Wate_, "WATR" },
+    { CkId::Type_Aact_, "AACT" }, { CkId::Type_Aamd_, "AAMD" },
+    { CkId::Type_Aapd_, "AAPD" }, { CkId::Type_Achr_, "ACHR" },
+    { CkId::Type_Addn_, "ADDN" }, { CkId::Type_Affe_, "AFFE" },
+    { CkId::Type_Ambs_, "AMBS" }, { CkId::Type_Amdl_, "AMDL" },
+    { CkId::Type_Aopf_, "AOPF" }, { CkId::Type_Aops_, "AOPS" },
+    { CkId::Type_Aoru_, "AORU" }, { CkId::Type_Arma_, "ARMA" },
+    { CkId::Type_Arto_, "ARTO" }, { CkId::Type_Aspc_, "ASPC" },
+    { CkId::Type_Atmo_, "ATMO" }, { CkId::Type_Avmd_, "AVMD" },
+    { CkId::Type_Biom_, "BIOM" }, { CkId::Type_Bmmo_, "BMMO" },
+    { CkId::Type_Bmod_, "BMOD" }, { CkId::Type_Bnds_, "BNDS" },
+    { CkId::Type_Bptd_, "BPTD" }, { CkId::Type_Cams_, "CAMS" },
+    { CkId::Type_Chal_, "CHAL" }, { CkId::Type_Cldf_, "CLDF" },
+    { CkId::Type_Cndf_, "CNDF" }, { CkId::Type_Coll_, "COLL" },
+    { CkId::Type_Cpth_, "CPTH" }, { CkId::Type_Dlbr_, "DLBR" },
+    { CkId::Type_Cur3_, "CUR3" }, { CkId::Type_Curv_, "CURV" },
+    { CkId::Type_Dfob_, "DFOB" }, { CkId::Type_Dmgt_, "DMGT" },
+    { CkId::Type_Dobj_, "DOBJ" }, { CkId::Type_Efsq_, "EFSQ" },
+    { CkId::Type_Equp_, "EQUP" },
 };
 
-// The 12 structs added to FOR_EACH_COMPONENT_RECORD_TYPE in
+// The 52 structs added to FOR_EACH_COMPONENT_RECORD_TYPE in
 // formcomponentsresolver.cpp (AnioRecord was already covered).
 static const TypeDisk kMacroAdded[] = {
     { CkId::Type_Artv_, "ARTV" }, { CkId::Type_Clfm_, "CLFM" },
@@ -45,9 +63,27 @@ static const TypeDisk kMacroAdded[] = {
     { CkId::Type_Hdpt_, "HDPT" }, { CkId::Type_Term_, "TERM" },
     { CkId::Type_Matt_, "MATT" }, { CkId::Type_Movt_, "MOVT" },
     { CkId::Type_Musc_, "MUSC" },
+    { CkId::Type_Aact_, "AACT" }, { CkId::Type_Aamd_, "AAMD" },
+    { CkId::Type_Aapd_, "AAPD" }, { CkId::Type_Achr_, "ACHR" },
+    { CkId::Type_Addn_, "ADDN" }, { CkId::Type_Affe_, "AFFE" },
+    { CkId::Type_Ambs_, "AMBS" }, { CkId::Type_Amdl_, "AMDL" },
+    { CkId::Type_Aopf_, "AOPF" }, { CkId::Type_Aops_, "AOPS" },
+    { CkId::Type_Aoru_, "AORU" }, { CkId::Type_Arma_, "ARMA" },
+    { CkId::Type_Arto_, "ARTO" }, { CkId::Type_Aspc_, "ASPC" },
+    { CkId::Type_Atmo_, "ATMO" }, { CkId::Type_Avmd_, "AVMD" },
+    { CkId::Type_Biom_, "BIOM" }, { CkId::Type_Bmmo_, "BMMO" },
+    { CkId::Type_Bmod_, "BMOD" }, { CkId::Type_Bnds_, "BNDS" },
+    { CkId::Type_Bptd_, "BPTD" }, { CkId::Type_Cams_, "CAMS" },
+    { CkId::Type_Chal_, "CHAL" }, { CkId::Type_Cldf_, "CLDF" },
+    { CkId::Type_Cndf_, "CNDF" }, { CkId::Type_Coll_, "COLL" },
+    { CkId::Type_Cpth_, "CPTH" }, { CkId::Type_Dlbr_, "DLBR" },
+    { CkId::Type_Cur3_, "CUR3" }, { CkId::Type_Curv_, "CURV" },
+    { CkId::Type_Dfob_, "DFOB" }, { CkId::Type_Dmgt_, "DMGT" },
+    { CkId::Type_Dobj_, "DOBJ" }, { CkId::Type_Efsq_, "EFSQ" },
+    { CkId::Type_Equp_, "EQUP" },
 };
 
-// The 13 types wired into the Document::save dispatch array.
+// The 53 types wired into the Document::save dispatch array.
 static const TypeDisk kSaveWired[] = {
     { CkId::Type_Plnt_, "PNDT" }, { CkId::Type_Anio_, "ANIO" },
     { CkId::Type_Artv_, "ARTV" }, { CkId::Type_Clfm_, "CLFM" },
@@ -59,9 +95,27 @@ static const TypeDisk kSaveWired[] = {
     { CkId::Type_Hdpt_, "HDPT" }, { CkId::Type_Term_, "TERM" },
     { CkId::Type_Matt_, "MATT" }, { CkId::Type_Movt_, "MOVT" },
     { CkId::Type_Musc_, "MUSC" },
+    { CkId::Type_Aact_, "AACT" }, { CkId::Type_Aamd_, "AAMD" },
+    { CkId::Type_Aapd_, "AAPD" }, { CkId::Type_Achr_, "ACHR" },
+    { CkId::Type_Addn_, "ADDN" }, { CkId::Type_Affe_, "AFFE" },
+    { CkId::Type_Ambs_, "AMBS" }, { CkId::Type_Amdl_, "AMDL" },
+    { CkId::Type_Aopf_, "AOPF" }, { CkId::Type_Aops_, "AOPS" },
+    { CkId::Type_Aoru_, "AORU" }, { CkId::Type_Arma_, "ARMA" },
+    { CkId::Type_Arto_, "ARTO" }, { CkId::Type_Aspc_, "ASPC" },
+    { CkId::Type_Atmo_, "ATMO" }, { CkId::Type_Avmd_, "AVMD" },
+    { CkId::Type_Biom_, "BIOM" }, { CkId::Type_Bmmo_, "BMMO" },
+    { CkId::Type_Bmod_, "BMOD" }, { CkId::Type_Bnds_, "BNDS" },
+    { CkId::Type_Bptd_, "BPTD" }, { CkId::Type_Cams_, "CAMS" },
+    { CkId::Type_Chal_, "CHAL" }, { CkId::Type_Cldf_, "CLDF" },
+    { CkId::Type_Cndf_, "CNDF" }, { CkId::Type_Coll_, "COLL" },
+    { CkId::Type_Cpth_, "CPTH" }, { CkId::Type_Dlbr_, "DLBR" },
+    { CkId::Type_Cur3_, "CUR3" }, { CkId::Type_Curv_, "CURV" },
+    { CkId::Type_Dfob_, "DFOB" }, { CkId::Type_Dmgt_, "DMGT" },
+    { CkId::Type_Dobj_, "DOBJ" }, { CkId::Type_Efsq_, "EFSQ" },
+    { CkId::Type_Equp_, "EQUP" },
 };
 
-// All 97 record types. Excludes GameSetting (GMST), GlobalVariable (GLOB)
+// All 132 record types. Excludes GameSetting (GMST), GlobalVariable (GLOB)
 // and LocationRefType (LCRT), whose structs carry no FormComponents member
 // and must stay out of the resolver macro.
 static const TypeDisk kComponentCapable[] = {
@@ -113,6 +167,24 @@ static const TypeDisk kComponentCapable[] = {
     { CkId::Type_Hdpt_, "HDPT" },       { CkId::Type_Term_, "TERM" },
     { CkId::Type_Matt_, "MATT" },       { CkId::Type_Movt_, "MOVT" },
     { CkId::Type_Musc_, "MUSC" },
+    { CkId::Type_Aact_, "AACT" },       { CkId::Type_Aamd_, "AAMD" },
+    { CkId::Type_Aapd_, "AAPD" },       { CkId::Type_Achr_, "ACHR" },
+    { CkId::Type_Addn_, "ADDN" },       { CkId::Type_Affe_, "AFFE" },
+    { CkId::Type_Ambs_, "AMBS" },       { CkId::Type_Amdl_, "AMDL" },
+    { CkId::Type_Aopf_, "AOPF" },       { CkId::Type_Aops_, "AOPS" },
+    { CkId::Type_Aoru_, "AORU" },       { CkId::Type_Arma_, "ARMA" },
+    { CkId::Type_Arto_, "ARTO" },       { CkId::Type_Aspc_, "ASPC" },
+    { CkId::Type_Atmo_, "ATMO" },       { CkId::Type_Avmd_, "AVMD" },
+    { CkId::Type_Biom_, "BIOM" },       { CkId::Type_Bmmo_, "BMMO" },
+    { CkId::Type_Bmod_, "BMOD" },       { CkId::Type_Bnds_, "BNDS" },
+    { CkId::Type_Bptd_, "BPTD" },       { CkId::Type_Cams_, "CAMS" },
+    { CkId::Type_Chal_, "CHAL" },       { CkId::Type_Cldf_, "CLDF" },
+    { CkId::Type_Cndf_, "CNDF" },       { CkId::Type_Coll_, "COLL" },
+    { CkId::Type_Cpth_, "CPTH" },       { CkId::Type_Dlbr_, "DLBR" },
+    { CkId::Type_Cur3_, "CUR3" },       { CkId::Type_Curv_, "CURV" },
+    { CkId::Type_Dfob_, "DFOB" },       { CkId::Type_Dmgt_, "DMGT" },
+    { CkId::Type_Dobj_, "DOBJ" },       { CkId::Type_Efsq_, "EFSQ" },
+    { CkId::Type_Equp_, "EQUP" },
 };
 
 } // namespace

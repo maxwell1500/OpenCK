@@ -1,4 +1,4 @@
-﻿#include "objectwindow.hpp"
+#include "objectwindow.hpp"
 
 #include "../world/data.hpp"
 #include "../world/collection.hpp"
@@ -327,6 +327,111 @@ void ObjectWindowModel::initCategories(Data* data)
             break;
         case CkId::Type_Musc_:
             cat.totalRecords = data->getMuscCollection().size();
+            break;
+        case CkId::Type_Aact_:
+            cat.totalRecords = data->getAactCollection().size();
+            break;
+        case CkId::Type_Aamd_:
+            cat.totalRecords = data->getAamdCollection().size();
+            break;
+        case CkId::Type_Aapd_:
+            cat.totalRecords = data->getAapdCollection().size();
+            break;
+        case CkId::Type_Achr_:
+            cat.totalRecords = data->getAchrCollection().size();
+            break;
+        case CkId::Type_Addn_:
+            cat.totalRecords = data->getAddnCollection().size();
+            break;
+        case CkId::Type_Affe_:
+            cat.totalRecords = data->getAffeCollection().size();
+            break;
+        case CkId::Type_Ambs_:
+            cat.totalRecords = data->getAmbsCollection().size();
+            break;
+        case CkId::Type_Amdl_:
+            cat.totalRecords = data->getAmdlCollection().size();
+            break;
+        case CkId::Type_Aopf_:
+            cat.totalRecords = data->getAopfCollection().size();
+            break;
+        case CkId::Type_Aops_:
+            cat.totalRecords = data->getAopsCollection().size();
+            break;
+        case CkId::Type_Aoru_:
+            cat.totalRecords = data->getAoruCollection().size();
+            break;
+        case CkId::Type_Arma_:
+            cat.totalRecords = data->getArmaCollection().size();
+            break;
+        case CkId::Type_Arto_:
+            cat.totalRecords = data->getArtoCollection().size();
+            break;
+        case CkId::Type_Aspc_:
+            cat.totalRecords = data->getAspcCollection().size();
+            break;
+        case CkId::Type_Atmo_:
+            cat.totalRecords = data->getAtmoCollection().size();
+            break;
+        case CkId::Type_Avmd_:
+            cat.totalRecords = data->getAvmdCollection().size();
+            break;
+        case CkId::Type_Biom_:
+            cat.totalRecords = data->getBiomCollection().size();
+            break;
+        case CkId::Type_Bmmo_:
+            cat.totalRecords = data->getBmmoCollection().size();
+            break;
+        case CkId::Type_Bmod_:
+            cat.totalRecords = data->getBmodCollection().size();
+            break;
+        case CkId::Type_Bnds_:
+            cat.totalRecords = data->getBndsCollection().size();
+            break;
+        case CkId::Type_Bptd_:
+            cat.totalRecords = data->getBptdCollection().size();
+            break;
+        case CkId::Type_Cams_:
+            cat.totalRecords = data->getCamsCollection().size();
+            break;
+        case CkId::Type_Chal_:
+            cat.totalRecords = data->getChalCollection().size();
+            break;
+        case CkId::Type_Cldf_:
+            cat.totalRecords = data->getCldfCollection().size();
+            break;
+        case CkId::Type_Cndf_:
+            cat.totalRecords = data->getCndfCollection().size();
+            break;
+        case CkId::Type_Coll_:
+            cat.totalRecords = data->getCollCollection().size();
+            break;
+        case CkId::Type_Cpth_:
+            cat.totalRecords = data->getCpthCollection().size();
+            break;
+        case CkId::Type_Dlbr_:
+            cat.totalRecords = data->getDlbrCollection().size();
+            break;
+        case CkId::Type_Cur3_:
+            cat.totalRecords = data->getCur3Collection().size();
+            break;
+        case CkId::Type_Curv_:
+            cat.totalRecords = data->getCurvCollection().size();
+            break;
+        case CkId::Type_Dfob_:
+            cat.totalRecords = data->getDfobCollection().size();
+            break;
+        case CkId::Type_Dmgt_:
+            cat.totalRecords = data->getDmgtCollection().size();
+            break;
+        case CkId::Type_Dobj_:
+            cat.totalRecords = data->getDobjCollection().size();
+            break;
+        case CkId::Type_Efsq_:
+            cat.totalRecords = data->getEfsqCollection().size();
+            break;
+        case CkId::Type_Equp_:
+            cat.totalRecords = data->getEqupCollection().size();
             break;
         default:
             break;
@@ -726,6 +831,146 @@ void ObjectWindowModel::initCategories(Data* data)
                 editorId = data->getMuscCollection().getId(i);
                 formId = formatFormId(data->getMuscCollection().getRecord(i).get().formId);
                 break;
+            case CkId::Type_Aact_:
+                editorId = data->getAactCollection().getId(i);
+                formId = formatFormId(data->getAactCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Aamd_:
+                editorId = data->getAamdCollection().getId(i);
+                formId = formatFormId(data->getAamdCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Aapd_:
+                editorId = data->getAapdCollection().getId(i);
+                formId = formatFormId(data->getAapdCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Achr_:
+                editorId = data->getAchrCollection().getId(i);
+                formId = formatFormId(data->getAchrCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Addn_:
+                editorId = data->getAddnCollection().getId(i);
+                formId = formatFormId(data->getAddnCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Affe_:
+                editorId = data->getAffeCollection().getId(i);
+                formId = formatFormId(data->getAffeCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Ambs_:
+                editorId = data->getAmbsCollection().getId(i);
+                formId = formatFormId(data->getAmbsCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Amdl_:
+                editorId = data->getAmdlCollection().getId(i);
+                formId = formatFormId(data->getAmdlCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Aopf_:
+                editorId = data->getAopfCollection().getId(i);
+                formId = formatFormId(data->getAopfCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Aops_:
+                editorId = data->getAopsCollection().getId(i);
+                formId = formatFormId(data->getAopsCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Aoru_:
+                editorId = data->getAoruCollection().getId(i);
+                formId = formatFormId(data->getAoruCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Arma_:
+                editorId = data->getArmaCollection().getId(i);
+                formId = formatFormId(data->getArmaCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Arto_:
+                editorId = data->getArtoCollection().getId(i);
+                formId = formatFormId(data->getArtoCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Aspc_:
+                editorId = data->getAspcCollection().getId(i);
+                formId = formatFormId(data->getAspcCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Atmo_:
+                editorId = data->getAtmoCollection().getId(i);
+                formId = formatFormId(data->getAtmoCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Avmd_:
+                editorId = data->getAvmdCollection().getId(i);
+                formId = formatFormId(data->getAvmdCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Biom_:
+                editorId = data->getBiomCollection().getId(i);
+                formId = formatFormId(data->getBiomCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Bmmo_:
+                editorId = data->getBmmoCollection().getId(i);
+                formId = formatFormId(data->getBmmoCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Bmod_:
+                editorId = data->getBmodCollection().getId(i);
+                formId = formatFormId(data->getBmodCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Bnds_:
+                editorId = data->getBndsCollection().getId(i);
+                formId = formatFormId(data->getBndsCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Bptd_:
+                editorId = data->getBptdCollection().getId(i);
+                formId = formatFormId(data->getBptdCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Cams_:
+                editorId = data->getCamsCollection().getId(i);
+                formId = formatFormId(data->getCamsCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Chal_:
+                editorId = data->getChalCollection().getId(i);
+                formId = formatFormId(data->getChalCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Cldf_:
+                editorId = data->getCldfCollection().getId(i);
+                formId = formatFormId(data->getCldfCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Cndf_:
+                editorId = data->getCndfCollection().getId(i);
+                formId = formatFormId(data->getCndfCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Coll_:
+                editorId = data->getCollCollection().getId(i);
+                formId = formatFormId(data->getCollCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Cpth_:
+                editorId = data->getCpthCollection().getId(i);
+                formId = formatFormId(data->getCpthCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Dlbr_:
+                editorId = data->getDlbrCollection().getId(i);
+                formId = formatFormId(data->getDlbrCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Cur3_:
+                editorId = data->getCur3Collection().getId(i);
+                formId = formatFormId(data->getCur3Collection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Curv_:
+                editorId = data->getCurvCollection().getId(i);
+                formId = formatFormId(data->getCurvCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Dfob_:
+                editorId = data->getDfobCollection().getId(i);
+                formId = formatFormId(data->getDfobCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Dmgt_:
+                editorId = data->getDmgtCollection().getId(i);
+                formId = formatFormId(data->getDmgtCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Dobj_:
+                editorId = data->getDobjCollection().getId(i);
+                formId = formatFormId(data->getDobjCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Efsq_:
+                editorId = data->getEfsqCollection().getId(i);
+                formId = formatFormId(data->getEfsqCollection().getRecord(i).get().formId);
+                break;
+            case CkId::Type_Equp_:
+                editorId = data->getEqupCollection().getId(i);
+                formId = formatFormId(data->getEqupCollection().getRecord(i).get().formId);
+                break;
             default:
                 break;
             }
@@ -821,6 +1066,43 @@ void ObjectWindowModel::initCategories(Data* data)
 
     addCategory("Music Type", CkId::Type_Must_);
     addCategory("Music Track", CkId::Type_Musc_);
+
+    addCategory("Action", CkId::Type_Aact_);
+    addCategory("Audio Modifier", CkId::Type_Aamd_);
+    addCategory("Animated Prop", CkId::Type_Aapd_);
+    addCategory("Actor Reference", CkId::Type_Achr_);
+    addCategory("Add-On Node", CkId::Type_Addn_);
+    addCategory("Affinity Event", CkId::Type_Affe_);
+    addCategory("Ambient Sound", CkId::Type_Ambs_);
+    addCategory("Audio Model", CkId::Type_Amdl_);
+    addCategory("Ambient Occlusion Float", CkId::Type_Aopf_);
+    addCategory("Shader Params", CkId::Type_Aops_);
+    addCategory("Audio Reverb Unit", CkId::Type_Aoru_);
+    addCategory("Armor Addon", CkId::Type_Arma_);
+    addCategory("Art Object 2", CkId::Type_Arto_);
+    addCategory("Acoustic Space", CkId::Type_Aspc_);
+    addCategory("Atmosphere", CkId::Type_Atmo_);
+    addCategory("Audio Visual Data", CkId::Type_Avmd_);
+    addCategory("Biome", CkId::Type_Biom_);
+    addCategory("Behavior", CkId::Type_Bmmo_);
+    addCategory("Behavior Mod", CkId::Type_Bmod_);
+    addCategory("Bounds", CkId::Type_Bnds_);
+    addCategory("Behavior Pattern", CkId::Type_Bptd_);
+    addCategory("Camera Shot", CkId::Type_Cams_);
+    addCategory("Challenge", CkId::Type_Chal_);
+    addCategory("Character Float Table", CkId::Type_Cldf_);
+    addCategory("Character Data", CkId::Type_Cndf_);
+    addCategory("Collision", CkId::Type_Coll_);
+    addCategory("Camera Path", CkId::Type_Cpth_);
+    addCategory("Culling Data", CkId::Type_Dlbr_);
+    addCategory("Curve Table 3", CkId::Type_Cur3_);
+    addCategory("Curve Table", CkId::Type_Curv_);
+    addCategory("Debris Object", CkId::Type_Dfob_);
+    addCategory("Damage Type", CkId::Type_Dmgt_);
+    addCategory("Default Object", CkId::Type_Dobj_);
+    addCategory("Effect Shader 2", CkId::Type_Efsq_);
+    addCategory("Equipment Slot", CkId::Type_Equp_);
+
     addCategory("Voice Type", CkId::Type_None);
     addCategory("Material Type", CkId::Type_Matt_);
     addCategory("Movement Type", CkId::Type_Movt_);
@@ -1140,6 +1422,146 @@ void ObjectWindowModel::rebuildAllRecords()
                 case CkId::Type_Musc_:
                     rec.editorId = mData->getMuscCollection().getId(i);
                     rec.formId = formatFormId(mData->getMuscCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Aact_:
+                    rec.editorId = mData->getAactCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAactCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Aamd_:
+                    rec.editorId = mData->getAamdCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAamdCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Aapd_:
+                    rec.editorId = mData->getAapdCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAapdCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Achr_:
+                    rec.editorId = mData->getAchrCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAchrCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Addn_:
+                    rec.editorId = mData->getAddnCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAddnCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Affe_:
+                    rec.editorId = mData->getAffeCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAffeCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Ambs_:
+                    rec.editorId = mData->getAmbsCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAmbsCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Amdl_:
+                    rec.editorId = mData->getAmdlCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAmdlCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Aopf_:
+                    rec.editorId = mData->getAopfCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAopfCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Aops_:
+                    rec.editorId = mData->getAopsCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAopsCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Aoru_:
+                    rec.editorId = mData->getAoruCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAoruCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Arma_:
+                    rec.editorId = mData->getArmaCollection().getId(i);
+                    rec.formId = formatFormId(mData->getArmaCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Arto_:
+                    rec.editorId = mData->getArtoCollection().getId(i);
+                    rec.formId = formatFormId(mData->getArtoCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Aspc_:
+                    rec.editorId = mData->getAspcCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAspcCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Atmo_:
+                    rec.editorId = mData->getAtmoCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAtmoCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Avmd_:
+                    rec.editorId = mData->getAvmdCollection().getId(i);
+                    rec.formId = formatFormId(mData->getAvmdCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Biom_:
+                    rec.editorId = mData->getBiomCollection().getId(i);
+                    rec.formId = formatFormId(mData->getBiomCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Bmmo_:
+                    rec.editorId = mData->getBmmoCollection().getId(i);
+                    rec.formId = formatFormId(mData->getBmmoCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Bmod_:
+                    rec.editorId = mData->getBmodCollection().getId(i);
+                    rec.formId = formatFormId(mData->getBmodCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Bnds_:
+                    rec.editorId = mData->getBndsCollection().getId(i);
+                    rec.formId = formatFormId(mData->getBndsCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Bptd_:
+                    rec.editorId = mData->getBptdCollection().getId(i);
+                    rec.formId = formatFormId(mData->getBptdCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Cams_:
+                    rec.editorId = mData->getCamsCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCamsCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Chal_:
+                    rec.editorId = mData->getChalCollection().getId(i);
+                    rec.formId = formatFormId(mData->getChalCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Cldf_:
+                    rec.editorId = mData->getCldfCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCldfCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Cndf_:
+                    rec.editorId = mData->getCndfCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCndfCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Coll_:
+                    rec.editorId = mData->getCollCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCollCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Cpth_:
+                    rec.editorId = mData->getCpthCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCpthCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Dlbr_:
+                    rec.editorId = mData->getDlbrCollection().getId(i);
+                    rec.formId = formatFormId(mData->getDlbrCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Cur3_:
+                    rec.editorId = mData->getCur3Collection().getId(i);
+                    rec.formId = formatFormId(mData->getCur3Collection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Curv_:
+                    rec.editorId = mData->getCurvCollection().getId(i);
+                    rec.formId = formatFormId(mData->getCurvCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Dfob_:
+                    rec.editorId = mData->getDfobCollection().getId(i);
+                    rec.formId = formatFormId(mData->getDfobCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Dmgt_:
+                    rec.editorId = mData->getDmgtCollection().getId(i);
+                    rec.formId = formatFormId(mData->getDmgtCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Dobj_:
+                    rec.editorId = mData->getDobjCollection().getId(i);
+                    rec.formId = formatFormId(mData->getDobjCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Efsq_:
+                    rec.editorId = mData->getEfsqCollection().getId(i);
+                    rec.formId = formatFormId(mData->getEfsqCollection().getRecord(i).get().formId);
+                    break;
+                case CkId::Type_Equp_:
+                    rec.editorId = mData->getEqupCollection().getId(i);
+                    rec.formId = formatFormId(mData->getEqupCollection().getRecord(i).get().formId);
                     break;
                 default:
                     break;

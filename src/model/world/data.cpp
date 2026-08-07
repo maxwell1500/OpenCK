@@ -1,4 +1,4 @@
-﻿#include "data.hpp"
+#include "data.hpp"
 #include "collection_impl.hpp"
 
 #include "../tools/undostack.hpp"
@@ -655,6 +655,182 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     muscCollection.addColumn(new StringColumn<MuscRecord>("Name", &MuscRecord::editorId));
     addModel(new IdTable(&muscCollection), CkId::Type_Musc_);
 
+    // AACT - Action
+    aactCollection.addColumn(new StringIdColumn<AactRecord>());
+    aactCollection.addColumn(new RecordStateColumn<AactRecord>());
+    aactCollection.addColumn(new StringColumn<AactRecord>("Name", &AactRecord::editorId));
+    addModel(new IdTable(&aactCollection), CkId::Type_Aact_);
+    // AAMD - Audio Modifier
+    aamdCollection.addColumn(new StringIdColumn<AamdRecord>());
+    aamdCollection.addColumn(new RecordStateColumn<AamdRecord>());
+    aamdCollection.addColumn(new StringColumn<AamdRecord>("Name", &AamdRecord::editorId));
+    addModel(new IdTable(&aamdCollection), CkId::Type_Aamd_);
+    // AAPD - Animated Prop
+    aapdCollection.addColumn(new StringIdColumn<AapdRecord>());
+    aapdCollection.addColumn(new RecordStateColumn<AapdRecord>());
+    aapdCollection.addColumn(new StringColumn<AapdRecord>("Name", &AapdRecord::editorId));
+    addModel(new IdTable(&aapdCollection), CkId::Type_Aapd_);
+    // ACHR - Actor Reference
+    achrCollection.addColumn(new StringIdColumn<AchrRecord>());
+    achrCollection.addColumn(new RecordStateColumn<AchrRecord>());
+    achrCollection.addColumn(new StringColumn<AchrRecord>("Name", &AchrRecord::editorId));
+    addModel(new IdTable(&achrCollection), CkId::Type_Achr_);
+    // ADDN - Add-On Node
+    addnCollection.addColumn(new StringIdColumn<AddnRecord>());
+    addnCollection.addColumn(new RecordStateColumn<AddnRecord>());
+    addnCollection.addColumn(new StringColumn<AddnRecord>("Name", &AddnRecord::editorId));
+    addModel(new IdTable(&addnCollection), CkId::Type_Addn_);
+    // AFFE - Affinity Event
+    affeCollection.addColumn(new StringIdColumn<AffeRecord>());
+    affeCollection.addColumn(new RecordStateColumn<AffeRecord>());
+    affeCollection.addColumn(new StringColumn<AffeRecord>("Name", &AffeRecord::editorId));
+    addModel(new IdTable(&affeCollection), CkId::Type_Affe_);
+    // AMBS - Ambient Sound
+    ambsCollection.addColumn(new StringIdColumn<AmbsRecord>());
+    ambsCollection.addColumn(new RecordStateColumn<AmbsRecord>());
+    ambsCollection.addColumn(new StringColumn<AmbsRecord>("Name", &AmbsRecord::editorId));
+    addModel(new IdTable(&ambsCollection), CkId::Type_Ambs_);
+    // AMDL - Audio Model
+    amdlCollection.addColumn(new StringIdColumn<AmdlRecord>());
+    amdlCollection.addColumn(new RecordStateColumn<AmdlRecord>());
+    amdlCollection.addColumn(new StringColumn<AmdlRecord>("Name", &AmdlRecord::editorId));
+    addModel(new IdTable(&amdlCollection), CkId::Type_Amdl_);
+    // AOPF - Ambient Occlusion Float
+    aopfCollection.addColumn(new StringIdColumn<AopfRecord>());
+    aopfCollection.addColumn(new RecordStateColumn<AopfRecord>());
+    aopfCollection.addColumn(new StringColumn<AopfRecord>("Name", &AopfRecord::editorId));
+    addModel(new IdTable(&aopfCollection), CkId::Type_Aopf_);
+    // AOPS - Shader Params
+    aopsCollection.addColumn(new StringIdColumn<AopsRecord>());
+    aopsCollection.addColumn(new RecordStateColumn<AopsRecord>());
+    aopsCollection.addColumn(new StringColumn<AopsRecord>("Name", &AopsRecord::editorId));
+    addModel(new IdTable(&aopsCollection), CkId::Type_Aops_);
+    // AORU - Audio Reverb Unit
+    aoruCollection.addColumn(new StringIdColumn<AoruRecord>());
+    aoruCollection.addColumn(new RecordStateColumn<AoruRecord>());
+    aoruCollection.addColumn(new StringColumn<AoruRecord>("Name", &AoruRecord::editorId));
+    addModel(new IdTable(&aoruCollection), CkId::Type_Aoru_);
+    // ARMA - Armor Addon
+    armaCollection.addColumn(new StringIdColumn<ArmaRecord>());
+    armaCollection.addColumn(new RecordStateColumn<ArmaRecord>());
+    armaCollection.addColumn(new StringColumn<ArmaRecord>("Name", &ArmaRecord::editorId));
+    addModel(new IdTable(&armaCollection), CkId::Type_Arma_);
+    // ARTO - Art Object 2
+    artoCollection.addColumn(new StringIdColumn<ArtoRecord>());
+    artoCollection.addColumn(new RecordStateColumn<ArtoRecord>());
+    artoCollection.addColumn(new StringColumn<ArtoRecord>("Name", &ArtoRecord::editorId));
+    addModel(new IdTable(&artoCollection), CkId::Type_Arto_);
+    // ASPC - Acoustic Space
+    aspcCollection.addColumn(new StringIdColumn<AspcRecord>());
+    aspcCollection.addColumn(new RecordStateColumn<AspcRecord>());
+    aspcCollection.addColumn(new StringColumn<AspcRecord>("Name", &AspcRecord::editorId));
+    addModel(new IdTable(&aspcCollection), CkId::Type_Aspc_);
+    // ATMO - Atmosphere
+    atmoCollection.addColumn(new StringIdColumn<AtmoRecord>());
+    atmoCollection.addColumn(new RecordStateColumn<AtmoRecord>());
+    atmoCollection.addColumn(new StringColumn<AtmoRecord>("Name", &AtmoRecord::editorId));
+    addModel(new IdTable(&atmoCollection), CkId::Type_Atmo_);
+    // AVMD - Audio Visual Data
+    avmdCollection.addColumn(new StringIdColumn<AvmdRecord>());
+    avmdCollection.addColumn(new RecordStateColumn<AvmdRecord>());
+    avmdCollection.addColumn(new StringColumn<AvmdRecord>("Name", &AvmdRecord::editorId));
+    addModel(new IdTable(&avmdCollection), CkId::Type_Avmd_);
+    // BIOM - Biome
+    biomCollection.addColumn(new StringIdColumn<BiomRecord>());
+    biomCollection.addColumn(new RecordStateColumn<BiomRecord>());
+    biomCollection.addColumn(new StringColumn<BiomRecord>("Name", &BiomRecord::editorId));
+    addModel(new IdTable(&biomCollection), CkId::Type_Biom_);
+    // BMMO - Behavior
+    bmmoCollection.addColumn(new StringIdColumn<BmmoRecord>());
+    bmmoCollection.addColumn(new RecordStateColumn<BmmoRecord>());
+    bmmoCollection.addColumn(new StringColumn<BmmoRecord>("Name", &BmmoRecord::editorId));
+    addModel(new IdTable(&bmmoCollection), CkId::Type_Bmmo_);
+    // BMOD - Behavior Mod
+    bmodCollection.addColumn(new StringIdColumn<BmodRecord>());
+    bmodCollection.addColumn(new RecordStateColumn<BmodRecord>());
+    bmodCollection.addColumn(new StringColumn<BmodRecord>("Name", &BmodRecord::editorId));
+    addModel(new IdTable(&bmodCollection), CkId::Type_Bmod_);
+    // BNDS - Bounds
+    bndsCollection.addColumn(new StringIdColumn<BndsRecord>());
+    bndsCollection.addColumn(new RecordStateColumn<BndsRecord>());
+    bndsCollection.addColumn(new StringColumn<BndsRecord>("Name", &BndsRecord::editorId));
+    addModel(new IdTable(&bndsCollection), CkId::Type_Bnds_);
+    // BPTD - Behavior Pattern
+    bptdCollection.addColumn(new StringIdColumn<BptdRecord>());
+    bptdCollection.addColumn(new RecordStateColumn<BptdRecord>());
+    bptdCollection.addColumn(new StringColumn<BptdRecord>("Name", &BptdRecord::editorId));
+    addModel(new IdTable(&bptdCollection), CkId::Type_Bptd_);
+    // CAMS - Camera Shot
+    camsCollection.addColumn(new StringIdColumn<CamsRecord>());
+    camsCollection.addColumn(new RecordStateColumn<CamsRecord>());
+    camsCollection.addColumn(new StringColumn<CamsRecord>("Name", &CamsRecord::editorId));
+    addModel(new IdTable(&camsCollection), CkId::Type_Cams_);
+    // CHAL - Challenge
+    chalCollection.addColumn(new StringIdColumn<ChalRecord>());
+    chalCollection.addColumn(new RecordStateColumn<ChalRecord>());
+    chalCollection.addColumn(new StringColumn<ChalRecord>("Name", &ChalRecord::editorId));
+    addModel(new IdTable(&chalCollection), CkId::Type_Chal_);
+    // CLDF - Character Float Table
+    cldfCollection.addColumn(new StringIdColumn<CldfRecord>());
+    cldfCollection.addColumn(new RecordStateColumn<CldfRecord>());
+    cldfCollection.addColumn(new StringColumn<CldfRecord>("Name", &CldfRecord::editorId));
+    addModel(new IdTable(&cldfCollection), CkId::Type_Cldf_);
+    // CNDF - Character Data
+    cndfCollection.addColumn(new StringIdColumn<CndfRecord>());
+    cndfCollection.addColumn(new RecordStateColumn<CndfRecord>());
+    cndfCollection.addColumn(new StringColumn<CndfRecord>("Name", &CndfRecord::editorId));
+    addModel(new IdTable(&cndfCollection), CkId::Type_Cndf_);
+    // COLL - Collision
+    collCollection.addColumn(new StringIdColumn<CollRecord>());
+    collCollection.addColumn(new RecordStateColumn<CollRecord>());
+    collCollection.addColumn(new StringColumn<CollRecord>("Name", &CollRecord::editorId));
+    addModel(new IdTable(&collCollection), CkId::Type_Coll_);
+    // CPTH - Camera Path
+    cpthCollection.addColumn(new StringIdColumn<CpthRecord>());
+    cpthCollection.addColumn(new RecordStateColumn<CpthRecord>());
+    cpthCollection.addColumn(new StringColumn<CpthRecord>("Name", &CpthRecord::editorId));
+    addModel(new IdTable(&cpthCollection), CkId::Type_Cpth_);
+    // DLBR - Culling Data
+    dlbrCollection.addColumn(new StringIdColumn<DlbrRecord>());
+    dlbrCollection.addColumn(new RecordStateColumn<DlbrRecord>());
+    dlbrCollection.addColumn(new StringColumn<DlbrRecord>("Name", &DlbrRecord::editorId));
+    addModel(new IdTable(&dlbrCollection), CkId::Type_Dlbr_);
+    // CUR3 - Curve Table 3
+    cur3Collection.addColumn(new StringIdColumn<Cur3Record>());
+    cur3Collection.addColumn(new RecordStateColumn<Cur3Record>());
+    cur3Collection.addColumn(new StringColumn<Cur3Record>("Name", &Cur3Record::editorId));
+    addModel(new IdTable(&cur3Collection), CkId::Type_Cur3_);
+    // CURV - Curve Table
+    curvCollection.addColumn(new StringIdColumn<CurvRecord>());
+    curvCollection.addColumn(new RecordStateColumn<CurvRecord>());
+    curvCollection.addColumn(new StringColumn<CurvRecord>("Name", &CurvRecord::editorId));
+    addModel(new IdTable(&curvCollection), CkId::Type_Curv_);
+    // DFOB - Debris Object
+    dfobCollection.addColumn(new StringIdColumn<DfobRecord>());
+    dfobCollection.addColumn(new RecordStateColumn<DfobRecord>());
+    dfobCollection.addColumn(new StringColumn<DfobRecord>("Name", &DfobRecord::editorId));
+    addModel(new IdTable(&dfobCollection), CkId::Type_Dfob_);
+    // DMGT - Damage Type
+    dmgtCollection.addColumn(new StringIdColumn<DmgtRecord>());
+    dmgtCollection.addColumn(new RecordStateColumn<DmgtRecord>());
+    dmgtCollection.addColumn(new StringColumn<DmgtRecord>("Name", &DmgtRecord::editorId));
+    addModel(new IdTable(&dmgtCollection), CkId::Type_Dmgt_);
+    // DOBJ - Default Object
+    dobjCollection.addColumn(new StringIdColumn<DobjRecord>());
+    dobjCollection.addColumn(new RecordStateColumn<DobjRecord>());
+    dobjCollection.addColumn(new StringColumn<DobjRecord>("Name", &DobjRecord::editorId));
+    addModel(new IdTable(&dobjCollection), CkId::Type_Dobj_);
+    // EFSQ - Effect Shader 2
+    efsqCollection.addColumn(new StringIdColumn<EfsqRecord>());
+    efsqCollection.addColumn(new RecordStateColumn<EfsqRecord>());
+    efsqCollection.addColumn(new StringColumn<EfsqRecord>("Name", &EfsqRecord::editorId));
+    addModel(new IdTable(&efsqCollection), CkId::Type_Efsq_);
+    // EQUP - Equipment Slot
+    equpCollection.addColumn(new StringIdColumn<EqupRecord>());
+    equpCollection.addColumn(new RecordStateColumn<EqupRecord>());
+    equpCollection.addColumn(new StringColumn<EqupRecord>("Name", &EqupRecord::editorId));
+    addModel(new IdTable(&equpCollection), CkId::Type_Equp_);
+
     // Loading Log (metadata)
     metaData.addColumn(new StringIdColumn<MetaData>());
     metaData.addColumn(new RecordStateColumn<MetaData>());
@@ -845,6 +1021,41 @@ bool Data::continueLoading(Messages& messages)
     case 'MATT': mattCollection.load(*reader, base); break;
     case 'MOVT': movtCollection.load(*reader, base); break;
     case 'MUSC': muscCollection.load(*reader, base); break;
+            case 'AACT': aactCollection.load(*reader, base); break;
+            case 'AAMD': aamdCollection.load(*reader, base); break;
+            case 'AAPD': aapdCollection.load(*reader, base); break;
+            case 'ACHR': achrCollection.load(*reader, base); break;
+            case 'ADDN': addnCollection.load(*reader, base); break;
+            case 'AFFE': affeCollection.load(*reader, base); break;
+            case 'AMBS': ambsCollection.load(*reader, base); break;
+            case 'AMDL': amdlCollection.load(*reader, base); break;
+            case 'AOPF': aopfCollection.load(*reader, base); break;
+            case 'AOPS': aopsCollection.load(*reader, base); break;
+            case 'AORU': aoruCollection.load(*reader, base); break;
+            case 'ARMA': armaCollection.load(*reader, base); break;
+            case 'ARTO': artoCollection.load(*reader, base); break;
+            case 'ASPC': aspcCollection.load(*reader, base); break;
+            case 'ATMO': atmoCollection.load(*reader, base); break;
+            case 'AVMD': avmdCollection.load(*reader, base); break;
+            case 'BIOM': biomCollection.load(*reader, base); break;
+            case 'BMMO': bmmoCollection.load(*reader, base); break;
+            case 'BMOD': bmodCollection.load(*reader, base); break;
+            case 'BNDS': bndsCollection.load(*reader, base); break;
+            case 'BPTD': bptdCollection.load(*reader, base); break;
+            case 'CAMS': camsCollection.load(*reader, base); break;
+            case 'CHAL': chalCollection.load(*reader, base); break;
+            case 'CLDF': cldfCollection.load(*reader, base); break;
+            case 'CNDF': cndfCollection.load(*reader, base); break;
+            case 'COLL': collCollection.load(*reader, base); break;
+            case 'CPTH': cpthCollection.load(*reader, base); break;
+            case 'DLBR': dlbrCollection.load(*reader, base); break;
+            case 'CUR3': cur3Collection.load(*reader, base); break;
+            case 'CURV': curvCollection.load(*reader, base); break;
+            case 'DFOB': dfobCollection.load(*reader, base); break;
+            case 'DMGT': dmgtCollection.load(*reader, base); break;
+            case 'DOBJ': dobjCollection.load(*reader, base); break;
+            case 'EFSQ': efsqCollection.load(*reader, base); break;
+            case 'EQUP': equpCollection.load(*reader, base); break;
             default:
             {
                 if (name == 0)
@@ -1135,6 +1346,41 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Matt_:    return &mattCollection;
     case CkId::Type_Movt_:    return &movtCollection;
     case CkId::Type_Musc_:    return &muscCollection;
+    case CkId::Type_Aact_:    return &aactCollection;
+    case CkId::Type_Aamd_:    return &aamdCollection;
+    case CkId::Type_Aapd_:    return &aapdCollection;
+    case CkId::Type_Achr_:    return &achrCollection;
+    case CkId::Type_Addn_:    return &addnCollection;
+    case CkId::Type_Affe_:    return &affeCollection;
+    case CkId::Type_Ambs_:    return &ambsCollection;
+    case CkId::Type_Amdl_:    return &amdlCollection;
+    case CkId::Type_Aopf_:    return &aopfCollection;
+    case CkId::Type_Aops_:    return &aopsCollection;
+    case CkId::Type_Aoru_:    return &aoruCollection;
+    case CkId::Type_Arma_:    return &armaCollection;
+    case CkId::Type_Arto_:    return &artoCollection;
+    case CkId::Type_Aspc_:    return &aspcCollection;
+    case CkId::Type_Atmo_:    return &atmoCollection;
+    case CkId::Type_Avmd_:    return &avmdCollection;
+    case CkId::Type_Biom_:    return &biomCollection;
+    case CkId::Type_Bmmo_:    return &bmmoCollection;
+    case CkId::Type_Bmod_:    return &bmodCollection;
+    case CkId::Type_Bnds_:    return &bndsCollection;
+    case CkId::Type_Bptd_:    return &bptdCollection;
+    case CkId::Type_Cams_:    return &camsCollection;
+    case CkId::Type_Chal_:    return &chalCollection;
+    case CkId::Type_Cldf_:    return &cldfCollection;
+    case CkId::Type_Cndf_:    return &cndfCollection;
+    case CkId::Type_Coll_:    return &collCollection;
+    case CkId::Type_Cpth_:    return &cpthCollection;
+    case CkId::Type_Dlbr_:    return &dlbrCollection;
+    case CkId::Type_Cur3_:    return &cur3Collection;
+    case CkId::Type_Curv_:    return &curvCollection;
+    case CkId::Type_Dfob_:    return &dfobCollection;
+    case CkId::Type_Dmgt_:    return &dmgtCollection;
+    case CkId::Type_Dobj_:    return &dobjCollection;
+    case CkId::Type_Efsq_:    return &efsqCollection;
+    case CkId::Type_Equp_:    return &equpCollection;
     default:                  return nullptr;
     }
 }
@@ -1240,6 +1486,41 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Matt_:    return &mattCollection;
     case CkId::Type_Movt_:    return &movtCollection;
     case CkId::Type_Musc_:    return &muscCollection;
+    case CkId::Type_Aact_:    return &aactCollection;
+    case CkId::Type_Aamd_:    return &aamdCollection;
+    case CkId::Type_Aapd_:    return &aapdCollection;
+    case CkId::Type_Achr_:    return &achrCollection;
+    case CkId::Type_Addn_:    return &addnCollection;
+    case CkId::Type_Affe_:    return &affeCollection;
+    case CkId::Type_Ambs_:    return &ambsCollection;
+    case CkId::Type_Amdl_:    return &amdlCollection;
+    case CkId::Type_Aopf_:    return &aopfCollection;
+    case CkId::Type_Aops_:    return &aopsCollection;
+    case CkId::Type_Aoru_:    return &aoruCollection;
+    case CkId::Type_Arma_:    return &armaCollection;
+    case CkId::Type_Arto_:    return &artoCollection;
+    case CkId::Type_Aspc_:    return &aspcCollection;
+    case CkId::Type_Atmo_:    return &atmoCollection;
+    case CkId::Type_Avmd_:    return &avmdCollection;
+    case CkId::Type_Biom_:    return &biomCollection;
+    case CkId::Type_Bmmo_:    return &bmmoCollection;
+    case CkId::Type_Bmod_:    return &bmodCollection;
+    case CkId::Type_Bnds_:    return &bndsCollection;
+    case CkId::Type_Bptd_:    return &bptdCollection;
+    case CkId::Type_Cams_:    return &camsCollection;
+    case CkId::Type_Chal_:    return &chalCollection;
+    case CkId::Type_Cldf_:    return &cldfCollection;
+    case CkId::Type_Cndf_:    return &cndfCollection;
+    case CkId::Type_Coll_:    return &collCollection;
+    case CkId::Type_Cpth_:    return &cpthCollection;
+    case CkId::Type_Dlbr_:    return &dlbrCollection;
+    case CkId::Type_Cur3_:    return &cur3Collection;
+    case CkId::Type_Curv_:    return &curvCollection;
+    case CkId::Type_Dfob_:    return &dfobCollection;
+    case CkId::Type_Dmgt_:    return &dmgtCollection;
+    case CkId::Type_Dobj_:    return &dobjCollection;
+    case CkId::Type_Efsq_:    return &efsqCollection;
+    case CkId::Type_Equp_:    return &equpCollection;
     default:                  return nullptr;
     }
 }
@@ -1344,6 +1625,41 @@ IdCollection<TermRecord>& Data::getTermCollection() { return termCollection; }
 IdCollection<MattRecord>& Data::getMattCollection() { return mattCollection; }
 IdCollection<MovtRecord>& Data::getMovtCollection() { return movtCollection; }
 IdCollection<MuscRecord>& Data::getMuscCollection() { return muscCollection; }
+IdCollection<AactRecord>& Data::getAactCollection() { return aactCollection; }
+IdCollection<AamdRecord>& Data::getAamdCollection() { return aamdCollection; }
+IdCollection<AapdRecord>& Data::getAapdCollection() { return aapdCollection; }
+IdCollection<AchrRecord>& Data::getAchrCollection() { return achrCollection; }
+IdCollection<AddnRecord>& Data::getAddnCollection() { return addnCollection; }
+IdCollection<AffeRecord>& Data::getAffeCollection() { return affeCollection; }
+IdCollection<AmbsRecord>& Data::getAmbsCollection() { return ambsCollection; }
+IdCollection<AmdlRecord>& Data::getAmdlCollection() { return amdlCollection; }
+IdCollection<AopfRecord>& Data::getAopfCollection() { return aopfCollection; }
+IdCollection<AopsRecord>& Data::getAopsCollection() { return aopsCollection; }
+IdCollection<AoruRecord>& Data::getAoruCollection() { return aoruCollection; }
+IdCollection<ArmaRecord>& Data::getArmaCollection() { return armaCollection; }
+IdCollection<ArtoRecord>& Data::getArtoCollection() { return artoCollection; }
+IdCollection<AspcRecord>& Data::getAspcCollection() { return aspcCollection; }
+IdCollection<AtmoRecord>& Data::getAtmoCollection() { return atmoCollection; }
+IdCollection<AvmdRecord>& Data::getAvmdCollection() { return avmdCollection; }
+IdCollection<BiomRecord>& Data::getBiomCollection() { return biomCollection; }
+IdCollection<BmmoRecord>& Data::getBmmoCollection() { return bmmoCollection; }
+IdCollection<BmodRecord>& Data::getBmodCollection() { return bmodCollection; }
+IdCollection<BndsRecord>& Data::getBndsCollection() { return bndsCollection; }
+IdCollection<BptdRecord>& Data::getBptdCollection() { return bptdCollection; }
+IdCollection<CamsRecord>& Data::getCamsCollection() { return camsCollection; }
+IdCollection<ChalRecord>& Data::getChalCollection() { return chalCollection; }
+IdCollection<CldfRecord>& Data::getCldfCollection() { return cldfCollection; }
+IdCollection<CndfRecord>& Data::getCndfCollection() { return cndfCollection; }
+IdCollection<CollRecord>& Data::getCollCollection() { return collCollection; }
+IdCollection<CpthRecord>& Data::getCpthCollection() { return cpthCollection; }
+IdCollection<DlbrRecord>& Data::getDlbrCollection() { return dlbrCollection; }
+IdCollection<Cur3Record>& Data::getCur3Collection() { return cur3Collection; }
+IdCollection<CurvRecord>& Data::getCurvCollection() { return curvCollection; }
+IdCollection<DfobRecord>& Data::getDfobCollection() { return dfobCollection; }
+IdCollection<DmgtRecord>& Data::getDmgtCollection() { return dmgtCollection; }
+IdCollection<DobjRecord>& Data::getDobjCollection() { return dobjCollection; }
+IdCollection<EfsqRecord>& Data::getEfsqCollection() { return efsqCollection; }
+IdCollection<EqupRecord>& Data::getEqupCollection() { return equpCollection; }
 
 QVector<IRecordCollection*> Data::allCollections()
 {
@@ -1433,6 +1749,41 @@ QVector<IRecordCollection*> Data::allCollections()
         &mattCollection,
         &movtCollection,
         &muscCollection,
+        &aactCollection,
+        &aamdCollection,
+        &aapdCollection,
+        &achrCollection,
+        &addnCollection,
+        &affeCollection,
+        &ambsCollection,
+        &amdlCollection,
+        &aopfCollection,
+        &aopsCollection,
+        &aoruCollection,
+        &armaCollection,
+        &artoCollection,
+        &aspcCollection,
+        &atmoCollection,
+        &avmdCollection,
+        &biomCollection,
+        &bmmoCollection,
+        &bmodCollection,
+        &bndsCollection,
+        &bptdCollection,
+        &camsCollection,
+        &chalCollection,
+        &cldfCollection,
+        &cndfCollection,
+        &collCollection,
+        &cpthCollection,
+        &dlbrCollection,
+        &cur3Collection,
+        &curvCollection,
+        &dfobCollection,
+        &dmgtCollection,
+        &dobjCollection,
+        &efsqCollection,
+        &equpCollection,
     };
 }
 
@@ -1535,6 +1886,41 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&mattCollection,    CkId::Type_Matt_},
         {&movtCollection,    CkId::Type_Movt_},
         {&muscCollection,    CkId::Type_Musc_},
+        {&aactCollection,    CkId::Type_Aact_},
+        {&aamdCollection,    CkId::Type_Aamd_},
+        {&aapdCollection,    CkId::Type_Aapd_},
+        {&achrCollection,    CkId::Type_Achr_},
+        {&addnCollection,    CkId::Type_Addn_},
+        {&affeCollection,    CkId::Type_Affe_},
+        {&ambsCollection,    CkId::Type_Ambs_},
+        {&amdlCollection,    CkId::Type_Amdl_},
+        {&aopfCollection,    CkId::Type_Aopf_},
+        {&aopsCollection,    CkId::Type_Aops_},
+        {&aoruCollection,    CkId::Type_Aoru_},
+        {&armaCollection,    CkId::Type_Arma_},
+        {&artoCollection,    CkId::Type_Arto_},
+        {&aspcCollection,    CkId::Type_Aspc_},
+        {&atmoCollection,    CkId::Type_Atmo_},
+        {&avmdCollection,    CkId::Type_Avmd_},
+        {&biomCollection,    CkId::Type_Biom_},
+        {&bmmoCollection,    CkId::Type_Bmmo_},
+        {&bmodCollection,    CkId::Type_Bmod_},
+        {&bndsCollection,    CkId::Type_Bnds_},
+        {&bptdCollection,    CkId::Type_Bptd_},
+        {&camsCollection,    CkId::Type_Cams_},
+        {&chalCollection,    CkId::Type_Chal_},
+        {&cldfCollection,    CkId::Type_Cldf_},
+        {&cndfCollection,    CkId::Type_Cndf_},
+        {&collCollection,    CkId::Type_Coll_},
+        {&cpthCollection,    CkId::Type_Cpth_},
+        {&dlbrCollection,    CkId::Type_Dlbr_},
+        {&cur3Collection,    CkId::Type_Cur3_},
+        {&curvCollection,    CkId::Type_Curv_},
+        {&dfobCollection,    CkId::Type_Dfob_},
+        {&dmgtCollection,    CkId::Type_Dmgt_},
+        {&dobjCollection,    CkId::Type_Dobj_},
+        {&efsqCollection,    CkId::Type_Efsq_},
+        {&equpCollection,    CkId::Type_Equp_},
         {&scenCollection,    CkId::Type_Scen_},
     };
 }
@@ -2190,6 +2576,146 @@ const IdCollection<MovtRecord>& Data::getMovtCollection() const
 const IdCollection<MuscRecord>& Data::getMuscCollection() const
 {
     return muscCollection;
+}
+const IdCollection<AactRecord>& Data::getAactCollection() const
+{
+    return aactCollection;
+}
+const IdCollection<AamdRecord>& Data::getAamdCollection() const
+{
+    return aamdCollection;
+}
+const IdCollection<AapdRecord>& Data::getAapdCollection() const
+{
+    return aapdCollection;
+}
+const IdCollection<AchrRecord>& Data::getAchrCollection() const
+{
+    return achrCollection;
+}
+const IdCollection<AddnRecord>& Data::getAddnCollection() const
+{
+    return addnCollection;
+}
+const IdCollection<AffeRecord>& Data::getAffeCollection() const
+{
+    return affeCollection;
+}
+const IdCollection<AmbsRecord>& Data::getAmbsCollection() const
+{
+    return ambsCollection;
+}
+const IdCollection<AmdlRecord>& Data::getAmdlCollection() const
+{
+    return amdlCollection;
+}
+const IdCollection<AopfRecord>& Data::getAopfCollection() const
+{
+    return aopfCollection;
+}
+const IdCollection<AopsRecord>& Data::getAopsCollection() const
+{
+    return aopsCollection;
+}
+const IdCollection<AoruRecord>& Data::getAoruCollection() const
+{
+    return aoruCollection;
+}
+const IdCollection<ArmaRecord>& Data::getArmaCollection() const
+{
+    return armaCollection;
+}
+const IdCollection<ArtoRecord>& Data::getArtoCollection() const
+{
+    return artoCollection;
+}
+const IdCollection<AspcRecord>& Data::getAspcCollection() const
+{
+    return aspcCollection;
+}
+const IdCollection<AtmoRecord>& Data::getAtmoCollection() const
+{
+    return atmoCollection;
+}
+const IdCollection<AvmdRecord>& Data::getAvmdCollection() const
+{
+    return avmdCollection;
+}
+const IdCollection<BiomRecord>& Data::getBiomCollection() const
+{
+    return biomCollection;
+}
+const IdCollection<BmmoRecord>& Data::getBmmoCollection() const
+{
+    return bmmoCollection;
+}
+const IdCollection<BmodRecord>& Data::getBmodCollection() const
+{
+    return bmodCollection;
+}
+const IdCollection<BndsRecord>& Data::getBndsCollection() const
+{
+    return bndsCollection;
+}
+const IdCollection<BptdRecord>& Data::getBptdCollection() const
+{
+    return bptdCollection;
+}
+const IdCollection<CamsRecord>& Data::getCamsCollection() const
+{
+    return camsCollection;
+}
+const IdCollection<ChalRecord>& Data::getChalCollection() const
+{
+    return chalCollection;
+}
+const IdCollection<CldfRecord>& Data::getCldfCollection() const
+{
+    return cldfCollection;
+}
+const IdCollection<CndfRecord>& Data::getCndfCollection() const
+{
+    return cndfCollection;
+}
+const IdCollection<CollRecord>& Data::getCollCollection() const
+{
+    return collCollection;
+}
+const IdCollection<CpthRecord>& Data::getCpthCollection() const
+{
+    return cpthCollection;
+}
+const IdCollection<DlbrRecord>& Data::getDlbrCollection() const
+{
+    return dlbrCollection;
+}
+const IdCollection<Cur3Record>& Data::getCur3Collection() const
+{
+    return cur3Collection;
+}
+const IdCollection<CurvRecord>& Data::getCurvCollection() const
+{
+    return curvCollection;
+}
+const IdCollection<DfobRecord>& Data::getDfobCollection() const
+{
+    return dfobCollection;
+}
+const IdCollection<DmgtRecord>& Data::getDmgtCollection() const
+{
+    return dmgtCollection;
+}
+const IdCollection<DobjRecord>& Data::getDobjCollection() const
+{
+    return dobjCollection;
+}
+const IdCollection<EfsqRecord>& Data::getEfsqCollection() const
+{
+    return efsqCollection;
+}
+const IdCollection<EqupRecord>& Data::getEqupCollection() const
+{
+    return equpCollection;
 }
 
 bool Data::addMaterial(MaterialRecord& record)
