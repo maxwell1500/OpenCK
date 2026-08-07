@@ -1005,6 +1005,209 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     pgreCollection.addColumn(new RecordStateColumn<PgreRecord>());
     pgreCollection.addColumn(new StringColumn<PgreRecord>("Name", &PgreRecord::editorId));
     addModel(new IdTable(&pgreCollection), CkId::Type_Pgre_);
+    // PHZD
+    phzdCollection.addColumn(new StringIdColumn<PhzdRecord>());
+    phzdCollection.addColumn(new RecordStateColumn<PhzdRecord>());
+    phzdCollection.addColumn(new StringColumn<PhzdRecord>("Name", &PhzdRecord::editorId));
+    addModel(new IdTable(&phzdCollection), CkId::Type_Phzd_);
+
+    // PKIN
+    pkinCollection.addColumn(new StringIdColumn<PkinRecord>());
+    pkinCollection.addColumn(new RecordStateColumn<PkinRecord>());
+    pkinCollection.addColumn(new StringColumn<PkinRecord>("Name", &PkinRecord::editorId));
+    addModel(new IdTable(&pkinCollection), CkId::Type_Pkin_);
+
+    // PMFT
+    pmftCollection.addColumn(new StringIdColumn<PmftRecord>());
+    pmftCollection.addColumn(new RecordStateColumn<PmftRecord>());
+    pmftCollection.addColumn(new StringColumn<PmftRecord>("Name", &PmftRecord::editorId));
+    addModel(new IdTable(&pmftCollection), CkId::Type_Pmft_);
+
+    // PSDC
+    psdcCollection.addColumn(new StringIdColumn<PsdcRecord>());
+    psdcCollection.addColumn(new RecordStateColumn<PsdcRecord>());
+    psdcCollection.addColumn(new StringColumn<PsdcRecord>("Name", &PsdcRecord::editorId));
+    addModel(new IdTable(&psdcCollection), CkId::Type_Psdc_);
+
+    // PTST
+    ptstCollection.addColumn(new StringIdColumn<PtstRecord>());
+    ptstCollection.addColumn(new RecordStateColumn<PtstRecord>());
+    ptstCollection.addColumn(new StringColumn<PtstRecord>("Name", &PtstRecord::editorId));
+    addModel(new IdTable(&ptstCollection), CkId::Type_Ptst_);
+
+    // RFGP
+    rfgpCollection.addColumn(new StringIdColumn<RfgpRecord>());
+    rfgpCollection.addColumn(new RecordStateColumn<RfgpRecord>());
+    rfgpCollection.addColumn(new StringColumn<RfgpRecord>("Name", &RfgpRecord::editorId));
+    addModel(new IdTable(&rfgpCollection), CkId::Type_Rfgp_);
+
+    // RSGD
+    rsgdCollection.addColumn(new StringIdColumn<RsgdRecord>());
+    rsgdCollection.addColumn(new RecordStateColumn<RsgdRecord>());
+    rsgdCollection.addColumn(new StringColumn<RsgdRecord>("Name", &RsgdRecord::editorId));
+    addModel(new IdTable(&rsgdCollection), CkId::Type_Rsgd_);
+
+    // RSPJ
+    rspjCollection.addColumn(new StringIdColumn<RspjRecord>());
+    rspjCollection.addColumn(new RecordStateColumn<RspjRecord>());
+    rspjCollection.addColumn(new StringColumn<RspjRecord>("Name", &RspjRecord::editorId));
+    addModel(new IdTable(&rspjCollection), CkId::Type_Rspj_);
+
+    // SDLT
+    sdltCollection.addColumn(new StringIdColumn<SdltRecord>());
+    sdltCollection.addColumn(new RecordStateColumn<SdltRecord>());
+    sdltCollection.addColumn(new StringColumn<SdltRecord>("Name", &SdltRecord::editorId));
+    addModel(new IdTable(&sdltCollection), CkId::Type_Sdlt_);
+
+    // SECH
+    sechCollection.addColumn(new StringIdColumn<SechRecord>());
+    sechCollection.addColumn(new RecordStateColumn<SechRecord>());
+    sechCollection.addColumn(new StringColumn<SechRecord>("Name", &SechRecord::editorId));
+    addModel(new IdTable(&sechCollection), CkId::Type_Sech_);
+
+    // SFBK
+    sfbkCollection.addColumn(new StringIdColumn<SfbkRecord>());
+    sfbkCollection.addColumn(new RecordStateColumn<SfbkRecord>());
+    sfbkCollection.addColumn(new StringColumn<SfbkRecord>("Name", &SfbkRecord::editorId));
+    addModel(new IdTable(&sfbkCollection), CkId::Type_Sfbk_);
+
+    // SFPC
+    sfpcCollection.addColumn(new StringIdColumn<SfpcRecord>());
+    sfpcCollection.addColumn(new RecordStateColumn<SfpcRecord>());
+    sfpcCollection.addColumn(new StringColumn<SfpcRecord>("Name", &SfpcRecord::editorId));
+    addModel(new IdTable(&sfpcCollection), CkId::Type_Sfpc_);
+
+    // SFPT
+    sfptCollection.addColumn(new StringIdColumn<SfptRecord>());
+    sfptCollection.addColumn(new RecordStateColumn<SfptRecord>());
+    sfptCollection.addColumn(new StringColumn<SfptRecord>("Name", &SfptRecord::editorId));
+    addModel(new IdTable(&sfptCollection), CkId::Type_Sfpt_);
+
+    // SFTR
+    sftrCollection.addColumn(new StringIdColumn<SftrRecord>());
+    sftrCollection.addColumn(new RecordStateColumn<SftrRecord>());
+    sftrCollection.addColumn(new StringColumn<SftrRecord>("Name", &SftrRecord::editorId));
+    addModel(new IdTable(&sftrCollection), CkId::Type_Sftr_);
+
+    // SMBN
+    smbnCollection.addColumn(new StringIdColumn<SmbnRecord>());
+    smbnCollection.addColumn(new RecordStateColumn<SmbnRecord>());
+    smbnCollection.addColumn(new StringColumn<SmbnRecord>("Name", &SmbnRecord::editorId));
+    addModel(new IdTable(&smbnCollection), CkId::Type_Smbn_);
+
+    // SMEN
+    smenCollection.addColumn(new StringIdColumn<SmenRecord>());
+    smenCollection.addColumn(new RecordStateColumn<SmenRecord>());
+    smenCollection.addColumn(new StringColumn<SmenRecord>("Name", &SmenRecord::editorId));
+    addModel(new IdTable(&smenCollection), CkId::Type_Smen_);
+
+    // SPCH
+    spchCollection.addColumn(new StringIdColumn<SpchRecord>());
+    spchCollection.addColumn(new RecordStateColumn<SpchRecord>());
+    spchCollection.addColumn(new StringColumn<SpchRecord>("Name", &SpchRecord::editorId));
+    addModel(new IdTable(&spchCollection), CkId::Type_Spch_);
+
+    // STAG
+    stagCollection.addColumn(new StringIdColumn<StagRecord>());
+    stagCollection.addColumn(new RecordStateColumn<StagRecord>());
+    stagCollection.addColumn(new StringColumn<StagRecord>("Name", &StagRecord::editorId));
+    addModel(new IdTable(&stagCollection), CkId::Type_Stag_);
+
+    // STBH
+    stbhCollection.addColumn(new StringIdColumn<StbhRecord>());
+    stbhCollection.addColumn(new RecordStateColumn<StbhRecord>());
+    stbhCollection.addColumn(new StringColumn<StbhRecord>("Name", &StbhRecord::editorId));
+    addModel(new IdTable(&stbhCollection), CkId::Type_Stbh_);
+
+    // STDT
+    stdtCollection.addColumn(new StringIdColumn<StdtRecord>());
+    stdtCollection.addColumn(new RecordStateColumn<StdtRecord>());
+    stdtCollection.addColumn(new StringColumn<StdtRecord>("Name", &StdtRecord::editorId));
+    addModel(new IdTable(&stdtCollection), CkId::Type_Stdt_);
+
+    // STMP
+    stmpCollection.addColumn(new StringIdColumn<StmpRecord>());
+    stmpCollection.addColumn(new RecordStateColumn<StmpRecord>());
+    stmpCollection.addColumn(new StringColumn<StmpRecord>("Name", &StmpRecord::editorId));
+    addModel(new IdTable(&stmpCollection), CkId::Type_Stmp_);
+
+    // STND
+    stndCollection.addColumn(new StringIdColumn<StndRecord>());
+    stndCollection.addColumn(new RecordStateColumn<StndRecord>());
+    stndCollection.addColumn(new StringColumn<StndRecord>("Name", &StndRecord::editorId));
+    addModel(new IdTable(&stndCollection), CkId::Type_Stnd_);
+
+    // SUNP
+    sunpCollection.addColumn(new StringIdColumn<SunpRecord>());
+    sunpCollection.addColumn(new RecordStateColumn<SunpRecord>());
+    sunpCollection.addColumn(new StringColumn<SunpRecord>("Name", &SunpRecord::editorId));
+    addModel(new IdTable(&sunpCollection), CkId::Type_Sunp_);
+
+    // TMLM
+    tmlmCollection.addColumn(new StringIdColumn<TmlmRecord>());
+    tmlmCollection.addColumn(new RecordStateColumn<TmlmRecord>());
+    tmlmCollection.addColumn(new StringColumn<TmlmRecord>("Name", &TmlmRecord::editorId));
+    addModel(new IdTable(&tmlmCollection), CkId::Type_Tmlm_);
+
+    // TODD
+    toddCollection.addColumn(new StringIdColumn<ToddRecord>());
+    toddCollection.addColumn(new RecordStateColumn<ToddRecord>());
+    toddCollection.addColumn(new StringColumn<ToddRecord>("Name", &ToddRecord::editorId));
+    addModel(new IdTable(&toddCollection), CkId::Type_Todd_);
+
+    // TRAV
+    travCollection.addColumn(new StringIdColumn<TravRecord>());
+    travCollection.addColumn(new RecordStateColumn<TravRecord>());
+    travCollection.addColumn(new StringColumn<TravRecord>("Name", &TravRecord::editorId));
+    addModel(new IdTable(&travCollection), CkId::Type_Trav_);
+
+    // TRNS
+    trnsCollection.addColumn(new StringIdColumn<TrnsRecord>());
+    trnsCollection.addColumn(new RecordStateColumn<TrnsRecord>());
+    trnsCollection.addColumn(new StringColumn<TrnsRecord>("Name", &TrnsRecord::editorId));
+    addModel(new IdTable(&trnsCollection), CkId::Type_Trns_);
+
+    // VOLI
+    voliCollection.addColumn(new StringIdColumn<VoliRecord>());
+    voliCollection.addColumn(new RecordStateColumn<VoliRecord>());
+    voliCollection.addColumn(new StringColumn<VoliRecord>("Name", &VoliRecord::editorId));
+    addModel(new IdTable(&voliCollection), CkId::Type_Voli_);
+
+    // VTYP
+    vtypCollection.addColumn(new StringIdColumn<VtypRecord>());
+    vtypCollection.addColumn(new RecordStateColumn<VtypRecord>());
+    vtypCollection.addColumn(new StringColumn<VtypRecord>("Name", &VtypRecord::editorId));
+    addModel(new IdTable(&vtypCollection), CkId::Type_Vtyp_);
+
+    // WBAR
+    wbarCollection.addColumn(new StringIdColumn<WbarRecord>());
+    wbarCollection.addColumn(new RecordStateColumn<WbarRecord>());
+    wbarCollection.addColumn(new StringColumn<WbarRecord>("Name", &WbarRecord::editorId));
+    addModel(new IdTable(&wbarCollection), CkId::Type_Wbar_);
+
+    // WKMF
+    wkmfCollection.addColumn(new StringIdColumn<WkmfRecord>());
+    wkmfCollection.addColumn(new RecordStateColumn<WkmfRecord>());
+    wkmfCollection.addColumn(new StringColumn<WkmfRecord>("Name", &WkmfRecord::editorId));
+    addModel(new IdTable(&wkmfCollection), CkId::Type_Wkmf_);
+
+    // WTHS
+    wthsCollection.addColumn(new StringIdColumn<WthsRecord>());
+    wthsCollection.addColumn(new RecordStateColumn<WthsRecord>());
+    wthsCollection.addColumn(new StringColumn<WthsRecord>("Name", &WthsRecord::editorId));
+    addModel(new IdTable(&wthsCollection), CkId::Type_Wths_);
+
+    // WWED
+    wwedCollection.addColumn(new StringIdColumn<WwedRecord>());
+    wwedCollection.addColumn(new RecordStateColumn<WwedRecord>());
+    wwedCollection.addColumn(new StringColumn<WwedRecord>("Name", &WwedRecord::editorId));
+    addModel(new IdTable(&wwedCollection), CkId::Type_Wwed_);
+
+    // ZOOM
+    zoomCollection.addColumn(new StringIdColumn<ZoomRecord>());
+    zoomCollection.addColumn(new RecordStateColumn<ZoomRecord>());
+    zoomCollection.addColumn(new StringColumn<ZoomRecord>("Name", &ZoomRecord::editorId));
+    addModel(new IdTable(&zoomCollection), CkId::Type_Zoom_);
 
     // Loading Log (metadata)
     metaData.addColumn(new StringIdColumn<MetaData>());
@@ -1266,6 +1469,40 @@ bool Data::continueLoading(Messages& messages)
     case 'PCMT': pcmtCollection.load(*reader, base); break;
     case 'PDCL': pdclCollection.load(*reader, base); break;
     case 'PGRE': pgreCollection.load(*reader, base); break;
+    case 'PHZD': phzdCollection.load(*reader, base); break;
+    case 'PKIN': pkinCollection.load(*reader, base); break;
+    case 'PMFT': pmftCollection.load(*reader, base); break;
+    case 'PSDC': psdcCollection.load(*reader, base); break;
+    case 'PTST': ptstCollection.load(*reader, base); break;
+    case 'RFGP': rfgpCollection.load(*reader, base); break;
+    case 'RSGD': rsgdCollection.load(*reader, base); break;
+    case 'RSPJ': rspjCollection.load(*reader, base); break;
+    case 'SDLT': sdltCollection.load(*reader, base); break;
+    case 'SECH': sechCollection.load(*reader, base); break;
+    case 'SFBK': sfbkCollection.load(*reader, base); break;
+    case 'SFPC': sfpcCollection.load(*reader, base); break;
+    case 'SFPT': sfptCollection.load(*reader, base); break;
+    case 'SFTR': sftrCollection.load(*reader, base); break;
+    case 'SMBN': smbnCollection.load(*reader, base); break;
+    case 'SMEN': smenCollection.load(*reader, base); break;
+    case 'SPCH': spchCollection.load(*reader, base); break;
+    case 'STAG': stagCollection.load(*reader, base); break;
+    case 'STBH': stbhCollection.load(*reader, base); break;
+    case 'STDT': stdtCollection.load(*reader, base); break;
+    case 'STMP': stmpCollection.load(*reader, base); break;
+    case 'STND': stndCollection.load(*reader, base); break;
+    case 'SUNP': sunpCollection.load(*reader, base); break;
+    case 'TMLM': tmlmCollection.load(*reader, base); break;
+    case 'TODD': toddCollection.load(*reader, base); break;
+    case 'TRAV': travCollection.load(*reader, base); break;
+    case 'TRNS': trnsCollection.load(*reader, base); break;
+    case 'VOLI': voliCollection.load(*reader, base); break;
+    case 'VTYP': vtypCollection.load(*reader, base); break;
+    case 'WBAR': wbarCollection.load(*reader, base); break;
+    case 'WKMF': wkmfCollection.load(*reader, base); break;
+    case 'WTHS': wthsCollection.load(*reader, base); break;
+    case 'WWED': wwedCollection.load(*reader, base); break;
+    case 'ZOOM': zoomCollection.load(*reader, base); break;
             default:
             {
                 if (name == 0)
@@ -1626,6 +1863,40 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Pcmt_:    return &pcmtCollection;
     case CkId::Type_Pdcl_:    return &pdclCollection;
     case CkId::Type_Pgre_:    return &pgreCollection;
+    case CkId::Type_Phzd_:    return &phzdCollection;
+    case CkId::Type_Pkin_:    return &pkinCollection;
+    case CkId::Type_Pmft_:    return &pmftCollection;
+    case CkId::Type_Psdc_:    return &psdcCollection;
+    case CkId::Type_Ptst_:    return &ptstCollection;
+    case CkId::Type_Rfgp_:    return &rfgpCollection;
+    case CkId::Type_Rsgd_:    return &rsgdCollection;
+    case CkId::Type_Rspj_:    return &rspjCollection;
+    case CkId::Type_Sdlt_:    return &sdltCollection;
+    case CkId::Type_Sech_:    return &sechCollection;
+    case CkId::Type_Sfbk_:    return &sfbkCollection;
+    case CkId::Type_Sfpc_:    return &sfpcCollection;
+    case CkId::Type_Sfpt_:    return &sfptCollection;
+    case CkId::Type_Sftr_:    return &sftrCollection;
+    case CkId::Type_Smbn_:    return &smbnCollection;
+    case CkId::Type_Smen_:    return &smenCollection;
+    case CkId::Type_Spch_:    return &spchCollection;
+    case CkId::Type_Stag_:    return &stagCollection;
+    case CkId::Type_Stbh_:    return &stbhCollection;
+    case CkId::Type_Stdt_:    return &stdtCollection;
+    case CkId::Type_Stmp_:    return &stmpCollection;
+    case CkId::Type_Stnd_:    return &stndCollection;
+    case CkId::Type_Sunp_:    return &sunpCollection;
+    case CkId::Type_Tmlm_:    return &tmlmCollection;
+    case CkId::Type_Todd_:    return &toddCollection;
+    case CkId::Type_Trav_:    return &travCollection;
+    case CkId::Type_Trns_:    return &trnsCollection;
+    case CkId::Type_Voli_:    return &voliCollection;
+    case CkId::Type_Vtyp_:    return &vtypCollection;
+    case CkId::Type_Wbar_:    return &wbarCollection;
+    case CkId::Type_Wkmf_:    return &wkmfCollection;
+    case CkId::Type_Wths_:    return &wthsCollection;
+    case CkId::Type_Wwed_:    return &wwedCollection;
+    case CkId::Type_Zoom_:    return &zoomCollection;
     default:                  return nullptr;
     }
 }
@@ -1801,6 +2072,40 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Pcmt_:    return &pcmtCollection;
     case CkId::Type_Pdcl_:    return &pdclCollection;
     case CkId::Type_Pgre_:    return &pgreCollection;
+    case CkId::Type_Phzd_:    return &phzdCollection;
+    case CkId::Type_Pkin_:    return &pkinCollection;
+    case CkId::Type_Pmft_:    return &pmftCollection;
+    case CkId::Type_Psdc_:    return &psdcCollection;
+    case CkId::Type_Ptst_:    return &ptstCollection;
+    case CkId::Type_Rfgp_:    return &rfgpCollection;
+    case CkId::Type_Rsgd_:    return &rsgdCollection;
+    case CkId::Type_Rspj_:    return &rspjCollection;
+    case CkId::Type_Sdlt_:    return &sdltCollection;
+    case CkId::Type_Sech_:    return &sechCollection;
+    case CkId::Type_Sfbk_:    return &sfbkCollection;
+    case CkId::Type_Sfpc_:    return &sfpcCollection;
+    case CkId::Type_Sfpt_:    return &sfptCollection;
+    case CkId::Type_Sftr_:    return &sftrCollection;
+    case CkId::Type_Smbn_:    return &smbnCollection;
+    case CkId::Type_Smen_:    return &smenCollection;
+    case CkId::Type_Spch_:    return &spchCollection;
+    case CkId::Type_Stag_:    return &stagCollection;
+    case CkId::Type_Stbh_:    return &stbhCollection;
+    case CkId::Type_Stdt_:    return &stdtCollection;
+    case CkId::Type_Stmp_:    return &stmpCollection;
+    case CkId::Type_Stnd_:    return &stndCollection;
+    case CkId::Type_Sunp_:    return &sunpCollection;
+    case CkId::Type_Tmlm_:    return &tmlmCollection;
+    case CkId::Type_Todd_:    return &toddCollection;
+    case CkId::Type_Trav_:    return &travCollection;
+    case CkId::Type_Trns_:    return &trnsCollection;
+    case CkId::Type_Voli_:    return &voliCollection;
+    case CkId::Type_Vtyp_:    return &vtypCollection;
+    case CkId::Type_Wbar_:    return &wbarCollection;
+    case CkId::Type_Wkmf_:    return &wkmfCollection;
+    case CkId::Type_Wths_:    return &wthsCollection;
+    case CkId::Type_Wwed_:    return &wwedCollection;
+    case CkId::Type_Zoom_:    return &zoomCollection;
     default:                  return nullptr;
     }
 }
@@ -1975,6 +2280,40 @@ IdCollection<PccnRecord>& Data::getPccnCollection() { return pccnCollection; }
 IdCollection<PcmtRecord>& Data::getPcmtCollection() { return pcmtCollection; }
 IdCollection<PdclRecord>& Data::getPdclCollection() { return pdclCollection; }
 IdCollection<PgreRecord>& Data::getPgreCollection() { return pgreCollection; }
+IdCollection<PhzdRecord>& Data::getPhzdCollection() { return phzdCollection; }
+IdCollection<PkinRecord>& Data::getPkinCollection() { return pkinCollection; }
+IdCollection<PmftRecord>& Data::getPmftCollection() { return pmftCollection; }
+IdCollection<PsdcRecord>& Data::getPsdcCollection() { return psdcCollection; }
+IdCollection<PtstRecord>& Data::getPtstCollection() { return ptstCollection; }
+IdCollection<RfgpRecord>& Data::getRfgpCollection() { return rfgpCollection; }
+IdCollection<RsgdRecord>& Data::getRsgdCollection() { return rsgdCollection; }
+IdCollection<RspjRecord>& Data::getRspjCollection() { return rspjCollection; }
+IdCollection<SdltRecord>& Data::getSdltCollection() { return sdltCollection; }
+IdCollection<SechRecord>& Data::getSechCollection() { return sechCollection; }
+IdCollection<SfbkRecord>& Data::getSfbkCollection() { return sfbkCollection; }
+IdCollection<SfpcRecord>& Data::getSfpcCollection() { return sfpcCollection; }
+IdCollection<SfptRecord>& Data::getSfptCollection() { return sfptCollection; }
+IdCollection<SftrRecord>& Data::getSftrCollection() { return sftrCollection; }
+IdCollection<SmbnRecord>& Data::getSmbnCollection() { return smbnCollection; }
+IdCollection<SmenRecord>& Data::getSmenCollection() { return smenCollection; }
+IdCollection<SpchRecord>& Data::getSpchCollection() { return spchCollection; }
+IdCollection<StagRecord>& Data::getStagCollection() { return stagCollection; }
+IdCollection<StbhRecord>& Data::getStbhCollection() { return stbhCollection; }
+IdCollection<StdtRecord>& Data::getStdtCollection() { return stdtCollection; }
+IdCollection<StmpRecord>& Data::getStmpCollection() { return stmpCollection; }
+IdCollection<StndRecord>& Data::getStndCollection() { return stndCollection; }
+IdCollection<SunpRecord>& Data::getSunpCollection() { return sunpCollection; }
+IdCollection<TmlmRecord>& Data::getTmlmCollection() { return tmlmCollection; }
+IdCollection<ToddRecord>& Data::getToddCollection() { return toddCollection; }
+IdCollection<TravRecord>& Data::getTravCollection() { return travCollection; }
+IdCollection<TrnsRecord>& Data::getTrnsCollection() { return trnsCollection; }
+IdCollection<VoliRecord>& Data::getVoliCollection() { return voliCollection; }
+IdCollection<VtypRecord>& Data::getVtypCollection() { return vtypCollection; }
+IdCollection<WbarRecord>& Data::getWbarCollection() { return wbarCollection; }
+IdCollection<WkmfRecord>& Data::getWkmfCollection() { return wkmfCollection; }
+IdCollection<WthsRecord>& Data::getWthsCollection() { return wthsCollection; }
+IdCollection<WwedRecord>& Data::getWwedCollection() { return wwedCollection; }
+IdCollection<ZoomRecord>& Data::getZoomCollection() { return zoomCollection; }
 
 QVector<IRecordCollection*> Data::allCollections()
 {
@@ -2134,6 +2473,40 @@ QVector<IRecordCollection*> Data::allCollections()
         &pcmtCollection,
         &pdclCollection,
         &pgreCollection,
+        &phzdCollection,
+        &pkinCollection,
+        &pmftCollection,
+        &psdcCollection,
+        &ptstCollection,
+        &rfgpCollection,
+        &rsgdCollection,
+        &rspjCollection,
+        &sdltCollection,
+        &sechCollection,
+        &sfbkCollection,
+        &sfpcCollection,
+        &sfptCollection,
+        &sftrCollection,
+        &smbnCollection,
+        &smenCollection,
+        &spchCollection,
+        &stagCollection,
+        &stbhCollection,
+        &stdtCollection,
+        &stmpCollection,
+        &stndCollection,
+        &sunpCollection,
+        &tmlmCollection,
+        &toddCollection,
+        &travCollection,
+        &trnsCollection,
+        &voliCollection,
+        &vtypCollection,
+        &wbarCollection,
+        &wkmfCollection,
+        &wthsCollection,
+        &wwedCollection,
+        &zoomCollection,
     };
 }
 
@@ -2307,6 +2680,40 @@ QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
         {&pdclCollection,    CkId::Type_Pdcl_},
         {&pgreCollection,    CkId::Type_Pgre_},
         {&scenCollection,    CkId::Type_Scen_},
+        {&phzdCollection,    CkId::Type_Phzd_},
+        {&pkinCollection,    CkId::Type_Pkin_},
+        {&pmftCollection,    CkId::Type_Pmft_},
+        {&psdcCollection,    CkId::Type_Psdc_},
+        {&ptstCollection,    CkId::Type_Ptst_},
+        {&rfgpCollection,    CkId::Type_Rfgp_},
+        {&rsgdCollection,    CkId::Type_Rsgd_},
+        {&rspjCollection,    CkId::Type_Rspj_},
+        {&sdltCollection,    CkId::Type_Sdlt_},
+        {&sechCollection,    CkId::Type_Sech_},
+        {&sfbkCollection,    CkId::Type_Sfbk_},
+        {&sfpcCollection,    CkId::Type_Sfpc_},
+        {&sfptCollection,    CkId::Type_Sfpt_},
+        {&sftrCollection,    CkId::Type_Sftr_},
+        {&smbnCollection,    CkId::Type_Smbn_},
+        {&smenCollection,    CkId::Type_Smen_},
+        {&spchCollection,    CkId::Type_Spch_},
+        {&stagCollection,    CkId::Type_Stag_},
+        {&stbhCollection,    CkId::Type_Stbh_},
+        {&stdtCollection,    CkId::Type_Stdt_},
+        {&stmpCollection,    CkId::Type_Stmp_},
+        {&stndCollection,    CkId::Type_Stnd_},
+        {&sunpCollection,    CkId::Type_Sunp_},
+        {&tmlmCollection,    CkId::Type_Tmlm_},
+        {&toddCollection,    CkId::Type_Todd_},
+        {&travCollection,    CkId::Type_Trav_},
+        {&trnsCollection,    CkId::Type_Trns_},
+        {&voliCollection,    CkId::Type_Voli_},
+        {&vtypCollection,    CkId::Type_Vtyp_},
+        {&wbarCollection,    CkId::Type_Wbar_},
+        {&wkmfCollection,    CkId::Type_Wkmf_},
+        {&wthsCollection,    CkId::Type_Wths_},
+        {&wwedCollection,    CkId::Type_Wwed_},
+        {&zoomCollection,    CkId::Type_Zoom_},
     };
 }
 
@@ -3277,6 +3684,143 @@ const IdCollection<PgreRecord>& Data::getPgreCollection() const
     return pgreCollection;
 }
 
+
+const IdCollection<PhzdRecord>& Data::getPhzdCollection() const
+{
+    return phzdCollection;
+}
+const IdCollection<PkinRecord>& Data::getPkinCollection() const
+{
+    return pkinCollection;
+}
+const IdCollection<PmftRecord>& Data::getPmftCollection() const
+{
+    return pmftCollection;
+}
+const IdCollection<PsdcRecord>& Data::getPsdcCollection() const
+{
+    return psdcCollection;
+}
+const IdCollection<PtstRecord>& Data::getPtstCollection() const
+{
+    return ptstCollection;
+}
+const IdCollection<RfgpRecord>& Data::getRfgpCollection() const
+{
+    return rfgpCollection;
+}
+const IdCollection<RsgdRecord>& Data::getRsgdCollection() const
+{
+    return rsgdCollection;
+}
+const IdCollection<RspjRecord>& Data::getRspjCollection() const
+{
+    return rspjCollection;
+}
+const IdCollection<SdltRecord>& Data::getSdltCollection() const
+{
+    return sdltCollection;
+}
+const IdCollection<SechRecord>& Data::getSechCollection() const
+{
+    return sechCollection;
+}
+const IdCollection<SfbkRecord>& Data::getSfbkCollection() const
+{
+    return sfbkCollection;
+}
+const IdCollection<SfpcRecord>& Data::getSfpcCollection() const
+{
+    return sfpcCollection;
+}
+const IdCollection<SfptRecord>& Data::getSfptCollection() const
+{
+    return sfptCollection;
+}
+const IdCollection<SftrRecord>& Data::getSftrCollection() const
+{
+    return sftrCollection;
+}
+const IdCollection<SmbnRecord>& Data::getSmbnCollection() const
+{
+    return smbnCollection;
+}
+const IdCollection<SmenRecord>& Data::getSmenCollection() const
+{
+    return smenCollection;
+}
+const IdCollection<SpchRecord>& Data::getSpchCollection() const
+{
+    return spchCollection;
+}
+const IdCollection<StagRecord>& Data::getStagCollection() const
+{
+    return stagCollection;
+}
+const IdCollection<StbhRecord>& Data::getStbhCollection() const
+{
+    return stbhCollection;
+}
+const IdCollection<StdtRecord>& Data::getStdtCollection() const
+{
+    return stdtCollection;
+}
+const IdCollection<StmpRecord>& Data::getStmpCollection() const
+{
+    return stmpCollection;
+}
+const IdCollection<StndRecord>& Data::getStndCollection() const
+{
+    return stndCollection;
+}
+const IdCollection<SunpRecord>& Data::getSunpCollection() const
+{
+    return sunpCollection;
+}
+const IdCollection<TmlmRecord>& Data::getTmlmCollection() const
+{
+    return tmlmCollection;
+}
+const IdCollection<ToddRecord>& Data::getToddCollection() const
+{
+    return toddCollection;
+}
+const IdCollection<TravRecord>& Data::getTravCollection() const
+{
+    return travCollection;
+}
+const IdCollection<TrnsRecord>& Data::getTrnsCollection() const
+{
+    return trnsCollection;
+}
+const IdCollection<VoliRecord>& Data::getVoliCollection() const
+{
+    return voliCollection;
+}
+const IdCollection<VtypRecord>& Data::getVtypCollection() const
+{
+    return vtypCollection;
+}
+const IdCollection<WbarRecord>& Data::getWbarCollection() const
+{
+    return wbarCollection;
+}
+const IdCollection<WkmfRecord>& Data::getWkmfCollection() const
+{
+    return wkmfCollection;
+}
+const IdCollection<WthsRecord>& Data::getWthsCollection() const
+{
+    return wthsCollection;
+}
+const IdCollection<WwedRecord>& Data::getWwedCollection() const
+{
+    return wwedCollection;
+}
+const IdCollection<ZoomRecord>& Data::getZoomCollection() const
+{
+    return zoomCollection;
+}
 
 bool Data::addMaterial(MaterialRecord& record)
 {

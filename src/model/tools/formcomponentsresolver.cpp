@@ -170,6 +170,40 @@
 #include "../../../libs/files/esm/dobjrecord.hpp"
 #include "../../../libs/files/esm/efsqrecord.hpp"
 #include "../../../libs/files/esm/equprecord.hpp"
+#include "../../../libs/files/esm/phzdrecord.hpp"
+#include "../../../libs/files/esm/pkinrecord.hpp"
+#include "../../../libs/files/esm/pmftrecord.hpp"
+#include "../../../libs/files/esm/psdcrecord.hpp"
+#include "../../../libs/files/esm/ptstrecord.hpp"
+#include "../../../libs/files/esm/rfgprecord.hpp"
+#include "../../../libs/files/esm/rsgdrecord.hpp"
+#include "../../../libs/files/esm/rspjrecord.hpp"
+#include "../../../libs/files/esm/sdltrecord.hpp"
+#include "../../../libs/files/esm/sechrecord.hpp"
+#include "../../../libs/files/esm/sfbkrecord.hpp"
+#include "../../../libs/files/esm/sfpcrecord.hpp"
+#include "../../../libs/files/esm/sfptrecord.hpp"
+#include "../../../libs/files/esm/sftrrecord.hpp"
+#include "../../../libs/files/esm/smbnrecord.hpp"
+#include "../../../libs/files/esm/smenrecord.hpp"
+#include "../../../libs/files/esm/spchrecord.hpp"
+#include "../../../libs/files/esm/stagrecord.hpp"
+#include "../../../libs/files/esm/stbhrecord.hpp"
+#include "../../../libs/files/esm/stdtrecord.hpp"
+#include "../../../libs/files/esm/stmprecord.hpp"
+#include "../../../libs/files/esm/stndrecord.hpp"
+#include "../../../libs/files/esm/sunprecord.hpp"
+#include "../../../libs/files/esm/tmlmrecord.hpp"
+#include "../../../libs/files/esm/toddrecord.hpp"
+#include "../../../libs/files/esm/travrecord.hpp"
+#include "../../../libs/files/esm/trnsrecord.hpp"
+#include "../../../libs/files/esm/volirecord.hpp"
+#include "../../../libs/files/esm/vtyprecord.hpp"
+#include "../../../libs/files/esm/wbarrecord.hpp"
+#include "../../../libs/files/esm/wkmfrecord.hpp"
+#include "../../../libs/files/esm/wthsrecord.hpp"
+#include "../../../libs/files/esm/wwedrecord.hpp"
+#include "../../../libs/files/esm/zoomrecord.hpp"
 
 namespace {
 template <typename T>
@@ -351,7 +385,41 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(WateRecord) \
     MACRO(WeaponRecord) \
     MACRO(WorldspaceRecord) \
-    MACRO(WthrRecord)
+    MACRO(WthrRecord) \
+    MACRO(PhzdRecord) \
+    MACRO(PkinRecord) \
+    MACRO(PmftRecord) \
+    MACRO(PsdcRecord) \
+    MACRO(PtstRecord) \
+    MACRO(RfgpRecord) \
+    MACRO(RsgdRecord) \
+    MACRO(RspjRecord) \
+    MACRO(SdltRecord) \
+    MACRO(SechRecord) \
+    MACRO(SfbkRecord) \
+    MACRO(SfpcRecord) \
+    MACRO(SfptRecord) \
+    MACRO(SftrRecord) \
+    MACRO(SmbnRecord) \
+    MACRO(SmenRecord) \
+    MACRO(SpchRecord) \
+    MACRO(StagRecord) \
+    MACRO(StbhRecord) \
+    MACRO(StdtRecord) \
+    MACRO(StmpRecord) \
+    MACRO(StndRecord) \
+    MACRO(SunpRecord) \
+    MACRO(TmlmRecord) \
+    MACRO(ToddRecord) \
+    MACRO(TravRecord) \
+    MACRO(TrnsRecord) \
+    MACRO(VoliRecord) \
+    MACRO(VtypRecord) \
+    MACRO(WbarRecord) \
+    MACRO(WkmfRecord) \
+    MACRO(WthsRecord) \
+    MACRO(WwedRecord) \
+    MACRO(ZoomRecord)
 } // namespace
 
 bool resolveComponents(BaseCollection* coll, int recordIndex,

@@ -173,6 +173,40 @@
 #include "../../../libs/files/esm/pcmtrecord.hpp"
 #include "../../../libs/files/esm/pdclrecord.hpp"
 #include "../../../libs/files/esm/pgrerecord.hpp"
+#include "../../../libs/files/esm/phzdrecord.hpp"
+#include "../../../libs/files/esm/pkinrecord.hpp"
+#include "../../../libs/files/esm/pmftrecord.hpp"
+#include "../../../libs/files/esm/psdcrecord.hpp"
+#include "../../../libs/files/esm/ptstrecord.hpp"
+#include "../../../libs/files/esm/rfgprecord.hpp"
+#include "../../../libs/files/esm/rsgdrecord.hpp"
+#include "../../../libs/files/esm/rspjrecord.hpp"
+#include "../../../libs/files/esm/sdltrecord.hpp"
+#include "../../../libs/files/esm/sechrecord.hpp"
+#include "../../../libs/files/esm/sfbkrecord.hpp"
+#include "../../../libs/files/esm/sfpcrecord.hpp"
+#include "../../../libs/files/esm/sfptrecord.hpp"
+#include "../../../libs/files/esm/sftrrecord.hpp"
+#include "../../../libs/files/esm/smbnrecord.hpp"
+#include "../../../libs/files/esm/smenrecord.hpp"
+#include "../../../libs/files/esm/spchrecord.hpp"
+#include "../../../libs/files/esm/stagrecord.hpp"
+#include "../../../libs/files/esm/stbhrecord.hpp"
+#include "../../../libs/files/esm/stdtrecord.hpp"
+#include "../../../libs/files/esm/stmprecord.hpp"
+#include "../../../libs/files/esm/stndrecord.hpp"
+#include "../../../libs/files/esm/sunprecord.hpp"
+#include "../../../libs/files/esm/tmlmrecord.hpp"
+#include "../../../libs/files/esm/toddrecord.hpp"
+#include "../../../libs/files/esm/travrecord.hpp"
+#include "../../../libs/files/esm/trnsrecord.hpp"
+#include "../../../libs/files/esm/volirecord.hpp"
+#include "../../../libs/files/esm/vtyprecord.hpp"
+#include "../../../libs/files/esm/wbarrecord.hpp"
+#include "../../../libs/files/esm/wkmfrecord.hpp"
+#include "../../../libs/files/esm/wthsrecord.hpp"
+#include "../../../libs/files/esm/wwedrecord.hpp"
+#include "../../../libs/files/esm/zoomrecord.hpp"
 
 #include <QObject>
 #include <QStringList>
@@ -764,6 +798,108 @@ public:
     /// \brief Get PGRE collection
     /// \return Const reference to the PGRE record collection
     const IdCollection<PgreRecord>& getPgreCollection() const;
+    /// \brief Get PHZD collection
+    /// \return Const reference to the PHZD record collection
+    const IdCollection<PhzdRecord>& getPhzdCollection() const;
+    /// \brief Get PKIN collection
+    /// \return Const reference to the PKIN record collection
+    const IdCollection<PkinRecord>& getPkinCollection() const;
+    /// \brief Get PMFT collection
+    /// \return Const reference to the PMFT record collection
+    const IdCollection<PmftRecord>& getPmftCollection() const;
+    /// \brief Get PSDC collection
+    /// \return Const reference to the PSDC record collection
+    const IdCollection<PsdcRecord>& getPsdcCollection() const;
+    /// \brief Get PTST collection
+    /// \return Const reference to the PTST record collection
+    const IdCollection<PtstRecord>& getPtstCollection() const;
+    /// \brief Get RFGP collection
+    /// \return Const reference to the RFGP record collection
+    const IdCollection<RfgpRecord>& getRfgpCollection() const;
+    /// \brief Get RSGD collection
+    /// \return Const reference to the RSGD record collection
+    const IdCollection<RsgdRecord>& getRsgdCollection() const;
+    /// \brief Get RSPJ collection
+    /// \return Const reference to the RSPJ record collection
+    const IdCollection<RspjRecord>& getRspjCollection() const;
+    /// \brief Get SDLT collection
+    /// \return Const reference to the SDLT record collection
+    const IdCollection<SdltRecord>& getSdltCollection() const;
+    /// \brief Get SECH collection
+    /// \return Const reference to the SECH record collection
+    const IdCollection<SechRecord>& getSechCollection() const;
+    /// \brief Get SFBK collection
+    /// \return Const reference to the SFBK record collection
+    const IdCollection<SfbkRecord>& getSfbkCollection() const;
+    /// \brief Get SFPC collection
+    /// \return Const reference to the SFPC record collection
+    const IdCollection<SfpcRecord>& getSfpcCollection() const;
+    /// \brief Get SFPT collection
+    /// \return Const reference to the SFPT record collection
+    const IdCollection<SfptRecord>& getSfptCollection() const;
+    /// \brief Get SFTR collection
+    /// \return Const reference to the SFTR record collection
+    const IdCollection<SftrRecord>& getSftrCollection() const;
+    /// \brief Get SMBN collection
+    /// \return Const reference to the SMBN record collection
+    const IdCollection<SmbnRecord>& getSmbnCollection() const;
+    /// \brief Get SMEN collection
+    /// \return Const reference to the SMEN record collection
+    const IdCollection<SmenRecord>& getSmenCollection() const;
+    /// \brief Get SPCH collection
+    /// \return Const reference to the SPCH record collection
+    const IdCollection<SpchRecord>& getSpchCollection() const;
+    /// \brief Get STAG collection
+    /// \return Const reference to the STAG record collection
+    const IdCollection<StagRecord>& getStagCollection() const;
+    /// \brief Get STBH collection
+    /// \return Const reference to the STBH record collection
+    const IdCollection<StbhRecord>& getStbhCollection() const;
+    /// \brief Get STDT collection
+    /// \return Const reference to the STDT record collection
+    const IdCollection<StdtRecord>& getStdtCollection() const;
+    /// \brief Get STMP collection
+    /// \return Const reference to the STMP record collection
+    const IdCollection<StmpRecord>& getStmpCollection() const;
+    /// \brief Get STND collection
+    /// \return Const reference to the STND record collection
+    const IdCollection<StndRecord>& getStndCollection() const;
+    /// \brief Get SUNP collection
+    /// \return Const reference to the SUNP record collection
+    const IdCollection<SunpRecord>& getSunpCollection() const;
+    /// \brief Get TMLM collection
+    /// \return Const reference to the TMLM record collection
+    const IdCollection<TmlmRecord>& getTmlmCollection() const;
+    /// \brief Get TODD collection
+    /// \return Const reference to the TODD record collection
+    const IdCollection<ToddRecord>& getToddCollection() const;
+    /// \brief Get TRAV collection
+    /// \return Const reference to the TRAV record collection
+    const IdCollection<TravRecord>& getTravCollection() const;
+    /// \brief Get TRNS collection
+    /// \return Const reference to the TRNS record collection
+    const IdCollection<TrnsRecord>& getTrnsCollection() const;
+    /// \brief Get VOLI collection
+    /// \return Const reference to the VOLI record collection
+    const IdCollection<VoliRecord>& getVoliCollection() const;
+    /// \brief Get VTYP collection
+    /// \return Const reference to the VTYP record collection
+    const IdCollection<VtypRecord>& getVtypCollection() const;
+    /// \brief Get WBAR collection
+    /// \return Const reference to the WBAR record collection
+    const IdCollection<WbarRecord>& getWbarCollection() const;
+    /// \brief Get WKMF collection
+    /// \return Const reference to the WKMF record collection
+    const IdCollection<WkmfRecord>& getWkmfCollection() const;
+    /// \brief Get WTHS collection
+    /// \return Const reference to the WTHS record collection
+    const IdCollection<WthsRecord>& getWthsCollection() const;
+    /// \brief Get WWED collection
+    /// \return Const reference to the WWED record collection
+    const IdCollection<WwedRecord>& getWwedCollection() const;
+    /// \brief Get ZOOM collection
+    /// \return Const reference to the ZOOM record collection
+    const IdCollection<ZoomRecord>& getZoomCollection() const;
 
     // --- Non-const overloads for mutation ---
 
@@ -1201,6 +1337,108 @@ public:
     /// \brief Get PGRE collection (mutable)
     /// \return Reference to the PGRE record collection for modification
     IdCollection<PgreRecord>& getPgreCollection();
+    /// \brief Get PHZD collection (mutable)
+    /// \return Reference to the PHZD record collection for modification
+    IdCollection<PhzdRecord>& getPhzdCollection();
+    /// \brief Get PKIN collection (mutable)
+    /// \return Reference to the PKIN record collection for modification
+    IdCollection<PkinRecord>& getPkinCollection();
+    /// \brief Get PMFT collection (mutable)
+    /// \return Reference to the PMFT record collection for modification
+    IdCollection<PmftRecord>& getPmftCollection();
+    /// \brief Get PSDC collection (mutable)
+    /// \return Reference to the PSDC record collection for modification
+    IdCollection<PsdcRecord>& getPsdcCollection();
+    /// \brief Get PTST collection (mutable)
+    /// \return Reference to the PTST record collection for modification
+    IdCollection<PtstRecord>& getPtstCollection();
+    /// \brief Get RFGP collection (mutable)
+    /// \return Reference to the RFGP record collection for modification
+    IdCollection<RfgpRecord>& getRfgpCollection();
+    /// \brief Get RSGD collection (mutable)
+    /// \return Reference to the RSGD record collection for modification
+    IdCollection<RsgdRecord>& getRsgdCollection();
+    /// \brief Get RSPJ collection (mutable)
+    /// \return Reference to the RSPJ record collection for modification
+    IdCollection<RspjRecord>& getRspjCollection();
+    /// \brief Get SDLT collection (mutable)
+    /// \return Reference to the SDLT record collection for modification
+    IdCollection<SdltRecord>& getSdltCollection();
+    /// \brief Get SECH collection (mutable)
+    /// \return Reference to the SECH record collection for modification
+    IdCollection<SechRecord>& getSechCollection();
+    /// \brief Get SFBK collection (mutable)
+    /// \return Reference to the SFBK record collection for modification
+    IdCollection<SfbkRecord>& getSfbkCollection();
+    /// \brief Get SFPC collection (mutable)
+    /// \return Reference to the SFPC record collection for modification
+    IdCollection<SfpcRecord>& getSfpcCollection();
+    /// \brief Get SFPT collection (mutable)
+    /// \return Reference to the SFPT record collection for modification
+    IdCollection<SfptRecord>& getSfptCollection();
+    /// \brief Get SFTR collection (mutable)
+    /// \return Reference to the SFTR record collection for modification
+    IdCollection<SftrRecord>& getSftrCollection();
+    /// \brief Get SMBN collection (mutable)
+    /// \return Reference to the SMBN record collection for modification
+    IdCollection<SmbnRecord>& getSmbnCollection();
+    /// \brief Get SMEN collection (mutable)
+    /// \return Reference to the SMEN record collection for modification
+    IdCollection<SmenRecord>& getSmenCollection();
+    /// \brief Get SPCH collection (mutable)
+    /// \return Reference to the SPCH record collection for modification
+    IdCollection<SpchRecord>& getSpchCollection();
+    /// \brief Get STAG collection (mutable)
+    /// \return Reference to the STAG record collection for modification
+    IdCollection<StagRecord>& getStagCollection();
+    /// \brief Get STBH collection (mutable)
+    /// \return Reference to the STBH record collection for modification
+    IdCollection<StbhRecord>& getStbhCollection();
+    /// \brief Get STDT collection (mutable)
+    /// \return Reference to the STDT record collection for modification
+    IdCollection<StdtRecord>& getStdtCollection();
+    /// \brief Get STMP collection (mutable)
+    /// \return Reference to the STMP record collection for modification
+    IdCollection<StmpRecord>& getStmpCollection();
+    /// \brief Get STND collection (mutable)
+    /// \return Reference to the STND record collection for modification
+    IdCollection<StndRecord>& getStndCollection();
+    /// \brief Get SUNP collection (mutable)
+    /// \return Reference to the SUNP record collection for modification
+    IdCollection<SunpRecord>& getSunpCollection();
+    /// \brief Get TMLM collection (mutable)
+    /// \return Reference to the TMLM record collection for modification
+    IdCollection<TmlmRecord>& getTmlmCollection();
+    /// \brief Get TODD collection (mutable)
+    /// \return Reference to the TODD record collection for modification
+    IdCollection<ToddRecord>& getToddCollection();
+    /// \brief Get TRAV collection (mutable)
+    /// \return Reference to the TRAV record collection for modification
+    IdCollection<TravRecord>& getTravCollection();
+    /// \brief Get TRNS collection (mutable)
+    /// \return Reference to the TRNS record collection for modification
+    IdCollection<TrnsRecord>& getTrnsCollection();
+    /// \brief Get VOLI collection (mutable)
+    /// \return Reference to the VOLI record collection for modification
+    IdCollection<VoliRecord>& getVoliCollection();
+    /// \brief Get VTYP collection (mutable)
+    /// \return Reference to the VTYP record collection for modification
+    IdCollection<VtypRecord>& getVtypCollection();
+    /// \brief Get WBAR collection (mutable)
+    /// \return Reference to the WBAR record collection for modification
+    IdCollection<WbarRecord>& getWbarCollection();
+    /// \brief Get WKMF collection (mutable)
+    /// \return Reference to the WKMF record collection for modification
+    IdCollection<WkmfRecord>& getWkmfCollection();
+    /// \brief Get WTHS collection (mutable)
+    /// \return Reference to the WTHS record collection for modification
+    IdCollection<WthsRecord>& getWthsCollection();
+    /// \brief Get WWED collection (mutable)
+    /// \return Reference to the WWED record collection for modification
+    IdCollection<WwedRecord>& getWwedCollection();
+    /// \brief Get ZOOM collection (mutable)
+    /// \return Reference to the ZOOM record collection for modification
+    IdCollection<ZoomRecord>& getZoomCollection();
 
     /// \brief Get collection by record type (const version)
     /// \param type Record type identifier
@@ -1615,6 +1853,40 @@ private:
     IdCollection<PcmtRecord> pcmtCollection;
     IdCollection<PdclRecord> pdclCollection;
     IdCollection<PgreRecord> pgreCollection;
+    IdCollection<PhzdRecord> phzdCollection;
+    IdCollection<PkinRecord> pkinCollection;
+    IdCollection<PmftRecord> pmftCollection;
+    IdCollection<PsdcRecord> psdcCollection;
+    IdCollection<PtstRecord> ptstCollection;
+    IdCollection<RfgpRecord> rfgpCollection;
+    IdCollection<RsgdRecord> rsgdCollection;
+    IdCollection<RspjRecord> rspjCollection;
+    IdCollection<SdltRecord> sdltCollection;
+    IdCollection<SechRecord> sechCollection;
+    IdCollection<SfbkRecord> sfbkCollection;
+    IdCollection<SfpcRecord> sfpcCollection;
+    IdCollection<SfptRecord> sfptCollection;
+    IdCollection<SftrRecord> sftrCollection;
+    IdCollection<SmbnRecord> smbnCollection;
+    IdCollection<SmenRecord> smenCollection;
+    IdCollection<SpchRecord> spchCollection;
+    IdCollection<StagRecord> stagCollection;
+    IdCollection<StbhRecord> stbhCollection;
+    IdCollection<StdtRecord> stdtCollection;
+    IdCollection<StmpRecord> stmpCollection;
+    IdCollection<StndRecord> stndCollection;
+    IdCollection<SunpRecord> sunpCollection;
+    IdCollection<TmlmRecord> tmlmCollection;
+    IdCollection<ToddRecord> toddCollection;
+    IdCollection<TravRecord> travCollection;
+    IdCollection<TrnsRecord> trnsCollection;
+    IdCollection<VoliRecord> voliCollection;
+    IdCollection<VtypRecord> vtypCollection;
+    IdCollection<WbarRecord> wbarCollection;
+    IdCollection<WkmfRecord> wkmfCollection;
+    IdCollection<WthsRecord> wthsCollection;
+    IdCollection<WwedRecord> wwedCollection;
+    IdCollection<ZoomRecord> zoomCollection;
 
     QVector<QAbstractItemModel*> models;
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;
