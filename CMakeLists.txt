@@ -164,6 +164,40 @@ set(ESM_SOURCES
     libs/files/esm/movtrecord.cpp
     libs/files/esm/muscrecord.cpp
     libs/files/esm/conditionrecord.cpp
+    libs/files/esm/phzdrecord.cpp
+    libs/files/esm/pkinrecord.cpp
+    libs/files/esm/pmftrecord.cpp
+    libs/files/esm/psdcrecord.cpp
+    libs/files/esm/ptstrecord.cpp
+    libs/files/esm/rfgprecord.cpp
+    libs/files/esm/rsgdrecord.cpp
+    libs/files/esm/rspjrecord.cpp
+    libs/files/esm/sdltrecord.cpp
+    libs/files/esm/sechrecord.cpp
+    libs/files/esm/sfbkrecord.cpp
+    libs/files/esm/sfpcrecord.cpp
+    libs/files/esm/sfptrecord.cpp
+    libs/files/esm/sftrrecord.cpp
+    libs/files/esm/smbnrecord.cpp
+    libs/files/esm/smenrecord.cpp
+    libs/files/esm/spchrecord.cpp
+    libs/files/esm/stagrecord.cpp
+    libs/files/esm/stbhrecord.cpp
+    libs/files/esm/stdtrecord.cpp
+    libs/files/esm/stmprecord.cpp
+    libs/files/esm/stndrecord.cpp
+    libs/files/esm/sunprecord.cpp
+    libs/files/esm/tmlmrecord.cpp
+    libs/files/esm/toddrecord.cpp
+    libs/files/esm/travrecord.cpp
+    libs/files/esm/trnsrecord.cpp
+    libs/files/esm/volirecord.cpp
+    libs/files/esm/vtyprecord.cpp
+    libs/files/esm/wbarrecord.cpp
+    libs/files/esm/wkmfrecord.cpp
+    libs/files/esm/wthsrecord.cpp
+    libs/files/esm/wwedrecord.cpp
+    libs/files/esm/zoomrecord.cpp
     libs/files/data/strings.cpp
 )
 
@@ -284,6 +318,40 @@ set(ESM_HEADERS
     libs/files/esm/mattrecord.hpp
     libs/files/esm/movtrecord.hpp
     libs/files/esm/muscrecord.hpp
+    libs/files/esm/phzdrecord.hpp
+    libs/files/esm/pkinrecord.hpp
+    libs/files/esm/pmftrecord.hpp
+    libs/files/esm/psdcrecord.hpp
+    libs/files/esm/ptstrecord.hpp
+    libs/files/esm/rfgprecord.hpp
+    libs/files/esm/rsgdrecord.hpp
+    libs/files/esm/rspjrecord.hpp
+    libs/files/esm/sdltrecord.hpp
+    libs/files/esm/sechrecord.hpp
+    libs/files/esm/sfbkrecord.hpp
+    libs/files/esm/sfpcrecord.hpp
+    libs/files/esm/sfptrecord.hpp
+    libs/files/esm/sftrrecord.hpp
+    libs/files/esm/smbnrecord.hpp
+    libs/files/esm/smenrecord.hpp
+    libs/files/esm/spchrecord.hpp
+    libs/files/esm/stagrecord.hpp
+    libs/files/esm/stbhrecord.hpp
+    libs/files/esm/stdtrecord.hpp
+    libs/files/esm/stmprecord.hpp
+    libs/files/esm/stndrecord.hpp
+    libs/files/esm/sunprecord.hpp
+    libs/files/esm/tmlmrecord.hpp
+    libs/files/esm/toddrecord.hpp
+    libs/files/esm/travrecord.hpp
+    libs/files/esm/trnsrecord.hpp
+    libs/files/esm/volirecord.hpp
+    libs/files/esm/vtyprecord.hpp
+    libs/files/esm/wbarrecord.hpp
+    libs/files/esm/wkmfrecord.hpp
+    libs/files/esm/wthsrecord.hpp
+    libs/files/esm/wwedrecord.hpp
+    libs/files/esm/zoomrecord.hpp
     libs/components/component.hpp
     libs/components/editorproperty.hpp
     libs/components/formcomponents.hpp
