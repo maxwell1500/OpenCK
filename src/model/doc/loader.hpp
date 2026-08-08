@@ -4,7 +4,6 @@
 #include <QMutex>
 #include <QObject>
 #include <QPair>
-#include <QTimer>
 #include <QVector>
 #include <QWaitCondition>
 
@@ -29,14 +28,10 @@ class Loader : public QObject
     QWaitCondition toDo;
     QVector<QPair<Document*, Stage>> documents;
 
-    std::unique_ptr<QTimer> timer;
-    bool shouldStop;
-
 public:
     Loader();
 
     QWaitCondition& hasThingsToDo();
-    void stop();
 
 public slots:
     void loadDocument(Document* document);
@@ -49,7 +44,7 @@ signals:
     void nextStage(Document* document, const QString& name, int records);
     void loadMessage(Document* document, const QString& message);
 
-private slots:
+public slots:
     void load();
 };
 

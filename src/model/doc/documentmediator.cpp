@@ -9,6 +9,15 @@ DocumentMediator::DocumentMediator()
     loader.moveToThread(&loaderThread);
     loaderThread.start();
 
+    // The tick timer lives on the mediator's (main) thread and drives the
+    // loader through a queued connection, so no timer is ever owned by the
+    // loader thread itself. Destroying a timer started in another thread
+    // QFATALs in Qt ("Cannot send events to objects owned by a different
+    // thread"), so the loader must not own one.
+    tickTimer.setInterval(20);
+    connect(&tickTimer, &QTimer::timeout, &loader, &Loader::load);
+    tickTimer.start();
+
     connect(&loader, &Loader::documentLoaded,
         this, &DocumentMediator::documentLoaded);
 
@@ -36,8 +45,8 @@ DocumentMediator::DocumentMediator()
 DocumentMediator::~DocumentMediator()
 {
     LOG_INFO("DocumentMediator shutting down...");
+    tickTimer.stop();
     loaderThread.quit();
-    loader.stop();
     loader.hasThingsToDo().wakeAll();
     loaderThread.wait();
     LOG_INFO("DocumentMediator shut down");

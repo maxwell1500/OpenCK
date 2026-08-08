@@ -7,6 +7,7 @@
 
 #include <QThread>
 #include <QObject>
+#include <QTimer>
 #include <QVector>
 
 #include <memory>
@@ -50,7 +51,8 @@ private:
     QVector<std::shared_ptr<Document>> documents;
     QThread loaderThread;
     Loader loader;
-    
+    QTimer tickTimer;
+
     FilePaths paths;
 };
 

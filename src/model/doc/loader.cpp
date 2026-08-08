@@ -8,30 +8,21 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <QThread>
 
 Loader::Stage::Stage() :
     file(0), recordsLoaded(0), recordsLeft(false)
 {
 }
 
-Loader::Loader() :
-    shouldStop(false)
+Loader::Loader()
 {
     LOG_INFO("Loader initialized");
-    timer = std::make_unique<QTimer>(this);
-
-    connect(timer.get(), &QTimer::timeout, this, &Loader::load);
-    timer->start();
 }
 
 QWaitCondition& Loader::hasThingsToDo()
 {
     return toDo;
-}
-
-void Loader::stop()
-{
-    shouldStop = true;
 }
 
 void Loader::load()
@@ -41,12 +32,6 @@ void Loader::load()
         mutex.lock();
         toDo.wait(&mutex);
         mutex.unlock();
-
-        if (shouldStop)
-        {
-            LOG_DEBUG("Loader stopping due to shouldStop flag");
-            timer->stop();
-        }
 
         return;
     }
