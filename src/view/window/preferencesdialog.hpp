@@ -79,7 +79,6 @@ private:
 
     // Network
     QCheckBox* mVersionControlCheck;
-    QLineEdit* mVcServerEdit;
 };
 
 #endif // PREFERENCESDIALOG_HPP

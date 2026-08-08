@@ -345,12 +345,7 @@ QWidget* PreferencesDialog::createNetworkPage()
     mVersionControlCheck->setEnabled(false);
     gform->addRow("", mVersionControlCheck);
 
-    mVcServerEdit = new QLineEdit();
-    mVcServerEdit->setPlaceholderText("Not implemented");
-    mVcServerEdit->setEnabled(false);
-    gform->addRow("VC Server:", mVcServerEdit);
-
-    auto* note = new QLabel("Version control: OpenCK uses Git or Perforce for Check In/Out (configured per-project). The VC settings below are reserved for future use.");
+    auto* note = new QLabel("Perforce and Git check-in/check-out are configured from the Tools menu and external tools.");
     note->setWordWrap(true);
     gform->addRow("", note);
 
@@ -427,7 +422,6 @@ void PreferencesDialog::loadSettings()
 
     conf.beginGroup("Network");
     mVersionControlCheck->setChecked(conf.value("bEnableVersionControl", false).toBool());
-    mVcServerEdit->setText(conf.value("sVCServer", "").toString());
     conf.endGroup();
 }
 
@@ -475,7 +469,6 @@ void PreferencesDialog::saveSettings()
 
     conf.beginGroup("Network");
     conf.setValue("bEnableVersionControl", mVersionControlCheck->isChecked());
-    conf.setValue("sVCServer", mVcServerEdit->text());
     conf.endGroup();
 
     conf.sync();

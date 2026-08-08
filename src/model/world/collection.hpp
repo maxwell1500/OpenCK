@@ -49,9 +49,8 @@ private:
     QVector<Column<ESXRecord>*> columns;
     mutable QVector<quint32> mDeletedFormIds;
 
-    // Not implemented
-    Collection(const Collection&);
-    Collection& operator=(const Collection&);
+    Collection(const Collection&) = delete;
+    Collection& operator=(const Collection&) = delete;
 
 protected:
     const QMap<QString, int>& getIdMap() const;

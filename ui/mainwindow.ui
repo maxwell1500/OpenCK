@@ -164,13 +164,7 @@
       <addaction name="actionThemeLight"/>
       <addaction name="actionThemeDark"/>
      </widget>
-    <widget class="QMenu" name="menuTests">
-     <property name="title">
-      <string>Tests</string>
-     </property>
-     <addaction name="actionNotImplementedTests"/>
-    </widget>
-   <widget class="QMenu" name="menuGameplay">
+    <widget class="QMenu" name="menuGameplay">
     <property name="title">
      <string>Gameplay</string>
     </property>
@@ -215,7 +209,6 @@
        <addaction name="menuAudio"/>
        <addaction name="menuDocks"/>
        <addaction name="menuTheme"/>
-       <addaction name="menuTests"/>
        <addaction name="menuHelp"/>
        <addaction name="menuTools"/>
        <addaction name="menuPlugins"/>
@@ -379,15 +372,7 @@
         <string>Dark</string>
        </property>
       </action>
-      <action name="actionNotImplementedTests">
-       <property name="text">
-        <string>Not implemented</string>
-       </property>
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-      </action>
-     <action name="actionCreateArchive">
+      <action name="actionCreateArchive">
       <property name="text">
        <string>Create Archive...</string>
       </property>

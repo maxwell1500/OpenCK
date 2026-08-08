@@ -11,6 +11,7 @@
 #include "../../../libs/files/esm/worldspacerecord.hpp"
 
 #include <QComboBox>
+#include <QLineEdit>
 #include <QListView>
 #include <QTableView>
 #include <QSplitter>
@@ -430,8 +431,8 @@ public:
     void setCell(const CellRecord* cell)
     {
         beginResetModel();
-        mRows.clear();
-        mPoints.clear();
+        mAllRows.clear();
+        mAllPoints.clear();
         if (!mData || !cell) { endResetModel(); return; }
 
         const auto& refrs = mData->getRefrCollection();
@@ -446,17 +447,47 @@ public:
             const qint32 gx = static_cast<qint32>(std::floor(r.posX / kCellUnits));
             const qint32 gy = static_cast<qint32>(std::floor(r.posY / kCellUnits));
             if (gx != cx || gy != cy) continue;
-            mRows.push_back(&r);
-            mPoints.push_back(QPointF(r.posX, r.posY));
+            mAllRows.push_back(&r);
+            mAllPoints.push_back(QPointF(r.posX, r.posY));
         }
+        applyFilter();
+        endResetModel();
+    }
+
+    void setFilter(const QString& filter)
+    {
+        beginResetModel();
+        mFilterText = filter.trimmed();
+        applyFilter();
         endResetModel();
     }
 
     const QVector<QPointF>& points() const { return mPoints; }
 
 private:
+    void applyFilter()
+    {
+        mRows.clear();
+        mPoints.clear();
+        for (int i = 0; i < static_cast<int>(mAllRows.size()); ++i)
+        {
+            const auto* r = mAllRows[i];
+            const QString formId = QStringLiteral("0x%1").arg(r->formId, 8, 16, QChar('0'));
+            if (mFilterText.isEmpty()
+                || r->editorId.contains(mFilterText, Qt::CaseInsensitive)
+                || formId.contains(mFilterText, Qt::CaseInsensitive))
+            {
+                mRows.push_back(r);
+                mPoints.push_back(mAllPoints[i]);
+            }
+        }
+    }
+
     Data* mData;
+    QString mFilterText;
+    std::vector<const RefrRecord*> mAllRows;
     std::vector<const RefrRecord*> mRows;
+    QVector<QPointF> mAllPoints;
     QVector<QPointF> mPoints;
 };
 
@@ -523,6 +554,10 @@ CellViewPanel::CellViewPanel(Data* data, QWidget* parent)
     bottomBar->addAction(goToAct);
     auto* filterAct = new QAction(QStringLiteral("Filter"), bottomBar);
     bottomBar->addAction(filterAct);
+    mFilterEdit = new QLineEdit(this);
+    mFilterEdit->setPlaceholderText(QStringLiteral("Filter refs by Editor ID or Form ID..."));
+    mFilterEdit->setClearButtonEnabled(true);
+    bottomBar->addWidget(mFilterEdit);
     bottomBar->addSeparator();
     auto* refreshAct = new QAction(QStringLiteral("Refresh"), bottomBar);
     bottomBar->addAction(refreshAct);
@@ -560,7 +595,13 @@ CellViewPanel::CellViewPanel(Data* data, QWidget* parent)
     });
     connect(filterAct, &QAction::triggered, this, [this]()
     {
-        LOG_DEBUG(QStringLiteral("Cell View filter requested (placeholder)"));
+        if (mFilterEdit)
+            mFilterEdit->setFocus();
+    });
+    connect(mFilterEdit, &QLineEdit::textChanged, this, [this](const QString& text)
+    {
+        if (mRefrModel)
+            mRefrModel->setFilter(text);
     });
 }
 

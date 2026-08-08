@@ -148,7 +148,8 @@ InfoDataWidget::InfoDataWidget(void* recordPtr, FormComponents* components,
     auto* browseBtn = new QPushButton(QStringLiteral("Browse..."), voiceGroup);
     auto* playBtn = new QPushButton(QStringLiteral("Play"), voiceGroup);
     auto* recordBtn = new QPushButton(QStringLiteral("Record"), voiceGroup);
-    recordBtn->setEnabled(false); // stub
+    recordBtn->setToolTip(QStringLiteral("Voice recording is not yet implemented"));
+    recordBtn->setEnabled(false);
     voiceRow->addWidget(browseBtn);
     voiceRow->addWidget(playBtn);
     voiceRow->addWidget(recordBtn);

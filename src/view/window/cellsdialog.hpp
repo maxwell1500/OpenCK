@@ -11,6 +11,7 @@ class QComboBox;
 class QListView;
 class QTableView;
 class QModelIndex;
+class QLineEdit;
 class CellMapCanvas;
 class CellListModel;
 class RefrTableModel;
@@ -40,6 +41,7 @@ private:
     QComboBox* mWorldspaceCombo;
     QListView* mCellList;
     QTableView* mRefrTable;
+    QLineEdit* mFilterEdit;
     CellMapCanvas* mMapCanvas;
     CellListModel* mCellModel;
     RefrTableModel* mRefrModel;
