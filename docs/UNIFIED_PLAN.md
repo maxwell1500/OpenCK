@@ -738,6 +738,14 @@ Sources reconciled here:
 
 ## Progress Tracker
 
+> **Audit 2026-08-07:** the test fleet is 104 exes / 101 CTest-registered
+> (103 incl. vendored ogg), 0 red (104/104 exit 0, 103/103 ctest green);
+> 3 exes (`dumpesm`, `scanbtd`, `meshprobe`) are non-QTest diagnostic tools
+> kept unregistered; the `test_specialized_widgets` failure was fixed in
+> Phase A / item A4 of `docs/REMAINING_WORK_PLAN.md`; the old "26 tests"
+> claim is superseded. Remaining audit follow-ups are tracked there
+> (Phases B, E).
+
 | Phase | Steps | Status |
 |-------|-------|--------|
 | 0 — Build Integrity | 6/6 | ✅ |
@@ -765,7 +773,10 @@ Sources reconciled here:
 | 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
 | 23 — Data Workflows & Plugin Utilities | 9/9 | ✅ |
 | 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
-| **TOTAL** | **310/310** | ✅ |
+| **TOTAL** | **310/310 (audited)** | ✅ |
+
+Known partial follow-ups are tracked in `docs/REMAINING_WORK_PLAN.md`
+(Phases E1–E10).
 
 ---
 

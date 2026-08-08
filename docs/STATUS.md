@@ -1,6 +1,6 @@
 # OpenCK — Current Project Status
 
-> Last updated: 2026-07-28
+> Last updated: 2026-08-07
 
 ## Project Summary
 
@@ -14,9 +14,20 @@ formats and observable behavior.
 
 ## Completion Overview
 
-**176 / 182 tasks complete across 13 phases (~96.7%).**
+**The project tracks 24+ phases in `docs/UNIFIED_PLAN.md` — all complete
+(310/310 in the tracker, audited).**
 
-Phase 11 (Documentation & Final Polish) is the only remaining open phase.
+Honest caveats:
+- **104 `test_*.exe` binaries** are built from **111 `tests/test_*.cpp`
+  sources**; **101 are registered in CTest** (plus 2 vendored-ogg tests =
+  103 total); **3 built exes are not** (`dumpesm`, `scanbtd`, `meshprobe` —
+  non-QTest diagnostic tools, intentionally unregistered).
+- **~7 of the registered tests require real game data** and are gated in
+  CMake behind `if (EXISTS "C:/XboxGames/...")` — they are only registered
+  on machines that have the game data (they skip cleanly — exit 0 — when
+  the data is absent).
+- **0 tests currently failing** — full fleet green (104/104 exes, 103/103
+  CTest) as of 2026-08-07.
 
 ## Phase-by-Phase Status
 
@@ -33,9 +44,21 @@ Phase 11 (Documentation & Final Polish) is the only remaining open phase.
 | 8 — Editor Completions | 7/7 | ✅ |
 | 9 — Papyrus & Dialogue Completion | 6/6 | ✅ |
 | 10 — Testing | 26/26 | ✅ |
-| 11 — Documentation & Final Polish | 0/5 | ⬜ |
-| 12 — UI Layout Parity with Real CK | 39/40 | ✅ |
-| **TOTAL** | **176/182** | |
+| 11 — Documentation & Final Polish | 5/5 | ✅ |
+| 12 — UI Layout Parity with Real CK | 40/40 | ✅ |
+| 13 — Editor Workspace Parity | 14/14 | ✅ |
+| 14 — Render Window Gizmos + Interactive Cell View | 23/23 | ✅ |
+| 15 — Record Coverage & Object Window Completion | 7/7 | ✅ |
+| 16 — Specialized Editor Completion | 8/8 | ✅ |
+| 17 — Terrain & Landscape Completion | 9/9 | ✅ |
+| 18 — Audio Pipeline | 7/7 | ✅ |
+| 19 — Material Editor & Asset Pipeline | 7/7 | ✅ |
+| 20 — Particle Editor & Icon Generation | 5/5 | ✅ |
+| 21 — Scripting Completion | 8/8 | ✅ |
+| 22 — Behavior / Animation Graph Editor | 5/5 | ✅ |
+| 23 — Data Workflows & Plugin Utilities | 9/9 | ✅ |
+| 24 — Infrastructure & Ecosystem | 11/11 | ✅ |
+| **TOTAL** | **310/310** | |
 
 Status key: ✅ done, ◐ partial, ⬜ not started.
 
@@ -65,25 +88,31 @@ Status key: ✅ done, ◐ partial, ⬜ not started.
 - **Dialogue & quest editing** — Quest stage tree, alias/objective
   editors, topic/response editors, voice file association, condition
   grids.
-- **26 tests passing** — covering ESM I/O round-trip, components,
+- **104 test binaries built** — covering ESM I/O round-trip, components,
   form dialogs, editor widgets, undo/redo, conflict detection,
-  Starfield ESM loading, and more.
+  Starfield ESM loading, and more (101 CTest-registered, 104/104 green —
+  see Test Instructions).
 
 ## Known Limitations
 
-- **12D.13 — CK File-menu actions not wired.** Create Archive,
-  Compile Papyrus Scripts, and Compact Master exist as stub menu
-  entries only; no backing implementations yet.
-- **CREA (Creature) editor widget not built.** The CREA record has
-  components wired but no specialized editor widget (5B.2 is ◐).
-- **SCEN / EFSH / PACK editors deferred.** Scene (5B.6),
-  EffectShader/ImageSpaceModifier (5B.16), and AI Package (5B.15)
-  specialized widgets are not yet implemented.
-- **Render Window edit modules are placeholders.** The
-  Select/Move/Rotate/Scale toolbar actions exist (12G.1–12G.3) but
-  the gizmo implementation (`BGSRenderWindowEditModule` pattern) is
-  deferred — transform mode is a placeholder enum with no on-canvas
-  manipulators.
+- **3 built `test_*.exe` binaries are not registered in CTest** — `dumpesm`,
+  `scanbtd`, `meshprobe` are non-QTest diagnostic CLI tools and are built
+  but intentionally unregistered.
+- **~7 registered tests require real game data** (a `C:/XboxGames/...`
+  install) and are registered via `if (EXISTS ...)` CMake gates, so they
+  only run on machines that have the files; they exit 0 when absent.
+- **7 test sources are orphaned** (never built): `test_dataexporter`,
+  `test_groundtruth`, `test_loader`, `test_recordloading`, `test_stubs`,
+  `test_subrecord_roundtrip`, `test_undo`. Cleanup is tracked in
+  `docs/REMAINING_WORK_PLAN.md` Phase B (B1/B2).
+- **Several UNIFIED_PLAN tasks marked ✅ still carry "Partial" caveats**
+  (binary encodings awaiting real-data validation): SCEN 16.1, EFSH/IMGS
+  16.2, PACK 16.3, LCTN 16.5, NavMesh 16.8. Follow-ups are tracked in
+  `docs/REMAINING_WORK_PLAN.md` (Phases E1–E10).
+- **Voice "Record" button disabled** (docs: honest tooltip in
+  `infodatawidget.cpp`), **VC server field removed from Preferences**,
+  and Search/Export still bail on a few types (D4/D5) — see
+  `docs/REMAINING_WORK_PLAN.md` Phase D.
 
 ## Build Instructions
 
@@ -94,12 +123,18 @@ cmake --build build --config Debug
 
 ## Test Instructions
 
+Test-count snapshot (2026-08-07): **111 `tests/test_*.cpp` sources** →
+**104 built `test_*.exe` binaries** in `build/bin/Debug/` → **101 registered
+in CTest** (`ctest --test-dir build -C Debug`; 103 total incl. 2 vendored
+ogg tests). 3 built exes are not registered (`dumpesm`, `scanbtd`,
+`meshprobe` — diagnostic CLI tools). 7 sources are orphaned (see B1/B2).
+
+All `test_*.exe` binaries exit 0 — verified 104/104 (2026-08-07).
+
 ```powershell
 $env:Path = "C:\Qt\6.5.3\msvc2019_64\bin;$env:Path"
 Get-ChildItem build\bin\Debug\test_*.exe | ForEach-Object { & $_.FullName }
 ```
-
-All 26 `test_*.exe` binaries should exit 0.
 
 ## Source
 

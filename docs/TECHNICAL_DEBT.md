@@ -1,6 +1,6 @@
 # OpenCK — Technical Debt Register
 
-> Last updated: 2026-08-04
+> Last updated: 2026-08-07
 > A living register of all known technical debt items, organized by severity.
 > Source cross-references point to tasks in `docs/UNIFIED_PLAN.md`.
 
@@ -19,8 +19,8 @@
 
 | ID | Item | Location / Ref | Notes |
 |----|------|----------------|-------|
-| H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp` | Partially resolved — see R21 (raw-subrecord + component refs for the known layouts; XPRM and opaque Starfield payloads remain). |
-| H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases, Phase 15 gap | Resolved - all 180 distinct record types in Starfield.esm now have structs, CkId enum entries, collections, resolver wiring, save array entries, object-window categories, and round-trip tests (verified by test_dumpesm scan; 103/104 suite tests green, pre-existing test_specialized_widgets failure). Wired via batches A/B/C plus pre-existing drift fixes. |
+| H1 | FormIdCompactor doesn't rewrite FormID references inside opaque raw subrecords | `formidcompactor.hpp` | Partially resolved — see R21 (raw-subrecord + component refs for the known layouts; XPRM and opaque Starfield payloads remain). Payoff tracked in `docs/REMAINING_WORK_PLAN.md` Phase E / item E1. |
+| H2 | ~90 record types in Starfield.esm have no CkId enum, no collection, no struct | `ckid.cpp` diskAliases | Resolved - all 180 distinct record types in Starfield.esm now have structs, CkId enum entries, collections, resolver wiring, save array entries, object-window categories, and round-trip tests (verified by test_dumpesm scan; 103/104 suite tests green, pre-existing test_specialized_widgets failure). Wired via batches A/B/C plus pre-existing drift fixes. Keep it green per `docs/REMAINING_WORK_PLAN.md` (Phase A/B wiring, Phase A-A6 CTest registration). |
 | H3 | BA2 DX10 (texture) archives can't be read or written | `ba2archive.cpp` | Resolved — see R20. |
 
 ---
@@ -35,7 +35,7 @@
 | M6 | Flat fields kept alongside components for back-compat | Phase 5E.1–5E.3 | `containerItems`, `keywords`, `spells` still have flat mirrors. Audit done; fields intentionally kept. |
 | M7 | NavMesh auto-gen from arbitrary world geometry is partial | `navmeshtoolkit.hpp/.cpp`, `navmeshgenerator.hpp` | Grid-based gen works; NIF-based `NavMeshGenerator` is wired into `navmesheditor.cpp:332` but voxel filter needs tuning against real data. |
 | M8 | SCEN PHDA binary encoding round-trips through raw subrecords | Phase 16.1 | The timeline widget edits a model, not the on-disk bytes. Needs validation against real Starfield data. |
-| M9 | hknp per-shape payload decode is best-effort | `hknpphysicssystem.hpp` | hknpConvexShape polytope arrays decoded; other shape types undecoded. No hknp encoder exists. |
+| M9 | hknp per-shape payload decode is best-effort | `hknpphysicssystem.hpp` | hknpConvexShape polytope arrays decoded; other shape types undecoded. No hknp encoder exists. Payoff tracked in `docs/REMAINING_WORK_PLAN.md` Phase E / item E3. |
 
 ---
 
