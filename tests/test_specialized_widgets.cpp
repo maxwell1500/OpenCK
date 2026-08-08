@@ -68,15 +68,22 @@ int main(int argc, char** argv)
         CHECK(idEdit && idEdit->text() == QStringLiteral("Tamriel"));
         auto* nameEdit = w.findChild<QLineEdit*>(QStringLiteral("name"));
         CHECK(nameEdit && nameEdit->text() == QStringLiteral("Tamriel"));
+        // Field order in WorldspaceDataWidget: waterType, climateId,
+        // lightingId, mapWidth, mapHeight, mapNwX, mapNwY, mapSeX, mapSeY.
+        // (music and terrain have no spinbox control.)
         auto spins = w.findChildren<QSpinBox*>();
-        CHECK(spins.size() == 5);
-        if (spins.size() == 5)
+        CHECK(spins.size() == 9);
+        if (spins.size() == 9)
         {
-            CHECK(spins.at(0)->value() == 1);
-            CHECK(spins.at(1)->value() == 2);
-            CHECK(spins.at(2)->value() == 3);
-            CHECK(spins.at(3)->value() == 4);
-            CHECK(spins.at(4)->value() == 5);
+            CHECK(spins.at(0)->value() == 1); // waterType
+            CHECK(spins.at(1)->value() == 2); // climateId
+            CHECK(spins.at(2)->value() == 3); // lightingId
+            CHECK(spins.at(3)->value() == 0); // mapWidth (unset)
+            CHECK(spins.at(4)->value() == 0); // mapHeight (unset)
+            CHECK(spins.at(5)->value() == 0); // mapNwX (unset)
+            CHECK(spins.at(6)->value() == 0); // mapNwY (unset)
+            CHECK(spins.at(7)->value() == 0); // mapSeX (unset)
+            CHECK(spins.at(8)->value() == 0); // mapSeY (unset)
         }
     }
 

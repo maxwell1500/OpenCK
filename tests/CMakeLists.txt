@@ -108,8 +108,13 @@ openck_add_test(test_lodgenerator)
 add_executable(test_configpaths test_configpaths.cpp)
 target_link_libraries(test_configpaths PRIVATE openck_esm test_stubs Qt6::Test)
 target_include_directories(test_configpaths PRIVATE ${TEST_INCLUDE_DIRS})
-# Note: test_configpaths passes when run directly but fails under CTest
-# due to DLL path resolution in the CTest environment. Keep for manual use.
+openck_add_test(test_configpaths)
+# test_configpaths used to fail under CTest because the CTest environment did
+# not put the Qt DLL directory on PATH. Prepend the Qt6::Core DLL directory so
+# the Qt DLLs (Qt6Core/Qt6Test) resolve from anywhere ctest is launched.
+set_tests_properties(test_configpaths PROPERTIES
+    ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>"
+)
 
 # Shortcut manager tests
 add_executable(test_shortcutmanager test_shortcutmanager.cpp)
@@ -159,42 +164,50 @@ target_link_libraries(test_compressedrecord PRIVATE openck_esm Qt6::Test Qt6::Zl
 target_include_directories(test_compressedrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_compressedrecord)
 
-# Starfield ESM direct loading test (requires the user's Starfield install)
+# Starfield ESM direct test (needs a real Starfield.esm — skips via CTest gate).
 add_executable(test_starfieldesm test_starfieldesm.cpp)
 target_link_libraries(test_starfieldesm PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_starfieldesm PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Starfield.esm.
+if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield.esm")
+    openck_add_test(test_starfieldesm)
+endif ()
 
 # Throwaway record-structure dumper used to validate the PNDT/CCT binary
 # encoders against the real Starfield.esm. Run: test_dumpesm PNDT
 add_executable(test_dumpesm test_dumpesm.cpp)
 target_link_libraries(test_dumpesm PRIVATE openck_esm Qt6::Core)
 target_include_directories(test_dumpesm PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Starfield.esm.
+# Diagnostic (non-QTest) tool: not registered with CTest.
 
-# PndRecord binary encoder round-trip against the real Starfield.esm.
+# PNDRecord binary encoder round-trip against the real Starfield.esm.
 add_executable(test_pndrecord test_pndrecord.cpp)
 target_link_libraries(test_pndrecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_pndrecord PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Starfield.esm.
+if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield.esm")
+    openck_add_test(test_pndrecord)
+endif ()
 
 # WorldspaceRecord binary encoder round-trip against the real Skyrim.esm.
 add_executable(test_worldspacerecord test_worldspacerecord.cpp)
 target_link_libraries(test_worldspacerecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_worldspacerecord PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Skyrim SE install.
+if (EXISTS "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim.esm")
+    openck_add_test(test_worldspacerecord)
+endif ()
 
-# BsaArchive (Skyrim SE .bsa) reader against the user's Skyrim install.
+# BsaArchive (Skyrim SE .bsa) reader.
 add_executable(test_bsaarchive test_bsaarchive.cpp)
 target_link_libraries(test_bsaarchive PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_bsaarchive PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Skyrim SE install.
+if (EXISTS "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim - Voices_en0.bsa")
+    openck_add_test(test_bsaarchive)
+endif ()
 
 # AssetResolver: archive-aware asset lookup against the user's install.
 add_executable(test_assetresolver test_assetresolver.cpp)
 target_link_libraries(test_assetresolver PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_assetresolver PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Skyrim SE install.
+openck_add_test(test_assetresolver)
 
 # Diagnostic: scan archives for .btd terrain samples (test_scanbtd [dataDir]).
 add_executable(test_scanbtd test_scanbtd.cpp)
@@ -225,7 +238,8 @@ openck_add_test(test_ba2dx10)
 add_executable(test_bsawrite test_bsawrite.cpp)
 target_link_libraries(test_bsawrite PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_bsawrite PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — hash check requires Skyrim SE.
+# The hash test self-skips when the real Skyrim SE archive is not present.
+openck_add_test(test_bsawrite)
 
 # ESL support: FormIdCompactor remap + LightMaster file-flag round-trip.
 add_executable(test_esl test_esl.cpp)
@@ -237,26 +251,33 @@ openck_add_test(test_esl)
 add_executable(test_btdterrain test_btdterrain.cpp)
 target_link_libraries(test_btdterrain PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_btdterrain PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Starfield install.
+if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield - Terrain01.ba2")
+    openck_add_test(test_btdterrain)
+endif ()
 
 # HknpPhysicsSystem: decode a real Starfield bhkPhysicsSystem collision block.
 add_executable(test_hknpphysicssystem test_hknpphysicssystem.cpp)
 target_link_libraries(test_hknpphysicssystem PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_hknpphysicssystem PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Starfield install.
+if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield - Meshes01.ba2")
+    openck_add_test(test_hknpphysicssystem)
+endif ()
 
 # XwmaDecoder: decodes a real Skyrim voice .fuz's xWMA audio to PCM via WMF.
 add_executable(test_xwmadecoder test_xwmadecoder.cpp)
 target_link_libraries(test_xwmadecoder PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_xwmadecoder PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Skyrim SE install.
+if (EXISTS "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim - Voices_en0.bsa")
+    openck_add_test(test_xwmadecoder)
+endif ()
 
 # ArchiveBrowserDialog: browse a real Skyrim BSA, filter/search entries, and
 # the PCM->WAV writer used by voice preview.
 add_executable(test_archivebrowser test_archivebrowser.cpp)
 target_link_libraries(test_archivebrowser PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
 target_include_directories(test_archivebrowser PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — requires a real Skyrim SE install.
+# Self-skips in initTestCase when the user's Skyrim SE archive is missing.
+openck_add_test(test_archivebrowser)
 
 # Header parsing robustness tests
 add_executable(test_headerparsing test_headerparsing.cpp)
@@ -687,15 +708,30 @@ target_include_directories(make_testplugin PRIVATE ${TEST_INCLUDE_DIRS})
 
 # Convenience target that builds every test executable.
 add_custom_target(all_tests DEPENDS
-    test_pluginio test_integration test_conflict test_datamodel
-    test_searchalgorithm test_columnvalidator test_editrecordcommand
-    test_undostack test_exportimport test_lodgenerator test_configpaths
-    test_shortcutmanager test_thememanager test_gizmomath
-    test_nifpyfilewrapper test_blenderlauncher test_objectwindow
-    test_nifintegration test_compressedrecord test_headerparsing
-    test_component test_editorproperty test_editor_lifecycle
-    test_qtformdialog test_tier3_components test_editor_widgets
-    test_creatureeditor test_cellviewcanvas test_warningsdock
-    test_specialized_widgets test_navmrecord test_scenrecord
-    test_starfieldesm test_cellrecord test_brushdefinition test_zipwriter
-    test_bitwise test_framing)
+    test_animationeventvalidator test_archivebrowser test_assetresolver
+    test_audiopipelinetools test_autopainter test_ba2dx10 test_ba2write
+    test_blenderlauncher test_blendtreemodel test_bnetclient test_brushalphamask
+    test_brushdefinition test_bsaarchive test_bsawrite test_btdfile test_btdterrain
+    test_cellrecord test_cellviewcanvas test_cli test_collisionshapegenerator
+    test_columnvalidator test_component test_compressedrecord test_conditionrecord
+    test_configpaths test_conflict test_creatureattachpoints test_creatureeditor
+    test_csvsnippet test_datamodel test_ddsdecoder test_dumpesm test_editor_lifecycle
+    test_editor_widgets test_editorproperty test_editrecordcommand test_efshrecord
+    test_esl test_exportimport test_fbximporter test_fuzparser test_gitrepository
+    test_gizmomath test_headerparsing test_hknpphysicssystem test_iconrenderer
+    test_imgsrecord test_integration test_locationrecord test_lodgenerator
+    test_mastermanagement test_materialpropertygraph test_materialruletemplate
+    test_meshlodconfig test_meshprobe test_missingrecords test_navmeshtoolkit
+    test_navmrecord test_nifintegration test_nifpyfilewrapper test_nodegraph
+    test_objectwindow test_objectwindowfilter test_opallist test_packagerecord
+    test_papyruscompiler test_papyruslanguageserver test_papyrusproject
+    test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
+    test_particleprojectilebindings test_particleslodpresets test_perforcerepository
+    test_planetdefinition test_plugincompactor test_pluginio test_pndrecord
+    test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
+    test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
+    test_scenrecord test_scriptflagfile test_searchalgorithm test_shortcutmanager
+    test_specialized_widgets test_spellchecker test_starfieldesm test_terrainblock
+    test_terrainoverlaymask test_textureconversionrules test_texturelayer
+    test_thememanager test_tier3_components test_undostack test_warningsdock
+    test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)
