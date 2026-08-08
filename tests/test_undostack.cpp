@@ -2,6 +2,7 @@
 
 #include "../../src/model/tools/undostack.hpp"
 #include "../../src/model/tools/command.hpp"
+#include "../../src/model/tools/macrocommand.hpp"
 
 class TestUndoStack : public QObject
 {
@@ -13,6 +14,7 @@ private slots:
     void testCanUndoRedo();
     void testMaxDepth();
     void testClear();
+    void testMacroCommand();
 };
 
 class StubCommand : public Command
@@ -117,6 +119,28 @@ void TestUndoStack::testClear()
     QVERIFY(!stack.canRedo());
     QCOMPARE(stack.undoCount(), 0);
     QCOMPARE(stack.redoCount(), 0);
+}
+
+void TestUndoStack::testMacroCommand()
+{
+    UndoStack stack;
+    MacroCommand* macro = new MacroCommand("macro1");
+    StubCommand* a = new StubCommand("cmdA");
+    StubCommand* b = new StubCommand("cmdB");
+    macro->addCommand(a);
+    macro->addCommand(b);
+
+    stack.push(macro);
+
+    QCOMPARE(stack.currentDescription(), QString("macro1"));
+
+    stack.undo();
+    QCOMPARE(a->undoCount(), 1);
+    QCOMPARE(b->undoCount(), 1);
+
+    stack.redo();
+    QCOMPARE(a->executeCount(), 1);
+    QCOMPARE(b->executeCount(), 1);
 }
 
 QTEST_MAIN(TestUndoStack)

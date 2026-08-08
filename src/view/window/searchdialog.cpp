@@ -1246,6 +1246,14 @@ void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
     }
     default:
     {
+        // Record kinds that have no form editor: GameSetting (grid editor
+        // only) and the internal log pseudo-types.
+        static const QVector<CkId::Type> uneditableTypes = {
+            CkId::Type_Gmst,
+            CkId::Type_LoadingLog,
+            CkId::Type_RunLog,
+        };
+
         if (result.type != CkId::Type_None)
         {
             BaseCollection* coll = mData->getCollectionByType(result.type);
@@ -1263,9 +1271,15 @@ void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
                     break;
                 }
             }
+            if (uneditableTypes.contains(result.type))
+            {
+                QMessageBox::information(this, "Edit",
+                    QString("Editing %1 records is not supported from the search dialog yet "
+                            "(see docs/REMAINING_WORK_PLAN.md Phase D).")
+                        .arg(CkId(result.type).getTypeName()));
+                break;
+            }
         }
-        QMessageBox::information(this, "Edit",
-            QString("Editing %1 records is not yet supported.").arg(CkId(result.type).getTypeName()));
         break;
     }
     }

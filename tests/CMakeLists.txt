@@ -29,12 +29,16 @@ set(TEST_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/src/model/world
 )
 
-# Helper to register a test with the correct working directory on Windows
+# Helper to register a test with the correct working directory on Windows.
+# Every test gets OPENCK_LOG_DIR pointing at an out-of-tree folder so any
+# openck_*.log written during the run (e.g. by the spawned openck.exe CLI in
+# test_cli) never lands next to the test executables in build/bin.
 function(openck_add_test name)
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
         WORKING_DIRECTORY "$<TARGET_FILE_DIR:${name}>"
+        ENVIRONMENT "OPENCK_LOG_DIR=${CMAKE_BINARY_DIR}/test-logs"
     )
 endfunction()
 
@@ -49,6 +53,14 @@ add_executable(test_integration test_integration.cpp)
 target_link_libraries(test_integration PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_integration PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_integration)
+
+# Loader: exercises the threaded Document/Data load path (DocumentMediator +
+# Loader) against a plugin produced with the ESM writer. One signal per
+# document, exactly once; no respawn of a finished preload.
+add_executable(test_loader test_loader.cpp)
+target_link_libraries(test_loader PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_loader PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_loader)
 
 # Conflict detection tests
 add_executable(test_conflict test_conflict.cpp)
@@ -112,8 +124,9 @@ openck_add_test(test_configpaths)
 # test_configpaths used to fail under CTest because the CTest environment did
 # not put the Qt DLL directory on PATH. Prepend the Qt6::Core DLL directory so
 # the Qt DLLs (Qt6Core/Qt6Test) resolve from anywhere ctest is launched.
+# OPENCK_LOG_DIR carries over from openck_add_test for the child env.
 set_tests_properties(test_configpaths PROPERTIES
-    ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>"
+    ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>;OPENCK_LOG_DIR=${CMAKE_BINARY_DIR}/test-logs"
 )
 
 # Shortcut manager tests
@@ -170,6 +183,25 @@ target_link_libraries(test_starfieldesm PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_starfieldesm PRIVATE ${TEST_INCLUDE_DIRS})
 if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield.esm")
     openck_add_test(test_starfieldesm)
+endif ()
+
+# Ground-truth scan of a real Starfield.esm: every record type observed in
+# the master must resolve through CkId::stringToType, and the component
+# record-type wiring is cross-checked against what the file actually emits.
+add_executable(test_groundtruth test_groundtruth.cpp)
+target_link_libraries(test_groundtruth PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_groundtruth PRIVATE ${TEST_INCLUDE_DIRS})
+if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield.esm")
+    openck_add_test(test_groundtruth)
+endif ()
+
+# Raw byte-level subrecord round-trip against the first records of a real
+# Starfield.esm (skips compressed records; 80% byte-identity gate).
+add_executable(test_subrecord_roundtrip test_subrecord_roundtrip.cpp)
+target_link_libraries(test_subrecord_roundtrip PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_subrecord_roundtrip PRIVATE ${TEST_INCLUDE_DIRS})
+if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield.esm")
+    openck_add_test(test_subrecord_roundtrip)
 endif ()
 
 # Throwaway record-structure dumper used to validate the PNDT/CCT binary
@@ -718,8 +750,8 @@ add_custom_target(all_tests DEPENDS
     test_csvsnippet test_datamodel test_ddsdecoder test_dumpesm test_editor_lifecycle
     test_editor_widgets test_editorproperty test_editrecordcommand test_efshrecord
     test_esl test_exportimport test_fbximporter test_fuzparser test_gitrepository
-    test_gizmomath test_headerparsing test_hknpphysicssystem test_iconrenderer
-    test_imgsrecord test_integration test_locationrecord test_lodgenerator
+    test_gizmomath test_groundtruth test_headerparsing test_hknpphysicssystem test_iconrenderer
+    test_imgsrecord test_integration test_loader test_locationrecord test_lodgenerator
     test_mastermanagement test_materialpropertygraph test_materialruletemplate
     test_meshlodconfig test_meshprobe test_missingrecords test_navmeshtoolkit
     test_navmrecord test_nifintegration test_nifpyfilewrapper test_nodegraph
@@ -731,7 +763,8 @@ add_custom_target(all_tests DEPENDS
     test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
     test_scenrecord test_scriptflagfile test_searchalgorithm test_shortcutmanager
-    test_specialized_widgets test_spellchecker test_starfieldesm test_terrainblock
+    test_specialized_widgets test_spellchecker test_starfieldesm test_subrecord_roundtrip
+    test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
     test_thememanager test_tier3_components test_undostack test_warningsdock
     test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)

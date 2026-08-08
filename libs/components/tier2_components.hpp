@@ -317,8 +317,9 @@ public:
     {
         // We claim the INRR + INRV + INRD subrecord family used by
         // Starfield instance naming. Real parsing of these into
-        // structured rules is a Tier 3 enhancement; for now we
-        // preserve the raw bytes.
+        // structured rules is a Phase E follow-up (see
+        // docs/REMAINING_WORK_PLAN.md); for now we preserve the raw
+        // bytes.
         return subrecordName == NAME('INRR')
             || subrecordName == NAME('INRV')
             || subrecordName == NAME('INRD');

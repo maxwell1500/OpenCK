@@ -9,9 +9,10 @@ class QTableWidget;
 struct RawSubRecord;
 
 // Read-only inspector for a record's raw (unparsed) subrecords. Records
-// whose specialized fields are not yet implemented (EFSH, IMGS, etc.)
-// still round-trip losslessly via rawSubRecords; this widget surfaces
-// that data so users can see what's stored.
+// whose specialized field parsing is still pending (EFSH, IMGS, etc.; see
+// docs/REMAINING_WORK_PLAN.md Phase D/E) round-trip losslessly via
+// rawSubRecords; this widget surfaces that data so users can see what's
+// stored.
 class RawSubrecordWidget : public QWidget
 {
     Q_OBJECT

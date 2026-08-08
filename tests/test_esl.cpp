@@ -14,6 +14,7 @@
 #include "libs/files/esm/cellrecord.hpp"
 #include "libs/files/esm/npcrecord.hpp"
 #include "libs/files/esm/alchrecord.hpp"
+#include "libs/files/esm/refrecord.hpp"
 #include "libs/components/tier2_components.hpp"
 #include "libs/files/filepaths.hpp"
 #include "logger.hpp"
@@ -55,6 +56,7 @@ private slots:
     void testCompactorRemapsFormIds();
     void testCompactorRewritesTypedReferences();
     void testCompactorRewritesRawAndComponentReferences();
+    void testCompactorRewritesRefrRawLayouts();
     void testCompactorTooManyRecords();
     void testLightMasterFlagRoundTrip();
 };
@@ -252,6 +254,86 @@ void TestEsl::testCompactorRewritesRawAndComponentReferences()
         QCOMPARE(snd->pickupSound, newTarget);
         QCOMPARE(snd->putdownSound, newTarget);
     }
+}
+
+void TestEsl::testCompactorRewritesRefrRawLayouts()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& statCol = data.getStatCollection();
+    auto& refrCol = data.getRefrCollection();
+
+    // Owned target the raw refs below point at.
+    StatRecord target;
+    target.editorId = "Target";
+    target.formId = 0x00100050;
+    statCol.add(target);
+
+    // REFR raw subrecords whose payload layouts are now interpreted:
+    // XAPR (u32 count then {ref, float} pairs), XLKR (FormIDs at every 4
+    // bytes, including the keyword slot at 0), XTEL (refs at 0 and 32),
+    // XMBR (ref at 0), XLRT (u32 count then one FormID per 4 bytes).
+    RefrRecord refr;
+    refr.editorId = "RefA";
+    refr.formId = 0x00100030;
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XAPR');
+        raw.data = rawFormId(1) + rawFormId(0x00100050) + rawFormId(0x3F800000); // count, ref, delay 1.0f
+        refr.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XLKR');
+        raw.data = rawFormId(0x00100050) + rawFormId(0x00100050)
+                 + rawFormId(0x00100050) + rawFormId(0x00100050); // 2 linked refs
+        refr.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XTEL');
+        QByteArray tel(36, '\0');
+        tel.replace(0, 4, rawFormId(0x00100050));
+        tel.replace(32, 4, rawFormId(0x00100050));
+        raw.data = tel;
+        refr.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XMBR');
+        raw.data = rawFormId(0x00100050);
+        refr.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XLRT');
+        raw.data = rawFormId(2) + rawFormId(0x00100050) + rawFormId(0x00100050);
+        refr.rawSubRecords.push_back(raw);
+    }
+    refrCol.add(refr);
+
+    FormIdCompactor compactor(data);
+    QCOMPARE(compactor.compact(), 2);
+
+    // Owned IDs 0x00100030/0x50 sort to locals 0/1, so the target becomes
+    // 0x00100001.
+    const quint32 newTarget = 0x00100001u;
+
+    const RefrRecord& saved = refrCol.getRecord(0).get();
+    QCOMPARE(saved.rawSubRecords.size(), 5);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 0), 1u);            // XAPR count
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 4), newTarget);     // XAPR ref
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 8), 0x3F800000u);   // XAPR delay kept
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 0), newTarget);     // XLKR keyword slot
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 4), newTarget);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 8), newTarget);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 12), newTarget);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(2).data, 0), newTarget);     // XTEL door
+    QCOMPARE(rawU32(saved.rawSubRecords.at(2).data, 32), newTarget);    // XTEL interior
+    QCOMPARE(rawU32(saved.rawSubRecords.at(3).data, 0), newTarget);     // XMBR
+    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 0), 2u);            // XLRT count
+    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 4), newTarget);     // XLRT refs
+    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 8), newTarget);
 }
 
 void TestEsl::testCompactorTooManyRecords()

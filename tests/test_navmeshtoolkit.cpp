@@ -2,6 +2,7 @@
 #include <QVector3D>
 
 #include "../src/model/tools/navmeshtoolkit.hpp"
+#include "../src/model/tools/navmeshgenerator.hpp"
 
 using namespace NavMeshTools;
 
@@ -18,6 +19,8 @@ private slots:
     void testRemoveTjunctions();
     void testGenerateGridFlat();
     void testGenerateGridSteepSlopeDropped();
+    void testGeneratorTriangleFan();
+    void testGeneratorKeepsWalkableOnly();
     void testComputeCoverData();
 };
 
@@ -224,6 +227,70 @@ void TestNavMeshToolkit::testGenerateGridSteepSlopeDropped()
         const float maxH = qMax(qMax(verts[t.v0].z(), verts[t.v1].z()), verts[t.v2].z());
         const float minH = qMin(qMin(verts[t.v0].z(), verts[t.v1].z()), verts[t.v2].z());
         QVERIFY(maxH - minH <= 128.0f + 1e-4f);
+    }
+}
+
+void TestNavMeshToolkit::testGeneratorTriangleFan()
+{
+    // Flat ground fan: center plus 4 rim vertices, 4 triangles all lying on
+    // the ground plane (y = 0). The voxel filter must keep every triangle.
+    NavMeshGenerator generator;
+    const QVector<QVector3D> verts = {
+        QVector3D(0, 0, 0),     // center
+        QVector3D(1, 0, 0),
+        QVector3D(1, 0, 1),
+        QVector3D(-1, 0, 1),
+        QVector3D(-1, 0, -1)
+    };
+    const QVector<unsigned int> indices = {
+        0, 2, 1,
+        0, 3, 2,
+        0, 4, 3,
+        0, 1, 4
+    };
+
+    const NavMeshGenerator::NavMesh mesh = generator.generateFromVertices(verts, indices);
+
+    QVERIFY(!mesh.triangles.isEmpty());
+    QVERIFY(mesh.vertices.size() >= 4 && mesh.vertices.size() <= 8);
+    QCOMPARE(mesh.triangles.size(), 4);
+    QCOMPARE(mesh.vertices.size(), 5);
+    // Adjacent fan triangles share two vertices -> 4 shared edges.
+    QCOMPARE(mesh.edges.size(), 4);
+    for (const auto& tri : mesh.triangles)
+        QVERIFY(tri.normal.y() > 0.9f);
+}
+
+void TestNavMeshToolkit::testGeneratorKeepsWalkableOnly()
+{
+    // Fan of four flat triangles plus one vertical wall (90 degree slope).
+    // The wall triangle must be rejected by the walkable filter.
+    NavMeshGenerator generator;
+    const QVector<QVector3D> verts = {
+        QVector3D(0, 0, 0),     // center
+        QVector3D(1, 0, 0),
+        QVector3D(1, 0, 1),
+        QVector3D(-1, 0, 1),
+        QVector3D(-1, 0, -1),
+        QVector3D(0, 2, -1),    // wall top
+        QVector3D(0, 2, 0)      // wall top
+    };
+    const QVector<unsigned int> indices = {
+        0, 2, 1,
+        0, 3, 2,
+        0, 4, 3,
+        0, 1, 4,
+        1, 5, 6   // vertical wall: normal is horizontal, slope 90 degrees
+    };
+
+    const NavMeshGenerator::NavMesh mesh = generator.generateFromVertices(verts, indices);
+
+    QVERIFY(!mesh.triangles.isEmpty());
+    QCOMPARE(mesh.triangles.size(), 4);
+    for (const auto& tri : mesh.triangles)
+    {
+        // Only triangles with an upward normal survive the filter.
+        QVERIFY(tri.normal.y() > 0.9f);
     }
 }
 

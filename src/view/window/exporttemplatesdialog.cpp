@@ -1011,8 +1011,13 @@ void ExportTemplatesDialog::exportWithTemplate(const ExportTemplate& tmplt)
     else if (tmplt.recordType == "LOCT_") exportRecords(out, tmplt, mData->getLocationCollection(), count);
     else
     {
+        // Only templates with a record type outside the 22 wired ones reach
+        // here (e.g. hand-authored JSON templates); the built-in combo only
+        // offers wired types.
         QMessageBox::information(this, "Export",
-            QString("Export for record type '%1' is not yet supported.").arg(tmplt.recordType));
+            QString("Export for record type '%1' is not defined yet; supported types are "
+                    "listed in the template editor (see docs/REMAINING_WORK_PLAN.md Phase D).")
+                .arg(tmplt.recordType));
         file.close();
         return;
     }

@@ -18,9 +18,11 @@ class Data;
 /// common record types (cell, refr, npc, dial, quest, alch/ingr/ench/spell/
 /// magic EFID, and the KWDA keyword arrays on the keyword-using records) and
 /// the simple FormID members of the TESEnchantableForm and
-/// BGSPickupPutdownSounds components. Raw payloads whose FormID layout is
-/// unknown or Starfield-specific (e.g. XPRM placement) are left untouched;
-/// production compaction of those is the documented follow-up.
+/// BGSPickupPutdownSounds components. The placed-reference table covers the
+/// FO4/Starfield rebuild fields (XAPR, XLKR, XLRT, XTEL, XLYR, XMSP, XRFG,
+/// XMBR, XASP, XEZN, XLRL). XPRM carries no FormIDs (a primitive descriptor
+/// of bounds, color and shape type), so no rewrite is needed there. Raw
+/// payloads whose FormID layout is otherwise unknown are left untouched.
 class FormIdCompactor
 {
 public:

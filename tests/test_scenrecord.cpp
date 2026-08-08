@@ -16,6 +16,7 @@ private slots:
     void initTestCase();
     void testRoundTrip();
     void testConditionsRoundTrip();
+    void testPhdaRawRoundTrip();
 };
 
 void TestScenRecord::initTestCase()
@@ -109,6 +110,60 @@ void TestScenRecord::testRoundTrip()
 
         QVERIFY(loaded.editorId.startsWith("Quest1Scene"));
         QCOMPARE(loaded.formId, static_cast<quint32>(0x30001));
+    }
+}
+
+void TestScenRecord::testPhdaRawRoundTrip()
+{
+    // PHDA (phase flags) is opaque binary: SCEN stores it in rawSubRecords and
+    // must preserve it byte-for-byte across a save/load cycle.
+    ScenRecord rec;
+    rec.editorId = QStringLiteral("SceneWithPhases");
+    rec.formId = 0x30002;
+
+    QByteArray phda(24, 0);
+    phda[0] = static_cast<char>(0x01);          // phase count
+    phda[4] = static_cast<char>(0x10);          // per-phase flags
+    phda[8] = static_cast<char>(0x40);
+    phda[12] = static_cast<char>(0x01);         // unknown per-phase data
+    phda[16] = static_cast<char>(0xAB);
+    phda[20] = static_cast<char>(0xCD);
+
+    RawSubRecord raw;
+    raw.name = NAME('PHDA');
+    raw.data = phda;
+    rec.rawSubRecords.push_back(raw);
+
+    QTemporaryFile tmpFile;
+    tmpFile.open();
+    QString path = tmpFile.fileName();
+    tmpFile.close();
+
+    {
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        ESMWriter writer;
+        writer.setAuthor("Test");
+        writer.save(file);
+        RecHeader recHeader;
+        recHeader.id = 0x30002;
+        writer.startRecord('SCEN', recHeader);
+        rec.save(writer);
+        writer.endRecord();
+        writer.close();
+        file.close();
+    }
+
+    {
+        ESMReader reader(path);
+        reader.open();
+        reader.readName();
+        ScenRecord loaded;
+        loaded.load(reader, true);
+
+        QCOMPARE(loaded.rawSubRecords.size(), 1);
+        QCOMPARE(loaded.rawSubRecords[0].name, static_cast<quint32>('PHDA'));
+        QCOMPARE(loaded.rawSubRecords[0].data, phda);
     }
 }
 

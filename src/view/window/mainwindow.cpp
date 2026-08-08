@@ -860,6 +860,18 @@ void MainWindow::applyShortcuts()
     ui->actionFormIdEditor->setShortcut(mgr.get("FormIdEditor"));
     ui->actionFormIdEditor->setToolTip(tr("Form ID Editor (%1)").arg(mgr.get("FormIdEditor").toString()));
     
+    // ========================================================================
+    // DISABLED ACTIONS (kept disabled; tooltips explain why)
+    // ========================================================================
+    ui->actionPreviewWindow->setToolTip(tr("Preview Window (not available)"));
+    ui->actionLighting->setToolTip(tr("Lighting editor (not available)"));
+    ui->actionNpcEditor->setToolTip(tr("NPC editor (not available)"));
+    ui->actionRaceEditor->setToolTip(tr("Race editor (not available)"));
+    ui->actionClassEditor->setToolTip(tr("Class editor (not available)"));
+    ui->actionFactionEditor->setToolTip(tr("Faction editor (not available)"));
+    ui->actionSaveLayout->setToolTip(tr("Save the current window layout to a file"));
+    ui->actionLoadLayout->setToolTip(tr("Load a saved window layout from a file"));
+    
     // Refresh (F5)
     auto* refreshAction = new QAction(tr("Refresh"), this);
     refreshAction->setShortcut(mgr.get("Refresh"));

@@ -132,14 +132,44 @@ void rewriteRawSubRecords<RefrRecord>(RefrRecord& rec, const QHash<quint32, quin
         case NAME('XMBO'):  // music override
         case NAME('XCNT'):  // instance count (extra-data container)
         case NAME('XPRD'):  // idle timer
+        case NAME('XEZN'):  // encounter zone override
+        case NAME('XLYR'):  // layer
+        case NAME('XMSP'):  // material swap
+        case NAME('XRFG'):  // reference group
+        case NAME('XMBR'):  // multibound reference
+        case NAME('XASP'):  // unknown reference (projectile support)
+        case NAME('XLRL'):  // location reference
             rewriteRawFormId(raw.data, 0, map);
             break;
-        case NAME('XTEL'):  // teleport: destination cell at 0, destination ref at 4 when present
-            rewriteRawFormId(raw.data, 0, map);
-            rewriteRawFormId(raw.data, 4, map);
+        case NAME('XAPR'):  // activate parent refs: u32 count, then {ref, delay}
+            if (raw.data.size() >= 4)
+            {
+                quint32 count = 0;
+                std::memcpy(&count, raw.data.constData(), 4);
+                for (quint32 i = 0; i < count && 4 + static_cast<quint64>(i) * 8 + 4 <= raw.data.size(); ++i)
+                    rewriteRawFormId(raw.data, 4 + static_cast<int>(i) * 8, map);
+            }
             break;
-        case NAME('XLKR'):  // linked ref list: u32 type at 0, FormIDs from 4
-            for (int off = 4; off + 4 <= raw.data.size(); off += 4)
+        case NAME('XLRT'):  // location ref types: u32 count, one FormID per 4 bytes
+            if (raw.data.size() >= 4)
+            {
+                quint32 count = 0;
+                std::memcpy(&count, raw.data.constData(), 4);
+                for (quint32 i = 0; i < count; ++i)
+                    rewriteRawFormId(raw.data, 4 + static_cast<int>(i) * 4, map);
+            }
+            break;
+        case NAME('XTEL'):  // teleport: legacy TES4 {cell, ref} at 0/4;
+                            // Skyrim+ {door, posrot, flags, interior} refs at 0/32
+            rewriteRawFormId(raw.data, 0, map);
+            if (raw.data.size() >= 36)
+                rewriteRawFormId(raw.data, 32, map);
+            else
+                rewriteRawFormId(raw.data, 4, map);
+            break;
+        case NAME('XLKR'):  // linked ref list: per-entry {keyword-or-type, ref},
+                            // both slots on Skyrim/FO4 are FormIDs
+            for (int off = 0; off + 4 <= raw.data.size(); off += 4)
                 rewriteRawFormId(raw.data, off, map);
             break;
         default:

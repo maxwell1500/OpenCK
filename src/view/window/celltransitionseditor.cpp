@@ -79,14 +79,16 @@ void CellTransitionsEditor::setupUI()
 
     auto* buttonBar = new QHBoxLayout();
     mAddTransitionButton = new QPushButton("Add Transition");
-    buttonBar->addWidget(mAddTransitionButton);
-
     mEditButton = new QPushButton("Edit");
-    mEditButton->setEnabled(false);
-    buttonBar->addWidget(mEditButton);
-
     mDeleteButton = new QPushButton("Delete");
+
+    // Transition editing is permanently disabled: the plugin format stores
+    // no cell-connection data (see docs/REMAINING_WORK_PLAN.md Phase D).
+    mAddTransitionButton->setEnabled(false);
+    mEditButton->setEnabled(false);
     mDeleteButton->setEnabled(false);
+    buttonBar->addWidget(mAddTransitionButton);
+    buttonBar->addWidget(mEditButton);
     buttonBar->addWidget(mDeleteButton);
 
     buttonBar->addStretch();
@@ -146,9 +148,6 @@ void CellTransitionsEditor::onNodeSelected(QTreeWidgetItem* item, int column)
 
     if (!item) return;
 
-    mEditButton->setEnabled(true);
-    mDeleteButton->setEnabled(true);
-
     QString type = item->text(1);
 
     if (type == "WRLD") {
@@ -181,6 +180,9 @@ void CellTransitionsEditor::showWorldspaceDetails(const WorldspaceRecord* ws)
     text += QString("<p><b>Map Scale:</b> %1</p>").arg(ws->mapScale(), 0, 'f', 2);
     text += QString("<p><b>LOD Bias:</b> %1</p>").arg(ws->mapLodBias, 0, 'f', 2);
     text += QString("<p><b>Stored Cells:</b> %1</p>").arg(ws->cellIds.size());
+    text += "<p><b>Note:</b> Add/Edit/Delete transition actions are permanently disabled - the "
+            "plugin format stores no cell-connection data "
+            "(see docs/REMAINING_WORK_PLAN.md Phase D).</p>";
 
     mDetailEdit->setHtml(text);
 }
@@ -209,35 +211,26 @@ void CellTransitionsEditor::showTransitionDetails(int fromCell, int toCell)
 
 void CellTransitionsEditor::onAddTransition()
 {
-    if (!mSelectedWorldspace) {
-        QMessageBox::information(this, "No Selection", "Please select a worldspace first.");
-        return;
-    }
-
-    QMessageBox::information(this, "Info",
-        "Cell transition management requires cell connection data not yet available in the TES4 format.");
+    Q_UNUSED(mSelectedWorldspace);
+    // Unreachable: Add Transition is permanently disabled because the plugin
+    // format stores no cell-connection data (see docs/REMAINING_WORK_PLAN.md
+    // Phase D).
 }
 
 void CellTransitionsEditor::onEditTransition()
 {
-    if (!mSelectedWorldspace) {
-        QMessageBox::information(this, "No Selection", "Please select a worldspace first.");
-        return;
-    }
-
-    QMessageBox::information(this, "Info",
-        "Cell transition editing requires cell connection data not yet available in the TES4 format.");
+    Q_UNUSED(mSelectedWorldspace);
+    // Unreachable: Edit is permanently disabled because the plugin format
+    // stores no cell-connection data (see docs/REMAINING_WORK_PLAN.md
+    // Phase D).
 }
 
 void CellTransitionsEditor::onDeleteTransition()
 {
-    if (!mSelectedWorldspace) {
-        QMessageBox::information(this, "No Selection", "Please select a worldspace first.");
-        return;
-    }
-
-    QMessageBox::information(this, "Info",
-        "Cell transition deletion requires cell connection data not yet available in the TES4 format.");
+    Q_UNUSED(mSelectedWorldspace);
+    // Unreachable: Delete is permanently disabled because the plugin format
+    // stores no cell-connection data (see docs/REMAINING_WORK_PLAN.md
+    // Phase D).
 }
 
 void CellTransitionsEditor::onSave()

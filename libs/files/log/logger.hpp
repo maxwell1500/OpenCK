@@ -4,6 +4,7 @@
 #include <QString>
 #include <QStringList>
 #include <QFile>
+#include <QDir>
 #include <QTextStream>
 #include <QDateTime>
 #include <QMutex>
@@ -34,8 +35,19 @@ public:
         if (m_file.isOpen()) {
             m_file.close();
         }
-        if (!logFile.isEmpty()) {
-            m_file.setFileName(logFile);
+        QString resolved = logFile;
+        if (resolved.isEmpty())
+        {
+            const QString dir = qEnvironmentVariable("OPENCK_LOG_DIR");
+            if (!dir.isEmpty())
+            {
+                QDir().mkpath(dir);
+                resolved = dir + "/openck_"
+                    + QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss") + ".log";
+            }
+        }
+        if (!resolved.isEmpty()) {
+            m_file.setFileName(resolved);
             if (m_file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
                 m_fileStream.setDevice(&m_file);
             }

@@ -17,6 +17,9 @@
 int main(int argc, char *argv[])
 {
     QString logDir = QFileInfo(QString::fromLocal8Bit(argv[0])).absolutePath();
+    const QString logDirOverride = QString::fromLocal8Bit(qgetenv("OPENCK_LOG_DIR"));
+    if (!logDirOverride.isEmpty())
+        logDir = logDirOverride;
     QString logFile = logDir + "/openck_" + QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss") + ".log";
 
     OpenCK::Logging::Logger::instance().init(logFile);
