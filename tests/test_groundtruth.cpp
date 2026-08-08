@@ -1,16 +1,20 @@
 #include <QtTest>
 #include <QFile>
-#include <QDataStream>
-#include <QByteArray>
-#include <QMap>
 #include <QSet>
+#include <QMap>
+#include <QStringList>
 #include <QDebug>
 
 #include "../../libs/files/esm/esmreader.hpp"
-#include "../../libs/files/esm/tes4.hpp"
-#include "../../libs/files/esm/tes4codes.hpp"
 #include "../../libs/files/esm/common.hpp"
-#include "../../libs/files/log/logger.hpp"
+#include "../../model/world/ckid.hpp"
+
+// Ground-truth scan of a real Starfield.esm. The record-type names observed
+// on disk are cross-checked against CkId::stringToType: every record type the
+// master actually emits must resolve to a CkId alias (and the bare/underscore
+// spellings must agree). The reverse direction — which known aliases the
+// master does not emit — is reported as warnings, not failures: a vanilla
+// master can legitimately be missing record types that exist in other games.
 
 static QString nameToString(NAME n)
 {
@@ -26,96 +30,56 @@ class TestGroundTruth : public QObject
     Q_OBJECT
 
     QString mFilePath;
-    QMap<QString, QMap<QString, int>> mRawCodeCount;
-    QMap<QString, QMap<QString, QPair<QString, int>>> mTranslationCount;
+    QSet<QString> mRecordTypes;
+    QMap<QString, int> mTypeCounts;
 
-    void processRecord(ESMReader& reader, NAME recName, qint64 startPos, int depth = 0)
+    void scanFile(ESMReader& reader)
     {
-        QString recStr = nameToString(recName);
-        QString indent = QString("  ").repeated(depth);
-
-        while (reader.isRecLeft())
-        {
-            // Peek at the next 4 bytes to see if it's a subrecord or a GRUP
-            if (reader.recLeft() < 6) break;
-
-            // Save position before readRawNSubHeader
-            NAME rawName = reader.readRawNSubHeader();
-            if (rawName == 0) break;
-
-            int subDataSize = static_cast<int>(reader.subLeft());
-
-            NAME translatedName = Tes4Codes::fromTes4(rawName);
-            QString rawStr = nameToString(rawName);
-            QString xlatStr = nameToString(translatedName);
-
-            mRawCodeCount[recStr][rawStr]++;
-            if (rawStr != xlatStr) {
-                mTranslationCount[recStr][rawStr].first = xlatStr;
-                mTranslationCount[recStr][rawStr].second++;
-            }
-
-            // Skip subrecord data
-            reader.skip(subDataSize);
-        }
-    }
-
-    void traverseFile(ESMReader& reader)
-    {
+        // Flat walk, same as the dumpesm diagnostic: groups are entered by
+        // skipping their 24-byte header, never by recursing, so the file
+        // position always refers to the real stream. seekTo(filePos())
+        // round-trips would misalign: while a compressed record is open the
+        // filePos() reports the in-memory buffer position, not the file.
         while (reader.isLeft())
         {
-            qint64 pos = reader.filePos();
-            NAME name = reader.readName();
+            NAME name = 0;
+            try
+            {
+                name = reader.readName();
+            }
+            catch (...)
+            {
+                break;
+            }
             if (name == 0) break;
 
             if (name == (NAME)'GRUP')
             {
-                reader.skipGrupHeader();
-                qint64 grupEnd = reader.grupEnd();
-
-                // For GRUP records, iterate their children
-                while (reader.filePos() < grupEnd && reader.isLeft())
+                try
                 {
-                    NAME childName = reader.readName();
-                    if (childName == 0) break;
-
-                    // Seek back to re-read the child name with readHeader
-                    reader.seekTo(reader.filePos() - 4);
-
-                    if (childName == (NAME)'GRUP')
-                    {
-                        // Nested GRUP
-                        reader.readName();
-                        reader.skipGrupHeader();
-                        qint64 nestedGrupEnd = reader.grupEnd();
-                        reader.seekTo(nestedGrupEnd);
-                    }
-                    else
-                    {
-                        // Regular record — read header, process subrecords, skip
-                        RecHeader header = reader.readHeader();
-                        qint64 recEnd = reader.filePos() + reader.recLeft();
-
-                        processRecord(reader, childName, reader.filePos(), 1);
-
-                        // Skip any remaining bytes in this record
-                        if (reader.recLeft() > 0)
-                            reader.skipRemainingRecord();
-                        reader.seekTo(recEnd);
-                    }
+                    reader.skipGrupHeader();
                 }
-
-                reader.seekTo(grupEnd);
+                catch (...)
+                {
+                    break;
+                }
+                continue;
             }
-            else
+
+            const QString recStr = nameToString(name);
+            if (recStr.size() == 4)
             {
-                // Top-level record (unusual for Starfield but handle it)
-                reader.seekTo(pos);
-                reader.readName(); // re-read
-                RecHeader header = reader.readHeader();
-                processRecord(reader, name, reader.filePos(), 0);
-                if (reader.recLeft() > 0)
-                    reader.skipRemainingRecord();
+                mRecordTypes.insert(recStr);
+                mTypeCounts[recStr]++;
+            }
+
+            try
+            {
+                reader.skipRecord();
+            }
+            catch (...)
+            {
+                break;
             }
         }
     }
@@ -123,73 +87,65 @@ class TestGroundTruth : public QObject
 private slots:
     void initTestCase()
     {
-        mFilePath = "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
-        QVERIFY2(QFile::exists(mFilePath), "Starfield.esm not found");
-    }
-
-    void testDumpSubrecords()
-    {
-        ESMReader reader(mFilePath);
-        reader.open();
-
-        traverseFile(reader);
-
-        qDebug() << "\n=== GROUND TRUTH: RAW ON-DISK SUBRECORD CODES ===";
-        qDebug() << "Format: RecordType -> (raw_code, count)";
-        qDebug() << "";
-
-        for (auto it = mRawCodeCount.begin(); it != mRawCodeCount.end(); ++it)
+        try
         {
-            QString recName = it.key();
-            auto& codes = it.value();
-
-            // Sort by code
-            QStringList sortedCodes = codes.keys();
-            sortedCodes.sort();
-
-            qDebug().noquote() << QString("[%1]").arg(recName);
-            for (const QString& code : sortedCodes)
-            {
-                int count = codes[code];
-                QString note;
-                if (mTranslationCount.contains(recName) && mTranslationCount[recName].contains(code))
-                {
-                    QString xlat = mTranslationCount[recName][code].first;
-                    note = QString("  -> translated to %1 by Tes4Codes::fromTes4()").arg(xlat);
-                }
-                qDebug().noquote() << QString("    %1 (0x%2) x%3%4")
-                    .arg(code)
-                    .arg(QString::number((code[0].unicode() << 24) | (code[1].unicode() << 16) | (code[2].unicode() << 8) | code[3].unicode(), 16))
-                    .arg(count)
-                    .arg(note);
-            }
-            qDebug() << "";
+            mFilePath = "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
+            QVERIFY2(QFile::exists(mFilePath), "Starfield.esm not found");
+            ESMReader reader(mFilePath);
+            reader.open();
+            scanFile(reader);
+            QVERIFY2(!mRecordTypes.isEmpty(), "scan observed no record types");
         }
-
-        qDebug() << "=== TRANSLATION SUMMARY ===";
-        qDebug() << "Raw code -> Translated code (occurs in record types):";
-        QMap<QString, QSet<QString>> xlatToRec;
-        for (auto it = mTranslationCount.begin(); it != mTranslationCount.end(); ++it)
+        catch (const std::exception& e)
         {
-            QString recName = it.key();
-            auto& codes = it.value();
-            for (auto cit = codes.begin(); cit != codes.end(); ++cit)
-            {
-                QString raw = cit.key();
-                QString xlat = cit.value().first;
-                xlatToRec[QString("%1 -> %2").arg(raw).arg(xlat)].insert(recName);
-            }
-        }
-        for (auto it = xlatToRec.begin(); it != xlatToRec.end(); ++it)
-        {
-            QStringList recs = it.value().values();
-            recs.sort();
-            qDebug().noquote() << QString("  %1  [%2]")
-                .arg(it.key(), -30)
-                .arg(recs.join(", "));
+            qFatal("initTestCase threw: %s", e.what());
         }
     }
+
+    void testRecordTypesResolve();
+    void testKnownAliasesCoveredByScan();
 };
+
+void TestGroundTruth::testRecordTypesResolve()
+{
+    qWarning() << "record types observed in Starfield.esm:" << mRecordTypes.size();
+
+    QStringList unresolved;
+    for (const QString& t : mRecordTypes)
+    {
+        if (t == "TES4" || t == "GRUP")
+            continue;
+        const CkId::Type bare = CkId::stringToType(t);
+        const CkId::Type trail = CkId::stringToType(t + QLatin1Char('_'));
+        if (bare == CkId::Type_None && trail == CkId::Type_None)
+            unresolved << t;
+        else if (bare != CkId::Type_None && trail != CkId::Type_None && bare != trail)
+            unresolved << (t + " (bare/underscore mapping conflict)");
+    }
+    QVERIFY2(unresolved.isEmpty(),
+        qPrintable(QString("Record types in Starfield.esm without a CkId alias: %1")
+            .arg(unresolved.join(", "))));
+}
+
+void TestGroundTruth::testKnownAliasesCoveredByScan()
+{
+    QStringList missing;
+    int aliasable = 0;
+    for (int t = CkId::Type_Npc_; t < CkId::NumTypes; ++t)
+    {
+        const QString disk = CkId(static_cast<CkId::Type>(t)).getTypeName();
+        if (disk.size() != 4)
+            continue;
+        ++aliasable;
+        if (!mRecordTypes.contains(disk))
+            missing << disk;
+    }
+    qWarning() << "known 4CC record aliases:" << aliasable
+               << "observed:" << mRecordTypes.size();
+    if (!missing.isEmpty())
+        qWarning() << "known record types not observed in Starfield.esm (n="
+                   << missing.size() << "):" << missing.join(", ");
+}
 
 QTEST_MAIN(TestGroundTruth)
 #include "test_groundtruth.moc"

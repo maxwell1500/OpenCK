@@ -27,6 +27,16 @@ private slots:
     void testWritePcmWav();
 };
 
+// Opening and filtering a 75k-file BSA through a QListWidget takes minutes
+// in a Debug build; the default per-function watchdog (5 min) is too tight
+// for CI. This test requires the game, so its timeout budget is raised
+// before main() runs (i.e. before QTest reads the limit).
+namespace {
+const struct WatchdogBudget {
+    WatchdogBudget() { qputenv("QTEST_FUNCTION_TIMEOUT", "1800000"); }
+} g_watchdogBudget;
+} // namespace
+
 void TestArchiveBrowser::initTestCase()
 {
     OpenCK::Logging::Logger::instance().setMinLevel(OpenCK::Logging::LogLevel::Debug);

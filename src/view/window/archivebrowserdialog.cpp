@@ -326,6 +326,8 @@ void ArchiveBrowserDialog::rebuildList()
     const int filterIndex = mFilterCombo ? mFilterCombo->currentIndex() : 0;
     const QString search = mSearchEdit ? mSearchEdit->text().trimmed().toLower() : QString();
 
+    mVisible.reserve(entryCount());
+    mList->setUpdatesEnabled(false);
     for (int i = 0; i < entryCount(); ++i)
     {
         const QString path = entryPath(i);
@@ -338,6 +340,7 @@ void ArchiveBrowserDialog::rebuildList()
         mList->addItem(item);
         mVisible.append(i);
     }
+    mList->setUpdatesEnabled(true);
 
     setStatus(tr("%1 of %2 entries shown").arg(mVisible.size()).arg(entryCount()));
 }
