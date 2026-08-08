@@ -26,7 +26,15 @@ moc_*.h
 qrc_*.cpp
 ui_*.h
 Makefile*
-*build*
+
+# CMake build outputs — precise ignores replacing the old `*build*` glob,
+# which wrongly matched docs/BUILD.md and .github/workflows/windows-build.yml.
+# Also covers the CMake-generated .vcxproj / .vcxproj.filters project files.
+/build/
+/build_ninja/
+build.ps1
+*.vcxproj
+*.vcxproj.filters
 
 # QtCreator
 
@@ -44,8 +52,7 @@ CMakeSettings.json
 .vs
 Debug
 Win32
-*.vcxproj
-*.vcxproj*
+*.vcxproj.user
 *.dir
 *.sln
 *_autogen
@@ -54,7 +61,6 @@ Win32
 CMakeFiles
 */CMakeFiles
 CMakeCache.txt
-build
 cmake_install.cmake
 out
 
