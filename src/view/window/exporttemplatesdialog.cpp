@@ -278,6 +278,67 @@ static QVector<QPair<QString, QString>> fieldsForType(const QString& recordType)
         fields.append(qMakePair(QString("y"), QString("Y")));
         fields.append(qMakePair(QString("z"), QString("Z")));
     }
+    else if (recordType == "KEYM")
+    {
+        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("weight"), QString("Weight")));
+        fields.append(qMakePair(QString("value"), QString("Value")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
+    else if (recordType == "AMMO")
+    {
+        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("weight"), QString("Weight")));
+        fields.append(qMakePair(QString("value"), QString("Value")));
+        fields.append(qMakePair(QString("damage"), QString("Damage")));
+        fields.append(qMakePair(QString("speed"), QString("Speed")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
+    else if (recordType == "LIGH")
+    {
+        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("weight"), QString("Weight")));
+        fields.append(qMakePair(QString("value"), QString("Value")));
+        fields.append(qMakePair(QString("radius"), QString("Radius")));
+        fields.append(qMakePair(QString("fov"), QString("FOV")));
+        fields.append(qMakePair(QString("lightFlags"), QString("Light Flags")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
+    else if (recordType == "FURN")
+    {
+        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("modelPath"), QString("Model Path")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
+    else if (recordType == "TREE")
+    {
+        fields.append(qMakePair(QString("modelPath"), QString("Model Path")));
+        fields.append(qMakePair(QString("iconPath"), QString("Icon Path")));
+        fields.append(qMakePair(QString("leafCurvature"), QString("Leaf Curvature")));
+        fields.append(qMakePair(QString("leafAmplitude"), QString("Leaf Amplitude")));
+        fields.append(qMakePair(QString("lodModelPath"), QString("LOD Model Path")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
+    else if (recordType == "SLGM")
+    {
+        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("weight"), QString("Weight")));
+        fields.append(qMakePair(QString("value"), QString("Value")));
+        fields.append(qMakePair(QString("capacity"), QString("Capacity")));
+        fields.append(qMakePair(QString("soul"), QString("Soul")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
+    else if (recordType == "DOOR")
+    {
+        fields.append(qMakePair(QString("fullName"), QString("Full Name")));
+        fields.append(qMakePair(QString("modelPath"), QString("Model Path")));
+        fields.append(qMakePair(QString("sound"), QString("Sound Form ID")));
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
+    else if (recordType == "KYWD")
+    {
+        fields.append(qMakePair(QString("flags"), QString("Flags")));
+    }
     return fields;
 }
 
@@ -553,6 +614,108 @@ static QString recordFieldValue(const LocationRecord& loc, const QString& field)
     return {};
 }
 
+static QString recordFieldValue(const KeymRecord& key, const QString& field)
+{
+    if (field == "editorId") return key.editorId;
+    if (field == "formId") return "0x" + QString::number(key.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "fullName") return key.fullName;
+    if (field == "weight") return QString::number(key.weight);
+    if (field == "value") return QString::number(key.value);
+    if (field == "iconPath") return key.iconPath;
+    if (field == "modelPath") return key.modelPath;
+    if (field == "flags") return "0x" + QString::number(key.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const AmmoRecord& ammo, const QString& field)
+{
+    if (field == "editorId") return ammo.editorId;
+    if (field == "formId") return "0x" + QString::number(ammo.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "fullName") return ammo.fullName;
+    if (field == "weight") return QString::number(ammo.weight);
+    if (field == "value") return QString::number(ammo.value);
+    if (field == "damage") return QString::number(ammo.damage);
+    if (field == "speed") return QString::number(ammo.speed);
+    if (field == "iconPath") return ammo.iconPath;
+    if (field == "modelPath") return ammo.modelPath;
+    if (field == "flags") return "0x" + QString::number(ammo.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const LighRecord& ligh, const QString& field)
+{
+    if (field == "editorId") return ligh.editorId;
+    if (field == "formId") return "0x" + QString::number(ligh.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "fullName") return ligh.fullName;
+    if (field == "weight") return QString::number(ligh.weight);
+    if (field == "value") return QString::number(ligh.value);
+    if (field == "radius") return QString::number(ligh.radius);
+    if (field == "fov") return QString::number(ligh.fov);
+    if (field == "lightFlags") return "0x" + QString::number(ligh.lightFlags, 16);
+    if (field == "iconPath") return ligh.iconPath;
+    if (field == "modelPath") return ligh.modelPath;
+    if (field == "flags") return "0x" + QString::number(ligh.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const FurnRecord& furn, const QString& field)
+{
+    if (field == "editorId") return furn.editorId;
+    if (field == "formId") return "0x" + QString::number(furn.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "fullName") return furn.fullName;
+    if (field == "modelPath") return furn.modelPath;
+    if (field == "flags") return "0x" + QString::number(furn.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const TreeRecord& tree, const QString& field)
+{
+    if (field == "editorId") return tree.editorId;
+    if (field == "formId") return "0x" + QString::number(tree.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "iconPath") return tree.iconPath;
+    if (field == "modelPath") return tree.modelPath;
+    if (field == "leafCurvature") return QString::number(tree.leafCurvature);
+    if (field == "leafAmplitude") return QString::number(tree.leafAmplitude);
+    if (field == "lodModelPath") return tree.lodModelPath;
+    if (field == "lodFlags") return "0x" + QString::number(tree.lodFlags, 16);
+    if (field == "flags") return "0x" + QString::number(tree.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const SlgmRecord& slgm, const QString& field)
+{
+    if (field == "editorId") return slgm.editorId;
+    if (field == "formId") return "0x" + QString::number(slgm.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "fullName") return slgm.fullName;
+    if (field == "weight") return QString::number(slgm.weight);
+    if (field == "value") return QString::number(slgm.value);
+    if (field == "capacity") return QString::number(slgm.capacity);
+    if (field == "soul") return QString::number(slgm.soul);
+    if (field == "iconPath") return slgm.iconPath;
+    if (field == "modelPath") return slgm.modelPath;
+    if (field == "flags") return "0x" + QString::number(slgm.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const DoorRecord& door, const QString& field)
+{
+    if (field == "editorId") return door.editorId;
+    if (field == "formId") return "0x" + QString::number(door.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "fullName") return door.fullName;
+    if (field == "modelPath") return door.modelPath;
+    if (field == "sound") return "0x" + QString::number(door.sound, 16).toUpper().rightJustified(8, '0');
+    if (field == "flags") return "0x" + QString::number(door.flags, 16);
+    return {};
+}
+
+static QString recordFieldValue(const KeywordRecord& kw, const QString& field)
+{
+    if (field == "editorId") return kw.editorId;
+    if (field == "formId") return "0x" + QString::number(kw.formId, 16).toUpper().rightJustified(8, '0');
+    if (field == "flags") return "0x" + QString::number(kw.flags, 16);
+    return {};
+}
+
 QVector<ExportTemplate> TemplateManager::builtinTemplates()
 {
     QVector<ExportTemplate> builtins;
@@ -646,7 +809,8 @@ TemplateEditDialog::TemplateEditDialog(const ExportTemplate& existing, QWidget* 
     QStringList types = {"NPC_", "WEAP_", "ARMOR_", "SPEL_", "BOOK_", "ALCH_",
                          "INGR_", "ENCH_", "CONT_", "MISC_", "ACTI_", "STAT_",
                          "RACE_", "CLASS_", "FACT_", "QUST_", "DIAL_", "INFO_",
-                         "PACK_", "CELL", "WRLD_", "LOCT_"};
+                         "PACK_", "CELL", "WRLD_", "LOCT_", "KEYM", "AMMO",
+                         "LIGH", "FURN", "TREE", "SLGM", "DOOR", "KYWD"};
     mRecordTypeCombo->addItems(types);
     if (!existing.recordType.isEmpty())
     {
@@ -1009,6 +1173,14 @@ void ExportTemplatesDialog::exportWithTemplate(const ExportTemplate& tmplt)
     else if (tmplt.recordType == "CELL")  exportRecords(out, tmplt, mData->getCellCollection(), count);
     else if (tmplt.recordType == "WRLD_") exportRecords(out, tmplt, mData->getWorldspaceCollection(), count);
     else if (tmplt.recordType == "LOCT_") exportRecords(out, tmplt, mData->getLocationCollection(), count);
+    else if (tmplt.recordType == "KEYM")  exportRecords(out, tmplt, mData->getKeymCollection(), count);
+    else if (tmplt.recordType == "AMMO")  exportRecords(out, tmplt, mData->getAmmoCollection(), count);
+    else if (tmplt.recordType == "LIGH")  exportRecords(out, tmplt, mData->getLighCollection(), count);
+    else if (tmplt.recordType == "FURN")  exportRecords(out, tmplt, mData->getFurnCollection(), count);
+    else if (tmplt.recordType == "TREE")  exportRecords(out, tmplt, mData->getTreeCollection(), count);
+    else if (tmplt.recordType == "SLGM")  exportRecords(out, tmplt, mData->getSlgmCollection(), count);
+    else if (tmplt.recordType == "DOOR")  exportRecords(out, tmplt, mData->getDoorCollection(), count);
+    else if (tmplt.recordType == "KYWD")  exportRecords(out, tmplt, mData->getKywdCollection(), count);
     else
     {
         // Only templates with a record type outside the 22 wired ones reach
