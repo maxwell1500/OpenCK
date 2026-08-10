@@ -11,7 +11,9 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # windows-latest now ships only Visual Studio 18 (2026); the VS17
+    # generator can't find an instance there, so pin the VS2022 image.
+    runs-on: windows-2022
 
     steps:
     - name: Checkout code
