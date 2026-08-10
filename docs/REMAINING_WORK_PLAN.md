@@ -35,27 +35,27 @@
 | A1 | Fix over-broad `.gitignore` | `.gitignore:29` | ✅ Done — `*build*` replaced with `/build/`, `/build_ninja/`, `build.ps1`, `*.vcxproj`, `*.vcxproj.filters`. `git status` shows `.github/workflows/` + `docs/BUILD.md` as untracked candidates. | verified via `git status` |
 | A2 | Commit CI workflow | `.github/workflows/windows-build.yml` | ✅ Done — workflow committed with three blockers fixed (Qt path now `$env:QT_ROOT_DIR` from install-qt-action; artifact paths `build/bin/Release/`; `all_tests` target). | file in `git ls-files`; pushed to origin |
 | A3 | Repair `all_tests` | `tests/CMakeLists.txt:689-701` | ✅ Done — dangling `test_bitwise`/`test_framing` deps removed; DEPENDS list now exactly the 104 real exes (verified by scripted compare). | `cmake --build build --config Debug --target all_tests` succeeds |
-| A4 | Fix red test `test_specialized_widgets` | `tests/test_specialized_widgets.cpp:72` | ✅ Done — widget creates 9 `QSpinBox` (worldspacedatawidget.cpp:33-47+); test now asserts 9 with correct ordering waterType=1, climateId=2, lightingId=3, map fields=0 (music/terrain have no spin control). Pack(3)/Loc(4) expectations still match. | test exits 0; suite 104/104 |
+| A4 | Fix red test `test_specialized_widgets` | `tests/test_specialized_widgets.cpp:72` | ✅ Done — widget creates 9 `QSpinBox` (worldspacedatawidget.cpp:33-47+); test now asserts 9 with correct ordering waterType=1, climateId=2, lightingId=3, map fields=0 (music/terrain have no spin control). Pack(3)/Loc(4) expectations still match. | test exits 0; suite 107/107 |
 | A5 | Tests menu | `ui/mainwindow.ui:382-387`, `mainwindow.cpp` | ✅ Done — removed `menuTests` + disabled `actionNotImplementedTests` from the .ui (deliberate F4 candidate to re-add with real actions). | menu absent |
-| A6 | Register unregistered tests | `tests/CMakeLists.txt` + 14 exes | ✅ Done — `test_configpaths` (w/ ENVIRONMENT PATH Qt DLL fix), `archivebrowser`, `assetresolver`, `bsawrite` registered unconditionally; `starfieldesm`, `pndrecord`, `worldspacerecord`, `bsaarchive`, `btdterrain`, `hknpphysicssystem`, `xwmadecoder` gated behind `if(EXISTS ...)` for real game data; `dumpesm`/`scanbtd`/`meshprobe` intentionally unregistered (non-QTest diagnostic tools). | `ctest -N` = 103 (101 OpenCK + 2 vendored ogg); gated tests skip cleanly |
+| A6 | Register unregistered tests | `tests/CMakeLists.txt` + 14 exes | ✅ Done — `test_configpaths` (w/ ENVIRONMENT PATH Qt DLL fix), `archivebrowser`, `assetresolver`, `bsawrite` registered unconditionally; `starfieldesm`, `pndrecord`, `worldspacerecord`, `bsaarchive`, `btdterrain`, `hknpphysicssystem`, `xwmadecoder` gated behind `if(EXISTS ...)` for real game data; `dumpesm`/`scanbtd`/`meshprobe` intentionally unregistered (non-QTest diagnostic tools). | `ctest -N` = 106 (104 OpenCK + 2 vendored ogg); gated tests skip cleanly |
 | A7 | Remove dead CI configs | `.travis.yml`, `appveyor.yml` | ✅ Done — both deleted; GitHub Actions is the only pipeline. | `git ls-files` clean of both |
 | A8 | CTest DLL-path fix | `test_configpaths`, `tests/CMakeLists.txt:112` | ✅ Done — `set_tests_properties(... ENVIRONMENT "PATH=$<TARGET_FILE_DIR:Qt6::Core>")`; "manual use only" caveat removed. | `ctest -R configpaths` green |
 
 ---
 
-## Phase B — Test suite hygiene & honest coverage ◐
+## Phase B — Test suite hygiene & honest coverage ◐ (B5: Release parity pending per CI)
 
-> 111 test sources, 104 built exes, 101 CTest-registered (103 incl. vendored
-> ogg's 2), 0 red, 7 orphan sources never built. Make the fleet deterministic
+> 108 test sources, 107 built exes, 104 CTest-registered (106 incl. vendored
+> ogg's 2), 0 red, 0 orphan sources. Fleet deterministic — all green as of 2026-08-08 (107/107 exes, 106/106 CTest).
 > and truthful.
 
 | # | Task | Where | Action | Verify |
 |---|------|-------|--------|--------|
-| B1 | Resurrect valuable orphans | `tests/test_groundtruth.cpp`, `test_subrecord_roundtrip.cpp` | **test_groundtruth** (4CC cross-check vs Starfield scan — extend to assert all 180 resolve, then fold into `test_wiring`); **test_subrecord_roundtrip** — build + register. | both in `git ls-files` + CTest |
-| B2 | Delete or rebuild the rest | `test_dataexporter.cpp`, `test_loader.cpp`, `test_recordloading.cpp`, `test_undo.cpp`, `test_stubs.cpp` (shim) | Decide per file: rebuild if it tests live code, else remove. `test_stubs` remains a linkage shim (keep, but rename/mark intentional). | no orphan sources in `tests/` |
-| B3 | QSKIP audit | `test_archivebrowser`, `test_assetresolver`, `test_ba2dx10`, `test_bsawrite`, `test_gitrepository`, `test_perforcerepository` | Standardize skip messages; ensure skips exit 0 (Qt does by default) and log reason; where a real game install exists locally, run and capture results. | all skip-path tests exit 0 |
-| B4 | Deterministic log-file tests | `tests/CMakeLists.txt` | Route per-test log files (`openck_*.log`) to a temp dir via env var or QDir::tempPath; stop tests writing logs next to exe. | no stray logs in `build/bin` after runs |
-| B5 | Debug/Release parity check | CI + `build.ps1` | Run the gate loop in Release too (CI does Release); capture `test_specialized_widgets` (A4) and any others that differ per config. | Debug + Release both green |
+| B1 | Resurrect valuable orphans | `tests/test_groundtruth.cpp`, `test_subrecord_roundtrip.cpp` | ✅ Done — **test_subrecord_roundtrip** rebuilt + registered (105-level subrecord round-trip coverage); **test_groundtruth** rebuilt with a flat compressed-record-safe scan (`skipRecord()` restores the stream after decompression) and registered; passes vs the real Starfield.esm. | both built + green; 107/107 gate |
+| B2 | Delete or rebuild the rest | `test_dataexporter.cpp`, `test_loader.cpp`, `test_recordloading.cpp`, `test_undo.cpp`, `test_stubs.cpp` (shim) | ✅ Done — `test_loader` rebuilt (QTimer moved off the loader thread — see commits 25a5b83/3818daa) + registered w/ `OPENCK_LOG_DIR`; `test_dataexporter`/`test_recordloading`/`test_undo` deleted (superseded); `test_stubs` kept as intentional static-lib shim. | 0 orphan sources in `tests/` |
+| B3 | QSKIP audit | `test_archivebrowser`, `test_assetresolver`, `test_ba2dx10`, `test_bsawrite`, `test_gitrepository`, `test_perforcerepository` | ✅ Done — all QSKIPs use consistent "… not found / not on PATH" wording; skips exit 0 (QTest default); local game data present so the game-data tests actually ran and passed in the 107/107 gate; `test_archivebrowser` got `QTEST_FUNCTION_TIMEOUT=1800000` (75k-entry BSA filter legitimately exceeds the 5-min watchdog in Debug). | all skip-path tests exit 0 |
+| B4 | Deterministic log-file tests | `tests/CMakeLists.txt` | ✅ Done — `openck_add_test` sets `OPENCK_LOG_DIR=${CMAKE_BINARY_DIR}/test-logs` (logger.hpp + main.cpp read it), so all registered tests write logs out-of-tree. | no stray logs in `build/bin` after runs |
+| B5 | Debug/Release parity check | CI + `build.ps1` | ◐ — Debug gate 107/107 verified locally on 2026-08-08 (incl. real-game-data tests). Release config not yet run on this machine; CI runs Release on its own matrix. Latest CI run after `06bc824` to be confirmed. | Debug + Release both green |
 
 ---
 
@@ -67,7 +67,7 @@
 
 | # | Task | Where | Action | Verify |
 |---|------|-------|--------|--------|
-| C1 | Refresh `STATUS.md` | `docs/STATUS.md:17,102` | ✅ Done — counts corrected to 104 exes / 101 CTest (+2 vendored) / 0 red; date 2026-08-07. | numbers match repo |
+| C1 | Refresh `STATUS.md` | `docs/STATUS.md:17,102` | ✅ Done — counts corrected to 107 exes / 104 CTest (+2 vendored) / 0 red / 0 orphans; date 2026-08-08. | numbers match repo |
 | C2 | Correct `UNIFIED_PLAN.md` tracker | `docs/UNIFIED_PLAN.md` tracker + phases 15-24 | ◐ — "310/310 (audited)" retained with caveat note; partials folded into Phase E refs. Remaining: 16.x/17.x/23.4/24.x cells explicitly marked. | tracker no longer overclaims |
 | C3 | Fix `ROADMAP.md` S-rows | `docs/ROADMAP.md:19-29` | ✅ Done — S1-S6/M1-M7 rewritten as complete; next candidates → Phase F. | roadmap reflects reality |
 | C4 | Update `TECHNICAL_DEBT.md` | H1 note, M rows, L rows | ✅ Done — H1/M9 link to Phase E; H2 marked resolved; date 2026-08-07. | each open row points at this doc |

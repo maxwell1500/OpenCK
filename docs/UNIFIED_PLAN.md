@@ -738,8 +738,8 @@ Sources reconciled here:
 
 ## Progress Tracker
 
-> **Audit 2026-08-07:** the test fleet is 104 exes / 101 CTest-registered
-> (103 incl. vendored ogg), 0 red (104/104 exit 0, 103/103 ctest green);
+> **Audit 2026-08-08:** the test fleet is 107 exes / 104 CTest-registered
+> (106 incl. vendored ogg), 0 red (107/107 exit 0, 106/106 ctest green);
 > 3 exes (`dumpesm`, `scanbtd`, `meshprobe`) are non-QTest diagnostic tools
 > kept unregistered; the `test_specialized_widgets` failure was fixed in
 > Phase A / item A4 of `docs/REMAINING_WORK_PLAN.md`; the old "26 tests"

@@ -1,6 +1,6 @@
 # OpenCK — Current Project Status
 
-> Last updated: 2026-08-07
+> Last updated: 2026-08-08
 
 ## Project Summary
 
@@ -18,16 +18,18 @@ formats and observable behavior.
 (310/310 in the tracker, audited).**
 
 Honest caveats:
-- **104 `test_*.exe` binaries** are built from **111 `tests/test_*.cpp`
-  sources**; **101 are registered in CTest** (plus 2 vendored-ogg tests =
-  103 total); **3 built exes are not** (`dumpesm`, `scanbtd`, `meshprobe` —
-  non-QTest diagnostic tools, intentionally unregistered).
+- **107 `test_*.exe` binaries** are built from **108 `tests/test_*.cpp`
+  sources** (1 of the sources, `test_stubs.cpp`, compiles into the
+  `test_stubs` linkage-shim static lib); **104 are registered in CTest**
+  (plus 2 vendored-ogg tests = 106 total); **3 built exes are not**
+  (`dumpesm`, `scanbtd`, `meshprobe` — non-QTest diagnostic tools,
+  intentionally unregistered).
 - **~7 of the registered tests require real game data** and are gated in
   CMake behind `if (EXISTS "C:/XboxGames/...")` — they are only registered
   on machines that have the game data (they skip cleanly — exit 0 — when
   the data is absent).
-- **0 tests currently failing** — full fleet green (104/104 exes, 103/103
-  CTest) as of 2026-08-07.
+- **0 tests currently failing** — full fleet green (107/107 exes, 106/106
+  CTest) as of 2026-08-08.
 
 ## Phase-by-Phase Status
 
@@ -88,9 +90,9 @@ Status key: ✅ done, ◐ partial, ⬜ not started.
 - **Dialogue & quest editing** — Quest stage tree, alias/objective
   editors, topic/response editors, voice file association, condition
   grids.
-- **104 test binaries built** — covering ESM I/O round-trip, components,
+- **107 test binaries built** — covering ESM I/O round-trip, components,
   form dialogs, editor widgets, undo/redo, conflict detection,
-  Starfield ESM loading, and more (101 CTest-registered, 104/104 green —
+  Starfield ESM loading, and more (104 CTest-registered, 107/107 green —
   see Test Instructions).
 
 ## Known Limitations
@@ -101,11 +103,13 @@ Status key: ✅ done, ◐ partial, ⬜ not started.
 - **~7 registered tests require real game data** (a `C:/XboxGames/...`
   install) and are registered via `if (EXISTS ...)` CMake gates, so they
   only run on machines that have the files; they exit 0 when absent.
-- **7 test sources are orphaned** (never built): `test_dataexporter`,
-  `test_groundtruth`, `test_loader`, `test_recordloading`, `test_stubs`,
-  `test_subrecord_roundtrip`, `test_undo`. Cleanup is tracked in
-  `docs/REMAINING_WORK_PLAN.md` Phase B (B1/B2).
-- **Several UNIFIED_PLAN tasks marked ✅ still carry "Partial" caveats**
+- **0 test sources are orphaned** — the B1/B2 cleanup is complete:
+  `test_groundtruth` and `test_subrecord_roundtrip` were rebuilt and
+  registered, `test_loader` was rebuilt and registered, and the dead
+  sources (`test_dataexporter`, `test_recordloading`, `test_undo`) were
+  deleted; `test_stubs` remains as an intentional linkage shim
+  (static lib, no exe).
+  - **Several UNIFIED_PLAN tasks marked ✅ still carry "Partial" caveats**
   (binary encodings awaiting real-data validation): SCEN 16.1, EFSH/IMGS
   16.2, PACK 16.3, LCTN 16.5, NavMesh 16.8. Follow-ups are tracked in
   `docs/REMAINING_WORK_PLAN.md` (Phases E1–E10).
@@ -123,13 +127,14 @@ cmake --build build --config Debug
 
 ## Test Instructions
 
-Test-count snapshot (2026-08-07): **111 `tests/test_*.cpp` sources** →
-**104 built `test_*.exe` binaries** in `build/bin/Debug/` → **101 registered
-in CTest** (`ctest --test-dir build -C Debug`; 103 total incl. 2 vendored
-ogg tests). 3 built exes are not registered (`dumpesm`, `scanbtd`,
-`meshprobe` — diagnostic CLI tools). 7 sources are orphaned (see B1/B2).
+Test-count snapshot (2026-08-08): **108 `tests/test_*.cpp` sources** →
+**107 built `test_*.exe` binaries** in `build/bin/Debug/` → **104 registered
+in CTest** (`ctest --test-dir build -C Debug`; 106 total incl. 2 vendored
+ogg tests, `test_loader` registered with `OPENCK_LOG_DIR`). 3 built exes
+are not registered (`dumpesm`, `scanbtd`, `meshprobe` — diagnostic CLI
+tools). 0 orphan sources remain.
 
-All `test_*.exe` binaries exit 0 — verified 104/104 (2026-08-07).
+All `test_*.exe` binaries exit 0 — verified 107/107 (2026-08-08).
 
 ```powershell
 $env:Path = "C:\Qt\6.5.3\msvc2019_64\bin;$env:Path"
