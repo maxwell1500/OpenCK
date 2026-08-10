@@ -55,6 +55,7 @@
 #include "worldspacedialog.hpp"
 #include "cellsdialog.hpp"
 #include "objectwindowdialog.hpp"
+#include "qtformdialogmanager.hpp"
 #include "exportdialog.hpp"
 #include "batchexportdialog.hpp"
 #include "exporttemplatesdialog.hpp"
@@ -199,6 +200,12 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->actionLoadLayout->setEnabled(true);
     connect(ui->actionSaveLayout, &QAction::triggered, this, &MainWindow::on_actionSaveLayout_triggered);
     connect(ui->actionLoadLayout, &QAction::triggered, this, &MainWindow::on_actionLoadLayout_triggered);
+
+    ui->actionPreviewWindow->setEnabled(true);
+    ui->actionNpcEditor->setEnabled(true);
+    ui->actionRaceEditor->setEnabled(true);
+    ui->actionClassEditor->setEnabled(true);
+    ui->actionFactionEditor->setEnabled(true);
 }
 
 MainWindow::~MainWindow()
@@ -863,12 +870,12 @@ void MainWindow::applyShortcuts()
     // ========================================================================
     // DISABLED ACTIONS (kept disabled; tooltips explain why)
     // ========================================================================
-    ui->actionPreviewWindow->setToolTip(tr("Preview Window (not available)"));
+    ui->actionPreviewWindow->setToolTip(tr("Preview a NIF file in the render window"));
     ui->actionLighting->setToolTip(tr("Lighting editor (not available)"));
-    ui->actionNpcEditor->setToolTip(tr("NPC editor (not available)"));
-    ui->actionRaceEditor->setToolTip(tr("Race editor (not available)"));
-    ui->actionClassEditor->setToolTip(tr("Class editor (not available)"));
-    ui->actionFactionEditor->setToolTip(tr("Faction editor (not available)"));
+    ui->actionNpcEditor->setToolTip(tr("Create a new NPC record and open its editor"));
+    ui->actionRaceEditor->setToolTip(tr("Create a new race record and open its editor"));
+    ui->actionClassEditor->setToolTip(tr("Create a new class record and open its editor"));
+    ui->actionFactionEditor->setToolTip(tr("Create a new faction record and open its editor"));
     ui->actionSaveLayout->setToolTip(tr("Save the current window layout to a file"));
     ui->actionLoadLayout->setToolTip(tr("Load a saved window layout from a file"));
     
@@ -2299,6 +2306,145 @@ void MainWindow::on_actionShortcuts_triggered()
     ShortcutEditorDialog dlg(this);
     connect(&dlg, &ShortcutEditorDialog::shortcutsChanged, this, &MainWindow::applyShortcuts);
     dlg.exec();
+}
+
+void MainWindow::on_actionPreviewWindow_triggered()
+{
+    if (!nifViewportWidget)
+        return;
+    QString filePath = QFileDialog::getOpenFileName(this, tr("Preview NIF File"),
+        QString(), tr("NIF Files (*.nif);;All Files (*)"));
+    if (filePath.isEmpty())
+        return;
+    nifViewportWidget->loadNif(filePath);
+    LOG_INFO(QString("Preview NIF: %1").arg(filePath));
+}
+
+void MainWindow::createAndOpenRecord(CkId::Type type, const QString& recordTypeName,
+                                     const QString& actionName)
+{
+    if (!mData)
+    {
+        QMessageBox::information(this, actionName, tr("Open a plugin file first."));
+        return;
+    }
+
+    bool ok = false;
+    QString editorId = QInputDialog::getText(this, actionName,
+        tr("Editor ID for the new %1 record:").arg(recordTypeName),
+        QLineEdit::Normal, "new", &ok);
+    if (!ok || editorId.isEmpty())
+        return;
+
+    bool added = false;
+    try
+    {
+        switch (type)
+        {
+        case CkId::Type_Npc_:
+        {
+            NpcRecord rec;
+            rec.editorId = editorId;
+            rec.formId = mData->createNewRecord(type, editorId);
+            added = mData->addNpc(rec);
+            break;
+        }
+        case CkId::Type_Race_:
+        {
+            RaceRecord rec;
+            rec.editorId = editorId;
+            rec.formId = mData->createNewRecord(type, editorId);
+            added = mData->addRace(rec);
+            break;
+        }
+        case CkId::Type_Class_:
+        {
+            ClassRecord rec;
+            rec.editorId = editorId;
+            rec.formId = mData->createNewRecord(type, editorId);
+            added = mData->addClass(rec);
+            break;
+        }
+        case CkId::Type_Fact_:
+        {
+            FactRecord rec;
+            rec.editorId = editorId;
+            rec.formId = mData->createNewRecord(type, editorId);
+            added = mData->addFact(rec);
+            break;
+        }
+        default:
+            return;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        QMessageBox::warning(this, actionName,
+            tr("Could not allocate a form ID: %1").arg(QString::fromUtf8(e.what())));
+        return;
+    }
+
+    if (!added)
+    {
+        QMessageBox::warning(this, actionName,
+            tr("A %1 record with Editor ID '%2' already exists.")
+                .arg(recordTypeName).arg(editorId));
+        return;
+    }
+
+    BaseCollection* coll = mData->getCollectionByType(type);
+    const int idx = coll ? coll->searchId(editorId) : -1;
+    if (!coll || idx < 0)
+        return;
+
+    openck::FormComponents* comps = nullptr;
+    void* recPtr = nullptr;
+    switch (type)
+    {
+    case CkId::Type_Npc_:
+        comps = &static_cast<IdCollection<NpcRecord>&>(*coll).getRecord(idx).get().components;
+        recPtr = &static_cast<IdCollection<NpcRecord>&>(*coll).getRecord(idx).get();
+        break;
+    case CkId::Type_Race_:
+        comps = &static_cast<IdCollection<RaceRecord>&>(*coll).getRecord(idx).get().components;
+        recPtr = &static_cast<IdCollection<RaceRecord>&>(*coll).getRecord(idx).get();
+        break;
+    case CkId::Type_Class_:
+        comps = &static_cast<IdCollection<ClassRecord>&>(*coll).getRecord(idx).get().components;
+        recPtr = &static_cast<IdCollection<ClassRecord>&>(*coll).getRecord(idx).get();
+        break;
+    case CkId::Type_Fact_:
+        comps = &static_cast<IdCollection<FactRecord>&>(*coll).getRecord(idx).get().components;
+        recPtr = &static_cast<IdCollection<FactRecord>&>(*coll).getRecord(idx).get();
+        break;
+    default:
+        return;
+    }
+
+    QString formIdKey = QStringLiteral("0x%1").arg(coll->getFormId(idx), 8, 16, QChar('0'));
+    openck::QtFormDialogManager::instance().openOrFocus(
+        formIdKey, recordTypeName, comps, recPtr, this);
+    LOG_INFO(QString("%1 record '%2' created and opened").arg(recordTypeName).arg(editorId));
+}
+
+void MainWindow::on_actionNpcEditor_triggered()
+{
+    createAndOpenRecord(CkId::Type_Npc_, QStringLiteral("NPC_"), tr("NPC Editor"));
+}
+
+void MainWindow::on_actionRaceEditor_triggered()
+{
+    createAndOpenRecord(CkId::Type_Race_, QStringLiteral("RACE"), tr("Race Editor"));
+}
+
+void MainWindow::on_actionClassEditor_triggered()
+{
+    createAndOpenRecord(CkId::Type_Class_, QStringLiteral("CLAS"), tr("Class Editor"));
+}
+
+void MainWindow::on_actionFactionEditor_triggered()
+{
+    createAndOpenRecord(CkId::Type_Fact_, QStringLiteral("FACT"), tr("Faction Editor"));
 }
 
 void MainWindow::on_actionCreateArchive_triggered()

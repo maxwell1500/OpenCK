@@ -9,6 +9,8 @@
 #include <DockManager.h>
 #include <DockWidget.h>
 
+#include "../../model/world/ckid.hpp"
+
 class Data;
 class UndoStack;
 class NifViewportWidget;
@@ -146,12 +148,19 @@ private slots:
     void on_actionBatchExport_triggered();
     void on_actionShortcuts_triggered();
     void on_actionCreateArchive_triggered();
+    void on_actionPreviewWindow_triggered();
+    void on_actionNpcEditor_triggered();
+    void on_actionRaceEditor_triggered();
+    void on_actionClassEditor_triggered();
+    void on_actionFactionEditor_triggered();
     void on_actionCompilePapyrusScripts_triggered();
     void on_actionCompactSmallMaster_triggered();
     void on_actionSaveAllButton_triggered();
     void on_actionCheckOut_triggered();
     void on_actionCheckIn_triggered();
     void runValidation();
+    void createAndOpenRecord(CkId::Type type, const QString& recordTypeName,
+                             const QString& actionName);
 
 private:
 void setupEditMenu();
