@@ -1,6 +1,6 @@
 # OpenCK — Current Project Status
 
-> Last updated: 2026-08-08
+> Last updated: 2026-08-10
 
 ## Project Summary
 
@@ -28,8 +28,9 @@ Honest caveats:
   CMake behind `if (EXISTS "C:/XboxGames/...")` — they are only registered
   on machines that have the game data (they skip cleanly — exit 0 — when
   the data is absent).
-- **0 tests currently failing** — full fleet green (107/107 exes, 106/106
-  CTest) as of 2026-08-08.
+- **0 tests currently failing** — full fleet green: Debug 107/107 exes,
+  106/106 CTest locally (2026-08-08), and the Release CI gate green on
+  GitHub Actions (100% — 97/97 registered on CI, 2026-08-10).
 
 ## Phase-by-Phase Status
 
@@ -127,14 +128,15 @@ cmake --build build --config Debug
 
 ## Test Instructions
 
-Test-count snapshot (2026-08-08): **108 `tests/test_*.cpp` sources** →
+Test-count snapshot (2026-08-10): **108 `tests/test_*.cpp` sources** →
 **107 built `test_*.exe` binaries** in `build/bin/Debug/` → **104 registered
 in CTest** (`ctest --test-dir build -C Debug`; 106 total incl. 2 vendored
 ogg tests, `test_loader` registered with `OPENCK_LOG_DIR`). 3 built exes
 are not registered (`dumpesm`, `scanbtd`, `meshprobe` — diagnostic CLI
 tools). 0 orphan sources remain.
 
-All `test_*.exe` binaries exit 0 — verified 107/107 (2026-08-08).
+All `test_*.exe` binaries exit 0 — verified 107/107 (2026-08-08) Debug;
+Release gate green on CI 100% (2026-08-10, run 31363153316).
 
 ```powershell
 $env:Path = "C:\Qt\6.5.3\msvc2019_64\bin;$env:Path"

@@ -71,7 +71,7 @@
 | C2 | Correct `UNIFIED_PLAN.md` tracker | `docs/UNIFIED_PLAN.md` tracker + phases 15-24 | ◐ — "310/310 (audited)" retained with caveat note; partials folded into Phase E refs. Remaining: 16.x/17.x/23.4/24.x cells explicitly marked. | tracker no longer overclaims |
 | C3 | Fix `ROADMAP.md` S-rows | `docs/ROADMAP.md:19-29` | ✅ Done — S1-S6/M1-M7 rewritten as complete; next candidates → Phase F. | roadmap reflects reality |
 | C4 | Update `TECHNICAL_DEBT.md` | H1 note, M rows, L rows | ✅ Done — H1/M9 link to Phase E; H2 marked resolved; date 2026-08-07. | each open row points at this doc |
-| C5 | Commit `docs/BUILD.md` | (untracked today) | ⬜ After A1 it's no longer ignored; refresh to use `cmake -G "Visual Studio 17 2022"` and the full test loop incl. Release. | matches CI steps |
+| C5 | Commit `docs/BUILD.md` | (was untracked) | ✅ Done — refreshed for the VS17 generator form, ads DLL copy step, `OPENCK_LOG_DIR`, Release gate + CI details (windows-2022 pin, qt3d module), NSIS local build caveat; committed. | matches CI steps |
 
 ---
 
@@ -124,11 +124,11 @@
 
 | # | Task | Action | Verify |
 |---|------|--------|--------|
-| G1 | Full CI run after A-E | Push to origin; watch Actions (Release build + CTest). | workflow green end-to-end |
-| G2 | Release packaging check | `cpack` locally + installer artifact from CI (24.4 claims done but NSIS only builds in CI). | installer builds |
-| G3 | Living tracker | Keep `docs/STATUS.md` + this plan's checkboxes updated at each phase end. | docs match repo |
-| G4 | Worktree cleanup | Remove `wt-a/wt-b/wt-c` worktrees (all merged), delete `types/batch-*` branches, drop `remotes/worktrees/*` refs. | `git worktree list` = 1 |
-| G5 | Tag + release | `git tag v0.x.y`; GitHub release with installer artifact. | release published |
+| G1 | Full CI run after A-E | ✅ Done — run 31363153316 (master @ 3f6448e) green end-to-end: configure + Release openck + all_tests + 100% ctest + installer. | workflow green end-to-end |
+| G2 | Release packaging check | ✅ Done — CI run 31363153316 built and uploaded the NSIS installer (`openck-installer` artifact). Local cpack not possible (NSIS not installed on this machine — documented in BUILD.md). | installer builds |
+| G3 | Living tracker | ✅ Done — `docs/STATUS.md` refreshed (2026-08-10): Release CI green (97/97), G1/G2/G4 recorded here. | docs match repo |
+| G4 | Worktree cleanup | ✅ Done — `wt-a/wt-b/wt-c` removed (all fully merged, verified via merge-base), `types/batch-*` branches deleted, `refs/remotes/worktrees/*` dropped. | `git worktree list` = 1 |
+| G5 | Tag + release | ⬜ — `git tag v0.x.y`; GitHub release with installer artifact. | release published |
 
 ---
 
