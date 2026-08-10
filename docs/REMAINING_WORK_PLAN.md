@@ -100,11 +100,11 @@
 | E3 | **M9** hknp encoder | Now that Starfield mesh BA2 v2 is readable (`Ba2Archive`), implement hknp polygon encode (`HknpPhysicsSystem`). | round-trip test |
 | E4 | **M8** SCEN PHDA binary | Real `ScenRecord` PHDA encode; validate vs real data. | round-trip test |
 | E5 | **M7** NavMesh auto-gen voxel tuning | Tune voxel filter against real world geometry; add acceptance signal to test. | `test_navmeshtoolkit` extended |
-| E6 | **M6** flat-field mirrors | Keep (audited); document as intentional — no code change. | debt row notes "intentional" |
+| E6 | **M6** flat-field mirrors | ✅ Done (audit 2026-08-10) — documented as intentional; TECHNICAL_DEBT.md R11/5E.4 record "most fields intentionally kept". | debt row notes "intentional" |
 | E7 | **L1** stale `.bak` files | ✅ Done — no `*.bak` remains in the tree (verified 2026-08-10). | `git rm` done |
-| E8 | **L2** `NewFindings.md` | Delete or fold into `docs/`; it references navmesheditor as a shell (false). | gone or corrected |
-| E9 | **L3** xWMA WMF fallback | Keep ffmpeg primary; mark WMF path as debug-only; optional removal. | documented |
-| E10 | Orphan sources cleanup | `bookrecord_new.cpp/_old.cpp`, `dataimporter_new.cpp`, legacy `dataimporter.cpp`/`dataexporter.cpp`, `src/debug_brace.py`, `fix_imp.py`, `fix_npc.py`, `ui/mainwindow.ui.new_section`, `src/view/window/test_new.txt` | Delete or archive all; confirm nothing references them. | `git grep` no refs |
+| E8 | **L2** `NewFindings.md` | ✅ Done — deleted in the Phase B/C/D/E hygiene commit (06bc824); nothing references it. | gone or corrected |
+| E9 | **L3** xWMA WMF fallback | ✅ Done (2026-08-10) — ffmpeg stays primary; WMF MFT path explicitly commented "debug-only diagnostics" with TECHNICAL_DEBT.md L3 pointer. | documented |
+| E10 | Orphan sources cleanup | ✅ Done — all listed files deleted in 06bc824; re-verified 2026-08-10 (no orphan sources remain). | `git grep` no refs |
 
 ---
 

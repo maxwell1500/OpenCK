@@ -166,10 +166,11 @@ XwmaDecoder::Result XwmaDecoder::decode(const QByteArray& xwmaBytes)
         return ffmpegResult;
 
     // ------------------------------------------------------------------
-    // Fallback: Windows Media Foundation WMA decoder MFT. Produces valid
-    // PCM but on this machine only the opening ~0.1s of a Bethesda voice
-    // (the decoder stops early / silences the rest). Kept as a self-contained
-    // path that works without external tools.
+    // Fallback: Windows Media Foundation WMA decoder MFT (debug-only
+    // diagnostics). Produces valid PCM but on this machine only the opening
+    // ~0.1s of a Bethesda voice (the decoder stops early / silences the
+    // rest). Kept as a self-contained path that works without external
+    // tools. See docs/TECHNICAL_DEBT.md L3.
     // ------------------------------------------------------------------
 
     static bool initialized = false;
