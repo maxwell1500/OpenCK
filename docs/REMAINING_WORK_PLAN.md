@@ -96,9 +96,9 @@
 | # | Item | Action | Verify |
 |---|------|--------|--------|
 | E1 | **H1** FormIdCompactor opaque refs | Extend raw-subrecord FormID rewriting to XPRM + Starfield payloads (`formidcompactor.hpp`), add tests. | `test_esl` extended |
-| E2 | **M5** QtFormDialog tabs | Add Basic/Components/Keywords/Ingest tabs (Phase 12F partial). | dialog has full tab set |
+| E2 | **M5** QtFormDialog tabs | ✅ Done (2026-08-10) — Basic (universal: TESFullName/TESModel/TESTexture/TESHealth/TESValue/TESWeight/TESDescription) / Components (record-specific) / Keywords (only when BGSKeywordForm present) / Data tabs; `test_qtformdialog` extended (T1b). | dialog has full tab set |
 | E3 | **M9** hknp encoder | Now that Starfield mesh BA2 v2 is readable (`Ba2Archive`), implement hknp polygon encode (`HknpPhysicsSystem`). | round-trip test |
-| E4 | **M8** SCEN PHDA binary | Real `ScenRecord` PHDA encode; validate vs real data. | round-trip test |
+| E4 | **M8** SCEN PHDA binary | ⬜ — real-data audit 2026-08-10: Skyrim.esm (1706 SCEN records) and Starfield.esm (7613 SCEN records) contain **zero** PHDA subrecords — both shipped games use the new-generation scene schema (FNAM/VNAM/ALID/LNAM/DNAM/ANAM groups). PHDA is the classic-Skyrim-mod / FO4 format; validating an encoder needs a FO4 install or a sample mod. Current raw-subrecord round-trip is byte-exact, so keep it until a sample is available (risk-register item). The `test_dumpesm` diagnostic gained a path + dump-count parameter for future audits. | round-trip test vs real data |
 | E5 | **M7** NavMesh auto-gen voxel tuning | Tune voxel filter against real world geometry; add acceptance signal to test. | `test_navmeshtoolkit` extended |
 | E6 | **M6** flat-field mirrors | ✅ Done (audit 2026-08-10) — documented as intentional; TECHNICAL_DEBT.md R11/5E.4 record "most fields intentionally kept". | debt row notes "intentional" |
 | E7 | **L1** stale `.bak` files | ✅ Done — no `*.bak` remains in the tree (verified 2026-08-10). | `git rm` done |

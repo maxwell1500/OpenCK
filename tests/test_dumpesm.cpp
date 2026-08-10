@@ -16,12 +16,14 @@ static void dumpName(NAME n, QTextStream& out)
 
 static int gScanned = 0;
 static QString gBrokeReason;
+static int gMaxDumpCount = 3;
 
 static int countRecords(ESMReader& reader, NAME want, QTextStream& out)
 {
     int found = 0;
     QMap<NAME, int> counts;
     QMap<NAME, int> firstPositions;
+    const int maxDump = gMaxDumpCount;
     while (reader.isLeft() && gScanned < 30000000)
     {
         qint64 pos = reader.filePos();
@@ -64,7 +66,7 @@ static int countRecords(ESMReader& reader, NAME want, QTextStream& out)
                 break;
             }
 
-            if (found < 3)
+            if (found < maxDump)
             {
                 out << "\n=== " << want << " record #" << found
                     << " at 0x" << Qt::hex << pos << Qt::dec
@@ -79,7 +81,7 @@ static int countRecords(ESMReader& reader, NAME want, QTextStream& out)
                 qint64 sz = reader.subLeft();
                 QByteArray data;
                 reader.readRawSubData(data);
-                if (found < 3)
+                if (found < maxDump)
                 {
                     out << "  SUB ";
                     dumpName(sub, out);
@@ -99,7 +101,7 @@ static int countRecords(ESMReader& reader, NAME want, QTextStream& out)
                 }
                 subCount++;
             }
-            if (found < 3)
+            if (found < maxDump)
                 out.flush();
             found++;
 
@@ -135,7 +137,9 @@ static int countRecords(ESMReader& reader, NAME want, QTextStream& out)
 int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
-    QString path = "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
+    QString path = (argc > 3)
+        ? QString::fromLocal8Bit(argv[3])
+        : "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
     NAME want = 0;
     if (argc > 1) {
         QByteArray tag = argv[1];
@@ -165,6 +169,8 @@ int main(int argc, char** argv)
     {
         outFile.open(stdout, QIODevice::WriteOnly);
     }
+    if (argc > 4)
+        gMaxDumpCount = qBound(1, QString::fromLocal8Bit(argv[4]).toInt(), 1000);
     QTextStream out(&outFile);
 
     ESMReader reader(path);
