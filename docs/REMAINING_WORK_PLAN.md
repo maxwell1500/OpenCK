@@ -43,7 +43,7 @@
 
 ---
 
-## Phase B — Test suite hygiene & honest coverage ◐ (B5: Release parity pending per CI)
+## Phase B — Test suite hygiene & honest coverage ✅
 
 > 108 test sources, 107 built exes, 104 CTest-registered (106 incl. vendored
 > ogg's 2), 0 red, 0 orphan sources. Fleet deterministic — all green as of 2026-08-08 (107/107 exes, 106/106 CTest).
@@ -55,7 +55,7 @@
 | B2 | Delete or rebuild the rest | `test_dataexporter.cpp`, `test_loader.cpp`, `test_recordloading.cpp`, `test_undo.cpp`, `test_stubs.cpp` (shim) | ✅ Done — `test_loader` rebuilt (QTimer moved off the loader thread — see commits 25a5b83/3818daa) + registered w/ `OPENCK_LOG_DIR`; `test_dataexporter`/`test_recordloading`/`test_undo` deleted (superseded); `test_stubs` kept as intentional static-lib shim. | 0 orphan sources in `tests/` |
 | B3 | QSKIP audit | `test_archivebrowser`, `test_assetresolver`, `test_ba2dx10`, `test_bsawrite`, `test_gitrepository`, `test_perforcerepository` | ✅ Done — all QSKIPs use consistent "… not found / not on PATH" wording; skips exit 0 (QTest default); local game data present so the game-data tests actually ran and passed in the 107/107 gate; `test_archivebrowser` got `QTEST_FUNCTION_TIMEOUT=1800000` (75k-entry BSA filter legitimately exceeds the 5-min watchdog in Debug). | all skip-path tests exit 0 |
 | B4 | Deterministic log-file tests | `tests/CMakeLists.txt` | ✅ Done — `openck_add_test` sets `OPENCK_LOG_DIR=${CMAKE_BINARY_DIR}/test-logs` (logger.hpp + main.cpp read it), so all registered tests write logs out-of-tree. | no stray logs in `build/bin` after runs |
-| B5 | Debug/Release parity check | CI + `build.ps1` | ◐ — Debug gate 107/107 verified locally on 2026-08-08 (incl. real-game-data tests). Release config not yet run on this machine; CI runs Release on its own matrix. Latest CI run after `06bc824` to be confirmed. | Debug + Release both green |
+| B5 | Debug/Release parity check | CI + `build.ps1` | ✅ Done — Debug gate 107/107 locally; Release gate green on CI (100%, 97/97 — the 10 game-data-gated tests aren't registered there; local release spot-checks of the same tests pass). Fixed along the way: ads DLL not deployed next to binaries (0xc0000135), ogg test_bitwise/framing not built into all_tests, test_compressedrecord hardcoded local paths. | Debug + Release both green |
 
 ---
 
