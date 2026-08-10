@@ -1274,8 +1274,9 @@ void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
             if (uneditableTypes.contains(result.type))
             {
                 QMessageBox::information(this, "Edit",
-                    QString("Editing %1 records is not supported from the search dialog yet "
-                            "(see docs/REMAINING_WORK_PLAN.md Phase D).")
+                    QString("%1 records have no form editor: GameSettings are "
+                            "edited via the Game Settings grid, and log entries "
+                            "are internal messages.")
                         .arg(CkId(result.type).getTypeName()));
                 break;
             }

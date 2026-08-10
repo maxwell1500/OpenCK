@@ -82,12 +82,12 @@
 | D1 | Preferences Network page | `preferencesdialog.cpp:345-353` | ✅ Done — removed the disabled "Not implemented" VC-server field; note now says VC is configured via Tools menu/external tools. | no disabled "Not implemented" text |
 | D2 | InfoData "Record" button | `infodatawidget.cpp:151` | ✅ Done — disabled with truthful tooltip "Voice recording is not yet implemented" (no playback backend exists). | wired or honestly labeled |
 | D3 | Cell View filter | `cellsdialog.cpp:563` | ✅ Done — real filter implemented: `RefrTableModel` keeps `mAllRows`/`mAllPoints`, `setFilter()` matches EditorID or Form ID (case-insensitive); QLineEdit in toolbar, Filter action focuses it. | filter works |
-| D4 | Search "not yet supported" | `searchdialog.cpp:1268` | ⬜ — narrow message to truly-uneditable (GMST) only after D5. | message only for GMST |
+| D4 | Search "not yet supported" | `searchdialog.cpp:1268` | ✅ Done — guard narrowed to truly-uneditable kinds (GMST + internal log pseudo-types); message reworded honestly ("no form editor", grid for GMST) — no "yet" implying future support. | message only for GMST |
 | D5 | Export templates gap | `exporttemplatesdialog.cpp:1015` | ⬜ — extend export `fieldsForType`/templates to remaining types; 22 covered done (R19). | no "not yet supported" for wired types |
 | D6 | Disabled menu actions | `ui/mainwindow.ui` (PreviewWindow, Lighting, NpcEditor, RaceEditor, ClassEditor, FactionEditor, SaveLayout, LoadLayout) | ⬜ — each action deliberately kept disabled; wire periodically. | all actions reachable or honestly disabled |
 | D7 | `collection.hpp` note | `src/model/world/collection.hpp:52` | ✅ Done — copy ctor/assign now `= delete`; "Not implemented" note removed. | note gone |
-| D8 | Header comment discipline | `rawsubrecordwidget.hpp:11-14`, tier2_components.hpp:320 | ⬜ — update comments that say "not yet implemented" to point at this plan (D4/E3) so they stay honest. | grep for "Not implemented" → only D2/D4/D5 refs |
-| D9 | `cellwithtransitionseditor.cpp:218-240` | M3 | ⬜ — permanent for Skyrim (no TES4 data) — add truthful disabled state + doc note. | documented, no stub text |
+| D8 | Header comment discipline | `rawsubrecordwidget.hpp:11-14`, tier2_components.hpp:320 | ✅ Done — audit on 2026-08-10: only remaining "not yet implemented" text is the honest D2 tooltip in `infodatawidget.cpp:151`; everything else updated. | grep for "Not implemented" → only D2 refs |
+| D9 | `celltransitionseditor.cpp:87-89,214-234` | M3 | ✅ Done — Add/Edit/Delete permanently disabled with truthful comments (plugin format stores no cell-connection data) + plan refs. | documented, no stub text |
 
 ---
 
@@ -101,7 +101,7 @@
 | E4 | **M8** SCEN PHDA binary | Real `ScenRecord` PHDA encode; validate vs real data. | round-trip test |
 | E5 | **M7** NavMesh auto-gen voxel tuning | Tune voxel filter against real world geometry; add acceptance signal to test. | `test_navmeshtoolkit` extended |
 | E6 | **M6** flat-field mirrors | Keep (audited); document as intentional — no code change. | debt row notes "intentional" |
-| E7 | **L1** stale `.bak` files | Remove `src/view/window/armor_editor.cpp.bak`, `objectwindowdialog.cpp.bak`. | `git rm` done |
+| E7 | **L1** stale `.bak` files | ✅ Done — no `*.bak` remains in the tree (verified 2026-08-10). | `git rm` done |
 | E8 | **L2** `NewFindings.md` | Delete or fold into `docs/`; it references navmesheditor as a shell (false). | gone or corrected |
 | E9 | **L3** xWMA WMF fallback | Keep ffmpeg primary; mark WMF path as debug-only; optional removal. | documented |
 | E10 | Orphan sources cleanup | `bookrecord_new.cpp/_old.cpp`, `dataimporter_new.cpp`, legacy `dataimporter.cpp`/`dataexporter.cpp`, `src/debug_brace.py`, `fix_imp.py`, `fix_npc.py`, `ui/mainwindow.ui.new_section`, `src/view/window/test_new.txt` | Delete or archive all; confirm nothing references them. | `git grep` no refs |
