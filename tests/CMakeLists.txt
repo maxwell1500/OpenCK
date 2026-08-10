@@ -10,6 +10,19 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Test Xml)
 
+# qtadvanceddocking-qt6 builds to ${CMAKE_BINARY_DIR}/${ads_PlatformDir}/bin/<Config>,
+# but openck.exe and the test exes all run from ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/<Config>.
+# windeployqt doesn't know about ADS, so nothing ever deployed the DLL next to the
+# binaries; openck_view-linked tests died with 0xc0000135 (STATUS_DLL_NOT_FOUND) on CI.
+# Copy it next to openck.exe (same directory as the test exes) with every build.
+add_custom_target(copy_ads_dll ALL DEPENDS qtadvanceddocking-qt6)
+add_custom_command(TARGET copy_ads_dll POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:qtadvanceddocking-qt6>
+        "$<TARGET_FILE_DIR:openck>/"
+    COMMENT "Copying qtadvanceddocking-qt6.dll next to openck.exe"
+)
+
 # Stubs for view-layer symbols referenced by openck_model
 add_library(test_stubs STATIC test_stubs.cpp)
 target_link_libraries(test_stubs PRIVATE Qt6::Core)
@@ -739,7 +752,7 @@ target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)
 target_include_directories(make_testplugin PRIVATE ${TEST_INCLUDE_DIRS})
 
 # Convenience target that builds every test executable.
-add_custom_target(all_tests DEPENDS
+add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_animationeventvalidator test_archivebrowser test_assetresolver
     test_audiopipelinetools test_autopainter test_ba2dx10 test_ba2write
     test_blenderlauncher test_blendtreemodel test_bnetclient test_brushalphamask

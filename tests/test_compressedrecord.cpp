@@ -48,17 +48,21 @@ private slots:
     void testCompressedCellRecord();
     void testRoundTripCompressedCell();
     void testMasterNameTrim();
+
+private:
+    QTemporaryDir m_tmp;
 };
 
 void TestCompressedRecord::initTestCase()
 {
+    QVERIFY(m_tmp.isValid());
     OpenCK::Logging::Logger::instance().setMinLevel(OpenCK::Logging::LogLevel::Debug);
-    OpenCK::Logging::Logger::instance().init("C:/Users/max/Projects/OpenCK/test_compressed_log.txt");
+    OpenCK::Logging::Logger::instance().init(m_tmp.filePath("test_compressed_log.txt"));
 }
 
 void TestCompressedRecord::testCompressedCellRecord()
 {
-    QString filePath = "C:/Users/max/Projects/OpenCK/test_compressed_check.esm";
+    const QString filePath = m_tmp.filePath("test_compressed_check.esm");
 
     QByteArray cellPayload;
     {
@@ -130,7 +134,7 @@ void TestCompressedRecord::testCompressedCellRecord()
 
 void TestCompressedRecord::testRoundTripCompressedCell()
 {
-    QString filePath = "C:/Users/max/Projects/OpenCK/test_compressed_rt.esm";
+    const QString filePath = m_tmp.filePath("test_compressed_rt.esm");
 
     QByteArray cellPayload;
     {

@@ -1299,6 +1299,15 @@ if(WIN32)
             COMMENT "Deploying Qt6 runtime DLLs..."
         )
     endif()
+    # qtadvanceddocking-qt6.dll builds to ${CMAKE_BINARY_DIR}/${ads_PlatformDir}/bin
+    # but the app and tests run from bin/. windeployqt doesn't know it; copy it
+    # next to openck.exe so both openck and the view tests find it at runtime.
+    add_custom_command(TARGET openck POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:qtadvanceddocking-qt6>
+            "$<TARGET_FILE_DIR:openck>/"
+        COMMENT "Copying qtadvanceddocking-qt6.dll next to openck.exe"
+    )
 endif()
 
 # Install targets for `cmake --install`
