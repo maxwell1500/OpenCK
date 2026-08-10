@@ -82,10 +82,12 @@ Status key: ✅ done, ◐ partial, ⬜ not started.
 - **Hierarchical Object Window tree** — 3-level
   (root → category group → record type) matching the real CK's
   `All → Actors/Items/World Objects/Gameplay/Audio/Dialogue` shape.
-- **16-menu top-level layout** matching the real Creation Kit
-  (File, Edit, View, Character, ObjectWindows, RenderWindows,
-  Navmesh, Terrain, Audio, World, Tools, Docks, Galaxy, Packin,
-  Theme, Tests, Help).
+- **17 top-level menus** matching the real Creation Kit's shape
+  (File, Edit, View, World, Character, ObjectWindows, RenderWindows,
+  Navmesh, Terrain, Audio, Docks, Gameplay, Plugins, Export, Tools,
+  Theme, Help). Empty placeholder menus (Galaxy/Packin, Tests) were
+  removed rather than left as stubs; menu actions are all reachable
+  or honestly disabled (see `docs/REMAINING_WORK_PLAN.md` Phase D).
 - **Papyrus scripting** — if/else/elif, while/for loops, and
   type checking implemented.
 - **Dialogue & quest editing** — Quest stage tree, alias/objective

@@ -68,7 +68,7 @@
 | # | Task | Where | Action | Verify |
 |---|------|-------|--------|--------|
 | C1 | Refresh `STATUS.md` | `docs/STATUS.md:17,102` | ✅ Done — counts corrected to 107 exes / 104 CTest (+2 vendored) / 0 red / 0 orphans; date 2026-08-08. | numbers match repo |
-| C2 | Correct `UNIFIED_PLAN.md` tracker | `docs/UNIFIED_PLAN.md` tracker + phases 15-24 | ◐ — "310/310 (audited)" retained with caveat note; partials folded into Phase E refs. Remaining: 16.x/17.x/23.4/24.x cells explicitly marked. | tracker no longer overclaims |
+| C2 | Correct `UNIFIED_PLAN.md` tracker | `docs/UNIFIED_PLAN.md` tracker + phases 15-24 | ✅ Done — "310/310 (audited)" retained with caveat note (2026-08-08 audit block); all partial cells carry ◐ + Phase E pointer (16.1/16.2/16.3/16.5/16.8, 17.6, 23.4); summary table marks 16/17/23 as ◐; 24.x cells verified against code (24.7 layout save/load wired, 24.10 Galaxy/Packin menus gone — menubar re-surveyed 2026-08-10). STATUS.md menu-belt claim corrected. | tracker no longer overclaims |
 | C3 | Fix `ROADMAP.md` S-rows | `docs/ROADMAP.md:19-29` | ✅ Done — S1-S6/M1-M7 rewritten as complete; next candidates → Phase F. | roadmap reflects reality |
 | C4 | Update `TECHNICAL_DEBT.md` | H1 note, M rows, L rows | ✅ Done — H1/M9 link to Phase E; H2 marked resolved; date 2026-08-07. | each open row points at this doc |
 | C5 | Commit `docs/BUILD.md` | (was untracked) | ✅ Done — refreshed for the VS17 generator form, ads DLL copy step, `OPENCK_LOG_DIR`, Release gate + CI details (windows-2022 pin, qt3d module), NSIS local build caveat; committed. | matches CI steps |
