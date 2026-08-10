@@ -26,6 +26,8 @@ jobs:
         host: windows
         target: desktop
         arch: win64_msvc2019_64
+        # CMakeLists.txt requires 3DCore/3DRender/3DExtras/3DInput
+        modules: qt3d
 
     - name: Setup MSBuild (dereference auto-enrolled VS)
       uses: microsoft/setup-msbuild@v2
