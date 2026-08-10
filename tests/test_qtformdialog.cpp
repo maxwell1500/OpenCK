@@ -16,12 +16,14 @@
 #include <QDialog>
 #include <QLabel>
 #include <QList>
+#include <QTabWidget>
 
 #include "../../libs/components/component.hpp"
 #include "../../libs/components/editorproperty.hpp"
 #include "../../libs/components/formcomponents.hpp"
 #include "../../libs/components/tesfullname.hpp"
 #include "../../libs/components/tier1_components.hpp"
+#include "../../libs/components/tier2_components.hpp"
 
 #include "../../src/view/window/qtformdialog.hpp"
 #include "../../src/view/window/qtformdialogmanager.hpp"
@@ -34,6 +36,8 @@ using openck::QtFormDialogManager;
 using openck::EditorPropertyGrid;
 using tescomponents::TESFullName_Component;
 using tescomponents::TESModel_Component;
+using tescomponents::BGSKeywordForm_Component;
+using tescomponents::TESEnchantableForm_Component;
 
 #define CHECK(cond) \
     do { \
@@ -87,6 +91,64 @@ int main(int argc, char** argv)
             }
         }
         CHECK(dialog.windowTitle().contains(QStringLiteral("0x00012345")));
+    }
+
+    // -----------------------------------------------------------------
+    // T1b_ComponentTabSplit
+    // A dialog with basic + specialized + keyword components renders
+    // three grids: Basic (universal components only), Components
+    // (record-specific), Keywords (the keyword form only).
+    // -----------------------------------------------------------------
+    {
+        FormComponents components;
+        components.clear();
+        TESFullName_Component* name = components.add<TESFullName_Component>();
+        name->fullName = QStringLiteral("Enchanted Sword");
+        TESModel_Component* model = components.add<TESModel_Component>();
+        model->modelPath = QStringLiteral("weapons/iron/sword.nif");
+        BGSKeywordForm_Component* kw = components.add<BGSKeywordForm_Component>();
+        kw->keywords = { 0x12345678, 0x1234ABCD };
+        TESEnchantableForm_Component* ench = components.add<TESEnchantableForm_Component>();
+        ench->enchantmentFormId = 0x0000DEAD;
+
+        QtFormDialog dialog(QStringLiteral("0x00054321"), &components);
+        dialog.show();
+
+        QList<EditorPropertyGrid*> grids = dialog.findChildren<EditorPropertyGrid*>();
+        CHECK(grids.size() == 3);
+        if (grids.size() == 3)
+        {
+            const auto& basicSections = grids.at(0)->sections();
+            CHECK(basicSections.size() == 2);
+            if (basicSections.size() == 2)
+            {
+                CHECK(basicSections.at(0)->component()->className() == QStringLiteral("TESFullName"));
+                CHECK(basicSections.at(1)->component()->className() == QStringLiteral("TESModel"));
+            }
+
+            const auto& compSections = grids.at(1)->sections();
+            CHECK(compSections.size() == 1);
+            if (compSections.size() == 1)
+                CHECK(compSections.at(0)->component()->className() == QStringLiteral("TESEnchantableForm"));
+
+            const auto& kwSections = grids.at(2)->sections();
+            CHECK(kwSections.size() == 1);
+            if (kwSections.size() == 1)
+                CHECK(kwSections.at(0)->component()->className() == QStringLiteral("BGSKeywordForm"));
+        }
+
+        QList<QTabWidget*> tabs = dialog.findChildren<QTabWidget*>();
+        if (tabs.size() >= 1)
+        {
+            const QStringList labels = {
+                tabs.first()->tabText(0),
+                tabs.first()->tabText(1),
+                tabs.first()->tabText(2),
+                tabs.first()->tabText(3)
+            };
+            CHECK(labels == QStringList({ QStringLiteral("Basic"), QStringLiteral("Components"),
+                                          QStringLiteral("Keywords"), QStringLiteral("Data") }));
+        }
     }
 
     // -----------------------------------------------------------------

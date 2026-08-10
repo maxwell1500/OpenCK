@@ -8,6 +8,12 @@
 // openck::FormComponents, walks each component, and renders its
 // properties in a property grid.
 //
+// The component grid is split into tabs matching the real CK form
+// dialog: "Basic" (universal components: name/model/icon/value/weight/
+// health/description), "Components" (record-specific components) and
+// "Keywords" (shown only when a keyword form is present). "Data" hosts
+// the per-record custom widget when one is registered.
+//
 // One dialog instance per record. The QtFormDialogManager
 // (qtformdialogmanager.hpp) keeps a registry so opening the same
 // record twice focuses the existing dialog rather than creating a
@@ -55,7 +61,9 @@ private:
     FormComponents* m_components;
     QVBoxLayout* m_layout = nullptr;
     QTabWidget* m_tabs = nullptr;
-    EditorPropertyGrid* m_grid = nullptr;
+    EditorPropertyGrid* m_basicGrid = nullptr;
+    EditorPropertyGrid* m_componentsGrid = nullptr;
+    EditorPropertyGrid* m_keywordsGrid = nullptr;
     QWidget* m_dataTab = nullptr;
     QVBoxLayout* m_dataTabLayout = nullptr;
     QWidget* m_customWidget = nullptr;

@@ -11,6 +11,28 @@
 
 namespace openck {
 
+namespace {
+
+// Universal components shown on the "Basic" tab of the form dialog,
+// mirroring the real CK's basic-form fields.
+bool isBasicComponent(const QString& className)
+{
+    return className == QStringLiteral("TESFullName")
+        || className == QStringLiteral("TESModel")
+        || className == QStringLiteral("TESTexture")
+        || className == QStringLiteral("TESHealth")
+        || className == QStringLiteral("TESValue")
+        || className == QStringLiteral("TESWeight")
+        || className == QStringLiteral("TESDescription");
+}
+
+bool isKeywordComponent(const QString& className)
+{
+    return className == QStringLiteral("BGSKeywordForm");
+}
+
+} // namespace
+
 QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
                            QWidget* parent)
     : QDialog(parent)
@@ -25,17 +47,48 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
 
     m_tabs = new QTabWidget(this);
 
-    auto* propertiesTab = new QWidget(m_tabs);
-    auto* propertiesLayout = new QVBoxLayout(propertiesTab);
-    propertiesLayout->setContentsMargins(0, 0, 0, 0);
+    std::vector<Component*> basic;
+    std::vector<Component*> specialized;
+    std::vector<Component*> keywords;
+    if (m_components)
+    {
+        const std::vector<Component*>::size_type count = m_components->size();
+        for (auto& c : m_components->all())
+        {
+            const QString cls = c->className();
+            if (isKeywordComponent(cls))
+                keywords.push_back(c.get());
+            else if (isBasicComponent(cls))
+                basic.push_back(c.get());
+            else
+                specialized.push_back(c.get());
+        }
+    }
 
-    auto* scroll = new QScrollArea(propertiesTab);
-    scroll->setWidgetResizable(true);
-    m_grid = new EditorPropertyGrid(scroll);
-    scroll->setWidget(m_grid);
-    propertiesLayout->addWidget(scroll, 1);
+    auto addGridTab = [this](const QString& label, const std::vector<Component*>& comps,
+                             EditorPropertyGrid** outGrid) -> QWidget* {
+        auto* tab = new QWidget(m_tabs);
+        auto* tabLayout = new QVBoxLayout(tab);
+        tabLayout->setContentsMargins(0, 0, 0, 0);
 
-    m_tabs->addTab(propertiesTab, tr("Properties"));
+        auto* scroll = new QScrollArea(tab);
+        scroll->setWidgetResizable(true);
+        auto* grid = new EditorPropertyGrid(scroll);
+        scroll->setWidget(grid);
+        tabLayout->addWidget(scroll, 1);
+
+        m_tabs->addTab(tab, label);
+        *outGrid = grid;
+        return tab;
+    };
+
+    addGridTab(tr("Basic"), basic, &m_basicGrid);
+
+    if (!specialized.empty())
+        addGridTab(tr("Components"), specialized, &m_componentsGrid);
+
+    if (!keywords.empty())
+        addGridTab(tr("Keywords"), keywords, &m_keywordsGrid);
 
     m_dataTab = new QWidget(m_tabs);
     m_dataTabLayout = new QVBoxLayout(m_dataTab);
@@ -44,16 +97,9 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
 
     m_layout->addWidget(m_tabs, 1);
 
-    if (m_components)
-    {
-        std::vector<Component*> componentPtrs;
-        componentPtrs.reserve(m_components->size());
-        for (const auto& c : m_components->all())
-        {
-            componentPtrs.push_back(c.get());
-        }
-        m_grid->setComponents(componentPtrs);
-    }
+    if (m_basicGrid) m_basicGrid->setComponents(basic);
+    if (m_componentsGrid) m_componentsGrid->setComponents(specialized);
+    if (m_keywordsGrid) m_keywordsGrid->setComponents(keywords);
 
     auto* buttons = new QDialogButtonBox(this);
     auto* applyBtn = buttons->addButton(QStringLiteral("Apply"),
@@ -85,12 +131,14 @@ void QtFormDialog::setCustomWidget(QWidget* widget)
 
 void QtFormDialog::onApply()
 {
-    if (m_grid) m_grid->apply();
+    if (m_basicGrid) m_basicGrid->apply();
+    if (m_componentsGrid) m_componentsGrid->apply();
+    if (m_keywordsGrid) m_keywordsGrid->apply();
 }
 
 void QtFormDialog::onOk()
 {
-    if (m_grid) m_grid->apply();
+    onApply();
     accept();
 }
 
