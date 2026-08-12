@@ -52,7 +52,6 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
     std::vector<Component*> keywords;
     if (m_components)
     {
-        const std::vector<Component*>::size_type count = m_components->size();
         for (auto& c : m_components->all())
         {
             const QString cls = c->className();

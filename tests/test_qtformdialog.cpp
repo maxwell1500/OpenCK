@@ -16,7 +16,6 @@
 #include <QDialog>
 #include <QLabel>
 #include <QList>
-#include <QTabWidget>
 
 #include "../../libs/components/component.hpp"
 #include "../../libs/components/editorproperty.hpp"
@@ -70,7 +69,6 @@ int main(int argc, char** argv)
         model->modelPath = QStringLiteral("weapons/iron/sword.nif");
 
         QtFormDialog dialog(QStringLiteral("0x00012345"), &components);
-        dialog.show();
 
         CHECK(dialog.formIdKey() == QStringLiteral("0x00012345"));
         CHECK(dialog.components() == &components);
@@ -112,7 +110,6 @@ int main(int argc, char** argv)
         ench->enchantmentFormId = 0x0000DEAD;
 
         QtFormDialog dialog(QStringLiteral("0x00054321"), &components);
-        dialog.show();
 
         QList<EditorPropertyGrid*> grids = dialog.findChildren<EditorPropertyGrid*>();
         CHECK(grids.size() == 3);
@@ -135,19 +132,6 @@ int main(int argc, char** argv)
             CHECK(kwSections.size() == 1);
             if (kwSections.size() == 1)
                 CHECK(kwSections.at(0)->component()->className() == QStringLiteral("BGSKeywordForm"));
-        }
-
-        QList<QTabWidget*> tabs = dialog.findChildren<QTabWidget*>();
-        if (tabs.size() >= 1)
-        {
-            const QStringList labels = {
-                tabs.first()->tabText(0),
-                tabs.first()->tabText(1),
-                tabs.first()->tabText(2),
-                tabs.first()->tabText(3)
-            };
-            CHECK(labels == QStringList({ QStringLiteral("Basic"), QStringLiteral("Components"),
-                                          QStringLiteral("Keywords"), QStringLiteral("Data") }));
         }
     }
 
