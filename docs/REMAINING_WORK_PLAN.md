@@ -113,14 +113,14 @@
 | # | Candidate | Where | Scope | Priority |
 |---|-----------|-------|-------|----------|
 | F1 | Render preview polish | `nifviewportwidget` | Mesh picker, pivot display, floor grid, camera presets — high demo value, near-term. | High |
-| F2 | Layout save/load UI | `windowlayout.cpp` | Wire `actionSaveLayout`/`actionLoadLayout` (file dialog already exists). One-session item. | High (cheap) |
+| F2 | Layout save/load UI | `windowlayout.cpp` | ✅ Done (verified 2026-08-12) — already wired: `actionSaveLayout`/`actionLoadLayout` enabled + connected (`mainwindow.cpp:199-202`); handlers (`mainwindow.cpp:1066/1081`) open a `QFileDialog` and call `WindowLayout::saveLayout`/`restoreLayout`. Stale row; no work needed. | High (cheap) |
 | F3 | Specialized editor wizards | `src/view/window/*datawidget*` | CREA (exists), RACE, CLAS, FACT, WTHR, HAZARD, REGN widgets as `QtFormDialog` factories. | Medium |
 | F4 | `Tests` menu (A5) + headless self-test | `mainwindow.cpp`, CLI | "Run All Tests" invoking the headless CLI; test log viewer. | Medium |
 | F5 | Behavior graph editor breadth | `NodeGraphWidget` | More node types + saved graphs. | Low |
 
 ---
 
-## Phase G — Closing & release gate ◐
+## Phase G — Closing & release gate ✅
 
 | # | Task | Action | Verify |
 |---|------|--------|--------|
@@ -128,7 +128,7 @@
 | G2 | Release packaging check | ✅ Done — CI run 31363153316 built and uploaded the NSIS installer (`openck-installer` artifact). Local cpack not possible (NSIS not installed on this machine — documented in BUILD.md). | installer builds |
 | G3 | Living tracker | ✅ Done — `docs/STATUS.md` refreshed (2026-08-10): Release CI green (97/97), G1/G2/G4 recorded here. | docs match repo |
 | G4 | Worktree cleanup | ✅ Done — `wt-a/wt-b/wt-c` removed (all fully merged, verified via merge-base), `types/batch-*` branches deleted, `refs/remotes/worktrees/*` dropped. | `git worktree list` = 1 |
-| G5 | Tag + release | ⬜ — `git tag v0.x.y`; GitHub release with installer artifact. | release published |
+| G5 | Tag + release | ✅ Done (2026-08-12) — tag `v1.0.0` on `fd59746`; GitHub release "OpenCK 1.0.0" published with the NSIS installer (`OpenCK-1.0.0-win64.exe`, ~324 MB) built by CI run `31563443987` (green, ctest 97/97). | release published |
 
 ---
 
