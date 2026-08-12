@@ -129,6 +129,7 @@
 | G3 | Living tracker | ✅ Done — `docs/STATUS.md` refreshed (2026-08-10): Release CI green (97/97), G1/G2/G4 recorded here. | docs match repo |
 | G4 | Worktree cleanup | ✅ Done — `wt-a/wt-b/wt-c` removed (all fully merged, verified via merge-base), `types/batch-*` branches deleted, `refs/remotes/worktrees/*` dropped. | `git worktree list` = 1 |
 | G5 | Tag + release | ✅ Done (2026-08-12) — tag `v1.0.0` on `fd59746`; GitHub release "OpenCK 1.0.0" published with the NSIS installer (`OpenCK-1.0.0-win64.exe`, ~324 MB) built by CI run `31563443987` (green, ctest 97/97). | release published |
+| G6 | Release discipline | ✅ Done (2026-08-12) — `CHANGELOG.md` created; CPack version wired to the single `project(... VERSION ...)` declaration; STATUS.md / UNIFIED_PLAN.md / risk register synced; E4 documented as the sole data-blocked item. Re-cut `v1.0.0` on the finished commit (`9296559`) with the fresh installer (run 31604541397). | docs match repo; installer built |
 
 ---
 
@@ -136,11 +137,12 @@
 
 | Risk | Impact | Mitigation |
 |------|--------|-----------|
-| CI never ran — workflow may have latent env bugs | False green | After A1-A3, do a trial Actions run on a branch before master |
-| Real-game-data tests depend on personal installs (C:/XboxGames, Skyrim SE) | Unregistered tests never exercised | Keep `OPENCK_TEST_STARFIELD_ESM`/`OPENCK_TEST_BA2_DIR` gating; document in CI README |
-| Overscoping Phase F | Release slips | Pick 1–2 candidates only; rest stay in roadmap |
-| Doc drift returns | Misleading tracker | G3 (living tracker) enforced each phase |
-| FormIdCompactor opaque payloads (H1/E1) may be intractable without samples | Partial fix | Document + ship; keep `test_esl` green |
+| CI never ran — workflow may have latent env bugs | False green | ✅ Resolved — multiple green CI runs; pinned `windows-2022`; last: run 31604541397 on `9296559` (100%). |
+| Real-game-data tests depend on personal installs (C:/XboxGames, Skyrim SE) | Registered tests skip on CI | ✅ Mitigated — env-gated; `test_archivebrowser` opens the real BSA locally (minutes) and QSKIPs on CI; CLI selftest uses a 600s ceiling per test. |
+| Overscoping Phase F | Release slips | ✅ Resolved — F1–F5 all landed in one commit `9296559`. |
+| Doc drift returns | Misleading tracker | ✅ Mitigated — STATUS.md/plan synced 2026-08-12; CHANGELOG added. |
+| FormIdCompactor opaque payloads (H1/E1) | Partial fix | ✅ Resolved — XPRM confirmed FormID-free; Starfield LCTN/REFR layouts added from xEdit defs; `test_esl` green. |
+| SCEN PHDA encoder (E4) has no real-data sample | Cannot validate encoder | ⬜ Open — Skyrim SE + Starfield.esm contain zero PHDA (new-generation scene schema); needs a FO4 install or classic-format scene mod sample. Raw round-trip is byte-exact; documented in CHANGELOG. |
 
 ---
 

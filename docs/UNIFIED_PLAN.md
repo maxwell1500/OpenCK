@@ -746,7 +746,10 @@ Sources reconciled here:
 > claim is superseded. Remaining audit follow-ups are tracked there
 > (Phases B, E).
 
-Partials: see `docs/REMAINING_WORK_PLAN.md` Phase E.
+Partials: see `docs/REMAINING_WORK_PLAN.md` Phase E — all Phase E items
+resolved as of 2026-08-12 except **E4 (SCEN PHDA encoder)**, which remains
+data-blocked (no real PHDA sample; Skyrim SE / Starfield.esm ship the
+new-generation scene schema).
 
 | Phase | Steps | Status |
 |-------|-------|--------|
@@ -778,7 +781,8 @@ Partials: see `docs/REMAINING_WORK_PLAN.md` Phase E.
 | **TOTAL** | **310/310 (audited)** | ✅ |
 
 Known partial follow-ups are tracked in `docs/REMAINING_WORK_PLAN.md`
-(Phases E1–E10).
+(Phase E). Status as of 2026-08-12: E1/E2/E3/E5/E6-E10 resolved; only **E4
+(SCEN PHDA encoder)** remains open (data-blocked — see plan + CHANGELOG).
 
 ---
 

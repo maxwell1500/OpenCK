@@ -1,6 +1,6 @@
 # OpenCK — Current Project Status
 
-> Last updated: 2026-08-10
+> Last updated: 2026-08-12
 
 ## Project Summary
 
@@ -14,8 +14,11 @@ formats and observable behavior.
 
 ## Completion Overview
 
-**The project tracks 24+ phases in `docs/UNIFIED_PLAN.md` — all complete
-(310/310 in the tracker, audited).**
+**All tracked closing phases in `docs/REMAINING_WORK_PLAN.md` are complete
+(Phases A–G ✅).** The earlier "310/310 in the tracker" claim in
+`docs/UNIFIED_PLAN.md` was audited and corrected — see the plan doc, which
+supersedes it. Release `v1.0.0` is cut (installer attached); the tracker's
+Phase G row records the re-cut on the finished commit.
 
 Honest caveats:
 - **107 `test_*.exe` binaries** are built from **108 `tests/test_*.cpp`
@@ -29,8 +32,10 @@ Honest caveats:
   on machines that have the game data (they skip cleanly — exit 0 — when
   the data is absent).
 - **0 tests currently failing** — full fleet green: Debug 107/107 exes,
-  106/106 CTest locally (2026-08-08), and the Release CI gate green on
-  GitHub Actions (100% — 97/97 registered on CI, 2026-08-10).
+  106/106 CTest locally, and the Release CI gate green on GitHub Actions
+  (100% — 97/97 registered on CI, 2026-08-12, run 31604541397). A `Tests →
+  Run All Tests` menu action runs every `test_*.exe` via `openck --cli
+  selftest` (Phase F4).
 
 ## Phase-by-Phase Status
 
@@ -82,12 +87,13 @@ Status key: ✅ done, ◐ partial, ⬜ not started.
 - **Hierarchical Object Window tree** — 3-level
   (root → category group → record type) matching the real CK's
   `All → Actors/Items/World Objects/Gameplay/Audio/Dialogue` shape.
-- **17 top-level menus** matching the real Creation Kit's shape
+- **18 top-level menus** matching the real Creation Kit's shape
   (File, Edit, View, World, Character, ObjectWindows, RenderWindows,
   Navmesh, Terrain, Audio, Docks, Gameplay, Plugins, Export, Tools,
-  Theme, Help). Empty placeholder menus (Galaxy/Packin, Tests) were
+  Theme, Tests, Help). Empty placeholder menus (Galaxy/Packin) were
   removed rather than left as stubs; menu actions are all reachable
   or honestly disabled (see `docs/REMAINING_WORK_PLAN.md` Phase D).
+  The Tests menu (F4) runs the headless self-test suite.
 - **Papyrus scripting** — if/else/elif, while/for loops, and
   type checking implemented.
 - **Dialogue & quest editing** — Quest stage tree, alias/objective
@@ -113,9 +119,13 @@ Status key: ✅ done, ◐ partial, ⬜ not started.
   deleted; `test_stubs` remains as an intentional linkage shim
   (static lib, no exe).
   - **Several UNIFIED_PLAN tasks marked ✅ still carry "Partial" caveats**
-  (binary encodings awaiting real-data validation): SCEN 16.1, EFSH/IMGS
-  16.2, PACK 16.3, LCTN 16.5, NavMesh 16.8. Follow-ups are tracked in
-  `docs/REMAINING_WORK_PLAN.md` (Phases E1–E10).
+  (binary encodings awaiting real-data validation): SCEN PHDA (E4),
+  EFSH/IMGS/PACK/LCTN raw layouts (E1), NavMesh NIF gen (E5). All resolved
+  except **E4 (SCEN PHDA encoder), which remains data-blocked**: Skyrim SE /
+  Starfield.esm contain zero PHDA subrecords (both use the new-generation
+  scene schema), so validating an encoder needs a FO4 install or a
+  classic-format scene mod sample. Raw-subrecord round-trip is byte-exact.
+  Tracked in `docs/REMAINING_WORK_PLAN.md` Phase E.
 - **Voice "Record" button disabled** (docs: honest tooltip in
   `infodatawidget.cpp`), **VC server field removed from Preferences**,
   and Search/Export still bail on a few types (D4/D5) — see
@@ -130,15 +140,17 @@ cmake --build build --config Debug
 
 ## Test Instructions
 
-Test-count snapshot (2026-08-10): **108 `tests/test_*.cpp` sources** →
+Test-count snapshot (2026-08-12): **108 `tests/test_*.cpp` sources** →
 **107 built `test_*.exe` binaries** in `build/bin/Debug/` → **104 registered
 in CTest** (`ctest --test-dir build -C Debug`; 106 total incl. 2 vendored
 ogg tests, `test_loader` registered with `OPENCK_LOG_DIR`). 3 built exes
 are not registered (`dumpesm`, `scanbtd`, `meshprobe` — diagnostic CLI
 tools). 0 orphan sources remain.
 
-All `test_*.exe` binaries exit 0 — verified 107/107 (2026-08-08) Debug;
-Release gate green on CI 100% (2026-08-10, run 31363153316).
+All `test_*.exe` binaries exit 0 — verified 107/107 Debug and 107/107
+Release locally (2026-08-12); Release gate green on CI 100% (2026-08-12,
+run 31604541397). From the app, `Tests → Run All Tests` (or
+`openck --cli selftest`) runs the same fleet and reports per-test PASS/FAIL.
 
 ```powershell
 $env:Path = "C:\Qt\6.5.3\msvc2019_64\bin;$env:Path"
