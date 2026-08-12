@@ -16,6 +16,8 @@
 #include <QDialog>
 #include <QLabel>
 #include <QList>
+#include <QSet>
+#include <QStringList>
 
 #include "../../libs/components/component.hpp"
 #include "../../libs/components/editorproperty.hpp"
@@ -33,6 +35,7 @@ using openck::FormComponents;
 using openck::QtFormDialog;
 using openck::QtFormDialogManager;
 using openck::EditorPropertyGrid;
+using openck::FormComponentWidget;
 using tescomponents::TESFullName_Component;
 using tescomponents::TESModel_Component;
 using tescomponents::BGSKeywordForm_Component;
@@ -111,28 +114,25 @@ int main(int argc, char** argv)
 
         QtFormDialog dialog(QStringLiteral("0x00054321"), &components);
 
+        // QStackedWidget raises the current tab to the end of its child list,
+        // so findChildren<EditorPropertyGrid*>() returns the grids in tab-raise
+        // order (the active tab's grid is last), not insertion order. Match
+        // grids by their section content rather than by position.
         QList<EditorPropertyGrid*> grids = dialog.findChildren<EditorPropertyGrid*>();
         CHECK(grids.size() == 3);
-        if (grids.size() == 3)
+        QSet<QStringList> gridClassSets;
+        for (EditorPropertyGrid* g : grids)
         {
-            const auto& basicSections = grids.at(0)->sections();
-            CHECK(basicSections.size() == 2);
-            if (basicSections.size() == 2)
-            {
-                CHECK(basicSections.at(0)->component()->className() == QStringLiteral("TESFullName"));
-                CHECK(basicSections.at(1)->component()->className() == QStringLiteral("TESModel"));
-            }
-
-            const auto& compSections = grids.at(1)->sections();
-            CHECK(compSections.size() == 1);
-            if (compSections.size() == 1)
-                CHECK(compSections.at(0)->component()->className() == QStringLiteral("TESEnchantableForm"));
-
-            const auto& kwSections = grids.at(2)->sections();
-            CHECK(kwSections.size() == 1);
-            if (kwSections.size() == 1)
-                CHECK(kwSections.at(0)->component()->className() == QStringLiteral("BGSKeywordForm"));
+            QStringList names;
+            for (FormComponentWidget* s : g->sections())
+                names << s->component()->className();
+            names.sort();
+            gridClassSets.insert(names);
         }
+        CHECK(gridClassSets.size() == 3);
+        CHECK(gridClassSets.contains(QStringList{ QStringLiteral("TESFullName"), QStringLiteral("TESModel") }));
+        CHECK(gridClassSets.contains(QStringList{ QStringLiteral("BGSKeywordForm") }));
+        CHECK(gridClassSets.contains(QStringList{ QStringLiteral("TESEnchantableForm") }));
     }
 
     // -----------------------------------------------------------------
