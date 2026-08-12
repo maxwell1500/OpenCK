@@ -2,10 +2,13 @@
 
 #include <QPainter>
 #include <QPainterPath>
+#include <QPolygon>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QMenu>
 #include <QAction>
+#include <QFileDialog>
+#include <QMessageBox>
 
 namespace {
 constexpr int kNodeWidth = 90;
@@ -19,6 +22,25 @@ const QColor kPortIn(96, 188, 96);
 const QColor kPortOut(232, 148, 60);
 const QColor kEdge(120, 160, 200);
 const QColor kEdgeHot(240, 120, 60);
+
+// Per-type accent for behavior-graph node kinds; a default-constructed
+// QColor means "render with the standard palette".
+QColor nodeAccent(const QString& type)
+{
+    if (type == QStringLiteral("Set_Value"))
+        return QColor(0, 170, 160);
+    if (type == QStringLiteral("If_Else_Branch"))
+        return QColor(230, 130, 40);
+    if (type == QStringLiteral("Loop"))
+        return QColor(150, 100, 220);
+    if (type == QStringLiteral("Wait"))
+        return QColor(80, 150, 220);
+    if (type == QStringLiteral("Event_Handler"))
+        return QColor(120, 190, 90);
+    if (type == QStringLiteral("Return"))
+        return QColor(210, 80, 90);
+    return QColor();
+}
 }
 
 NodeGraphWidget::NodeGraphWidget(QWidget* parent)
@@ -60,6 +82,42 @@ int NodeGraphWidget::addNode(const QString& type, const QString& label,
     return id;
 }
 
+void NodeGraphWidget::saveToFile(QWidget* parent)
+{
+    if (!m_graph)
+        return;
+    QWidget* owner = parent ? parent : this;
+    const QString path = QFileDialog::getSaveFileName(owner, tr("Save Behavior Graph"),
+        QString(), tr("Behavior Graph (*.ngraph)"));
+    if (path.isEmpty())
+        return;
+    QString error;
+    if (!m_graph->save(path, &error))
+        QMessageBox::warning(owner, tr("Save Failed"), error);
+}
+
+void NodeGraphWidget::loadFromFile(QWidget* parent)
+{
+    if (!m_graph)
+        return;
+    QWidget* owner = parent ? parent : this;
+    const QString path = QFileDialog::getOpenFileName(owner, tr("Load Behavior Graph"),
+        QString(), tr("Behavior Graph (*.ngraph)"));
+    if (path.isEmpty())
+        return;
+    QString error;
+    if (!m_graph->load(path, &error))
+    {
+        QMessageBox::warning(owner, tr("Load Failed"), error);
+        return;
+    }
+    m_selectedNode = -1;
+    m_dragNode = -1;
+    m_connecting = false;
+    emit graphChanged();
+    update();
+}
+
 QStringList NodeGraphWidget::paletteTypes()
 {
     return {
@@ -83,6 +141,13 @@ QStringList NodeGraphWidget::paletteTypes()
         QStringLiteral("Dampen_Variable"),
         QStringLiteral("Linear_Variable"),
         QStringLiteral("Rotation_Variable"),
+        // Behavior-graph control flow nodes.
+        QStringLiteral("Set_Value"),
+        QStringLiteral("If_Else_Branch"),
+        QStringLiteral("Loop"),
+        QStringLiteral("Wait"),
+        QStringLiteral("Event_Handler"),
+        QStringLiteral("Return"),
     };
 }
 
@@ -191,9 +256,11 @@ void NodeGraphWidget::paintNode(QPainter& p, const GraphNode& n, bool selected)
     const int portGap = static_cast<int>(kPortSpacing * m_zoom);
     const int bodyH = static_cast<int>(n.inputPorts * kPortSpacing * m_zoom);
 
-    // Header.
+    // Header (behavior nodes carry a per-type accent color).
+    const QColor accent = nodeAccent(n.type);
+    const QColor headerColor = accent.isValid() ? accent : kNodeBorder;
     p.setPen(Qt::NoPen);
-    p.setBrush(selected ? kNodeBorder.lighter(130) : kNodeBorder);
+    p.setBrush(selected ? headerColor.lighter(130) : headerColor);
     p.drawRect(topLeft.x(), topLeft.y(), w, header);
     // Body.
     p.setBrush(kNodeFill);
@@ -228,6 +295,23 @@ void NodeGraphWidget::paintNode(QPainter& p, const GraphNode& n, bool selected)
     p.setPen(QColor(200, 205, 215));
     p.drawText(QRect(topLeft.x(), topLeft.y() + header + 2, w, 14),
                Qt::AlignHCenter | Qt::AlignTop, n.label);
+
+    // Diamond badge marks the behavior-graph node kinds apart from animation
+    // nodes at a glance, independent of the accent color.
+    if (accent.isValid())
+    {
+        p.setBrush(QColor(240, 240, 240));
+        p.setPen(Qt::NoPen);
+        const int badgeR = qMax(2, static_cast<int>(4 * m_zoom));
+        const QPoint badgeC(topLeft.x() + w - badgeR - 2,
+                            topLeft.y() + header / 2);
+        QPolygon diamond;
+        diamond << QPoint(badgeC.x(), badgeC.y() - badgeR)
+                << QPoint(badgeC.x() + badgeR, badgeC.y())
+                << QPoint(badgeC.x(), badgeC.y() + badgeR)
+                << QPoint(badgeC.x() - badgeR, badgeC.y());
+        p.drawPolygon(diamond);
+    }
 }
 
 void NodeGraphWidget::mousePressEvent(QMouseEvent* event)

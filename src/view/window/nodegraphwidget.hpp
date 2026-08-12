@@ -19,6 +19,11 @@ public:
     // under the cursor). Returns the new node id.
     int addNode(const QString& type, const QString& label, QPointF viewPos);
 
+    // Prompts for a file and persists / restores the whole graph via the
+    // model's JSON serialization.
+    void saveToFile(QWidget* parent = nullptr);
+    void loadFromFile(QWidget* parent = nullptr);
+
     // The node palette (Phase 22.2); node types the editor can create.
     static QStringList paletteTypes();
 

@@ -158,6 +158,7 @@ private slots:
     void on_actionSaveAllButton_triggered();
     void on_actionCheckOut_triggered();
     void on_actionCheckIn_triggered();
+    void on_actionRunAllTests_triggered();
     void runValidation();
     void createAndOpenRecord(CkId::Type type, const QString& recordTypeName,
                              const QString& actionName);
@@ -166,6 +167,7 @@ private:
 void setupEditMenu();
 void setupTerrainMenu();
 void setupPrimitivePreviewMenu();
+    void setupTestsMenu();
     void setupShortcuts();
     void applyShortcuts();
     void updateUndoRedoActions();

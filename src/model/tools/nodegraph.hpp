@@ -5,6 +5,7 @@
 #include <QPointF>
 #include <QVector>
 #include <QMap>
+#include <QJsonObject>
 
 // NodeGraph is the data model for the behavior/animation graph editor. A
 // graph holds nodes (state-machine / blend-tree blocks) and directed edges
@@ -62,6 +63,12 @@ public:
 
     // Returns true if the graph has any cycles (for validation).
     bool hasCycles() const;
+
+    // Persists / restores the graph as JSON. 'error' receives a message on
+    // failure so the UI can show why without cluttering the log.
+    QJsonObject toJson() const;
+    bool save(const QString& filePath, QString* error = nullptr) const;
+    bool load(const QString& filePath, QString* error = nullptr);
 
 private:
     QVector<GraphNode> m_nodes;

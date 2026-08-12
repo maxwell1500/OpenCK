@@ -10,6 +10,7 @@ namespace OpenCK::Cli {
 // (0 = success, non-zero = error). Supported commands:
 //   openck --cli export <plugin> --format json|csv|xml --out <path> [--types T1,T2]
 //   openck --cli info <plugin>
+//   openck --cli selftest
 //   openck --cli help
 int run(int argc, char* argv[]);
 

@@ -120,6 +120,7 @@ public:
     void updateCamera();
     void onFilterChanged(int index);
     void toggleHierarchy();
+    void setSelectedShapeByName(const QString& name);
 
     const Nif::NifParser* getNifParser() const;
 
@@ -182,6 +183,7 @@ private:
     QVector<float> shapeSpecularExponents;
     QVector<QVector3D> shapeEmissionColors;
     QVector<QPair<QVector3D, QVector3D>> shapeBounds;
+    QVector<QString> shapeNames;
     QOpenGLTexture* defaultTexture = nullptr;
     bool texturesBuilt;
 
@@ -235,6 +237,14 @@ private:
     QMap<Nif::Node*, QMatrix4x4> nodeCumulativeTransforms;
     QVector<Nif::Node*> shapeOwnerNode;
 
+    QComboBox* m_shapePickerCombo = nullptr;
+    QComboBox* m_cameraPresetCombo = nullptr;
+    QLabel* m_pivotInfoLabel = nullptr;
+    OverlayVBO m_pivotVBO;
+    QVector3D m_pivotPosition;
+    QVector<OverlayVertex> m_pivotVerts;
+    bool m_pivotVisible = false;
+
     NifAnimationState* animState;
     NifAnimation* nifAnimData;
     QSlider* animTimeline;
@@ -259,6 +269,9 @@ private:
     void initAnimationState();
     void initParticleSystems();
     void applyAnimationFrame();
+    void populateShapePicker();
+    void rebuildPivot();
+    void updatePivotInfo();
 
     QVector<QVector3D> restVertices;
     QVector<QVector3D> restNormals;

@@ -63,6 +63,7 @@
 #include "modmanagerdialog.hpp"
 #include "validationreportdialog.hpp"
 #include "inspectorwidget.hpp"
+#include "testlogdialog.hpp"
 #include "warningsdockwidget.hpp"
 #include "../../model/tools/assetvalidator.hpp"
 #include "../../model/tools/assetdependencyscanner.hpp"
@@ -143,6 +144,7 @@ MainWindow::MainWindow(QWidget *parent) :
     setupEditMenu();
     setupTerrainMenu();
     setupPrimitivePreviewMenu();
+    setupTestsMenu();
     setupShortcuts();
     restoreUiState();
 
@@ -759,6 +761,20 @@ void MainWindow::setupPrimitivePreviewMenu()
 
     ui->menuView->addSeparator();
     ui->menuView->addMenu(previewMenu);
+}
+
+void MainWindow::setupTestsMenu()
+{
+    QMenu* testsMenu = new QMenu(tr("Tests"), this);
+    QAction* runAllTestsAction = testsMenu->addAction(tr("Run All Tests"));
+    connect(runAllTestsAction, &QAction::triggered, this, &MainWindow::on_actionRunAllTests_triggered);
+    menuBar()->insertMenu(ui->menuHelp->menuAction(), testsMenu);
+}
+
+void MainWindow::on_actionRunAllTests_triggered()
+{
+    LOG_INFO("Running all tests from Tests menu");
+    TestLogDialog::runAllTests(this);
 }
 
 void MainWindow::setupShortcuts()

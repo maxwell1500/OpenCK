@@ -314,6 +314,20 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     connect(filterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &NifViewportWidget::onFilterChanged);
 
+    auto* shapePickerLabel = new QLabel(tr("Shape:"), toolbar);
+    shapePickerLabel->setObjectName("shapePickerLabel");
+    toolbar->addWidget(shapePickerLabel);
+
+    m_shapePickerCombo = new QComboBox(toolbar);
+    m_shapePickerCombo->setObjectName("shapePickerCombo");
+    m_shapePickerCombo->setMinimumWidth(140);
+    toolbar->addWidget(m_shapePickerCombo);
+    connect(m_shapePickerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int index) {
+        if (index < 0) return;
+        setSelectedShapeByName(m_shapePickerCombo->itemText(index));
+    });
+
     toolbar->addSeparator();
     auto* wireframeBtn = new QPushButton(tr("Wireframe"));
     wireframeBtn->setCheckable(true);
@@ -330,6 +344,7 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     toolbar->addWidget(gridBtn);
     connect(gridBtn, &QPushButton::toggled, this, [this](bool checked) {
         gridEnabled = checked;
+        m_gridVBO.dirty = true;
         glWidget->update();
     });
 
@@ -377,6 +392,28 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     toolbar->addWidget(hierarchyBtn);
     connect(hierarchyBtn, &QPushButton::toggled, this, &NifViewportWidget::toggleHierarchy);
 
+    toolbar->addSeparator();
+    auto* cameraLabel = new QLabel(tr("Camera:"), toolbar);
+    cameraLabel->setObjectName("cameraLabel");
+    toolbar->addWidget(cameraLabel);
+
+    m_cameraPresetCombo = new QComboBox(toolbar);
+    m_cameraPresetCombo->setObjectName("cameraPresetCombo");
+    m_cameraPresetCombo->addItems({tr("Front"), tr("Top"), tr("Side"), tr("Isometric"), tr("Reset")});
+    toolbar->addWidget(m_cameraPresetCombo);
+    connect(m_cameraPresetCombo, QOverload<int>::of(&QComboBox::activated), this,
+            [this](int index) {
+        switch (index) {
+        case 0: rotationX = 0.0f; rotationY = 0.0f; zoom = 1.0f; break;
+        case 1: rotationX = 90.0f; rotationY = 0.0f; zoom = 1.0f; break;
+        case 2: rotationX = 0.0f; rotationY = 90.0f; zoom = 1.0f; break;
+        case 3: rotationX = 45.0f; rotationY = 45.0f; zoom = 1.0f; break;
+        case 4: rotationX = 0.0f; rotationY = 0.0f; zoom = 1.0f; cameraPos = QVector3D(0, 0, 0); break;
+        default: return;
+        }
+        updateCamera();
+    });
+
     layout->addWidget(toolbar);
 
     animState = new NifAnimationState(this);
@@ -402,6 +439,10 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     nodeInfoLabel = new QLabel(tr("No node selected"), rightPanel);
     nodeInfoLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     rightLayout->addWidget(nodeInfoLabel);
+
+    m_pivotInfoLabel = new QLabel(tr("No pivot"), rightPanel);
+    m_pivotInfoLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    rightLayout->addWidget(m_pivotInfoLabel);
 
     mainSplitter->addWidget(rightPanel);
     mainSplitter->setSizes({400, 200});
@@ -462,6 +503,7 @@ NifViewportWidget::~NifViewportWidget()
     m_translateGizmoVBO.clear();
     m_rotateGizmoVBO.clear();
     m_scaleGizmoVBO.clear();
+    m_pivotVBO.clear();
     clearTextures();
         if (defaultTexture) { delete defaultTexture; defaultTexture = nullptr; }
 
@@ -647,6 +689,8 @@ void NifViewportWidget::setSelectedRefIndex(int index)
     mHoverAxis = -1;
     mHoverRefIndex = -1;
     m_cellRefVBO.dirty = true;
+    rebuildPivot();
+    updatePivotInfo();
     glWidget->update();
 }
 
@@ -696,6 +740,7 @@ void NifViewportWidget::clear()
     shapeSpecularExponents.clear();
     shapeEmissionColors.clear();
     shapeBounds.clear();
+    shapeNames.clear();
     navmeshTriangles.clear();
     pathWaypoints.clear();
     cellReferences.clear();
@@ -733,6 +778,19 @@ void NifViewportWidget::clear()
     shapeOwnerNode.clear();
     selectedNode = nullptr;
     nodeInfoLabel->setText(tr("No node selected"));
+
+    selectedShape = -1;
+    m_pivotVisible = false;
+    m_pivotVerts.clear();
+    m_pivotVBO.dirty = true;
+    if (m_pivotInfoLabel) {
+        m_pivotInfoLabel->setText(tr("No pivot"));
+    }
+    if (m_shapePickerCombo) {
+        m_shapePickerCombo->blockSignals(true);
+        m_shapePickerCombo->clear();
+        m_shapePickerCombo->blockSignals(false);
+    }
 
     if (animState) {
         animState->stop();
@@ -886,6 +944,7 @@ void NifViewportWidget::buildMesh()
     shapeSpecularExponents.clear();
     shapeEmissionColors.clear();
     shapeBounds.clear();
+    shapeNames.clear();
     shapeOwnerNode.clear();
     clearTextures();
     texturesBuilt = false;
@@ -905,6 +964,9 @@ void NifViewportWidget::buildMesh()
     m_meshDirty = true;
     m_bboxVBO.dirty = true;
     m_collisionVBO.dirty = true;
+    populateShapePicker();
+    rebuildPivot();
+    updatePivotInfo();
 }
 
 void NifViewportWidget::clearTextures()
@@ -973,6 +1035,7 @@ void NifViewportWidget::buildMeshFromNode(Nif::Node* node, const QMatrix4x4& par
         const int indexEnd = indices.size();
         shapeIndexRanges.append({indexStart, indexEnd});
         shapeOwnerNode.append(node);
+        shapeNames.append(shape.name);
         shapeBaseColors.append(QColor::fromRgbF(
             qBound(0.0f, shape.baseColor.r, 1.0f),
             qBound(0.0f, shape.baseColor.g, 1.0f),
@@ -1615,6 +1678,17 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         glEnable(GL_DEPTH_TEST);
     }
 
+    if (m_pivotVisible) {
+        if (m_pivotVBO.dirty) {
+            m_pivotVBO.build(m_pivotVerts, GL_LINES);
+        }
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(2.0f);
+        m_pivotVBO.draw(m_overlayShader, modelView);
+        glLineWidth(1.0f);
+        glEnable(GL_DEPTH_TEST);
+    }
+
     if (cellGridEnabled) {
         if (m_cellGridVBO.dirty) {
             QVector<OverlayVertex> verts;
@@ -2052,6 +2126,13 @@ void NifViewportWidget::mousePressEvent(QMouseEvent* event)
             selectedShape = -1;
         }
         m_bboxVBO.dirty = true;
+        if (m_shapePickerCombo) {
+            m_shapePickerCombo->blockSignals(true);
+            m_shapePickerCombo->setCurrentIndex(selectedShape);
+            m_shapePickerCombo->blockSignals(false);
+        }
+        rebuildPivot();
+        updatePivotInfo();
         glWidget->update();
     }
 }
@@ -2835,4 +2916,94 @@ void NifViewportWidget::initParticleSystems()
     });
 
     ParticleEffectsParser::cleanup(systems);
+}
+
+void NifViewportWidget::populateShapePicker()
+{
+    if (!m_shapePickerCombo) return;
+    m_shapePickerCombo->blockSignals(true);
+    m_shapePickerCombo->clear();
+    for (int s = 0; s < shapeNames.size(); ++s) {
+        QString label = shapeNames[s];
+        if (label.isEmpty()) {
+            label = tr("Shape %1").arg(s);
+        }
+        m_shapePickerCombo->addItem(label);
+    }
+    if (selectedShape >= 0 && selectedShape < m_shapePickerCombo->count()) {
+        m_shapePickerCombo->setCurrentIndex(selectedShape);
+    }
+    m_shapePickerCombo->blockSignals(false);
+}
+
+void NifViewportWidget::setSelectedShapeByName(const QString& name)
+{
+    if (name.isEmpty()) return;
+    for (int s = 0; s < shapeNames.size(); ++s) {
+        QString label = shapeNames[s];
+        if (label.isEmpty()) {
+            label = tr("Shape %1").arg(s);
+        }
+        if (label == name) {
+            selectedShape = s;
+            highlightEnabled = true;
+            m_bboxVBO.dirty = true;
+            rebuildPivot();
+            updatePivotInfo();
+            glWidget->update();
+            return;
+        }
+    }
+    selectedShape = -1;
+    rebuildPivot();
+    updatePivotInfo();
+    glWidget->update();
+}
+
+void NifViewportWidget::rebuildPivot()
+{
+    bool show = false;
+    QVector3D pos;
+    float armLen = 1.0f;
+
+    if (mSelectedRefIndex >= 0 && mSelectedRefIndex < cellReferences.size()) {
+        pos = cellReferences[mSelectedRefIndex].position;
+        armLen = 32.0f;
+        show = true;
+    } else if (selectedShape >= 0 && selectedShape < shapeBounds.size()) {
+        const QVector3D& bmin = shapeBounds[selectedShape].first;
+        const QVector3D& bmax = shapeBounds[selectedShape].second;
+        pos = (bmin + bmax) * 0.5f;
+        const float diag = (bmax - bmin).length();
+        armLen = diag > 0.0f ? qMax(0.5f, diag * 0.05f) : 0.5f;
+        show = true;
+    }
+
+    m_pivotVisible = show;
+    m_pivotPosition = pos;
+    m_pivotVerts.clear();
+    m_pivotVBO.dirty = true;
+
+    if (!show) return;
+
+    m_pivotVerts.reserve(6);
+    m_pivotVerts.append({pos, QVector3D(1.0f, 0.2f, 0.2f)});
+    m_pivotVerts.append({pos + QVector3D(armLen, 0.0f, 0.0f), QVector3D(1.0f, 0.2f, 0.2f)});
+    m_pivotVerts.append({pos, QVector3D(0.2f, 1.0f, 0.2f)});
+    m_pivotVerts.append({pos + QVector3D(0.0f, armLen, 0.0f), QVector3D(0.2f, 1.0f, 0.2f)});
+    m_pivotVerts.append({pos, QVector3D(0.3f, 0.3f, 1.0f)});
+    m_pivotVerts.append({pos + QVector3D(0.0f, 0.0f, armLen), QVector3D(0.3f, 0.3f, 1.0f)});
+}
+
+void NifViewportWidget::updatePivotInfo()
+{
+    if (!m_pivotInfoLabel) return;
+    if (!m_pivotVisible) {
+        m_pivotInfoLabel->setText(tr("No pivot"));
+        return;
+    }
+    m_pivotInfoLabel->setText(QStringLiteral("Pivot: (%1, %2, %3)")
+        .arg(m_pivotPosition.x(), 0, 'f', 3)
+        .arg(m_pivotPosition.y(), 0, 'f', 3)
+        .arg(m_pivotPosition.z(), 0, 'f', 3));
 }

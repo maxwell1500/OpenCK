@@ -24,6 +24,9 @@
 #include "packdatawidget.hpp"
 #include "worldspacedatawidget.hpp"
 #include "locationdatawidget.hpp"
+#include "factdatawidget.hpp"
+#include "hazddatawidget.hpp"
+#include "regndatawidget.hpp"
 #include "scenetimelinewidget.hpp"
 #include "navmesheditordialog.hpp"
 #include "rawsubrecordwidget.hpp"
@@ -186,6 +189,21 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             QStringLiteral("QUST"),
             [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
                 return new QuestDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("FACT"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new FactDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("HAZD"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new HazdDataWidget(recPtr, comps, parent);
+            });
+        QtFormDialogManager::instance().registerFactory(
+            QStringLiteral("REGN"),
+            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new RegnDataWidget(recPtr, comps, parent);
             });
         QtFormDialogManager::instance().registerFactory(
             QStringLiteral("CREA"),
@@ -868,7 +886,34 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             FactRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("FACT"), &rec.components, &rec, this);
+        }
+        break;
+    }
+    case CkId::Type_Regn_:
+    {
+        auto& collection = mData->getRegnCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            RegionRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("REGN"), &rec.components, &rec, this);
+        }
+        break;
+    }
+    case CkId::Type_Hazd_:
+    {
+        auto& collection = mData->getHazdCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            HazdRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openck::QtFormDialogManager::instance().openOrFocus(
+                formIdKey, QStringLiteral("HAZD"), &rec.components, &rec, this);
         }
         break;
     }

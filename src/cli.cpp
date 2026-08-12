@@ -8,7 +8,9 @@
 #include "libs/files/data/dataexporter.hpp"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFileInfo>
+#include <QProcess>
 #include <QString>
 #include <QTextStream>
 
@@ -150,6 +152,51 @@ int cmdExport(const QStringList& args)
     return 1;
 }
 
+int cmdSelfTest()
+{
+    const QString dir = QCoreApplication::applicationDirPath();
+    const QFileInfoList tests = QDir(dir).entryInfoList(
+        QStringList() << QStringLiteral("test_*.exe"), QDir::Files, QDir::Name);
+
+    QTextStream out(stdout);
+    int passed = 0;
+    int failed = 0;
+    for (const QFileInfo& info : tests)
+    {
+        QProcess process;
+        process.setProcessChannelMode(QProcess::MergedChannels);
+        process.start(info.absoluteFilePath());
+        // Game-data tests (e.g. test_archivebrowser opening a real BSA) can
+        // legitimately take minutes in a Debug build; keep a generous ceiling
+        // that still terminates a wedged test.
+        if (!process.waitForFinished(600000))
+        {
+            process.kill();
+            process.waitForFinished();
+            ++failed;
+            out << "FAIL " << info.fileName() << " (did not finish)\n";
+        }
+        else if (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0)
+        {
+            ++passed;
+            out << "PASS " << info.fileName() << "\n";
+        }
+        else
+        {
+            ++failed;
+            out << "FAIL " << info.fileName() << " (exit code "
+                << process.exitCode() << ")\n";
+        }
+        out.flush();
+    }
+
+    out << QStringLiteral("SELFTEST: %1 passed, %2 failed, %3 total\n")
+        .arg(passed).arg(failed).arg(tests.size());
+    out.flush();
+    LOG_INFO(QString("CLI selftest: %1 passed, %2 failed").arg(passed).arg(failed));
+    return failed == 0 && !tests.isEmpty() ? 0 : 1;
+}
+
 } // namespace
 
 QString usage()
@@ -158,6 +205,7 @@ QString usage()
         "OpenCK command-line interface\n"
         "  openck --cli export <plugin> [--format json|csv|xml] [--out path] [--types T1,T2]\n"
         "  openck --cli info <plugin>\n"
+        "  openck --cli selftest\n"
         "  openck --cli help\n");
 }
 
@@ -198,6 +246,11 @@ int run(int argc, char* argv[])
     if (cliArgs[0] == "export")
     {
         return cmdExport(cliArgs.mid(1));
+    }
+
+    if (cliArgs[0] == "selftest")
+    {
+        return cmdSelfTest();
     }
 
     QTextStream(stdout) << "Unknown command: " << cliArgs[0] << "\n" << usage();

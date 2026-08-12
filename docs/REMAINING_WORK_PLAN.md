@@ -108,15 +108,15 @@
 
 ---
 
-## Phase F — Feature surface: next release candidates ◐ (pick 1–2)
+## Phase F — Feature surface: next release candidates ✅
 
 | # | Candidate | Where | Scope | Priority |
 |---|-----------|-------|-------|----------|
-| F1 | Render preview polish | `nifviewportwidget` | Mesh picker, pivot display, floor grid, camera presets — high demo value, near-term. | High |
+| F1 | Render preview polish | `nifviewportwidget` | ✅ Done (2026-08-12) — mesh picker combo (shape selection by name, sets highlight + bbox), pivot display (OverlayVBO cross at selected shape position + info label), floor-grid toggle, camera presets (Front/Top/Side/Isometric/Reset). | High |
 | F2 | Layout save/load UI | `windowlayout.cpp` | ✅ Done (verified 2026-08-12) — already wired: `actionSaveLayout`/`actionLoadLayout` enabled + connected (`mainwindow.cpp:199-202`); handlers (`mainwindow.cpp:1066/1081`) open a `QFileDialog` and call `WindowLayout::saveLayout`/`restoreLayout`. Stale row; no work needed. | High (cheap) |
-| F3 | Specialized editor wizards | `src/view/window/*datawidget*` | CREA (exists), RACE, CLAS, FACT, WTHR, HAZARD, REGN widgets as `QtFormDialog` factories. | Medium |
-| F4 | `Tests` menu (A5) + headless self-test | `mainwindow.cpp`, CLI | "Run All Tests" invoking the headless CLI; test log viewer. | Medium |
-| F5 | Behavior graph editor breadth | `NodeGraphWidget` | More node types + saved graphs. | Low |
+| F3 | Specialized editor wizards | `src/view/window/*datawidget*` | ✅ Done (2026-08-12) — added FACT/HAZD/REGN data widgets as QtFormDialog factories (`factdatawidget`/`hazddatawidget`/`regndatawidget`, mirroring classdatawidget), registered in objectwindowdialog.cpp and routed from editSelected with the record-type string. RACE/CLAS/WTHR/CREA/etc. already existed. | Medium |
+| F4 | `Tests` menu (A5) + headless self-test | `mainwindow.cpp`, CLI | ✅ Done (2026-08-12) — `openck --cli selftest` runs every `test_*.exe` next to the exe (per-test 600s ceiling for game-data tests), prints PASS/FAIL + summary, exit 0 iff all pass; "Tests → Run All Tests" menu (programmatic, before Help) streams output into a `TestLogDialog` log viewer. | Medium |
+| F5 | Behavior graph editor breadth | `NodeGraphWidget` | ✅ Done (2026-08-12) — 6 new control-flow node types (Set_Value/If_Else_Branch/Loop/Wait/Event_Handler/Return) with distinct header accents + diamond badge; graph save/load as JSON (`*.ngraph`) via `NodeGraph::save/load` with validation + atomic swap; `NodeGraphWidget::saveToFile/loadFromFile`. | Low |
 
 ---
 
