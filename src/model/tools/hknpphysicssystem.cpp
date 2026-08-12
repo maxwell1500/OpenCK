@@ -33,6 +33,50 @@ float leF32(const QByteArray& b, qint64 pos)
     return v;
 }
 
+void putU32le(QByteArray& b, qint64 pos, quint32 v)
+{
+    if (pos < 0 || pos + 4 > b.size()) return;
+    b[static_cast<int>(pos)] = static_cast<char>(v & 0xFF);
+    b[static_cast<int>(pos + 1)] = static_cast<char>((v >> 8) & 0xFF);
+    b[static_cast<int>(pos + 2)] = static_cast<char>((v >> 16) & 0xFF);
+    b[static_cast<int>(pos + 3)] = static_cast<char>((v >> 24) & 0xFF);
+}
+
+void appendU32le(QByteArray& b, quint32 v)
+{
+    b.append(static_cast<char>(v & 0xFF));
+    b.append(static_cast<char>((v >> 8) & 0xFF));
+    b.append(static_cast<char>((v >> 16) & 0xFF));
+    b.append(static_cast<char>((v >> 24) & 0xFF));
+}
+
+void appendU32be(QByteArray& b, quint32 v)
+{
+    b.append(static_cast<char>((v >> 24) & 0xFF));
+    b.append(static_cast<char>((v >> 16) & 0xFF));
+    b.append(static_cast<char>((v >> 8) & 0xFF));
+    b.append(static_cast<char>(v & 0xFF));
+}
+
+void appendF32le(QByteArray& b, float v)
+{
+    quint32 raw = 0;
+    memcpy(&raw, &v, sizeof(raw));
+    appendU32le(b, raw);
+}
+
+// TAG0-style 8-byte header {decorator<<24 | size_with_header} + fourcc + body.
+// Mirrors kaosnyrb hk_encode.py: DATA/ITEM/PTCH are leaves (0x40), TAG0/INDX
+// are parents (0x00). read() masks off the decorator either way.
+QByteArray packChunk(const QByteArray& fourcc, quint32 decorator, const QByteArray& body)
+{
+    QByteArray out;
+    appendU32be(out, ((decorator & 0xFF) << 24) | ((8u + static_cast<quint32>(body.size())) & 0xFFFFFF));
+    out.append(fourcc);
+    out.append(body);
+    return out;
+}
+
 } // namespace
 
 HknpPhysicsSystem HknpPhysicsSystem::read(const QByteArray& block)
@@ -128,6 +172,94 @@ HknpPhysicsSystem HknpPhysicsSystem::read(const QByteArray& block)
     sys.readPolytopeArrays();
     sys.ok = true;
     return sys;
+}
+
+QByteArray HknpPhysicsSystem::encode(const QString& sdkvVersion,
+                                     const QByteArray& typeBody,
+                                     const ConvexShapeData& shape,
+                                     const QVector<Patch>& patches)
+{
+    // DATA body: 608-byte fixed prefix (system metadata + hknpConvexShape,
+    // zero-filled -- read() only interprets the hkRelArray fields) with the six
+    // hkRelArray item indices at +556..+603, then the polytope arrays laid out
+    // 16-byte aligned from offset 608, exactly like hk_encode.py.
+    QByteArray dataBody(608, '\0');
+    for (int k = 0; k < 6; ++k)
+    {
+        putU32le(dataBody, 556 + 8 * k, static_cast<quint32>(k));
+        putU32le(dataBody, 560 + 8 * k, 0);
+    }
+
+    quint32 itemData[6] = { 0, 0, 0, 0, 0, 0 };
+    quint32 itemCount[6] = { 0, 0, 0, 0, 0, 0 };
+
+    const auto align16 = [&dataBody]() {
+        while (dataBody.size() % 16 != 0) dataBody.append('\0');
+    };
+
+    align16();
+    itemData[0] = static_cast<quint32>(dataBody.size());
+    itemCount[0] = static_cast<quint32>(shape.vertices.size());
+    for (const QVector<float>& v : shape.vertices)
+        for (float f : v) appendF32le(dataBody, f);
+
+    align16();
+    itemData[1] = static_cast<quint32>(dataBody.size());
+    itemCount[1] = static_cast<quint32>(shape.planes.size());
+    for (const QVector<float>& p : shape.planes)
+        for (float f : p) appendF32le(dataBody, f);
+
+    align16();
+    itemData[2] = static_cast<quint32>(dataBody.size());
+    itemCount[2] = static_cast<quint32>(shape.faces.size());
+    for (quint32 f : shape.faces) appendU32le(dataBody, f);
+
+    align16();
+    itemData[3] = static_cast<quint32>(dataBody.size());
+    itemCount[3] = static_cast<quint32>(shape.indices.size());
+    dataBody.append(reinterpret_cast<const char*>(shape.indices.constData()),
+                    shape.indices.size());
+
+    align16();
+    itemData[4] = static_cast<quint32>(dataBody.size());
+    itemCount[4] = static_cast<quint32>(shape.faceLinks.size());
+    for (quint32 e : shape.faceLinks) appendU32le(dataBody, e);
+
+    align16();
+    itemData[5] = static_cast<quint32>(dataBody.size());
+    itemCount[5] = static_cast<quint32>(shape.vertexEdges.size());
+    for (quint32 e : shape.vertexEdges) appendU32le(dataBody, e);
+
+    align16();
+
+    QByteArray itemBody;
+    for (int k = 0; k < 6; ++k)
+    {
+        appendU32le(itemBody, shape.itemTypeIdx.value(k));
+        appendU32le(itemBody, itemData[k]);
+        appendU32le(itemBody, itemCount[k]);
+    }
+
+    QByteArray patchBody;
+    for (const Patch& p : patches)
+    {
+        appendU32le(patchBody, static_cast<quint32>(p.typeIdx));
+        appendU32le(patchBody, static_cast<quint32>(p.offsets.size()));
+        for (quint32 o : p.offsets) appendU32le(patchBody, o);
+    }
+
+    const QByteArray sdkvBytes = packChunk("SDKV", 0x00, sdkvVersion.toLatin1());
+    const QByteArray dataBytes = packChunk("DATA", 0x40, dataBody);
+    const QByteArray typeBytes = packChunk("TYPE", 0x00, typeBody);
+    const QByteArray indxBytes = packChunk("INDX", 0x00,
+        packChunk("ITEM", 0x40, itemBody) + packChunk("PTCH", 0x40, patchBody));
+    const QByteArray tag0Bytes = packChunk("TAG0", 0x00,
+        sdkvBytes + dataBytes + typeBytes + indxBytes);
+
+    QByteArray block;
+    appendU32le(block, static_cast<quint32>(tag0Bytes.size()));
+    block.append(tag0Bytes);
+    return block;
 }
 
 void HknpPhysicsSystem::readPolytopeArrays()

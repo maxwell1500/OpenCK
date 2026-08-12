@@ -15,6 +15,7 @@
 #include "libs/files/esm/npcrecord.hpp"
 #include "libs/files/esm/alchrecord.hpp"
 #include "libs/files/esm/refrecord.hpp"
+#include "libs/files/esm/locationrecord.hpp"
 #include "libs/components/tier2_components.hpp"
 #include "libs/files/filepaths.hpp"
 #include "logger.hpp"
@@ -57,6 +58,8 @@ private slots:
     void testCompactorRewritesTypedReferences();
     void testCompactorRewritesRawAndComponentReferences();
     void testCompactorRewritesRefrRawLayouts();
+    void testCompactorRewritesStarfieldLctnRawLayouts();
+    void testCompactorLeavesXprmByteIdentical();
     void testCompactorTooManyRecords();
     void testLightMasterFlagRoundTrip();
 };
@@ -270,16 +273,16 @@ void TestEsl::testCompactorRewritesRefrRawLayouts()
     statCol.add(target);
 
     // REFR raw subrecords whose payload layouts are now interpreted:
-    // XAPR (u32 count then {ref, float} pairs), XLKR (FormIDs at every 4
-    // bytes, including the keyword slot at 0), XTEL (refs at 0 and 32),
-    // XMBR (ref at 0), XLRT (u32 count then one FormID per 4 bytes).
+    // XAPR ({ref FormID, delay float} per subrecord), XLKR (FormIDs at every
+    // 4 bytes, including the keyword slot at 0), XTEL (refs at 0 and 32),
+    // XMBR (ref at 0), XLRT (one FormID per 4 bytes, no count prefix).
     RefrRecord refr;
     refr.editorId = "RefA";
     refr.formId = 0x00100030;
     {
         RawSubRecord raw;
         raw.name = NAME('XAPR');
-        raw.data = rawFormId(1) + rawFormId(0x00100050) + rawFormId(0x3F800000); // count, ref, delay 1.0f
+        raw.data = rawFormId(0x00100050) + rawFormId(0x3F800000); // ref, delay 1.0f
         refr.rawSubRecords.push_back(raw);
     }
     {
@@ -307,7 +310,7 @@ void TestEsl::testCompactorRewritesRefrRawLayouts()
     {
         RawSubRecord raw;
         raw.name = NAME('XLRT');
-        raw.data = rawFormId(2) + rawFormId(0x00100050) + rawFormId(0x00100050);
+        raw.data = rawFormId(0x00100050) + rawFormId(0x00100050);
         refr.rawSubRecords.push_back(raw);
     }
     refrCol.add(refr);
@@ -321,9 +324,8 @@ void TestEsl::testCompactorRewritesRefrRawLayouts()
 
     const RefrRecord& saved = refrCol.getRecord(0).get();
     QCOMPARE(saved.rawSubRecords.size(), 5);
-    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 0), 1u);            // XAPR count
-    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 4), newTarget);     // XAPR ref
-    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 8), 0x3F800000u);   // XAPR delay kept
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 0), newTarget);     // XAPR ref
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 4), 0x3F800000u);   // XAPR delay kept
     QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 0), newTarget);     // XLKR keyword slot
     QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 4), newTarget);
     QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 8), newTarget);
@@ -331,9 +333,137 @@ void TestEsl::testCompactorRewritesRefrRawLayouts()
     QCOMPARE(rawU32(saved.rawSubRecords.at(2).data, 0), newTarget);     // XTEL door
     QCOMPARE(rawU32(saved.rawSubRecords.at(2).data, 32), newTarget);    // XTEL interior
     QCOMPARE(rawU32(saved.rawSubRecords.at(3).data, 0), newTarget);     // XMBR
-    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 0), 2u);            // XLRT count
-    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 4), newTarget);     // XLRT refs
-    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 8), newTarget);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 0), newTarget);     // XLRT refs
+    QCOMPARE(rawU32(saved.rawSubRecords.at(4).data, 4), newTarget);
+}
+
+void TestEsl::testCompactorRewritesStarfieldLctnRawLayouts()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& statCol = data.getStatCollection();
+    auto& locCol = data.getLocationCollection();
+
+    // Owned target the raw refs below point at.
+    StatRecord target;
+    target.editorId = "Target";
+    target.formId = 0x00100050;
+    statCol.add(target);
+
+    // Starfield's LCTN rebuild arrays (documented in xEdit wbDefinitionsSF1,
+    // wbRecord(LCTN)) carry FormIDs at fixed offsets inside each fixed-size
+    // entry: LCUR {base, placed, location} 12-byte triplets, LCID a plain
+    // FormID array, LCEP {ref, enable parent, flags, pad} 12-byte entries.
+    // PNAM (parentId) and the linked-ref groups are typed members.
+    LocationRecord loc;
+    loc.editorId = "LocA";
+    loc.formId = 0x00100030;
+    loc.parentId = 0x00100050;
+    {
+        LocationRecord::LinkedRef group;
+        group.refTypeId = 0x00100050;
+        group.linkedIds = { 0x00100050, 0x00200001 };
+        loc.linkedRefs.append(group);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('LCUR');
+        raw.data = rawFormId(0x00100050) + rawFormId(0x00200001) + rawFormId(0x00200002);
+        loc.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('LCID');
+        raw.data = rawFormId(0x00100050) + rawFormId(0x00200001);
+        loc.rawSubRecords.push_back(raw);
+    }
+    {
+        QByteArray lcep(12, '\0');
+        lcep.replace(0, 4, rawFormId(0x00100050));
+        lcep.replace(4, 4, rawFormId(0x00200001));
+        lcep[8] = '\x01';  // flags byte, not a FormID
+        RawSubRecord raw;
+        raw.name = NAME('LCEP');
+        raw.data = lcep;
+        loc.rawSubRecords.push_back(raw);
+    }
+    locCol.add(loc);
+
+    FormIdCompactor compactor(data);
+    QCOMPARE(compactor.compact(), 2);
+
+    // Owned IDs 0x00100030/0x50 sort to locals 0/1, so the target becomes
+    // 0x00100001.
+    const quint32 newTarget = 0x00100001u;
+
+    const LocationRecord& saved = locCol.getRecord(0).get();
+    QCOMPARE(saved.parentId, newTarget);
+    QCOMPARE(saved.linkedRefs.size(), 1);
+    QCOMPARE(saved.linkedRefs.at(0).refTypeId, newTarget);
+    QCOMPARE(saved.linkedRefs.at(0).linkedIds.size(), 2);
+    QCOMPARE(saved.linkedRefs.at(0).linkedIds.at(0), newTarget);
+    QCOMPARE(saved.linkedRefs.at(0).linkedIds.at(1), static_cast<quint32>(0x00200001));
+
+    QCOMPARE(saved.rawSubRecords.size(), 3);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 0), newTarget);        // LCUR base
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 4), static_cast<quint32>(0x00200001));
+    QCOMPARE(rawU32(saved.rawSubRecords.at(0).data, 8), static_cast<quint32>(0x00200002));
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 0), newTarget);        // LCID
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 4), static_cast<quint32>(0x00200001));
+    QCOMPARE(rawU32(saved.rawSubRecords.at(2).data, 0), newTarget);        // LCEP ref
+    QCOMPARE(rawU32(saved.rawSubRecords.at(2).data, 4), static_cast<quint32>(0x00200001));
+    QCOMPARE(static_cast<quint8>(saved.rawSubRecords.at(2).data.at(8)), 0x01u);  // flags untouched
+}
+
+void TestEsl::testCompactorLeavesXprmByteIdentical()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& statCol = data.getStatCollection();
+    auto& refrCol = data.getRefrCollection();
+
+    // Owned target the raw XLMS ref below points at.
+    StatRecord target;
+    target.editorId = "Target";
+    target.formId = 0x00100050;
+    statCol.add(target);
+
+    // XPRM is a primitive descriptor (bounds, color, shape type) with no
+    // FormID slots (xEdit wbDefinitionsSF1 wbStruct(XPRM,...)); its payload
+    // must round-trip byte-for-byte even when it happens to contain a value
+    // that equals an owned record's old FormID.
+    RefrRecord refr;
+    refr.editorId = "RefA";
+    refr.formId = 0x00100030;
+    {
+        QByteArray xprm(32, '\0');
+        xprm.replace(0, 4, rawFormId(0x00100050));   // looks like a ref, is a float
+        xprm.replace(4, 4, rawFormId(0x3F800000));   // 1.0f
+        RawSubRecord raw;
+        raw.name = NAME('XPRM');
+        raw.data = xprm;
+        refr.rawSubRecords.push_back(raw);
+    }
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XLMS');
+        raw.data = rawFormId(0x00100050) + rawFormId(0x00200001);
+        refr.rawSubRecords.push_back(raw);
+    }
+    refrCol.add(refr);
+
+    const QByteArray xprmBefore = refrCol.getRecord(0).get().rawSubRecords.at(0).data;
+
+    FormIdCompactor compactor(data);
+    QCOMPARE(compactor.compact(), 2);
+
+    // The XPRM payload is byte-identical; the neighbouring FormID-bearing
+    // XLMS array is rewritten as expected.
+    const RefrRecord& saved = refrCol.getRecord(0).get();
+    QCOMPARE(saved.rawSubRecords.size(), 2);
+    QCOMPARE(saved.rawSubRecords.at(0).data, xprmBefore);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 0), 0x00100001u);
+    QCOMPARE(rawU32(saved.rawSubRecords.at(1).data, 4), static_cast<quint32>(0x00200001));
 }
 
 void TestEsl::testCompactorTooManyRecords()

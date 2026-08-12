@@ -14,15 +14,19 @@ class Data;
 /// Scope: rewrites each owned record's own formId plus the FormID reference
 /// fields that record types expose as typed members (e.g. RELA parent/child,
 /// SHOU words, ECZN zone/location, IPDS impact list, HAZD image space, IPCT
-/// effect). It also rewrites the known FormID-bearing raw subrecords of the
-/// common record types (cell, refr, npc, dial, quest, alch/ingr/ench/spell/
-/// magic EFID, and the KWDA keyword arrays on the keyword-using records) and
-/// the simple FormID members of the TESEnchantableForm and
-/// BGSPickupPutdownSounds components. The placed-reference table covers the
-/// FO4/Starfield rebuild fields (XAPR, XLKR, XLRT, XTEL, XLYR, XMSP, XRFG,
-/// XMBR, XASP, XEZN, XLRL). XPRM carries no FormIDs (a primitive descriptor
-/// of bounds, color and shape type), so no rewrite is needed there. Raw
-/// payloads whose FormID layout is otherwise unknown are left untouched.
+/// effect, LCTN parent/linked refs). It also rewrites the known FormID-bearing
+/// raw subrecords of the common record types (cell, refr, npc, dial, quest,
+/// alch/ingr/ench/spell/magic EFID, and the KWDA keyword arrays on the
+/// keyword-using records), the FO4/Starfield placed-reference table (XAPR,
+/// XLKR, XLRT, XTEL, XLYR, XMSP, XRFG, XMBR, XASP, XEZN, XLRL plus the
+/// Starfield-only XLCN/XTNM/XPCK/XPCS/XLIB/XATR/XNDP/XSAD/XCZR/XCZC/TODD/
+/// GNAM/HNAM/JNAM/XCOL/XLOC/XVL2/XLMS/XPDO/XPLK), the Starfield LCTN rebuild
+/// arrays (ACPR/LCPR/RCPR/ACUR/LCUR/RCUR/ACUN/LCUN/RCUN/ACSR/LCSR/RCSR/
+/// ACID/LCID/ACEP/LCEP/ACEC/LCEC/RCEC), and the simple FormID members of the
+/// TESEnchantableForm and BGSPickupPutdownSounds components. XPRM carries no
+/// FormIDs (a primitive descriptor of bounds, color and shape type), so no
+/// rewrite is needed there. Raw payloads whose FormID layout is otherwise
+/// unknown are left untouched.
 class FormIdCompactor
 {
 public:

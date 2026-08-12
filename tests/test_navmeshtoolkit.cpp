@@ -21,6 +21,11 @@ private slots:
     void testGenerateGridSteepSlopeDropped();
     void testGeneratorTriangleFan();
     void testGeneratorKeepsWalkableOnly();
+    void testVoxelFilterFlatFloor();
+    void testVoxelFilterStaircase();
+    void testVoxelFilterRamp();
+    void testVoxelFilterBlockedHeadroom();
+    void testVoxelFilterDegenerate();
     void testComputeCoverData();
 };
 
@@ -292,6 +297,191 @@ void TestNavMeshToolkit::testGeneratorKeepsWalkableOnly()
         // Only triangles with an upward normal survive the filter.
         QVERIFY(tri.normal.y() > 0.9f);
     }
+}
+
+void TestNavMeshToolkit::testVoxelFilterFlatFloor()
+{
+    // Flat 2x2-cell floor at y=0 on a shared 3x3 vertex grid. cellSize =
+    // 2*agentRadius = 72, so the four cells (0,0),(1,0),(0,1),(1,1) must all
+    // be walkable and all eight triangles kept. This is the acceptance signal
+    // for the voxel filter.
+    NavMeshGenerator generator;
+    QVector<QVector3D> verts;
+    QVector<unsigned int> indices;
+    const float cs = 72.0f;
+    for (int z = 0; z < 3; ++z)
+        for (int x = 0; x < 3; ++x)
+            verts.append(QVector3D(x * cs, 0, z * cs));
+    auto idx = [](int x, int z) { return unsigned(z * 3 + x); };
+    for (int z = 0; z < 2; ++z) {
+        for (int x = 0; x < 2; ++x) {
+            const unsigned int tl = idx(x, z);
+            const unsigned int tr = idx(x + 1, z);
+            const unsigned int bl = idx(x, z + 1);
+            const unsigned int br = idx(x + 1, z + 1);
+            indices << tl << br << tr
+                    << tl << bl << br;
+        }
+    }
+
+    const NavMeshGenerator::NavMesh mesh = generator.generateFromVertices(verts, indices);
+
+    QCOMPARE(mesh.vertices.size(), 9);
+    QCOMPARE(mesh.triangles.size(), 8);
+    QCOMPARE(mesh.cells.size(), 4);
+    QVERIFY(mesh.cells.contains(qMakePair(0, 0)));
+    QVERIFY(mesh.cells.contains(qMakePair(1, 0)));
+    QVERIFY(mesh.cells.contains(qMakePair(0, 1)));
+    QVERIFY(mesh.cells.contains(qMakePair(1, 1)));
+}
+
+void TestNavMeshToolkit::testVoxelFilterStaircase()
+{
+    // Three 24-unit steps (well under stepHeight 48) plus vertical risers.
+    // Every tread must stay walkable; the risers are non-walkable and must
+    // not block the tread cells they border.
+    NavMeshGenerator generator;
+    QVector<QVector3D> verts;
+    QVector<unsigned int> indices;
+    const float cs = 72.0f;
+    const float rise = 24.0f;
+    for (int k = 0; k < 3; ++k) {
+        const float z0 = k * cs;
+        const float y = k * rise;
+        const unsigned int base = verts.size();
+        verts << QVector3D(0, y, z0)
+              << QVector3D(cs, y, z0)
+              << QVector3D(cs, y, z0 + cs)
+              << QVector3D(0, y, z0 + cs);
+        indices << base << base + 2 << base + 1
+                << base << base + 3 << base + 2;
+        if (k < 2) {
+            const unsigned int rb = verts.size();
+            verts << QVector3D(0, y, z0 + cs)
+                  << QVector3D(cs, y, z0 + cs)
+                  << QVector3D(cs, y + rise, z0 + cs)
+                  << QVector3D(0, y + rise, z0 + cs);
+            indices << rb << rb + 1 << rb + 2
+                    << rb << rb + 2 << rb + 3;
+        }
+    }
+
+    const NavMeshGenerator::NavMesh mesh = generator.generateFromVertices(verts, indices);
+
+    QCOMPARE(mesh.triangles.size(), 6);
+    QCOMPARE(mesh.cells.size(), 3);
+    QVERIFY(mesh.cells.contains(qMakePair(0, 0)));
+    QVERIFY(mesh.cells.contains(qMakePair(0, 1)));
+    QVERIFY(mesh.cells.contains(qMakePair(0, 2)));
+}
+
+void TestNavMeshToolkit::testVoxelFilterRamp()
+{
+    // A 30-degree ramp (rise 41.57 over a 72 run) is walkable; a 60-degree
+    // ramp (rise 124.7) exceeds maxSlope 45 and must be dropped entirely.
+    NavMeshGenerator generator;
+
+    QVector<QVector3D> verts;
+    QVector<unsigned int> indices;
+    const float cs = 72.0f;
+    const unsigned int base = verts.size();
+    verts << QVector3D(0, 0, 0)          // p0: low x
+          << QVector3D(cs, 41.57f, 0)    // p1: high x
+          << QVector3D(cs, 41.57f, cs)   // p2: high x, high z
+          << QVector3D(0, 0, cs);        // p3: low x, high z
+    indices << base + 1 << base + 0 << base + 3
+            << base + 2 << base + 1 << base + 3;
+
+    NavMeshGenerator::NavMesh mesh = generator.generateFromVertices(verts, indices);
+    QCOMPARE(mesh.triangles.size(), 2);
+    QCOMPARE(mesh.cells.size(), 1);
+    QVERIFY(mesh.cells.contains(qMakePair(0, 0)));
+
+    QVector<QVector3D> steepVerts;
+    QVector<unsigned int> steepIndices;
+    const unsigned int sb = steepVerts.size();
+    steepVerts << QVector3D(0, 0, 0)
+               << QVector3D(cs, 124.71f, 0)
+               << QVector3D(cs, 124.71f, cs)
+               << QVector3D(0, 0, cs);
+    steepIndices << sb + 1 << sb + 0 << sb + 3
+                 << sb + 2 << sb + 1 << sb + 3;
+
+    mesh = generator.generateFromVertices(steepVerts, steepIndices);
+    QCOMPARE(mesh.triangles.size(), 0);
+    QCOMPARE(mesh.cells.size(), 0);
+}
+
+void TestNavMeshToolkit::testVoxelFilterBlockedHeadroom()
+{
+    // A ceiling 100 units over a floor (between stepHeight 48 and
+    // agentHeight 176) blocks the cell; a ceiling 300 units up does not.
+    NavMeshGenerator generator;
+    const float cs = 72.0f;
+
+    auto floorWithCeiling = [&](float ceilY) {
+        QVector<QVector3D> verts;
+        QVector<unsigned int> indices;
+        const unsigned int fb = verts.size();
+        verts << QVector3D(0, 0, 0)
+              << QVector3D(cs, 0, 0)
+              << QVector3D(cs, 0, cs)
+              << QVector3D(0, 0, cs);
+        indices << fb << fb + 2 << fb + 1
+                << fb << fb + 3 << fb + 2;
+        const unsigned int cb = verts.size();
+        verts << QVector3D(0, ceilY, 0)
+              << QVector3D(cs, ceilY, 0)
+              << QVector3D(cs, ceilY, cs)
+              << QVector3D(0, ceilY, cs);
+        // Ceiling wound downward so its normal points down (non-walkable).
+        indices << cb << cb + 1 << cb + 2
+                << cb << cb + 2 << cb + 3;
+        return generator.generateFromVertices(verts, indices);
+    };
+
+    // Low ceiling: headroom 100 < agentHeight 176 -> cell blocked.
+    NavMeshGenerator::NavMesh mesh = floorWithCeiling(100.0f);
+    QCOMPARE(mesh.triangles.size(), 0);
+    QCOMPARE(mesh.cells.size(), 0);
+
+    // High ceiling: headroom 300 >= agentHeight -> cell stays walkable.
+    mesh = floorWithCeiling(300.0f);
+    QCOMPARE(mesh.triangles.size(), 2);
+    QCOMPARE(mesh.cells.size(), 1);
+    QVERIFY(mesh.cells.contains(qMakePair(0, 0)));
+}
+
+void TestNavMeshToolkit::testVoxelFilterDegenerate()
+{
+    NavMeshGenerator generator;
+
+    // Degenerate triangle (two identical vertices) plus a valid floor quad:
+    // the degenerate face is skipped, the floor survives.
+    QVector<QVector3D> verts;
+    QVector<unsigned int> indices;
+    const float cs = 72.0f;
+    const unsigned int fb = verts.size();
+    verts << QVector3D(0, 0, 0)
+          << QVector3D(cs, 0, 0)
+          << QVector3D(cs, 0, cs)
+          << QVector3D(0, 0, cs);
+    indices << fb << fb + 2 << fb + 1
+            << fb << fb + 3 << fb + 2;
+    const unsigned int db = verts.size();
+    verts << QVector3D(10, 0, 10)
+          << QVector3D(10, 0, 10)
+          << QVector3D(20, 0, 10);
+    indices << db << db + 1 << db + 2;
+
+    NavMeshGenerator::NavMesh mesh = generator.generateFromVertices(verts, indices);
+    QCOMPARE(mesh.triangles.size(), 2);
+    QCOMPARE(mesh.cells.size(), 1);
+
+    // Empty input must produce an empty mesh without crashing.
+    mesh = generator.generateFromVertices({}, {});
+    QVERIFY(mesh.triangles.isEmpty());
+    QVERIFY(mesh.vertices.isEmpty());
 }
 
 void TestNavMeshToolkit::testComputeCoverData()

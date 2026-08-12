@@ -103,7 +103,9 @@ NavMeshGenerator::NavMesh NavMeshGenerator::generateFromVertices(
         triangles.append(tri);
     }
 
-    triangles = voxelFilter(triangles);
+    QVector<QPair<int,int>> cells;
+    triangles = voxelFilter(triangles, cells);
+    mesh.cells = cells;
 
     for (int i = 0; i < triangles.size(); ++i) {
         for (int j = i + 1; j < triangles.size(); ++j) {
@@ -130,11 +132,13 @@ NavMeshGenerator::NavMesh NavMeshGenerator::generateFromVertices(
 }
 
 QVector<NavMeshGenerator::NavTriangle> NavMeshGenerator::voxelFilter(
-    const QVector<NavTriangle>& triangles)
+    const QVector<NavTriangle>& triangles,
+    QVector<QPair<int,int>>& walkableCells)
 {
+    walkableCells.clear();
     if (triangles.isEmpty()) return {};
 
-    float cellSize = agentRadius * 2.0f;
+    const float cellSize = agentRadius * 2.0f;
 
     float minX = std::numeric_limits<float>::max();
     float minZ = std::numeric_limits<float>::max();
@@ -160,10 +164,33 @@ QVector<NavMeshGenerator::NavTriangle> NavMeshGenerator::voxelFilter(
 
     if (gridW <= 0 || gridH <= 0) return triangles;
 
-    QVector<bool> cellWalkable(gridW * gridH, false);
+    auto centroid = [](const NavTriangle& tri) {
+        return (tri.v0 + tri.v1 + tri.v2) / 3.0f;
+    };
+    auto cellIndex = [&](float cx, float cz) {
+        int gx = static_cast<int>(std::floor(cx / cellSize)) - gridMinX;
+        int gz = static_cast<int>(std::floor(cz / cellSize)) - gridMinZ;
+        if (gx < 0 || gx >= gridW || gz < 0 || gz >= gridH) return -1;
+        return gz * gridW + gx;
+    };
+
+    QVector<float> floorY(gridW * gridH, std::numeric_limits<float>::lowest());
+    QVector<bool> hasFloor(gridW * gridH, false);
+    QVector<bool> blocked(gridW * gridH, false);
 
     for (const auto& tri : triangles) {
         if (!isWalkable(tri)) continue;
+        const QVector3D c = centroid(tri);
+        const int idx = cellIndex(c.x(), c.z());
+        if (idx < 0) continue;
+        hasFloor[idx] = true;
+        const float top = std::max({tri.v0.y(), tri.v1.y(), tri.v2.y()});
+        if (top > floorY[idx]) floorY[idx] = top;
+    }
+
+    for (const auto& tri : triangles) {
+        if (QVector3D::crossProduct(tri.v1 - tri.v0, tri.v2 - tri.v0).lengthSquared() < 1e-8f)
+            continue;
 
         int triMinX = static_cast<int>(std::floor(
             std::min({tri.v0.x(), tri.v1.x(), tri.v2.x()}) / cellSize)) - gridMinX;
@@ -179,9 +206,15 @@ QVector<NavMeshGenerator::NavTriangle> NavMeshGenerator::voxelFilter(
         triMaxX = std::min(gridW - 1, triMaxX);
         triMaxZ = std::min(gridH - 1, triMaxZ);
 
+        const float lo = std::min({tri.v0.y(), tri.v1.y(), tri.v2.y()});
+        const float hi = std::max({tri.v0.y(), tri.v1.y(), tri.v2.y()});
+
         for (int z = triMinZ; z <= triMaxZ; ++z) {
             for (int x = triMinX; x <= triMaxX; ++x) {
-                cellWalkable[z * gridW + x] = true;
+                const int idx = z * gridW + x;
+                if (!hasFloor[idx]) continue;
+                if (hi > floorY[idx] + stepHeight && lo < floorY[idx] + agentHeight)
+                    blocked[idx] = true;
             }
         }
     }
@@ -189,32 +222,18 @@ QVector<NavMeshGenerator::NavTriangle> NavMeshGenerator::voxelFilter(
     QVector<NavTriangle> result;
     for (const auto& tri : triangles) {
         if (!isWalkable(tri)) continue;
+        const QVector3D c = centroid(tri);
+        const int idx = cellIndex(c.x(), c.z());
+        if (idx < 0) continue;
+        if (!hasFloor[idx] || blocked[idx]) continue;
+        result.append(tri);
+    }
 
-        int triMinX = static_cast<int>(std::floor(
-            std::min({tri.v0.x(), tri.v1.x(), tri.v2.x()}) / cellSize)) - gridMinX;
-        int triMinZ = static_cast<int>(std::floor(
-            std::min({tri.v0.z(), tri.v1.z(), tri.v2.z()}) / cellSize)) - gridMinZ;
-        int triMaxX = static_cast<int>(std::floor(
-            std::max({tri.v0.x(), tri.v1.x(), tri.v2.x()}) / cellSize)) - gridMinX;
-        int triMaxZ = static_cast<int>(std::floor(
-            std::max({tri.v0.z(), tri.v1.z(), tri.v2.z()}) / cellSize)) - gridMinZ;
-
-        triMinX = std::max(0, triMinX);
-        triMinZ = std::max(0, triMinZ);
-        triMaxX = std::min(gridW - 1, triMaxX);
-        triMaxZ = std::min(gridH - 1, triMaxZ);
-
-        bool inWalkableCell = false;
-        for (int z = triMinZ; z <= triMaxZ && !inWalkableCell; ++z) {
-            for (int x = triMinX; x <= triMaxX && !inWalkableCell; ++x) {
-                if (cellWalkable[z * gridW + x]) {
-                    inWalkableCell = true;
-                }
-            }
-        }
-
-        if (inWalkableCell) {
-            result.append(tri);
+    for (int gz = 0; gz < gridH; ++gz) {
+        for (int gx = 0; gx < gridW; ++gx) {
+            const int idx = gz * gridW + gx;
+            if (hasFloor[idx] && !blocked[idx])
+                walkableCells.append(qMakePair(gx + gridMinX, gz + gridMinZ));
         }
     }
 

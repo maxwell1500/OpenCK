@@ -90,6 +90,20 @@ void rewriteReferences<ShouRecord>(ShouRecord& rec, const QHash<quint32, quint32
     }
 }
 
+template <>
+void rewriteReferences<LocationRecord>(LocationRecord& rec, const QHash<quint32, quint32>& map)
+{
+    // PNAM (parent location) and the classic XNAM/LNAM linked-reference groups
+    // are FormID members documented in locationrecord.hpp.
+    rec.parentId = map.value(rec.parentId, rec.parentId);
+    for (LocationRecord::LinkedRef& group : rec.linkedRefs)
+    {
+        group.refTypeId = map.value(group.refTypeId, group.refTypeId);
+        for (quint32& id : group.linkedIds)
+            id = map.value(id, id);
+    }
+}
+
 // Rewrite FormIDs inside a record's opaque rawSubRecords. Only the known
 // (record type, subrecord name) payload layouts are interpreted; anything
 // else is preserved byte-for-byte because its FormID offsets are unknown.
@@ -119,6 +133,85 @@ void rewriteRawSubRecords<CellRecord>(CellRecord& rec, const QHash<quint32, quin
     }
 }
 
+// Starfield's LCTN record was rebuilt: the classic XNAM/LNAM linked-ref groups
+// were replaced by Add/Master/Removed arrays (ACPR/LCPR/.../LCEP). The layouts
+// below come from the community-documented record definition in xEdit
+// (wbDefinitionsSF1.pas, wbRecord(LCTN)), cross-checked against real
+// Starfield.esm subrecord payloads.
+template <>
+void rewriteRawSubRecords<LocationRecord>(LocationRecord& rec, const QHash<quint32, quint32>& map)
+{
+    for (RawSubRecord& raw : rec.rawSubRecords)
+    {
+        switch (raw.name)
+        {
+        case NAME('NAM1'):  // music type
+        case NAME('MNAM'):  // world location marker ref
+            rewriteRawFormId(raw.data, 0, map);
+            break;
+        case NAME('RCPR'):  // removed persist location refs
+        case NAME('RCUR'):  // removed unique base forms
+        case NAME('RCUN'):  // removed unique NPCs
+        case NAME('RCSR'):  // removed special refs
+        case NAME('ACID'):  // added initially disabled refs
+        case NAME('LCID'):  // master initially disabled refs
+            for (int off = 0; off + 4 <= raw.data.size(); off += 4)
+                rewriteRawFormId(raw.data, off, map);
+            break;
+        case NAME('ACPR'):  // added persist location refs (16-byte entries)
+        case NAME('LCPR'):  // master persist location refs (16-byte entries):
+                            // {ref, world/cell, s16 y, s16 x, u32}
+            for (int off = 0; off + 16 <= raw.data.size(); off += 16)
+            {
+                rewriteRawFormId(raw.data, off, map);
+                rewriteRawFormId(raw.data, off + 4, map);
+            }
+            break;
+        case NAME('ACEP'):  // added enable parent refs (12-byte entries)
+        case NAME('LCEP'):  // master enable parent refs (12-byte entries):
+                            // {ref, enable parent, u8 flags, u8[3]}
+            for (int off = 0; off + 12 <= raw.data.size(); off += 12)
+            {
+                rewriteRawFormId(raw.data, off, map);
+                rewriteRawFormId(raw.data, off + 4, map);
+            }
+            break;
+        case NAME('ACUR'):  // added unique base forms (12-byte entries)
+        case NAME('LCUR'):  // master unique base forms (12-byte entries):
+                            // {base, placed object, location}
+        case NAME('ACUN'):  // added unique NPCs (12-byte entries)
+        case NAME('LCUN'):  // master unique NPCs (12-byte entries): {npc, ref, location}
+            for (int off = 0; off + 12 <= raw.data.size(); off += 12)
+            {
+                rewriteRawFormId(raw.data, off, map);
+                rewriteRawFormId(raw.data, off + 4, map);
+                rewriteRawFormId(raw.data, off + 8, map);
+            }
+            break;
+        case NAME('ACSR'):  // added special refs (20-byte entries)
+        case NAME('LCSR'):  // master special refs (20-byte entries):
+                            // {ref type, ref, world/cell, s16 y, s16 x, u32}
+            for (int off = 0; off + 20 <= raw.data.size(); off += 20)
+            {
+                rewriteRawFormId(raw.data, off, map);
+                rewriteRawFormId(raw.data, off + 4, map);
+                rewriteRawFormId(raw.data, off + 8, map);
+            }
+            break;
+        case NAME('ACEC'):  // added worldspace cells: {world, then s16 grid pairs}
+        case NAME('LCEC'):  // master worldspace cells: {world, then s16 grid pairs}
+        case NAME('RCEC'):  // removed worldspace cells: {world, then s16 grid pairs}
+            rewriteRawFormId(raw.data, 0, map);
+            break;
+        case NAME('KWDA'):
+            rewriteKwdaArray(raw, map);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 template <>
 void rewriteRawSubRecords<RefrRecord>(RefrRecord& rec, const QHash<quint32, quint32>& map)
 {
@@ -126,46 +219,57 @@ void rewriteRawSubRecords<RefrRecord>(RefrRecord& rec, const QHash<quint32, quin
     {
         switch (raw.name)
         {
-        case NAME('XNAM'):  // enable parent
-        case NAME('XEMI'):  // ambient emission
-        case NAME('XLTW'):  // location weight override
-        case NAME('XMBO'):  // music override
-        case NAME('XCNT'):  // instance count (extra-data container)
-        case NAME('XPRD'):  // idle timer
-        case NAME('XEZN'):  // encounter zone override
+        case NAME('XEMI'):  // emitted light
+        case NAME('XLTW'):  // water
+        case NAME('XEZN'):  // encounter zone / location override
         case NAME('XLYR'):  // layer
         case NAME('XMSP'):  // material swap
         case NAME('XRFG'):  // reference group
         case NAME('XMBR'):  // multibound reference
-        case NAME('XASP'):  // unknown reference (projectile support)
+        case NAME('XASP'):  // acoustic restriction / projectile reference
         case NAME('XLRL'):  // location reference
+        case NAME('XLCN'):  // persist location (Starfield)
+        case NAME('XTNM'):  // teleport name (Starfield)
+        case NAME('XPCK'):  // reference group (Starfield)
+        case NAME('XPCS'):  // source pack-in (Starfield)
+        case NAME('XLIB'):  // leveled item base object (Starfield)
+        case NAME('XATR'):  // attach ref (Starfield)
+        case NAME('XNDP'):  // navmesh door link (Starfield)
+        case NAME('XSAD'):  // ship arrival target (Starfield)
+        case NAME('XCZR'):  // water current reference (Starfield)
+        case NAME('XCZC'):  // water current cell (Starfield)
+        case NAME('TODD'):  // time-of-day data (Starfield)
+        case NAME('GNAM'):  // grouped pack-in base (Starfield)
+        case NAME('HNAM'):  // grouped pack-in ref (Starfield)
+        case NAME('JNAM'):  // grouped pack-in base (Starfield)
             rewriteRawFormId(raw.data, 0, map);
             break;
-        case NAME('XAPR'):  // activate parent refs: u32 count, then {ref, delay}
-            if (raw.data.size() >= 4)
-            {
-                quint32 count = 0;
-                std::memcpy(&count, raw.data.constData(), 4);
-                for (quint32 i = 0; i < count && 4 + static_cast<quint64>(i) * 8 + 4 <= raw.data.size(); ++i)
-                    rewriteRawFormId(raw.data, 4 + static_cast<int>(i) * 8, map);
-            }
+        case NAME('XCOL'):  // collision layer: u32 layer index, then material FormID
+        case NAME('XLOC'):  // lock data: level + pad, then key FormID
+            rewriteRawFormId(raw.data, 4, map);
             break;
-        case NAME('XLRT'):  // location ref types: u32 count, one FormID per 4 bytes
-            if (raw.data.size() >= 4)
-            {
-                quint32 count = 0;
-                std::memcpy(&count, raw.data.constData(), 4);
-                for (quint32 i = 0; i < count; ++i)
-                    rewriteRawFormId(raw.data, 4 + static_cast<int>(i) * 4, map);
-            }
+        case NAME('XVL2'):  // volume data: 8 bytes unknown, then image-space and
+                            // fog-volume FormIDs (Starfield)
+            rewriteRawFormId(raw.data, 8, map);
+            rewriteRawFormId(raw.data, 12, map);
             break;
-        case NAME('XTEL'):  // teleport: legacy TES4 {cell, ref} at 0/4;
-                            // Skyrim+ {door, posrot, flags, interior} refs at 0/32
+        case NAME('XLMS'):  // layered material swaps (Starfield): one FormID per 4 bytes
+        case NAME('XPDO'):  // projected decal references (Starfield): one FormID per 4 bytes
+        case NAME('XLRT'):  // location ref types: one FormID per 4 bytes
+            for (int off = 0; off + 4 <= raw.data.size(); off += 4)
+                rewriteRawFormId(raw.data, off, map);
+            break;
+        case NAME('XAPR'):  // activate parent: each subrecord is {ref FormID, delay float}
+            rewriteRawFormId(raw.data, 0, map);
+            break;
+        case NAME('XPLK'):  // power link: each subrecord is {ref FormID, unknown u32}
+            rewriteRawFormId(raw.data, 0, map);
+            break;
+        case NAME('XTEL'):  // teleport: {door FormID, pos/rot, flags} then a
+                            // transition-interior FormID on Skyrim+ (refs at 0 and 32)
             rewriteRawFormId(raw.data, 0, map);
             if (raw.data.size() >= 36)
                 rewriteRawFormId(raw.data, 32, map);
-            else
-                rewriteRawFormId(raw.data, 4, map);
             break;
         case NAME('XLKR'):  // linked ref list: per-entry {keyword-or-type, ref},
                             // both slots on Skyrim/FO4 are FormIDs
@@ -287,7 +391,6 @@ OPENCK_KWDA_RAW_REWRITE(WeaponRecord)
 OPENCK_KWDA_RAW_REWRITE(ActiRecord)
 OPENCK_KWDA_RAW_REWRITE(DoorRecord)
 OPENCK_KWDA_RAW_REWRITE(FlorRecord)
-OPENCK_KWDA_RAW_REWRITE(LocationRecord)
 OPENCK_KWDA_RAW_REWRITE(CreatureRecord)
 
 #undef OPENCK_KWDA_RAW_REWRITE

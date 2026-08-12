@@ -91,15 +91,15 @@
 
 ---
 
-## Phase E — Technical debt register payoff ◐
+## Phase E — Technical debt register payoff ✅
 
 | # | Item | Action | Verify |
 |---|------|--------|--------|
-| E1 | **H1** FormIdCompactor opaque refs | Extend raw-subrecord FormID rewriting to XPRM + Starfield payloads (`formidcompactor.hpp`), add tests. | `test_esl` extended |
+| E1 | **H1** FormIdCompactor opaque refs | ✅ Done (2026-08-10) — audited against xEdit `wbDefinitionsSF1.pas` + real Starfield.esm dumps: XPRM confirmed FormID-free (bounds/color/type descriptor; test asserts byte-identical round-trip); added Starfield LCTN rebuild arrays (ACPR/LCPR/RCPR/ACUR/LCUR/RCUR/ACUN/LCUN/RCUN/ACSR/LCSR/RCSR/ACID/LCID/ACEP/LCEP/ACEC/LCEC/RCEC), Starfield REFR fields (XLCN/XTNM/XPCK/XPCS/XLIB/XATR/XNDP/XSAD/XCZR/XCZC/TODD/GNAM/HNAM/JNAM/XCOL/XLOC/XVL2/XLMS/XPDO/XPLK), and typed LCTN parent/linked refs; corrected prior wrong layouts (XAPR/XLRT/XTEL no count prefixes, XPRD/XCNT/XMBO/XNAM removed). Left untouched where undocumented (XSL1, LNAM group pack-in). | `test_esl` extended |
 | E2 | **M5** QtFormDialog tabs | ✅ Done (2026-08-10) — Basic (universal: TESFullName/TESModel/TESTexture/TESHealth/TESValue/TESWeight/TESDescription) / Components (record-specific) / Keywords (only when BGSKeywordForm present) / Data tabs; `test_qtformdialog` extended (T1b). | dialog has full tab set |
-| E3 | **M9** hknp encoder | Now that Starfield mesh BA2 v2 is readable (`Ba2Archive`), implement hknp polygon encode (`HknpPhysicsSystem`). | round-trip test |
+| E3 | **M9** hknp encoder | ✅ Done (2026-08-10) — `HknpPhysicsSystem::encode()` builds a full bhkPhysicsSystem block (u32 length + TAG0/SDKV/DATA/TYPE/INDX, BE chunk headers with decorators, DATA prefix + polytope arrays 16-aligned from 608, ITEM/PTCH children). Convex-only scope (mirrors what the decoder understands); round-trip test synthesizes a tetrahedron in-memory and asserts every decoded field equals the input. | round-trip test |
 | E4 | **M8** SCEN PHDA binary | ⬜ — real-data audit 2026-08-10: Skyrim.esm (1706 SCEN records) and Starfield.esm (7613 SCEN records) contain **zero** PHDA subrecords — both shipped games use the new-generation scene schema (FNAM/VNAM/ALID/LNAM/DNAM/ANAM groups). PHDA is the classic-Skyrim-mod / FO4 format; validating an encoder needs a FO4 install or a sample mod. Current raw-subrecord round-trip is byte-exact, so keep it until a sample is available (risk-register item). The `test_dumpesm` diagnostic gained a path + dump-count parameter for future audits. | round-trip test vs real data |
-| E5 | **M7** NavMesh auto-gen voxel tuning | Tune voxel filter against real world geometry; add acceptance signal to test. | `test_navmeshtoolkit` extended |
+| E5 | **M7** NavMesh auto-gen voxel tuning | ✅ Done (2026-08-10) — `agentHeight`/`stepHeight` now actually applied: per-cell floorY from walkable-triangle centroids, cells blocked when a non-walkable surface intrudes into (floorY+stepHeight, floorY+agentHeight); walkable cells exposed on `NavMesh::cells` as the acceptance signal. Tuned against deterministic synthetic geometry (flat floor, staircase, 30°/60° ramps, low/high ceiling, degenerate + empty input). Residual (documented in report): centroid-based cell assignment, no reachability flood-fill. | `test_navmeshtoolkit` extended |
 | E6 | **M6** flat-field mirrors | ✅ Done (audit 2026-08-10) — documented as intentional; TECHNICAL_DEBT.md R11/5E.4 record "most fields intentionally kept". | debt row notes "intentional" |
 | E7 | **L1** stale `.bak` files | ✅ Done — no `*.bak` remains in the tree (verified 2026-08-10). | `git rm` done |
 | E8 | **L2** `NewFindings.md` | ✅ Done — deleted in the Phase B/C/D/E hygiene commit (06bc824); nothing references it. | gone or corrected |

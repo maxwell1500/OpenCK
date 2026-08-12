@@ -22,6 +22,7 @@ public:
         QVector<NavTriangle> triangles;
         QVector<QVector3D> vertices;
         QVector<QPair<int,int>> edges;
+        QVector<QPair<int,int>> cells; // walkable voxel cells (absolute grid coords)
     };
 
     NavMesh generate(const Nif::NifParser& parser);
@@ -34,7 +35,8 @@ private:
     float stepHeight = 48.0f;
     float maxSlope = 45.0f;
 
-    QVector<NavTriangle> voxelFilter(const QVector<NavTriangle>& triangles);
+    QVector<NavTriangle> voxelFilter(const QVector<NavTriangle>& triangles,
+                                     QVector<QPair<int,int>>& walkableCells);
     bool isWalkable(const NavTriangle& tri) const;
     float computeSlope(const QVector3D& normal) const;
     QVector<QVector3D> extractVertices(const Nif::NifParser& parser);

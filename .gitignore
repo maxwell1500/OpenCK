@@ -32,6 +32,7 @@ Makefile*
 # Also covers the CMake-generated .vcxproj / .vcxproj.filters project files.
 /build/
 /build_ninja/
+/build-e*/
 build.ps1
 *.vcxproj
 *.vcxproj.filters

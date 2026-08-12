@@ -17,6 +17,7 @@ class TestHknpPhysicsSystem : public QObject
 private slots:
     void initTestCase();
     void testDecodeRealCollision();
+    void testRoundTripEncodeDecode();
 };
 
 void TestHknpPhysicsSystem::initTestCase()
@@ -94,6 +95,84 @@ void TestHknpPhysicsSystem::testDecodeRealCollision()
         qDebug() << "first vertex:" << sys.vertices.at(0).at(0)
                  << sys.vertices.at(0).at(1) << sys.vertices.at(0).at(2);
     }
+}
+
+void TestHknpPhysicsSystem::testRoundTripEncodeDecode()
+{
+    // Synthesize a minimal tetrahedron-shaped convex descriptor entirely in
+    // memory (no Bethesda data) and check encode() -> read() preserves it.
+    HknpPhysicsSystem::ConvexShapeData shape;
+    shape.vertices = { { 0.0f, 0.0f, 0.0f },
+                       { 1.0f, 0.0f, 0.0f },
+                       { 0.0f, 1.0f, 0.0f },
+                       { 0.0f, 0.0f, 1.0f } };
+    shape.planes = { { 1.0f, 0.0f, 0.0f, 0.0f },
+                     { 0.0f, 1.0f, 0.0f, 0.0f },
+                     { 0.0f, 0.0f, 1.0f, 0.0f },
+                     { 1.0f, 1.0f, 1.0f, -1.0f } };
+    // Packed (firstIndex | numIndices<<16 | minHalfAngle<<24): four triangle
+    // faces of three indices starting at 0, 3, 6, 9.
+    for (quint32 k = 0; k < 4; ++k)
+        shape.faces.append(k * 3 | (3u << 16));
+    shape.indices = { 0, 1, 2, 0, 2, 3, 0, 3, 1, 1, 2, 3 };
+    for (quint32 k = 0; k < 6; ++k)
+        shape.faceLinks.append(k & 0xFFFFu);
+    for (quint32 k = 0; k < 4; ++k)
+        shape.vertexEdges.append(k & 0xFFFFu);
+    shape.itemTypeIdx = { 8, 9, 10, 11, 12, 13 };
+
+    QVector<HknpPhysicsSystem::Patch> patches;
+    patches.append({ -1, { 0x0C, 0x100 } });
+    patches.append(HknpPhysicsSystem::Patch{ 2, QVector<quint32>{ 0 } });
+
+    const QString version = QStringLiteral("1.7.12.5");
+    const QByteArray typeBody = QByteArray("\x01\x00\x00\x00TYPE-PASSTHROUGH", 20);
+
+    const QByteArray block =
+        HknpPhysicsSystem::encode(version, typeBody, shape, patches);
+    const HknpPhysicsSystem sys = HknpPhysicsSystem::read(block);
+    QVERIFY(sys.ok);
+    QCOMPARE(sys.dataLength, static_cast<quint32>(block.size() - 4));
+    QCOMPARE(sys.sdkvVersion, version);
+    QCOMPARE(sys.typeBody, typeBody);
+    QCOMPARE(sys.chunks.size(), 4);
+    QCOMPARE(sys.chunks.at(0).fourcc, QByteArray("SDKV"));
+    QCOMPARE(sys.chunks.at(1).fourcc, QByteArray("DATA"));
+    QCOMPARE(sys.chunks.at(2).fourcc, QByteArray("TYPE"));
+    QCOMPARE(sys.chunks.at(3).fourcc, QByteArray("INDX"));
+
+    QVERIFY(sys.vertices == shape.vertices);
+    QVERIFY(sys.planes == shape.planes);
+    QVERIFY(sys.faces == shape.faces);
+    QVERIFY(sys.indices == shape.indices);
+    QVERIFY(sys.faceLinks == shape.faceLinks);
+    QVERIFY(sys.vertexEdges == shape.vertexEdges);
+
+    QCOMPARE(sys.items.size(), 6);
+    for (int k = 0; k < 6; ++k)
+    {
+        QCOMPARE(sys.items.at(k).typeIdx, shape.itemTypeIdx.value(k));
+        switch (k)
+        {
+        case 0: QCOMPARE(sys.items.at(k).count, quint32(shape.vertices.size())); break;
+        case 1: QCOMPARE(sys.items.at(k).count, quint32(shape.planes.size())); break;
+        case 2: QCOMPARE(sys.items.at(k).count, quint32(shape.faces.size())); break;
+        case 3: QCOMPARE(sys.items.at(k).count, quint32(shape.indices.size())); break;
+        case 4: QCOMPARE(sys.items.at(k).count, quint32(shape.faceLinks.size())); break;
+        case 5: QCOMPARE(sys.items.at(k).count, quint32(shape.vertexEdges.size())); break;
+        }
+    }
+
+    QCOMPARE(sys.patches.size(), patches.size());
+    for (int k = 0; k < patches.size(); ++k)
+    {
+        QCOMPARE(sys.patches.at(k).typeIdx, patches.at(k).typeIdx);
+        QCOMPARE(sys.patches.at(k).offsets, patches.at(k).offsets);
+    }
+
+    qDebug() << "round-trip ok: block" << block.size()
+             << "bytes, verts" << sys.vertices.size()
+             << "faces" << sys.faces.size();
 }
 
 QTEST_MAIN(TestHknpPhysicsSystem)

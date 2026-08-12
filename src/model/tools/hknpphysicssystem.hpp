@@ -53,6 +53,28 @@ struct HknpPhysicsSystem
     // Parses a bhkPhysicsSystem block (starting at the u32 data_length).
     static HknpPhysicsSystem read(const QByteArray& blockBytes);
 
+    // Mirror of the decode-side polytope arrays; the input to encode().
+    struct ConvexShapeData
+    {
+        QVector<QVector<float>> vertices;   // 3 floats each
+        QVector<QVector<float>> planes;     // 4 floats each
+        QVector<quint32> faces;             // packed (firstIndex | numIndices<<16 | minHalfAngle<<24)
+        QVector<quint8> indices;
+        QVector<quint32> faceLinks;         // packed (faceIndex | edgeIndex<<16 | padding<<24)
+        QVector<quint32> vertexEdges;       // packed same as faceLinks
+        // ITEM type indices for the six arrays, in the same order
+        // (vertices, planes, faces, indices, faceLinks, vertexEdges).
+        QVector<quint32> itemTypeIdx = { 0, 0, 0, 0, 0, 0 };
+    };
+
+    // Builds a fresh bhkPhysicsSystem block (u32 data_length + TAG0 stream)
+    // carrying a convex-only shape. The TYPE chunk is passed through untouched
+    // and the SDKV chunk carries sdkvVersion verbatim.
+    static QByteArray encode(const QString& sdkvVersion,
+                             const QByteArray& typeBody,
+                             const ConvexShapeData& shape,
+                             const QVector<Patch>& patches = {});
+
 private:
     void readPolytopeArrays();
 };
