@@ -6,6 +6,7 @@
 #include "../../src/model/doc/documentmediator.hpp"
 #include "../../src/model/doc/document.hpp"
 #include "../../src/model/world/ckid.hpp"
+#include "../../src/model/window/objectwindow.hpp"
 #include "../../libs/files/esm/esmwriter.hpp"
 #include "../../libs/files/esm/npcrecord.hpp"
 
@@ -21,6 +22,7 @@ private slots:
     void testLoaderDoesNotRespawnPreload();
     void testDocumentInsertedAfterIdleTicks();
     void testDeferredMasterMaterialization();
+    void testObjectWindowDeferredCategoryFetch();
 
 private:
     static bool writeTestPlugin(const QString& path)
@@ -165,6 +167,67 @@ void TestLoaderSinglePass::testDeferredMasterMaterialization()
     QCOMPARE(data.ensureTypeLoaded(static_cast<int>(CkId::Type_Npc_)), 0);
     QCOMPARE(data.getNpcCollection().size(), 2);
     QCOMPARE(data.masterIndexCount(static_cast<int>(CkId::Type_Npc_)), 0);
+}
+
+// Regression for the Object Window crash on deferred categories: expanding
+// a category whose type has both parsed (plugin) and deferred (master)
+// records must materialize the master records through fetchMore() without
+// resetting the model mid-fetch.
+void TestLoaderSinglePass::testObjectWindowDeferredCategoryFetch()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    QVERIFY(writeTestPluginEx(tmp.filePath("master_regression.esm"), "masternpc", 0x1111, "Master Character", 1));
+    QVERIFY(writeTestPluginEx(tmp.filePath("plugin_regression.esm"), "pluginnpc", 0x2222, "Plugin Character", 2));
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+
+    Document* doc = mediator.makeDocument(
+        QStringList{ "master_regression.esm", "plugin_regression.esm" },
+        tmp.path() + "/plugin_regression.esm", false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(doc);
+
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+    QCOMPARE(stopped.at(0).at(1).toBool(), true);
+
+    ObjectWindowModel model;
+    model.setData(&doc->getData());
+
+    // Locate the NPC category across groups.
+    QModelIndex npcCategory;
+    bool found = false;
+    for (int g = 0; g < model.rowCount() && !found; ++g)
+    {
+        const QModelIndex groupIdx = model.index(g, 0);
+        for (int c = 0; c < model.rowCount(groupIdx); ++c)
+        {
+            const QModelIndex catIdx = model.index(c, 0, groupIdx);
+            const int flatId = model.getCategoryIndex(catIdx);
+            if (model.getCategoryType(flatId) == static_cast<int>(CkId::Type_Npc_))
+            {
+                npcCategory = catIdx;
+                found = true;
+                break;
+            }
+        }
+    }
+    QVERIFY(found);
+
+    // Before the fetch: the plugin NPC is visible, the master NPC is
+    // deferred, and the category reports the combined count.
+    QCOMPARE(model.rowCount(npcCategory), 1);
+    QVERIFY(model.canFetchMore(npcCategory));
+
+    model.fetchMore(npcCategory);
+
+    // The materialization + model reset is queued; spin until the rows
+    // for the master NPC appear.
+    QTRY_COMPARE_WITH_TIMEOUT(model.rowCount(npcCategory), 2, 15000);
+    QVERIFY(!model.canFetchMore(npcCategory));
+    QCOMPARE(doc->getData().getNpcCollection().searchId(QStringLiteral("masternpc")) >= 0, true);
 }
 
 QTEST_GUILESS_MAIN(TestLoaderSinglePass)

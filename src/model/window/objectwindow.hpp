@@ -63,8 +63,8 @@ private:
         QString name;
         int typeId;
         int totalRecords;
-        int parsedCount;
-        bool pendingMaterialize;
+        int parsedCount = 0;
+        bool pendingMaterialize = false;
         QVector<VisibleRecord> visibleRecords;
     };
 

@@ -642,14 +642,15 @@ void ObjectWindowModel::initCategories(Data* data)
             break;
         }
 
-        // Deferred masters: records of this type were indexed, not parsed.
-        // Report the real total from the index and mark the category so
-        // fetchMore() materializes it when the user expands it.
+        // Deferred masters: some records of this type were indexed, not
+        // parsed. parsedCount is what the eager pass produced; the rest
+        // comes from the master index and is materialized via fetchMore()
+        // when the user expands the category.
         cat.parsedCount = cat.totalRecords;
         const int pending = data->masterIndexCount(static_cast<CkId::Type>(typeId));
-        if (cat.totalRecords == 0 && pending > 0)
+        if (pending > 0)
         {
-            cat.totalRecords = pending;
+            cat.totalRecords = cat.parsedCount + pending;
             cat.pendingMaterialize = true;
         }
 
@@ -2514,8 +2515,10 @@ bool ObjectWindowModel::canFetchMore(const QModelIndex& parent) const
     if (!mData || !parent.isValid())
         return false;
 
+    // Only category nodes fetch (deferred master types); group nodes
+    // (internalId 0) and record nodes never do.
     quintptr internal = parent.internalId();
-    if (internal & kRecordBit)
+    if (internal == kGroupInternalId || (internal & kRecordBit))
         return false;
 
     int groupRow = static_cast<int>((internal >> 16) & 0xFFFF);
@@ -2534,7 +2537,7 @@ void ObjectWindowModel::fetchMore(const QModelIndex& parent)
         return;
 
     quintptr internal = parent.internalId();
-    if (internal & kRecordBit)
+    if (internal == kGroupInternalId || (internal & kRecordBit))
         return;
 
     int groupRow = static_cast<int>((internal >> 16) & 0xFFFF);
@@ -2550,11 +2553,16 @@ void ObjectWindowModel::fetchMore(const QModelIndex& parent)
         return;
 
     cat.pendingMaterialize = false;
-    mData->ensureTypeLoaded(cat.typeId);
+    const int typeId = cat.typeId;
 
-    // Rebuild the whole model: the materialized type now has real parsed
-    // records, and initCategories() fills them with real editor IDs.
-    const_cast<ObjectWindowModel*>(this)->setData(mData);
+    // Materialize and rebuild on the next event-loop pass. Resetting the
+    // model inside fetchMore() itself would invalidate indexes while the
+    // view is mid-fetch; the deferred reset is safe and the view re-expands
+    // from its saved state after modelReset.
+    QMetaObject::invokeMethod(this, [this, typeId]() {
+        mData->ensureTypeLoaded(typeId);
+        setData(mData);
+    }, Qt::QueuedConnection);
 }
 
 QVariant ObjectWindowModel::data(const QModelIndex& index, int role) const
