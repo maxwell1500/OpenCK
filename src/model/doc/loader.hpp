@@ -1,11 +1,9 @@
 #ifndef LOADER_H
 #define LOADER_H
 
-#include <QMutex>
 #include <QObject>
 #include <QPair>
 #include <QVector>
-#include <QWaitCondition>
 
 #include <memory>
 
@@ -24,14 +22,12 @@ class Loader : public QObject
         Stage();
     };
 
-    QMutex mutex;
-    QWaitCondition toDo;
+    // Owned by the loader thread only: loadDocument()/abortLoading()/load()
+    // all run on that thread via queued connections, so no lock is needed.
     QVector<QPair<Document*, Stage>> documents;
 
 public:
     Loader();
-
-    QWaitCondition& hasThingsToDo();
 
 public slots:
     void loadDocument(Document* document);

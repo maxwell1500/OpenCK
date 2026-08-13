@@ -9,10 +9,8 @@
 #include "../../libs/files/esm/npcrecord.hpp"
 
 // Loader protocol test against the live Document/Loader/Data pipeline.
-// The Loader blocks inside its timer slot (QWaitCondition) whenever its
-// document queue is empty, so it must run on a dedicated thread. The
-// DocumentMediator does exactly that, so these tests drive the loader
-// through the mediator instead of constructing the Loader directly.
+// The Loader does the heavy parsing work, so it runs on a dedicated thread
+// driven by the DocumentMediator's tick timer plus its own self-resume.
 class TestLoaderSinglePass : public QObject
 {
     Q_OBJECT
@@ -20,6 +18,7 @@ class TestLoaderSinglePass : public QObject
 private slots:
     void testDocumentLoadedEmittedExactlyOnce();
     void testLoaderDoesNotRespawnPreload();
+    void testDocumentInsertedAfterIdleTicks();
 
 private:
     static bool writeTestPlugin(const QString& path)
@@ -97,6 +96,29 @@ void TestLoaderSinglePass::testLoaderDoesNotRespawnPreload()
     // loadingStopped signals during this grace period.
     QTest::qWait(750);
     QCOMPARE(stopped.count(), 2);
+}
+
+void TestLoaderSinglePass::testDocumentInsertedAfterIdleTicks()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    QVERIFY(writeTestPlugin(tmp.filePath("loader_idle.esm")));
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+
+    // Reproduces the GUI scenario that used to deadlock: the tick timer
+    // fires many times with an empty queue, and only then does a document
+    // arrive. The loader must pick it up instead of blocking its thread's
+    // event queue (the old QWaitCondition design never processed the
+    // queued loadDocument in this case).
+    QTest::qWait(500);
+
+    mediator.insertDocument(makeDocument(mediator, "loader_idle.esm", tmp.path()));
+
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+    QCOMPARE(stopped.at(0).at(1).toBool(), true);
 }
 
 QTEST_GUILESS_MAIN(TestLoaderSinglePass)

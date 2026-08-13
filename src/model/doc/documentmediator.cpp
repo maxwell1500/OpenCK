@@ -47,7 +47,6 @@ DocumentMediator::~DocumentMediator()
     LOG_INFO("DocumentMediator shutting down...");
     tickTimer.stop();
     loaderThread.quit();
-    loader.hasThingsToDo().wakeAll();
     loaderThread.wait();
     LOG_INFO("DocumentMediator shut down");
 }
@@ -80,8 +79,6 @@ void DocumentMediator::insertDocument(Document* document)
     documents.push_back(std::shared_ptr<Document>(document));
 
     emit loadRequest(document);
-
-    loader.hasThingsToDo().wakeAll();
 }
 
 Document* DocumentMediator::getDocument(int index)
