@@ -223,9 +223,9 @@ void TestLoaderSinglePass::testObjectWindowDeferredCategoryFetch()
 
     model.fetchMore(npcCategory);
 
-    // The materialization + model reset is queued; spin until the rows
-    // for the master NPC appear.
-    QTRY_COMPARE_WITH_TIMEOUT(model.rowCount(npcCategory), 2, 15000);
+    // Materialization + rebuild are synchronous; the master NPC row is
+    // present immediately after fetchMore returns.
+    QCOMPARE(model.rowCount(npcCategory), 2);
     QVERIFY(!model.canFetchMore(npcCategory));
     QCOMPARE(doc->getData().getNpcCollection().searchId(QStringLiteral("masternpc")) >= 0, true);
 }

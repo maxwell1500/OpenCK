@@ -2553,16 +2553,13 @@ void ObjectWindowModel::fetchMore(const QModelIndex& parent)
         return;
 
     cat.pendingMaterialize = false;
-    const int typeId = cat.typeId;
 
-    // Materialize and rebuild on the next event-loop pass. Resetting the
-    // model inside fetchMore() itself would invalidate indexes while the
-    // view is mid-fetch; the deferred reset is safe and the view re-expands
-    // from its saved state after modelReset.
-    QMetaObject::invokeMethod(this, [this, typeId]() {
-        mData->ensureTypeLoaded(typeId);
-        setData(mData);
-    }, Qt::QueuedConnection);
+    // Materialize synchronously, then rebuild the whole model. The reset
+    // happens inside fetchMore(), which Qt permits (the view re-expands
+    // from its saved state after modelReset); no deferred work is queued
+    // so no call can outlive the document's Data.
+    mData->ensureTypeLoaded(cat.typeId);
+    setData(mData);
 }
 
 QVariant ObjectWindowModel::data(const QModelIndex& index, int role) const

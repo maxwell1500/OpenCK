@@ -30,6 +30,15 @@ void CellRecord::load(ESMReader& esm, bool)
         NAME sub = esm.readNSubHeader();
         LOG_DEBUG(QString("CellRecord::load iter %1 sub=0x%2 recLeft=%3 subLeft=%4")
             .arg(iter).arg(QString::number(sub, 16)).arg(esm.recLeft()).arg(esm.subLeft()));
+        // readNSubHeader returns 0 when the record is drained or its tail
+        // is a run of zero subrecords (some Starfield mods pad records with
+        // zeros). Stop here and drain whatever remains so the reader stays
+        // aligned on the next record.
+        if (sub == 0)
+        {
+            esm.skipRemainingRecord();
+            break;
+        }
         bool handled = false;
         for (auto& c : components.all())
         {
