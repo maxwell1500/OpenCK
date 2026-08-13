@@ -67,6 +67,20 @@ void Header::load(ESMReader& esm)
             break;
         }
 
+        // 'GRUP' is never a TES4 subrecord — it's a top-level record group.
+        // Encountering it here means the TES4 record's declared size was
+        // larger than its real body (a malformed header seen in some
+        // Starfield plugins, where size is set to the whole remaining
+        // file). Roll back so continueLoading reads the group as a real
+        // top-level record instead of swallowing it into the header.
+        if (subName == NAME('GRUP'))
+        {
+            esm.seekTo(filePosBefore);
+            LOG_WARNING(QString("Header::load: top-level GRUP at 0x%1 before declared TES4 end (recLeft=%2); treating TES4 as ended here")
+                .arg(filePosBefore).arg(esm.recLeft()));
+            break;
+        }
+
         LOG_DEBUG(QString("Header::load iter %1 subName=0x%2 filePos %3->%4 recLeft before=%5 after=%6 subLeft=%7")
             .arg(iter)
             .arg(QString::number(subName, 16))
@@ -99,9 +113,16 @@ void Header::load(ESMReader& esm)
             MasterData mst;
             mst.name= esm.readZString();
 
-            // DATA subrecord will follow
-            esm.readNSubHeader();
-            mst.size = esm.readType<quint64>();
+            // A DATA subrecord (master file size / timestamp) usually follows
+            // each MAST, but Starfield plugins sometimes list MASTs back-to-
+            // back without DATA. Only consume DATA when it is actually next;
+            // otherwise leave the stream positioned for the main loop to read
+            // the following subrecord (which is typically another MAST).
+            if (esm.isNextName(NAME('DATA')))
+            {
+                esm.readNSubHeader();
+                mst.size = esm.readType<quint64>();
+            }
             masters.push_back(mst);
             break;
         }
