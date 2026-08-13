@@ -5,6 +5,7 @@
 
 #include "../../src/model/doc/documentmediator.hpp"
 #include "../../src/model/doc/document.hpp"
+#include "../../src/model/world/ckid.hpp"
 #include "../../libs/files/esm/esmwriter.hpp"
 #include "../../libs/files/esm/npcrecord.hpp"
 
@@ -19,9 +20,16 @@ private slots:
     void testDocumentLoadedEmittedExactlyOnce();
     void testLoaderDoesNotRespawnPreload();
     void testDocumentInsertedAfterIdleTicks();
+    void testDeferredMasterMaterialization();
 
 private:
     static bool writeTestPlugin(const QString& path)
+    {
+        return writeTestPluginEx(path, "LoaderTestNPC", 0x1234, "Loader Test Character", 5);
+    }
+
+    static bool writeTestPluginEx(const QString& path, const QString& editorId,
+        quint32 formId, const QString& fullName, int level)
     {
         QFile file(path);
         if (!file.open(QIODevice::WriteOnly))
@@ -31,13 +39,13 @@ private:
         writer.save(file);
 
         NpcRecord npc;
-        npc.editorId = "LoaderTestNPC";
-        npc.formId = 0x1234;
-        npc.fullName = "Loader Test Character";
-        npc.level = 5;
+        npc.editorId = editorId;
+        npc.formId = formId;
+        npc.fullName = fullName;
+        npc.level = level;
 
         RecHeader recHeader;
-        recHeader.id = 0x1234;
+        recHeader.id = formId;
         writer.startRecord('NPC_', recHeader);
         npc.save(writer);
         writer.endRecord();
@@ -119,6 +127,44 @@ void TestLoaderSinglePass::testDocumentInsertedAfterIdleTicks()
 
     QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
     QCOMPARE(stopped.at(0).at(1).toBool(), true);
+}
+
+void TestLoaderSinglePass::testDeferredMasterMaterialization()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    QVERIFY(writeTestPluginEx(tmp.filePath("master_regression.esm"), "masternpc", 0x1111, "Master Character", 1));
+    QVERIFY(writeTestPluginEx(tmp.filePath("plugin_regression.esm"), "pluginnpc", 0x2222, "Plugin Character", 2));
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+
+    Document* doc = mediator.makeDocument(
+        QStringList{ "master_regression.esm", "plugin_regression.esm" },
+        tmp.path() + "/plugin_regression.esm", false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(doc);
+
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+    QCOMPARE(stopped.at(0).at(1).toBool(), true);
+
+    Data& data = doc->getData();
+
+    // The master is deferred: only the edited plugin's NPC was parsed.
+    QCOMPARE(data.getNpcCollection().size(), 1);
+    QCOMPARE(data.getNpcCollection().getId(0), QStringLiteral("pluginnpc"));
+    QCOMPARE(data.masterIndexCount(static_cast<int>(CkId::Type_Npc_)), 1);
+
+    // Materializing the type parses the master's NPC too.
+    QCOMPARE(data.ensureTypeLoaded(static_cast<int>(CkId::Type_Npc_)), 1);
+    QCOMPARE(data.getNpcCollection().size(), 2);
+    QVERIFY(data.getNpcCollection().searchId(QStringLiteral("masternpc")) >= 0);
+
+    // A second materialization is a no-op (index entries consumed).
+    QCOMPARE(data.ensureTypeLoaded(static_cast<int>(CkId::Type_Npc_)), 0);
+    QCOMPARE(data.getNpcCollection().size(), 2);
+    QCOMPARE(data.masterIndexCount(static_cast<int>(CkId::Type_Npc_)), 0);
 }
 
 QTEST_GUILESS_MAIN(TestLoaderSinglePass)

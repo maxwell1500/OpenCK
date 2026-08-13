@@ -103,6 +103,49 @@ void ESMReader::peekRaw(char* dest, qint64 len) const
         memset(dest + n, 0, static_cast<size_t>(len - n));
 }
 
+bool ESMReader::peekBytesAt(qint64 off, void* dest, int len) const
+{
+    if (!m_mapped || off < 0 || off + len > m_mappedSize)
+        return false;
+    memcpy(dest, m_mapped + off, static_cast<size_t>(len));
+    return true;
+}
+
+void ESMReader::buildRecordIndex(QVector<RecordIndexEntry>& out)
+{
+    while (true)
+    {
+        const qint64 pos = m_pos;
+        quint32 rawName = 0;
+        if (!peekBytesAt(pos, &rawName, 4))
+            break;
+        const NAME name = swapName(rawName);
+        if (name == 0)
+            break;
+        if (name == NAME('GRUP'))
+        {
+            // GRUP header is 24 bytes; the records inside it are scanned on
+            // the next iterations, so the group's own size is irrelevant.
+            m_pos = pos + 24;
+            continue;
+        }
+        quint32 size = 0;
+        quint32 id = 0;
+        if (!peekBytesAt(pos + 4, &size, 4) || !peekBytesAt(pos + 12, &id, 4))
+            break;
+        out.push_back({ name, id, pos });
+        m_pos = pos + 24 + size;
+        if (m_pos > m_mappedSize)
+            m_pos = m_mappedSize;
+    }
+
+    // Resync the byte accounting: the scan advanced via peek+seek, so
+    // `left` no longer matches the position. Nothing below depends on the
+    // absolute value of `left` except isLeft() and error offsets, so set it
+    // to "remaining bytes from the current position".
+    esm.left = esm.size - m_pos;
+}
+
 NAME ESMReader::readName()
 {
     // If a decompression buffer is open but fully consumed, the previous
@@ -441,4 +484,8 @@ qint64 ESMReader::filePos() const
 void ESMReader::seekTo(qint64 pos)
 {
     m_pos = pos;
+    // Keep the byte accounting consistent with the new position so
+    // isLeft()/continueLoading() work after an arbitrary seek (e.g.
+    // on-demand record materialization from the record index).
+    esm.left = esm.size - pos;
 }

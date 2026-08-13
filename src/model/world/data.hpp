@@ -250,7 +250,7 @@ public:
     /// 
     /// Initializes all record collections with column definitions
     /// and registers Qt models for UI binding. Does not load data
-    /// yet — call preload() and continueLoading() to load files.
+    /// yet ï¿½ call preload() and continueLoading() to load files.
     Data(const QStringList& files, const FilePaths& paths);
     ~Data();
 
@@ -263,7 +263,7 @@ public:
     /// \return Number of records found in file
     /// 
     /// Reads TES4 header, master list, and file metadata.
-    /// Does not load individual records — call continueLoading() for that.
+    /// Does not load individual records ï¿½ call continueLoading() for that.
     int preload(const QString& filename, bool base);
 
     /// \brief TES4 header of the last preloaded plugin (for flag preservation).
@@ -277,6 +277,17 @@ public:
     /// Each call processes one record type's worth of data.
     /// Call repeatedly until returns true.
     bool continueLoading(Messages& messages);
+
+    /// \brief Number of records of a type known from the deferred-master
+    /// index (records not yet parsed into collections). 0 for eagerly
+    /// loaded files and unknown types.
+    int masterIndexCount(int typeId) const;
+
+    /// \brief Materializes one record type from the deferred-master index:
+    /// reopens each master that contributed records of this type and parses
+    /// those records into their collections. Returns the number of records
+    /// parsed. No-op (0) when the type has no deferred master records.
+    int ensureTypeLoaded(int typeId);
 
     /// \brief Register a Qt model for a record type
     /// \param model Pointer to QAbstractItemModel subclass
@@ -1683,6 +1694,21 @@ private:
     QStringList contentFiles;
     FilePaths paths;
     bool base;
+
+    // Deferred-master index: records of master files that were indexed
+    // (headers only) instead of parsed, plus the master file paths, so a
+    // record type can be materialized on demand later.
+    struct MasterIndexEntry
+    {
+        NAME type;
+        quint32 formId;
+        qint64 offset;
+        int fileIndex;
+    };
+    QVector<MasterIndexEntry> m_masterIndex;
+    QStringList m_deferredMasterFiles;
+    QString m_lastPreloadPath;
+    static NAME typeNameFor(int typeId);
     
     IdCollection<GameSetting> gameSettings;
     Collection<MetaData> metaData;

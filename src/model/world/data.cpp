@@ -13,9 +13,12 @@
 #include "logger.hpp"
 
 #include <QAbstractItemModel>
+#include <QElapsedTimer>
 #include <QMessageBox>
 
 #include <stdexcept>
+
+#include <algorithm>
 
 #ifdef _WIN32
 static void seh_translator(unsigned int code, EXCEPTION_POINTERS*)
@@ -1257,6 +1260,7 @@ int Data::preload(const QString& filename, bool base_)
     reader.reset(new ESMReader(fullPath, paths));
     reader->open();
     base = base_;
+    m_lastPreloadPath = fullPath;
 
     if (!base)
     {
@@ -1265,6 +1269,28 @@ int Data::preload(const QString& filename, bool base_)
         metaData_.load(*reader);
 
         metaData.appendRecord(Record<MetaData>(State::State_ModifiedOnly, 0, &metaData_));
+    }
+    else
+    {
+        // Masters are indexed (headers only) instead of parsed. The Loader
+        // skips the eager record pass for them; records materialize on
+        // demand via ensureTypeLoaded(). This is what makes opening a
+        // plugin instant even when its master is a multi-GB game file.
+        m_deferredMasterFiles.append(fullPath);
+        const int masterFileIdx = m_deferredMasterFiles.size() - 1;
+
+        QElapsedTimer t;
+        t.start();
+        QVector<RecordIndexEntry> fileIndex;
+        reader->buildRecordIndex(fileIndex);
+        for (const RecordIndexEntry& entry : fileIndex)
+        {
+            m_masterIndex.push_back({ entry.type, entry.formId, entry.offset, masterFileIdx });
+        }
+        LOG_INFO(QString("Data::preload: indexed master %1: %2 records in %3 ms")
+            .arg(filename)
+            .arg(fileIndex.size())
+            .arg(t.elapsed()));
     }
 
     return reader->recordCount();
@@ -1535,6 +1561,290 @@ bool Data::continueLoading(Messages& messages)
 
         return false;
     }
+}
+
+NAME Data::typeNameFor(int typeId)
+{
+    switch (static_cast<CkId::Type>(typeId))
+    {
+    case CkId::Type_Gmst: return NAME('GMST');
+    case CkId::Type_Npc_: return NAME('NPC_');
+    case CkId::Type_Weap_: return NAME('WEAP');
+    case CkId::Type_Armor_: return NAME('ARMO');
+    case CkId::Type_Spel_: return NAME('SPEL');
+    case CkId::Type_Magic_: return NAME('MGEF');
+    case CkId::Type_Quest_: return NAME('QUST');
+    case CkId::Type_Dial_: return NAME('DIAL');
+    case CkId::Type_Info_: return NAME('INFO');
+    case CkId::Type_Glob_: return NAME('GLOB');
+    case CkId::Type_Lcrt_: return NAME('LCRT');
+    case CkId::Type_Pack_: return NAME('PACK');
+    case CkId::Type_Tree_: return NAME('TREE');
+    case CkId::Type_Alch_: return NAME('ALCH');
+    case CkId::Type_Ingr_: return NAME('INGR');
+    case CkId::Type_Cont_: return NAME('CONT');
+    case CkId::Type_Ench_: return NAME('ENCH');
+    case CkId::Type_Book_: return NAME('BOOK');
+    case CkId::Type_Misc_: return NAME('MISC');
+    case CkId::Type_Acti_: return NAME('ACTI');
+    case CkId::Type_Stat_: return NAME('STAT');
+    case CkId::Type_Race_: return NAME('RACE');
+    case CkId::Type_Class_: return NAME('CLAS');
+    case CkId::Type_Fact_: return NAME('FACT');
+    case CkId::Type_PerK_: return NAME('PERK');
+    case CkId::Type_Cel_: return NAME('CELL');
+    case CkId::Type_WRLD_: return NAME('WRLD');
+    case CkId::Type_LOCT_: return NAME('LCTN');
+    case CkId::Type_Plnt_: return NAME('PNDT');
+    case CkId::Type_Refr_: return NAME('REFR');
+    case CkId::Type_Material_: return NAME('MATL');
+    case CkId::Type_Land_: return NAME('LAND');
+    case CkId::Type_Soun_: return NAME('SOUN');
+    case CkId::Type_Wthr_: return NAME('WTHR');
+    case CkId::Type_Ltex_: return NAME('LTEX');
+    case CkId::Type_Ammo_: return NAME('AMMO');
+    case CkId::Type_Appa_: return NAME('APPA');
+    case CkId::Type_Avif_: return NAME('AVIF');
+    case CkId::Type_Bsgn_: return NAME('BSGN');
+    case CkId::Type_Clmt_: return NAME('CLMT');
+    case CkId::Type_Clot_: return NAME('CLOT');
+    case CkId::Type_Cobj_: return NAME('COBJ');
+    case CkId::Type_Crea_: return NAME('CREA');
+    case CkId::Type_Csty_: return NAME('CSTY');
+    case CkId::Type_Door_: return NAME('DOOR');
+    case CkId::Type_Efsh_: return NAME('EFSH');
+    case CkId::Type_Expl_: return NAME('EXPL');
+    case CkId::Type_Eyes_: return NAME('EYES');
+    case CkId::Type_Flor_: return NAME('FLOR');
+    case CkId::Type_Flst_: return NAME('FLST');
+    case CkId::Type_Furn_: return NAME('FURN');
+    case CkId::Type_Grass_: return NAME('GRAS');
+    case CkId::Type_Hair_: return NAME('HAIR');
+    case CkId::Type_Idle_: return NAME('IDLE');
+    case CkId::Type_Idlm_: return NAME('IDLM');
+    case CkId::Type_Imgs_: return NAME('IMGS');
+    case CkId::Type_Keym_: return NAME('KEYM');
+    case CkId::Type_Kywd_: return NAME('KYWD');
+    case CkId::Type_Ligh_: return NAME('LIGH');
+    case CkId::Type_Lscr_: return NAME('LSCR');
+    case CkId::Type_Lvlc_: return NAME('LVLC');
+    case CkId::Type_Lvli_: return NAME('LVLI');
+    case CkId::Type_Lvsp_: return NAME('LVSP');
+    case CkId::Type_Mesg_: return NAME('MESG');
+    case CkId::Type_Mstt_: return NAME('MSTT');
+    case CkId::Type_Navm_: return NAME('NAVM');
+    case CkId::Type_Note_: return NAME('NOTE');
+    case CkId::Type_Otft_: return NAME('OTFT');
+    case CkId::Type_Proj_: return NAME('PROJ');
+    case CkId::Type_Regn_: return NAME('REGN');
+    case CkId::Type_Road_: return NAME('ROAD');
+    case CkId::Type_Scpt_: return NAME('SCPT');
+    case CkId::Type_Scrl_: return NAME('SCRL');
+    case CkId::Type_Slgm_: return NAME('SLGM');
+    case CkId::Type_Smqn_: return NAME('SMQN');
+    case CkId::Type_Spgd_: return NAME('SPGD');
+    case CkId::Type_Scol_: return NAME('SCOL');
+    case CkId::Type_Scen_: return NAME('SCEN');
+    case CkId::Type_Txst_: return NAME('TXST');
+    case CkId::Type_Wate_: return NAME('WATR');
+    case CkId::Type_Anio_: return NAME('ANIO');
+    case CkId::Type_Artv_: return NAME('ARTV');
+    case CkId::Type_Clfm_: return NAME('CLFM');
+    case CkId::Type_Debr_: return NAME('DEBR');
+    case CkId::Type_Eczn_: return NAME('ECZN');
+    case CkId::Type_Hazd_: return NAME('HAZD');
+    case CkId::Type_Ipct_: return NAME('IPCT');
+    case CkId::Type_Ipds_: return NAME('IPDS');
+    case CkId::Type_Must_: return NAME('MUST');
+    case CkId::Type_Rela_: return NAME('RELA');
+    case CkId::Type_Revb_: return NAME('REVB');
+    case CkId::Type_Shou_: return NAME('SHOU');
+    case CkId::Type_Hdpt_: return NAME('HDPT');
+    case CkId::Type_Term_: return NAME('TERM');
+    case CkId::Type_Matt_: return NAME('MATT');
+    case CkId::Type_Movt_: return NAME('MOVT');
+    case CkId::Type_Musc_: return NAME('MUSC');
+    case CkId::Type_Aact_: return NAME('AACT');
+    case CkId::Type_Aamd_: return NAME('AAMD');
+    case CkId::Type_Aapd_: return NAME('AAPD');
+    case CkId::Type_Achr_: return NAME('ACHR');
+    case CkId::Type_Addn_: return NAME('ADDN');
+    case CkId::Type_Affe_: return NAME('AFFE');
+    case CkId::Type_Ambs_: return NAME('AMBS');
+    case CkId::Type_Amdl_: return NAME('AMDL');
+    case CkId::Type_Aopf_: return NAME('AOPF');
+    case CkId::Type_Aops_: return NAME('AOPS');
+    case CkId::Type_Aoru_: return NAME('AORU');
+    case CkId::Type_Arma_: return NAME('ARMA');
+    case CkId::Type_Arto_: return NAME('ARTO');
+    case CkId::Type_Aspc_: return NAME('ASPC');
+    case CkId::Type_Atmo_: return NAME('ATMO');
+    case CkId::Type_Avmd_: return NAME('AVMD');
+    case CkId::Type_Biom_: return NAME('BIOM');
+    case CkId::Type_Bmmo_: return NAME('BMMO');
+    case CkId::Type_Bmod_: return NAME('BMOD');
+    case CkId::Type_Bnds_: return NAME('BNDS');
+    case CkId::Type_Bptd_: return NAME('BPTD');
+    case CkId::Type_Cams_: return NAME('CAMS');
+    case CkId::Type_Chal_: return NAME('CHAL');
+    case CkId::Type_Cldf_: return NAME('CLDF');
+    case CkId::Type_Cndf_: return NAME('CNDF');
+    case CkId::Type_Coll_: return NAME('COLL');
+    case CkId::Type_Cpth_: return NAME('CPTH');
+    case CkId::Type_Dlbr_: return NAME('DLBR');
+    case CkId::Type_Cur3_: return NAME('CUR3');
+    case CkId::Type_Curv_: return NAME('CURV');
+    case CkId::Type_Dfob_: return NAME('DFOB');
+    case CkId::Type_Dmgt_: return NAME('DMGT');
+    case CkId::Type_Dobj_: return NAME('DOBJ');
+    case CkId::Type_Efsq_: return NAME('EFSQ');
+    case CkId::Type_Equp_: return NAME('EQUP');
+    case CkId::Type_Ffkw_: return NAME('FFKW');
+    case CkId::Type_Fogv_: return NAME('FOGV');
+    case CkId::Type_Forc_: return NAME('FORC');
+    case CkId::Type_Fstp_: return NAME('FSTP');
+    case CkId::Type_Fsts_: return NAME('FSTS');
+    case CkId::Type_Fxpd_: return NAME('FXPD');
+    case CkId::Type_Gbfm_: return NAME('GBFM');
+    case CkId::Type_Gbft_: return NAME('GBFT');
+    case CkId::Type_Gcvr_: return NAME('GCVR');
+    case CkId::Type_Imad_: return NAME('IMAD');
+    case CkId::Type_Innr_: return NAME('INNR');
+    case CkId::Type_Ires_: return NAME('IRES');
+    case CkId::Type_Kssm_: return NAME('KSSM');
+    case CkId::Type_Layr_: return NAME('LAYR');
+    case CkId::Type_Lens_: return NAME('LENS');
+    case CkId::Type_Lgdi_: return NAME('LGDI');
+    case CkId::Type_Lgtm_: return NAME('LGTM');
+    case CkId::Type_Lmsw_: return NAME('LMSW');
+    case CkId::Type_Lvlb_: return NAME('LVLB');
+    case CkId::Type_Lvln_: return NAME('LVLN');
+    case CkId::Type_Lvlp_: return NAME('LVLP');
+    case CkId::Type_Lvsc_: return NAME('LVSC');
+    case CkId::Type_Maam_: return NAME('MAAM');
+    case CkId::Type_Mrhp_: return NAME('MRPH');
+    case CkId::Type_Mtpt_: return NAME('MTPT');
+    case CkId::Type_Navi_: return NAME('NAVI');
+    case CkId::Type_Nocm_: return NAME('NOCM');
+    case CkId::Type_Omod_: return NAME('OMOD');
+    case CkId::Type_Oswp_: return NAME('OSWP');
+    case CkId::Type_Ovis_: return NAME('OVIS');
+    case CkId::Type_Pcbn_: return NAME('PCBN');
+    case CkId::Type_Pccn_: return NAME('PCCN');
+    case CkId::Type_Pcmt_: return NAME('PCMT');
+    case CkId::Type_Pdcl_: return NAME('PDCL');
+    case CkId::Type_Pgre_: return NAME('PGRE');
+    case CkId::Type_Phzd_: return NAME('PHZD');
+    case CkId::Type_Pkin_: return NAME('PKIN');
+    case CkId::Type_Pmft_: return NAME('PMFT');
+    case CkId::Type_Psdc_: return NAME('PSDC');
+    case CkId::Type_Ptst_: return NAME('PTST');
+    case CkId::Type_Rfgp_: return NAME('RFGP');
+    case CkId::Type_Rsgd_: return NAME('RSGD');
+    case CkId::Type_Rspj_: return NAME('RSPJ');
+    case CkId::Type_Sdlt_: return NAME('SDLT');
+    case CkId::Type_Sech_: return NAME('SECH');
+    case CkId::Type_Sfbk_: return NAME('SFBK');
+    case CkId::Type_Sfpc_: return NAME('SFPC');
+    case CkId::Type_Sfpt_: return NAME('SFPT');
+    case CkId::Type_Sftr_: return NAME('SFTR');
+    case CkId::Type_Smbn_: return NAME('SMBN');
+    case CkId::Type_Smen_: return NAME('SMEN');
+    case CkId::Type_Spch_: return NAME('SPCH');
+    case CkId::Type_Stag_: return NAME('STAG');
+    case CkId::Type_Stbh_: return NAME('STBH');
+    case CkId::Type_Stdt_: return NAME('STDT');
+    case CkId::Type_Stmp_: return NAME('STMP');
+    case CkId::Type_Stnd_: return NAME('STND');
+    case CkId::Type_Sunp_: return NAME('SUNP');
+    case CkId::Type_Tmlm_: return NAME('TMLM');
+    case CkId::Type_Todd_: return NAME('TODD');
+    case CkId::Type_Trav_: return NAME('TRAV');
+    case CkId::Type_Trns_: return NAME('TRNS');
+    case CkId::Type_Voli_: return NAME('VOLI');
+    case CkId::Type_Vtyp_: return NAME('VTYP');
+    case CkId::Type_Wbar_: return NAME('WBAR');
+    case CkId::Type_Wkmf_: return NAME('WKMF');
+    case CkId::Type_Wths_: return NAME('WTHS');
+    case CkId::Type_Wwed_: return NAME('WWED');
+    case CkId::Type_Zoom_: return NAME('ZOOM');
+    default: return 0;
+    }
+}
+
+int Data::masterIndexCount(int typeId) const
+{
+    const NAME name = typeNameFor(typeId);
+    if (name == 0)
+        return 0;
+    int count = 0;
+    for (const MasterIndexEntry& entry : m_masterIndex)
+    {
+        if (entry.type == name)
+            ++count;
+    }
+    return count;
+}
+
+int Data::ensureTypeLoaded(int typeId)
+{
+    const NAME name = typeNameFor(typeId);
+    if (name == 0)
+        return 0;
+
+    int loaded = 0;
+    Messages messages(Message::Error);
+    const bool prevBase = base;
+    base = true;
+
+    for (int f = 0; f < m_deferredMasterFiles.size(); ++f)
+    {
+        bool hasEntries = false;
+        for (const MasterIndexEntry& entry : m_masterIndex)
+        {
+            if (entry.fileIndex == f && entry.type == name)
+            {
+                hasEntries = true;
+                break;
+            }
+        }
+        if (!hasEntries)
+            continue;
+
+        // Reopen this master (header parse only) so its records can be read.
+        reader.reset(new ESMReader(m_deferredMasterFiles[f], paths));
+        reader->open();
+
+        for (const MasterIndexEntry& entry : m_masterIndex)
+        {
+            if (entry.fileIndex != f || entry.type != name)
+                continue;
+            reader->seekTo(entry.offset);
+            if (continueLoading(messages))
+                break;
+            ++loaded;
+        }
+    }
+
+    // Restore the reader to the edited file so post-load state matches
+    // the pre-materialization state.
+    if (!m_lastPreloadPath.isEmpty())
+    {
+        reader.reset(new ESMReader(m_lastPreloadPath, paths));
+        reader->open();
+    }
+    base = prevBase;
+
+    // Consume the materialized entries so repeated calls are no-ops.
+    m_masterIndex.erase(
+        std::remove_if(m_masterIndex.begin(), m_masterIndex.end(),
+            [name](const MasterIndexEntry& e) { return e.type == name; }),
+        m_masterIndex.end());
+
+    LOG_INFO(QString("Data::ensureTypeLoaded: %1 -> %2 record(s)")
+        .arg(CkId(static_cast<CkId::Type>(typeId)).getTypeName())
+        .arg(loaded));
+    return loaded;
 }
 
 const IdCollection<GameSetting>& Data::getGameSettings() const

@@ -642,7 +642,18 @@ void ObjectWindowModel::initCategories(Data* data)
             break;
         }
 
-        for (int i = 0; i < cat.totalRecords; i++)
+        // Deferred masters: records of this type were indexed, not parsed.
+        // Report the real total from the index and mark the category so
+        // fetchMore() materializes it when the user expands it.
+        cat.parsedCount = cat.totalRecords;
+        const int pending = data->masterIndexCount(static_cast<CkId::Type>(typeId));
+        if (cat.totalRecords == 0 && pending > 0)
+        {
+            cat.totalRecords = pending;
+            cat.pendingMaterialize = true;
+        }
+
+        for (int i = 0; i < cat.parsedCount; i++)
         {
             VisibleRecord rec;
             rec.actualIndex = i;
@@ -2496,6 +2507,54 @@ int ObjectWindowModel::rowCount(const QModelIndex& parent) const
 int ObjectWindowModel::columnCount(const QModelIndex& /*parent*/) const
 {
     return 3;
+}
+
+bool ObjectWindowModel::canFetchMore(const QModelIndex& parent) const
+{
+    if (!mData || !parent.isValid())
+        return false;
+
+    quintptr internal = parent.internalId();
+    if (internal & kRecordBit)
+        return false;
+
+    int groupRow = static_cast<int>((internal >> 16) & 0xFFFF);
+    int categoryRow = parent.row();
+    if (groupRow < 0 || groupRow >= mGroups.size())
+        return false;
+    const auto& group = mGroups[groupRow];
+    if (categoryRow < 0 || categoryRow >= group.categoryIndices.size())
+        return false;
+    return mCategories[group.categoryIndices[categoryRow]].pendingMaterialize;
+}
+
+void ObjectWindowModel::fetchMore(const QModelIndex& parent)
+{
+    if (!mData || !parent.isValid())
+        return;
+
+    quintptr internal = parent.internalId();
+    if (internal & kRecordBit)
+        return;
+
+    int groupRow = static_cast<int>((internal >> 16) & 0xFFFF);
+    int categoryRow = parent.row();
+    if (groupRow < 0 || groupRow >= mGroups.size())
+        return;
+    const auto& group = mGroups[groupRow];
+    if (categoryRow < 0 || categoryRow >= group.categoryIndices.size())
+        return;
+
+    Category& cat = mCategories[group.categoryIndices[categoryRow]];
+    if (!cat.pendingMaterialize)
+        return;
+
+    cat.pendingMaterialize = false;
+    mData->ensureTypeLoaded(cat.typeId);
+
+    // Rebuild the whole model: the materialized type now has real parsed
+    // records, and initCategories() fills them with real editor IDs.
+    const_cast<ObjectWindowModel*>(this)->setData(mData);
 }
 
 QVariant ObjectWindowModel::data(const QModelIndex& index, int role) const

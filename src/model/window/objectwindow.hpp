@@ -26,6 +26,11 @@ public:
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
+    // Deferred-master categories (indexed but not yet parsed) report their
+    // records through canFetchMore/fetchMore: expanding the category
+    // materializes the record type from the master index.
+    bool canFetchMore(const QModelIndex& parent) const override;
+    void fetchMore(const QModelIndex& parent) override;
 
     int getCategoryIndex(const QModelIndex& index) const;
     int getCategoryType(int categoryId) const;
@@ -58,6 +63,8 @@ private:
         QString name;
         int typeId;
         int totalRecords;
+        int parsedCount;
+        bool pendingMaterialize;
         QVector<VisibleRecord> visibleRecords;
     };
 

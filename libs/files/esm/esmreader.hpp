@@ -13,6 +13,16 @@
 // in on demand and the reader memcpys field-sized slices out of the mapped
 // region. Compressed records (flag 0x00040000) are inflated once into a
 // QByteArray and reads switch to that buffer until the record is drained.
+
+// One record's position in the file, discovered by buildRecordIndex()
+// without parsing the record body.
+struct RecordIndexEntry
+{
+    NAME type;
+    quint32 formId;
+    qint64 offset;
+};
+
 class ESMReader
 {
 public:
@@ -22,6 +32,13 @@ public:
 
     void open();
     void startStream();
+
+    // Scans the file from the current position, reading only record/GRUP
+    // headers (no record bodies are touched, nothing is decompressed), and
+    // appends one entry per record. Used to defer parsing large masters:
+    // the index is built in milliseconds and bodies are parsed later, on
+    // demand, by seeking to entry.offset and reading the record normally.
+    void buildRecordIndex(QVector<RecordIndexEntry>& out);
 
     NAME readName();
     bool isNextName(NAME name);
@@ -117,6 +134,9 @@ private:
     void readRaw(char* dest, qint64 len);
     // Like readRaw but does not advance (always from the mapped file).
     void peekRaw(char* dest, qint64 len) const;
+    // Copies `len` bytes at absolute file offset `off` without moving the
+    // read position. Returns false if the range is outside the mapped file.
+    bool peekBytesAt(qint64 off, void* dest, int len) const;
 
     [[noreturn]] void notifyFailure(const QString& msg);
     void decompressCurrentRecord(int compressedSize);

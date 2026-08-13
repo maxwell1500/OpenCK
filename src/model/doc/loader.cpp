@@ -86,21 +86,28 @@ void Loader::load()
                     return;
                 }
 
-                ++(it->second.file);
                 continue;
             }
 
             if (it->second.file < size)
             {
                 QString file = document->getContentFiles()[it->second.file];
-                LOG_INFO(QString("Loading file: %1 (master=%2)").arg(file).arg(it->second.file == editedIndex ? "no" : "yes"));
-                int recordCount = document->getData().preload(file, it->second.file != editedIndex);
+                const bool isMaster = it->second.file != editedIndex;
+                LOG_INFO(QString("Loading file: %1 (master=%2)").arg(file).arg(isMaster ? "yes" : "no"));
+                int recordCount = document->getData().preload(file, isMaster);
                 LOG_INFO(QString("File loaded: %1, %2 records").arg(file).arg(recordCount));
 
-                it->second.recordsLeft = true;
+                // Masters are indexed-only (Data::preload builds a header
+                // index and skips body parsing); their records materialize
+                // on demand when the user opens them. Only the edited file
+                // gets the eager record pass. recordCount is informational
+                // (header HEDR value, sometimes 0); continueLoading() itself
+                // reports EOF.
+                it->second.recordsLeft = !isMaster;
                 it->second.recordsLoaded = 0;
 
                 emit nextStage(document, file, recordCount);
+                ++(it->second.file);
                 continue;
             }
 
