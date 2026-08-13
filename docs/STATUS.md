@@ -119,13 +119,13 @@ Status key: ✅ done, ◐ partial, ⬜ not started.
   deleted; `test_stubs` remains as an intentional linkage shim
   (static lib, no exe).
   - **Several UNIFIED_PLAN tasks marked ✅ still carry "Partial" caveats**
-  (binary encodings awaiting real-data validation): SCEN PHDA (E4),
-  EFSH/IMGS/PACK/LCTN raw layouts (E1), NavMesh NIF gen (E5). All resolved
-  except **E4 (SCEN PHDA encoder), which remains data-blocked**: Skyrim SE /
-  Starfield.esm contain zero PHDA subrecords (both use the new-generation
-  scene schema), so validating an encoder needs a FO4 install or a
-  classic-format scene mod sample. Raw-subrecord round-trip is byte-exact.
-  Tracked in `docs/REMAINING_WORK_PLAN.md` Phase E.
+  (binary encodings awaiting real-data validation): EFSH/IMGS/PACK/LCTN raw
+  layouts (E1), NavMesh NIF gen (E5). All resolved — including **E4 (SCEN
+  PHDA)**, now closed as a finding: Skyrim.esm, Starfield.esm and
+  Fallout4.esm SCEN records contain zero PHDA subrecords (all use the
+  new-generation scene schema), so PHDA is a classic-format vestige with no
+  live payloads; raw round-trip stays byte-exact. Tracked in
+  `docs/REMAINING_WORK_PLAN.md` Phase E.
 - **Voice "Record" button disabled** (docs: honest tooltip in
   `infodatawidget.cpp`), **VC server field removed from Preferences**,
   and Search/Export still bail on a few types (D4/D5) — see

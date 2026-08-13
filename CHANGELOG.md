@@ -51,8 +51,8 @@ are complete (Phases A-G).
 - Release CI gate green end-to-end (configure, build, tests, NSIS installer).
 
 ### Known limitations
-- **SCEN PHDA encoder** (Phase E4) remains data-blocked: Skyrim SE and
-  Starfield.esm contain zero PHDA subrecords (both ship the new-generation
-  scene schema), so a PHDA encoder can't be validated against real data
-  without a FO4 install or a classic-format scene mod sample. Raw-subrecord
-  round-trip is byte-exact.
+- **SCEN PHDA** (Phase E4): audited against all three shipped games with SCEN
+  (Skyrim SE 1706 records, Starfield 7613, Fallout 4 3568) — none contain a
+  `PHDA` subrecord; all use the new-generation scene schema. PHDA is a
+  classic-format vestige with no live payloads, so no PHDA encoder is
+  shipped. Raw-subrecord round-trip is byte-exact.

@@ -747,8 +747,8 @@ Sources reconciled here:
 > (Phases B, E).
 
 Partials: see `docs/REMAINING_WORK_PLAN.md` Phase E — all Phase E items
-resolved as of 2026-08-12 except **E4 (SCEN PHDA encoder)**, which remains
-data-blocked (no real PHDA sample; Skyrim SE / Starfield.esm ship the
+resolved as of 2026-08-12 (E4 closed as a finding: no shipped game's SCEN
+records contain PHDA — Skyrim SE / Starfield / Fallout 4 all use the
 new-generation scene schema).
 
 | Phase | Steps | Status |
@@ -781,8 +781,9 @@ new-generation scene schema).
 | **TOTAL** | **310/310 (audited)** | ✅ |
 
 Known partial follow-ups are tracked in `docs/REMAINING_WORK_PLAN.md`
-(Phase E). Status as of 2026-08-12: E1/E2/E3/E5/E6-E10 resolved; only **E4
-(SCEN PHDA encoder)** remains open (data-blocked — see plan + CHANGELOG).
+(Phase E). Status as of 2026-08-12: all of E1–E10 resolved, including E4
+(SCEN PHDA) closed as a finding — no shipped game's SCEN records contain
+PHDA (Skyrim SE / Starfield / Fallout 4 audited).
 
 ---
 
