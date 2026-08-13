@@ -1,9 +1,9 @@
 #include "esmreader.hpp"
 #include "../log/logger.hpp"
 
-#include <QBuffer>
 #include <zlib.h>
 #include <sstream>
+#include <cstring>
 
 ESMReader::ESMReader(const QString& path)
     : esm(path)
@@ -17,6 +17,8 @@ ESMReader::ESMReader(const QString& path, const FilePaths& filePaths)
 
 ESMReader::~ESMReader()
 {
+    // QFile unmaps its views when closed/destroyed; m_mapped becomes stale
+    // by then but is never dereferenced again.
 }
 
 void ESMReader::startStream()
@@ -26,8 +28,12 @@ void ESMReader::startStream()
 void ESMReader::open()
 {
     esm.file.close();
-    stream.setDevice(&esm.file);
-    stream.setByteOrder(QDataStream::LittleEndian);
+    m_mapped = nullptr;
+    m_mappedSize = 0;
+    m_pos = 0;
+    m_inDecomp = false;
+    m_decompData.clear();
+    m_decompPos = 0;
 
     if (!esm.file.open(QIODevice::ReadOnly))
     {
@@ -37,6 +43,9 @@ void ESMReader::open()
             << "\".";
         throw std::runtime_error(oss.str());
     }
+
+    m_mappedSize = esm.file.size();
+    m_mapped = esm.file.map(0, m_mappedSize);
 
     if (readName() != 'TES4')
     {
@@ -51,51 +60,76 @@ void ESMReader::open()
         esm.localised = true;
     }
 
-    qint64 posAfterHeader = esm.file.pos();
-    qint64 recLeft = esm.recLeft;
-    qint64 subLeft = esm.subLeft;
-    qDebug() << "ESMReader::open: posAfterHeader=" << posAfterHeader
-             << "recLeft=" << recLeft
-             << "subLeft=" << subLeft
+    qDebug() << "ESMReader::open: posAfterHeader=" << m_pos
+             << "recLeft=" << esm.recLeft
+             << "subLeft=" << esm.subLeft
              << "fileSize=" << esm.size;
+}
+
+void ESMReader::readRaw(char* dest, qint64 len)
+{
+    if (m_inDecomp)
+    {
+        const qint64 avail = (m_decompPos >= 0 && m_decompPos < m_decompData.size())
+            ? m_decompData.size() - m_decompPos : 0;
+        const qint64 n = qMin(len, avail);
+        if (n > 0)
+            memcpy(dest, m_decompData.constData() + m_decompPos, static_cast<size_t>(n));
+        if (n < len)
+            memset(dest + n, 0, static_cast<size_t>(len - n));
+        m_decompPos += len;
+    }
+    else
+    {
+        const qint64 avail = (m_mapped && m_pos >= 0 && m_pos < m_mappedSize)
+            ? m_mappedSize - m_pos : 0;
+        const qint64 n = qMin(len, avail);
+        if (n > 0)
+            memcpy(dest, m_mapped + m_pos, static_cast<size_t>(n));
+        if (n < len)
+            memset(dest + n, 0, static_cast<size_t>(len - n));
+        m_pos += len;
+    }
+}
+
+void ESMReader::peekRaw(char* dest, qint64 len) const
+{
+    const qint64 avail = (m_mapped && m_pos >= 0 && m_pos < m_mappedSize)
+        ? m_mappedSize - m_pos : 0;
+    const qint64 n = qMin(len, avail);
+    if (n > 0)
+        memcpy(dest, m_mapped + m_pos, static_cast<size_t>(n));
+    if (n < len)
+        memset(dest + n, 0, static_cast<size_t>(len - n));
 }
 
 NAME ESMReader::readName()
 {
     // If a decompression buffer is open but fully consumed, the previous
-    // record is done — switch back to the file stream so this read gets the
-    // next record, regardless of how the caller drained the buffer.
-    if (compressedBuffer && compressedBuffer->isOpen() &&
-        compressedBuffer->atEnd())
+    // record is done — switch back to the file so this read gets the next
+    // record, regardless of how the caller drained the buffer.
+    if (m_inDecomp && m_decompPos >= m_decompData.size())
     {
         restoreStreamFromCompression();
     }
 
     NAME name = 0;
-    buf.resize(sizeof(NAME));
-    qint64 bytesRead = stream.readRawData(buf.data(), sizeof(NAME));
+    readRaw(reinterpret_cast<char*>(&name), sizeof(NAME));
     esm.forward(sizeof(NAME));
-    if (bytesRead != sizeof(NAME))
-    {
-        return 0;
-    }
-    memcpy(&name, buf.data(), sizeof(NAME));
     return swapName(name);
 }
 
 bool ESMReader::isNextName(NAME name)
 {
-    NAME cmp;
-    buf.resize(sizeof(NAME));
-    esm.file.peek(buf.data(), sizeof(NAME));
-    memcpy(&cmp, buf.data(), sizeof(NAME));
+    NAME cmp = 0;
+    peekRaw(reinterpret_cast<char*>(&cmp), sizeof(NAME));
     return swapName(cmp) == name;
 }
 
 void ESMReader::skipGrupHeader()
 {
     quint32 grupSize = readType<quint32>(true);    // size
-    mGrupEnd = esm.file.pos() + grupSize;
+    mGrupEnd = m_pos + grupSize;
     readType<quint32>(true);    // label
     readType<quint32>(true);    // group type
     readType<quint8>(true);        // vc day
@@ -111,7 +145,7 @@ RecHeader ESMReader::readHeader()
     // so the next record is read from the file. Any leftover recLeft in the
     // compressed buffer is silently dropped — the caller's readNSubHeader
     // should have drained it.
-    if (compressedBuffer && compressedBuffer->isOpen())
+    if (m_inDecomp)
     {
         restoreStreamFromCompression();
     }
@@ -158,11 +192,7 @@ void ESMReader::decompressCurrentRecord(int compressedSize)
     // Read the entire compressed payload (4-byte size header + zlib stream).
     int payloadSize = compressedSize;
     QByteArray zlibData(payloadSize, '\0');
-    qint64 bytesRead = esm.file.read(zlibData.data(), payloadSize);
-    if (bytesRead != payloadSize)
-    {
-        throw std::runtime_error("Failed to read compressed record data");
-    }
+    readRaw(zlibData.data(), payloadSize);
 
     // Update left/recLeft/subLeft counters to reflect the file bytes consumed.
     esm.left -= payloadSize;
@@ -208,36 +238,33 @@ void ESMReader::decompressCurrentRecord(int compressedSize)
                 .toStdString());
     }
 
-    QByteArray actual = decompressed.left(static_cast<int>(zs.total_out));
+    m_decompData = decompressed.left(static_cast<int>(zs.total_out));
 
     // Set recLeft to the actual decompressed size so the load loop drains correctly.
-    esm.recLeft = actual.size();
+    esm.recLeft = m_decompData.size();
     esm.subLeft = 0;
 
-    // Switch the stream to read from the decompressed buffer.
-    // While reading the buffer, forward() must not double-count bytes
-    // against esm.left (the compressed payload was already charged above).
-    compressedData = actual;
-    compressedBuffer.reset(new QBuffer(&compressedData));
-    compressedBuffer->open(QIODevice::ReadOnly);
-    stream.setDevice(compressedBuffer.get());
+    // Switch reads to the decompressed buffer. While reading it, forward()
+    // must not double-count bytes against esm.left (the compressed payload
+    // was already charged above).
+    m_decompPos = 0;
+    m_inDecomp = true;
     esm.inCompressedBuffer = true;
 
     LOG_DEBUG(QString("ESMReader: decompressed record: %1 bytes -> %2 bytes")
         .arg(compressedSize)
-        .arg(actual.size()));
+        .arg(m_decompData.size()));
 }
 
 void ESMReader::restoreStreamFromCompression()
 {
-    if (!compressedBuffer)
+    if (!m_inDecomp)
     {
         return;
     }
-    compressedBuffer->close();
-    compressedBuffer.reset();
-    compressedData.clear();
-    stream.setDevice(&esm.file);
+    m_inDecomp = false;
+    m_decompData.clear();
+    m_decompPos = 0;
     esm.inCompressedBuffer = false;
     // recLeft should be 0 (the entire decompressed buffer was consumed) at
     // this point. If it isn't, the caller didn't fully drain the record,
@@ -284,10 +311,10 @@ quint16 ESMReader::readSubHeader()
 QString ESMReader::readZString()
 {
     const quint16 sz = static_cast<quint16>(esm.subLeft);
-    buf.resize(sz);
-    stream.readRawData(buf.data(), sz);
+    QByteArray data(static_cast<int>(sz), '\0');
+    readRaw(data.data(), sz);
     esm.forward(sz);
-    QString str = QString::fromUtf8(buf.constData(), sz);
+    QString str = QString::fromUtf8(data.constData(), sz);
     while (str.endsWith(QChar(0)))
         str.chop(1);
     return str;
@@ -329,7 +356,7 @@ void ESMReader::skipRecord()
 {
     readHeader();
     skip(esm.recLeft);
-    // readHeader may have switched the stream to a decompression buffer;
+    // readHeader may have switched reads to a decompression buffer;
     // restore the file stream so the next record is read from the file.
     restoreStreamFromCompression();
 }
@@ -351,15 +378,14 @@ void ESMReader::skipSub()
 void ESMReader::skip(int bytes)
 {
     // When reading from a decompressed buffer, use the buffer's position.
-    // Otherwise use the file's position.
-    if (compressedBuffer && compressedBuffer->isOpen())
+    // Otherwise use the mapped-file position.
+    if (m_inDecomp)
     {
-        qint64 currentPos = compressedBuffer->pos();
-        compressedBuffer->seek(currentPos + bytes);
+        m_decompPos += bytes;
     }
     else
     {
-        esm.file.seek(esm.file.pos() + bytes);
+        m_pos += bytes;
     }
     esm.forward(bytes);
 }
@@ -368,7 +394,7 @@ void ESMReader::skipToGrupEnd()
 {
     if (mGrupEnd > 0)
     {
-        qint64 remaining = mGrupEnd - esm.file.pos();
+        qint64 remaining = mGrupEnd - m_pos;
         if (remaining > 0)
         {
             skip(static_cast<int>(remaining));
@@ -409,10 +435,10 @@ bool ESMReader::localised() const
 
 qint64 ESMReader::filePos() const
 {
-    return esm.file.pos();
+    return m_pos;
 }
 
 void ESMReader::seekTo(qint64 pos)
 {
-    esm.file.seek(pos);
+    m_pos = pos;
 }

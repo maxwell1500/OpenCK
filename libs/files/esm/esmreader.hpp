@@ -5,11 +5,14 @@
 #include "records.hpp"
 #include "tes4.hpp"
 
-#include <QBuffer>
-#include <QDataStream>
 #include <QFile>
 #include <QString>
 
+// ESMReader reads plugin files via a memory-mapped view of the file
+// (QFile::map), so parsing is zero-copy: the OS page cache pages the file
+// in on demand and the reader memcpys field-sized slices out of the mapped
+// region. Compressed records (flag 0x00040000) are inflated once into a
+// QByteArray and reads switch to that buffer until the record is drained.
 class ESMReader
 {
 public:
@@ -56,16 +59,11 @@ public:
     template<typename T>
     T peekType()
     {
-        // Always peek from the file, regardless of whether the stream is
-        // currently reading from a decompressed buffer. The file position
-        // is the source of truth for "where the next record starts".
-        T data;
-        qint64 savedPos = esm.file.pos();
-        char buf[sizeof(T)];
-        qint64 bytesRead = esm.file.peek(buf, sizeof(T));
-        (void)bytesRead;
-        memcpy(&data, buf, sizeof(T));
-        esm.file.seek(savedPos);
+        // Always peek from the mapped file, regardless of whether reads are
+        // currently drawing from a decompressed record buffer. The file
+        // position is the source of truth for "where the next record starts".
+        T data{};
+        peekRaw(reinterpret_cast<char*>(&data), sizeof(T));
         return data;
     }
 
@@ -75,10 +73,8 @@ public:
     template<typename T>
     inline T readType(bool recHeader = false)
     {
-        T data;
-        buf.resize(sizeof(T));
-        stream.readRawData(buf.data(), sizeof(T));
-        memcpy(&data, buf.data(), sizeof(T));
+        T data{};
+        readRaw(reinterpret_cast<char*>(&data), sizeof(T));
         esm.forward(sizeof(T), recHeader);
         return data;
     }
@@ -93,10 +89,8 @@ public:
             throw std::runtime_error("Error process subrecord - unexpected name.");
         }
 
-        T data;
-        buf.resize(sizeof(T));
-        stream.readRawData(buf.data(), sizeof(T));
-        memcpy(&data, buf.data(), sizeof(T));
+        T data{};
+        readRaw(reinterpret_cast<char*>(&data), sizeof(T));
         esm.forward(sizeof(T));
         return data;
     }
@@ -107,7 +101,7 @@ public:
         if (sz > 0)
         {
             data.resize(static_cast<int>(sz));
-            stream.readRawData(data.data(), static_cast<int>(sz));
+            readRaw(data.data(), sz);
             esm.forward(sz);
         }
         else
@@ -117,18 +111,28 @@ public:
     }
 
 private:
+    // Copies `len` bytes from the current read position into `dest` and
+    // advances the position. Short reads are zero-filled (mirrors the old
+    // QDataStream::readRawData behavior the callers rely on).
+    void readRaw(char* dest, qint64 len);
+    // Like readRaw but does not advance (always from the mapped file).
+    void peekRaw(char* dest, qint64 len) const;
+
     [[noreturn]] void notifyFailure(const QString& msg);
     void decompressCurrentRecord(int compressedSize);
     void restoreStreamFromCompression();
 
     ESMFile esm;
-    QDataStream stream;
-    QByteArray buf;
     quint32 mCurrentFormId = 0;
     qint64 mGrupEnd = 0;
-    QScopedPointer<QBuffer> compressedBuffer;
-    QByteArray compressedData;
-    qint64 mCompressedFileStart = 0;
+
+    uchar* m_mapped = nullptr;
+    qint64 m_mappedSize = 0;
+    qint64 m_pos = 0;
+
+    QByteArray m_decompData;
+    qint64 m_decompPos = 0;
+    bool m_inDecomp = false;
 
     Header header;
 };
