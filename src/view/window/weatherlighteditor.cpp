@@ -1,9 +1,11 @@
 #include "weatherlighteditor.hpp"
-#include "fieldvalidators.hpp"
 
 #include "../../model/world/data.hpp"
 #include "../../model/world/collection.hpp"
+#include "../../model/world/collection_impl.hpp"
 #include "../../model/world/idcollection.hpp"
+#include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/undostack.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/gmst.hpp"
@@ -19,7 +21,37 @@
 #include <QFormLayout>
 #include <QSplitter>
 #include <QFile>
-#include <QColorDialog>
+
+namespace {
+
+void applySettingValue(GameSetting& setting, const QString& newValue)
+{
+    switch (setting.value.getType())
+    {
+    case Var_Short:
+        setting.value.setShort(static_cast<quint16>(newValue.toUInt()));
+        break;
+    case Var_Int:
+    case Var_Long:
+        setting.value.setInt(static_cast<quint32>(newValue.toUInt()));
+        break;
+    case Var_Float:
+        setting.value.setFloat(newValue.toFloat());
+        break;
+    case Var_String:
+    case Var_LString:
+        setting.value.setString(newValue);
+        break;
+    case Var_Bool:
+        setting.value.setBool(newValue.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0
+                             || newValue == QLatin1String("1"));
+        break;
+    default:
+        break;
+    }
+}
+
+} // namespace
 
 WeatherLightEditor::WeatherLightEditor(Data* data, QWidget* parent)
     : QDialog(parent),
@@ -32,60 +64,7 @@ WeatherLightEditor::WeatherLightEditor(Data* data, QWidget* parent)
       mSaveButton(nullptr),
       mStatusLabel(nullptr),
       mSelectedName(),
-      mSelectedValue(),
-      mTabWidget(nullptr),
-      mLightTypeIndex(0),
-      mLightColor(Qt::white),
-      mLightIntensity(1.0),
-      mLightAttenuation(100.0),
-      mLightFlicker(false),
-      mLightFlickerSpeed(0.0),
-      mShadowTypeIndex(0),
-      mShadowDepthBias(0.03),
-      mShadowDistance(3000.0),
-      mShadowResolutionIndex(2),
-      mShadowCast(true),
-      mShadowReceive(true),
-      mAmbientColor(QColor(64, 64, 96)),
-      mAmbientIntensity(0.3),
-      mSpecularColor(Qt::white),
-      mSpecularPower(16.0),
-      mFogNear(0.0),
-      mFogFar(5000.0),
-      mTransitionSpeed(1.0),
-      mTransitionCurveIndex(0),
-      mPrecipitationFadeTime(5.0),
-      mCloudSpeedMultiplier(1.0),
-      mSkyTransitionDuration(10.0),
-      mLightTypeCombo(nullptr),
-      mLightColorButton(nullptr),
-      mIntensitySlider(nullptr),
-      mIntensitySpinBox(nullptr),
-      mIntensityDoubleSpinBox(nullptr),
-      mAttenuationSpinBox(nullptr),
-      mFlickerCheckBox(nullptr),
-      mFlickerSpeedSpinBox(nullptr),
-      mShadowTypeCombo(nullptr),
-      mShadowDepthBiasSpinBox(nullptr),
-      mShadowDistanceSpinBox(nullptr),
-      mShadowResolutionCombo(nullptr),
-      mCastShadowsCheckBox(nullptr),
-      mReceiveShadowsCheckBox(nullptr),
-      mAmbientColorButton(nullptr),
-      mAmbientIntensitySpinBox(nullptr),
-      mSpecularColorButton(nullptr),
-      mSpecularPowerSpinBox(nullptr),
-      mFogNearSpinBox(nullptr),
-      mFogFarSpinBox(nullptr),
-      mTransitionSpeedSpinBox(nullptr),
-      mTransitionCurveCombo(nullptr),
-      mPrecipitationFadeSpinBox(nullptr),
-      mCloudSpeedMultiplierSpinBox(nullptr),
-      mSkyTransitionDurationSpinBox(nullptr),
-      mRainSoundEdit(nullptr),
-      mThunderSoundEdit(nullptr),
-      mWindSoundEdit(nullptr),
-      mSnowSoundEdit(nullptr)
+      mSelectedValue()
 {
     LOG_INFO("WeatherLightEditor created");
     setupUI();
@@ -126,26 +105,6 @@ void WeatherLightEditor::setupUI()
     auto* rightLayout = new QVBoxLayout(rightPanel);
     rightLayout->setContentsMargins(0, 0, 0, 0);
 
-    mTabWidget = new QTabWidget();
-
-    auto* lightTab = new QWidget();
-    setupLightTab(lightTab);
-    mTabWidget->addTab(lightTab, "Light");
-
-    auto* shadowsTab = new QWidget();
-    setupShadowsTab(shadowsTab);
-    mTabWidget->addTab(shadowsTab, "Shadows");
-
-    auto* ambientTab = new QWidget();
-    setupAmbientTab(ambientTab);
-    mTabWidget->addTab(ambientTab, "Ambient");
-
-    auto* transitionsTab = new QWidget();
-    setupTransitionsTab(transitionsTab);
-    mTabWidget->addTab(transitionsTab, "Transitions");
-
-    rightLayout->addWidget(mTabWidget, 1);
-
     auto* detailsGroup = new QGroupBox("GMST Details");
     auto* detailsLayout = new QVBoxLayout(detailsGroup);
     mDetailEdit = new QTextEdit();
@@ -154,6 +113,7 @@ void WeatherLightEditor::setupUI()
     mDetailEdit->setMaximumHeight(180);
     detailsLayout->addWidget(mDetailEdit);
     rightLayout->addWidget(detailsGroup);
+    rightLayout->addStretch(1);
 
     splitter->addWidget(rightPanel);
 
@@ -163,6 +123,8 @@ void WeatherLightEditor::setupUI()
 
     auto* buttonBar = new QHBoxLayout();
     mAddSettingButton = new QPushButton("Add Setting");
+    mAddSettingButton->setEnabled(false);
+    mAddSettingButton->setToolTip("Adding game settings is not yet supported.");
     buttonBar->addWidget(mAddSettingButton);
 
     mEditButton = new QPushButton("Edit");
@@ -188,258 +150,6 @@ void WeatherLightEditor::setupUI()
     connect(mEditButton, &QPushButton::clicked, this, &WeatherLightEditor::onEditSetting);
     connect(mDeleteButton, &QPushButton::clicked, this, &WeatherLightEditor::onDeleteSetting);
     connect(mSaveButton, &QPushButton::clicked, this, &WeatherLightEditor::onSave);
-}
-
-void WeatherLightEditor::setupLightTab(QWidget* tab)
-{
-    auto* layout = new QVBoxLayout(tab);
-    layout->setContentsMargins(12, 12, 12, 12);
-
-    auto* typeGroup = new QGroupBox("Light Properties");
-    auto* typeLayout = new QFormLayout(typeGroup);
-
-    mLightTypeCombo = new QComboBox();
-    mLightTypeCombo->addItems({"Point Light", "Spot Light", "Directional Light", "Ambient Light"});
-    mLightTypeCombo->setCurrentIndex(mLightTypeIndex);
-    typeLayout->addRow("Light Type:", mLightTypeCombo);
-
-    auto* colorRow = new QHBoxLayout();
-    mLightColorButton = new QPushButton();
-    updateLightColorButton();
-    mLightColorButton->setMaximumWidth(120);
-    colorRow->addWidget(mLightColorButton);
-    colorRow->addStretch();
-    typeLayout->addRow("Light Color:", colorRow);
-    connect(mLightColorButton, &QPushButton::clicked, this, &WeatherLightEditor::onLightColorClicked);
-
-    auto* intensityRow = new QHBoxLayout();
-    mIntensitySlider = new QSlider(Qt::Horizontal);
-    mIntensitySlider->setRange(0, 100);
-    mIntensitySlider->setValue(qRound(mLightIntensity * 10.0));
-    intensityRow->addWidget(mIntensitySlider, 1);
-
-    mIntensitySpinBox = new QSpinBox();
-    mIntensitySpinBox->setRange(0, 100);
-    mIntensitySpinBox->setValue(qRound(mLightIntensity * 10.0));
-    mIntensitySpinBox->setMaximumWidth(70);
-    intensityRow->addWidget(mIntensitySpinBox);
-
-    mIntensityDoubleSpinBox = new QDoubleSpinBox();
-    mIntensityDoubleSpinBox->setRange(0.0, 10.0);
-    mIntensityDoubleSpinBox->setValue(mLightIntensity);
-    mIntensityDoubleSpinBox->setDecimals(2);
-    mIntensityDoubleSpinBox->setSingleStep(0.1);
-    mIntensityDoubleSpinBox->setMaximumWidth(80);
-    intensityRow->addWidget(mIntensityDoubleSpinBox);
-
-    typeLayout->addRow("Intensity / Fade:", intensityRow);
-
-    connect(mIntensitySlider, &QSlider::valueChanged, this, &WeatherLightEditor::onIntensitySliderChanged);
-    connect(mIntensitySpinBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &WeatherLightEditor::onIntensitySpinBoxChanged);
-    connect(mIntensityDoubleSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &WeatherLightEditor::onIntensityDoubleChanged);
-
-    mAttenuationSpinBox = new QDoubleSpinBox();
-    mAttenuationSpinBox->setRange(0.0, 10000.0);
-    mAttenuationSpinBox->setValue(mLightAttenuation);
-    mAttenuationSpinBox->setDecimals(1);
-    mAttenuationSpinBox->setSingleStep(10.0);
-    typeLayout->addRow("Attenuation / Range:", mAttenuationSpinBox);
-
-    mFlickerCheckBox = new QCheckBox("Flicker Effect");
-    mFlickerCheckBox->setChecked(mLightFlicker);
-    typeLayout->addRow("", mFlickerCheckBox);
-
-    mFlickerSpeedSpinBox = new QDoubleSpinBox();
-    mFlickerSpeedSpinBox->setRange(0.0, 10.0);
-    mFlickerSpeedSpinBox->setValue(mLightFlickerSpeed);
-    mFlickerSpeedSpinBox->setDecimals(2);
-    mFlickerSpeedSpinBox->setSingleStep(0.1);
-    mFlickerSpeedSpinBox->setEnabled(mLightFlicker);
-    typeLayout->addRow("Flicker Speed:", mFlickerSpeedSpinBox);
-
-    connect(mFlickerCheckBox, &QCheckBox::toggled, this, &WeatherLightEditor::onFlickerToggled);
-
-    layout->addWidget(typeGroup);
-    layout->addStretch();
-}
-
-void WeatherLightEditor::setupShadowsTab(QWidget* tab)
-{
-    auto* layout = new QVBoxLayout(tab);
-    layout->setContentsMargins(12, 12, 12, 12);
-
-    auto* shadowGroup = new QGroupBox("Shadow Settings");
-    auto* shadowLayout = new QFormLayout(shadowGroup);
-
-    mShadowTypeCombo = new QComboBox();
-    mShadowTypeCombo->addItems({"None", "Hard", "Soft", "Omni-directional"});
-    mShadowTypeCombo->setCurrentIndex(mShadowTypeIndex);
-    shadowLayout->addRow("Shadow Type:", mShadowTypeCombo);
-
-    mShadowDepthBiasSpinBox = new QDoubleSpinBox();
-    mShadowDepthBiasSpinBox->setRange(0.0, 1.0);
-    mShadowDepthBiasSpinBox->setValue(mShadowDepthBias);
-    mShadowDepthBiasSpinBox->setDecimals(3);
-    mShadowDepthBiasSpinBox->setSingleStep(0.001);
-    shadowLayout->addRow("Shadow Depth Bias:", mShadowDepthBiasSpinBox);
-
-    mShadowDistanceSpinBox = new QDoubleSpinBox();
-    mShadowDistanceSpinBox->setRange(0.0, 10000.0);
-    mShadowDistanceSpinBox->setValue(mShadowDistance);
-    mShadowDistanceSpinBox->setDecimals(1);
-    mShadowDistanceSpinBox->setSingleStep(100.0);
-    shadowLayout->addRow("Shadow Distance:", mShadowDistanceSpinBox);
-
-    mShadowResolutionCombo = new QComboBox();
-    mShadowResolutionCombo->addItems({"256", "512", "1024", "2048", "4096"});
-    mShadowResolutionCombo->setCurrentIndex(mShadowResolutionIndex);
-    shadowLayout->addRow("Shadow Resolution:", mShadowResolutionCombo);
-
-    mCastShadowsCheckBox = new QCheckBox("Cast Shadows");
-    mCastShadowsCheckBox->setChecked(mShadowCast);
-    shadowLayout->addRow("", mCastShadowsCheckBox);
-
-    mReceiveShadowsCheckBox = new QCheckBox("Receive Shadows");
-    mReceiveShadowsCheckBox->setChecked(mShadowReceive);
-    shadowLayout->addRow("", mReceiveShadowsCheckBox);
-
-    layout->addWidget(shadowGroup);
-    layout->addStretch();
-}
-
-void WeatherLightEditor::setupAmbientTab(QWidget* tab)
-{
-    auto* layout = new QVBoxLayout(tab);
-    layout->setContentsMargins(12, 12, 12, 12);
-
-    auto* ambientGroup = new QGroupBox("Ambient Light");
-    auto* ambientLayout = new QFormLayout(ambientGroup);
-
-    auto* ambientColorRow = new QHBoxLayout();
-    mAmbientColorButton = new QPushButton();
-    updateAmbientColorButton();
-    mAmbientColorButton->setMaximumWidth(120);
-    ambientColorRow->addWidget(mAmbientColorButton);
-    ambientColorRow->addStretch();
-    ambientLayout->addRow("Ambient Color:", ambientColorRow);
-    connect(mAmbientColorButton, &QPushButton::clicked, this, &WeatherLightEditor::onAmbientColorClicked);
-
-    mAmbientIntensitySpinBox = new QDoubleSpinBox();
-    mAmbientIntensitySpinBox->setRange(0.0, 1.0);
-    mAmbientIntensitySpinBox->setValue(mAmbientIntensity);
-    mAmbientIntensitySpinBox->setDecimals(2);
-    mAmbientIntensitySpinBox->setSingleStep(0.01);
-    ambientLayout->addRow("Ambient Intensity:", mAmbientIntensitySpinBox);
-
-    auto* specularColorRow = new QHBoxLayout();
-    mSpecularColorButton = new QPushButton();
-    updateSpecularColorButton();
-    mSpecularColorButton->setMaximumWidth(120);
-    specularColorRow->addWidget(mSpecularColorButton);
-    specularColorRow->addStretch();
-    ambientLayout->addRow("Specular Color:", specularColorRow);
-    connect(mSpecularColorButton, &QPushButton::clicked, this, &WeatherLightEditor::onSpecularColorClicked);
-
-    mSpecularPowerSpinBox = new QDoubleSpinBox();
-    mSpecularPowerSpinBox->setRange(0.0, 128.0);
-    mSpecularPowerSpinBox->setValue(mSpecularPower);
-    mSpecularPowerSpinBox->setDecimals(1);
-    mSpecularPowerSpinBox->setSingleStep(1.0);
-    ambientLayout->addRow("Specular Power:", mSpecularPowerSpinBox);
-
-    layout->addWidget(ambientGroup);
-
-    auto* fogGroup = new QGroupBox("Fog Settings");
-    auto* fogLayout = new QFormLayout(fogGroup);
-
-    mFogNearSpinBox = new QDoubleSpinBox();
-    mFogNearSpinBox->setRange(0.0, 100000.0);
-    mFogNearSpinBox->setValue(mFogNear);
-    mFogNearSpinBox->setDecimals(1);
-    mFogNearSpinBox->setSingleStep(100.0);
-    fogLayout->addRow("Fog Near:", mFogNearSpinBox);
-
-    mFogFarSpinBox = new QDoubleSpinBox();
-    mFogFarSpinBox->setRange(0.0, 100000.0);
-    mFogFarSpinBox->setValue(mFogFar);
-    mFogFarSpinBox->setDecimals(1);
-    mFogFarSpinBox->setSingleStep(100.0);
-    fogLayout->addRow("Fog Far:", mFogFarSpinBox);
-
-    layout->addWidget(fogGroup);
-    layout->addStretch();
-}
-
-void WeatherLightEditor::setupTransitionsTab(QWidget* tab)
-{
-    auto* layout = new QVBoxLayout(tab);
-    layout->setContentsMargins(12, 12, 12, 12);
-
-    auto* transitionGroup = new QGroupBox("Weather Transition");
-    auto* transitionLayout = new QFormLayout(transitionGroup);
-
-    mTransitionSpeedSpinBox = new QDoubleSpinBox();
-    mTransitionSpeedSpinBox->setRange(0.0, 10.0);
-    mTransitionSpeedSpinBox->setValue(mTransitionSpeed);
-    mTransitionSpeedSpinBox->setDecimals(2);
-    mTransitionSpeedSpinBox->setSingleStep(0.1);
-    transitionLayout->addRow("Transition Speed:", mTransitionSpeedSpinBox);
-
-    mTransitionCurveCombo = new QComboBox();
-    mTransitionCurveCombo->addItems({"Linear", "Ease In", "Ease Out", "Ease In-Out", "Smooth Step"});
-    mTransitionCurveCombo->setCurrentIndex(mTransitionCurveIndex);
-    transitionLayout->addRow("Transition Curve:", mTransitionCurveCombo);
-
-    mPrecipitationFadeSpinBox = new QDoubleSpinBox();
-    mPrecipitationFadeSpinBox->setRange(0.0, 30.0);
-    mPrecipitationFadeSpinBox->setValue(mPrecipitationFadeTime);
-    mPrecipitationFadeSpinBox->setDecimals(1);
-    mPrecipitationFadeSpinBox->setSingleStep(0.5);
-    mPrecipitationFadeSpinBox->setSuffix(" s");
-    transitionLayout->addRow("Precipitation Fade Time:", mPrecipitationFadeSpinBox);
-
-    mCloudSpeedMultiplierSpinBox = new QDoubleSpinBox();
-    mCloudSpeedMultiplierSpinBox->setRange(0.1, 5.0);
-    mCloudSpeedMultiplierSpinBox->setValue(mCloudSpeedMultiplier);
-    mCloudSpeedMultiplierSpinBox->setDecimals(2);
-    mCloudSpeedMultiplierSpinBox->setSingleStep(0.1);
-    transitionLayout->addRow("Cloud Speed Multiplier:", mCloudSpeedMultiplierSpinBox);
-
-    mSkyTransitionDurationSpinBox = new QDoubleSpinBox();
-    mSkyTransitionDurationSpinBox->setRange(0.0, 60.0);
-    mSkyTransitionDurationSpinBox->setValue(mSkyTransitionDuration);
-    mSkyTransitionDurationSpinBox->setDecimals(1);
-    mSkyTransitionDurationSpinBox->setSingleStep(1.0);
-    mSkyTransitionDurationSpinBox->setSuffix(" s");
-    transitionLayout->addRow("Sky Transition Duration:", mSkyTransitionDurationSpinBox);
-
-    layout->addWidget(transitionGroup);
-
-    auto* soundGroup = new QGroupBox("Sound Environment Mapping");
-    auto* soundLayout = new QFormLayout(soundGroup);
-
-    mRainSoundEdit = new QLineEdit();
-    mRainSoundEdit->setPlaceholderText("FormID");
-    setHexFormIdValidator(mRainSoundEdit, this);
-    soundLayout->addRow("Rain Sound:", mRainSoundEdit);
-
-    mThunderSoundEdit = new QLineEdit();
-    mThunderSoundEdit->setPlaceholderText("FormID");
-    setHexFormIdValidator(mThunderSoundEdit, this);
-    soundLayout->addRow("Thunder Sound:", mThunderSoundEdit);
-
-    mWindSoundEdit = new QLineEdit();
-    mWindSoundEdit->setPlaceholderText("FormID");
-    setHexFormIdValidator(mWindSoundEdit, this);
-    soundLayout->addRow("Wind Sound:", mWindSoundEdit);
-
-    mSnowSoundEdit = new QLineEdit();
-    mSnowSoundEdit->setPlaceholderText("FormID");
-    setHexFormIdValidator(mSnowSoundEdit, this);
-    soundLayout->addRow("Snow Sound:", mSnowSoundEdit);
-
-    layout->addWidget(soundGroup);
-    layout->addStretch();
 }
 
 void WeatherLightEditor::loadSettings()
@@ -581,9 +291,28 @@ void WeatherLightEditor::onEditSetting()
 
     if (!ok) return;
 
-    LOG_INFO(QString("Updated setting '%1' from '%2' to '%3'")
-        .arg(mSelectedName).arg(mSelectedValue).arg(newValue));
+    auto& coll = mData->getGameSettings();
+    int idx = coll.searchId(mSelectedName);
+    if (idx < 0)
+    {
+        LOG_WARNING(QString("Cannot edit setting '%1': not found in game settings").arg(mSelectedName));
+        return;
+    }
+
+    GameSetting original = coll.getRecord(idx).get();
+    GameSetting edited = original;
+    applySettingValue(edited, newValue);
+
+    if (mData->getUndoStack())
+    {
+        auto* cmd = new EditRecordCommand<GameSetting>(
+            &coll, idx, original, edited,
+            QStringLiteral("Edit Game Setting: %1").arg(mSelectedName));
+        cmd && !(original == edited) ? mData->getUndoStack()->push(cmd) : delete cmd;
+    }
+
     mSelectedValue = newValue;
+    LOG_INFO(QString("Updated setting '%1' to '%2'").arg(mSelectedName).arg(newValue));
     refreshTree();
 }
 
@@ -597,7 +326,14 @@ void WeatherLightEditor::onDeleteSetting()
         QMessageBox::Yes | QMessageBox::No);
 
     if (reply == QMessageBox::Yes) {
-        LOG_INFO(QString("Deleted setting '%1'").arg(mSelectedName));
+        if (mData->getGameSettings().removeRecordWithUndo(mSelectedName, mData->getUndoStack()))
+        {
+            LOG_INFO(QString("Deleted setting '%1'").arg(mSelectedName));
+        }
+        else
+        {
+            LOG_WARNING(QString("Could not delete setting '%1': not found in game settings").arg(mSelectedName));
+        }
         mSelectedName.clear();
         mSelectedValue.clear();
         refreshTree();
@@ -669,111 +405,4 @@ void WeatherLightEditor::onSave()
             .arg(lightingCount)
             .arg(weatherCount + lightingCount)
             .arg(filePath));
-}
-
-void WeatherLightEditor::onLightColorClicked()
-{
-    QColor color = QColorDialog::getColor(mLightColor, this, "Select Light Color");
-    if (color.isValid()) {
-        mLightColor = color;
-        updateLightColorButton();
-    }
-}
-
-void WeatherLightEditor::onAmbientColorClicked()
-{
-    QColor color = QColorDialog::getColor(mAmbientColor, this, "Select Ambient Color");
-    if (color.isValid()) {
-        mAmbientColor = color;
-        updateAmbientColorButton();
-    }
-}
-
-void WeatherLightEditor::onSpecularColorClicked()
-{
-    QColor color = QColorDialog::getColor(mSpecularColor, this, "Select Specular Color");
-    if (color.isValid()) {
-        mSpecularColor = color;
-        updateSpecularColorButton();
-    }
-}
-
-void WeatherLightEditor::onIntensitySliderChanged(int value)
-{
-    syncIntensityFromSlider(value);
-}
-
-void WeatherLightEditor::onIntensitySpinBoxChanged(int value)
-{
-    syncIntensityFromSlider(value);
-}
-
-void WeatherLightEditor::onIntensityDoubleChanged(double value)
-{
-    syncIntensityFromDouble(value);
-}
-
-void WeatherLightEditor::onFlickerToggled(bool checked)
-{
-    mLightFlicker = checked;
-    mFlickerSpeedSpinBox->setEnabled(checked);
-}
-
-void WeatherLightEditor::updateLightColorButton()
-{
-    mLightColorButton->setStyleSheet(QString(
-        "QPushButton { background-color: %1; border: 1px solid #888; min-height: 24px; }"
-    ).arg(mLightColor.name()));
-    mLightColorButton->setText(mLightColor.name().toUpper());
-}
-
-void WeatherLightEditor::updateAmbientColorButton()
-{
-    mAmbientColorButton->setStyleSheet(QString(
-        "QPushButton { background-color: %1; border: 1px solid #888; min-height: 24px; }"
-    ).arg(mAmbientColor.name()));
-    mAmbientColorButton->setText(mAmbientColor.name().toUpper());
-}
-
-void WeatherLightEditor::updateSpecularColorButton()
-{
-    mSpecularColorButton->setStyleSheet(QString(
-        "QPushButton { background-color: %1; border: 1px solid #888; min-height: 24px; }"
-    ).arg(mSpecularColor.name()));
-    mSpecularColorButton->setText(mSpecularColor.name().toUpper());
-}
-
-void WeatherLightEditor::syncIntensityFromSlider(int sliderValue)
-{
-    mLightIntensity = sliderValue * 0.1;
-
-    mIntensitySlider->blockSignals(true);
-    mIntensitySpinBox->blockSignals(true);
-    mIntensityDoubleSpinBox->blockSignals(true);
-
-    mIntensitySlider->setValue(sliderValue);
-    mIntensitySpinBox->setValue(sliderValue);
-    mIntensityDoubleSpinBox->setValue(mLightIntensity);
-
-    mIntensitySlider->blockSignals(false);
-    mIntensitySpinBox->blockSignals(false);
-    mIntensityDoubleSpinBox->blockSignals(false);
-}
-
-void WeatherLightEditor::syncIntensityFromDouble(double doubleValue)
-{
-    mLightIntensity = doubleValue;
-    int sliderValue = qRound(doubleValue * 10.0);
-
-    mIntensitySlider->blockSignals(true);
-    mIntensitySpinBox->blockSignals(true);
-    mIntensityDoubleSpinBox->blockSignals(true);
-
-    mIntensitySlider->setValue(sliderValue);
-    mIntensitySpinBox->setValue(sliderValue);
-    mIntensityDoubleSpinBox->setValue(doubleValue);
-
-    mIntensitySlider->blockSignals(false);
-    mIntensitySpinBox->blockSignals(false);
-    mIntensityDoubleSpinBox->blockSignals(false);
 }

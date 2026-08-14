@@ -562,6 +562,7 @@ void QuestGraphEditor::onSave()
         {
             RecHeader recHeader;
             recHeader.id = record.get().formId;
+            recHeader.flags.val = record.get().flags;
             writer.startRecord('QUST', recHeader);
             record.get().save(writer);
             writer.endRecord();

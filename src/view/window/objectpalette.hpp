@@ -108,8 +108,8 @@ private:
 
     bool placementMode;
     QString selectedObject;
-    quint32 nextRefFormId;
 
+    quint32 allocateRefFormId();
     float snapToGrid(float value, int gridSize) const;
 };
 

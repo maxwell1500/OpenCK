@@ -342,8 +342,9 @@ void MainWindow::setData(Data* data)
                     if (mStatusSelectedObject) mStatusSelectedObject->setText(QStringLiteral("No selection"));
                     return;
                 }
-                const int idx = mData->getRefrCollection().searchId(rec->editorId);
                 const QString id = QStringLiteral("0x%1").arg(rec->formId, 8, 16, QChar('0'));
+                const int idx = mData->getRefrCollection().searchId(
+                    QStringLiteral("%1").arg(rec->formId, 8, 16, QLatin1Char('0')));
                 if (mStatusSelectedObject) mStatusSelectedObject->setText(QStringLiteral("REFR %1").arg(id));
                 if (idx >= 0)
                 {
@@ -392,8 +393,9 @@ void MainWindow::setData(Data* data)
                 } else {
                     mInspectorWidget->clear();
                 }
-                mStatusSelectedObject->setText(QStringLiteral("%1: %2")
-                    .arg(lookup.recordType, eid));
+                if (mStatusSelectedObject)
+                    mStatusSelectedObject->setText(QStringLiteral("%1: %2")
+                        .arg(lookup.recordType, eid));
             });
         }
         

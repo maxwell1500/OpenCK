@@ -2,7 +2,10 @@
 
 #include "../../model/world/data.hpp"
 #include "../../model/world/collection.hpp"
+#include "../../model/world/collection_impl.hpp"
 #include "../../model/world/idcollection.hpp"
+#include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/undostack.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/glob.hpp"
@@ -18,6 +21,38 @@
 #include <QSplitter>
 #include <QFile>
 
+namespace {
+
+template<typename T>
+void applySettingValue(T& setting, const QString& newValue)
+{
+    switch (setting.value.getType())
+    {
+    case Var_Short:
+        setting.value.setShort(static_cast<quint16>(newValue.toUInt()));
+        break;
+    case Var_Int:
+    case Var_Long:
+        setting.value.setInt(static_cast<quint32>(newValue.toUInt()));
+        break;
+    case Var_Float:
+        setting.value.setFloat(newValue.toFloat());
+        break;
+    case Var_String:
+    case Var_LString:
+        setting.value.setString(newValue);
+        break;
+    case Var_Bool:
+        setting.value.setBool(newValue.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0
+                             || newValue == QLatin1String("1"));
+        break;
+    default:
+        break;
+    }
+}
+
+} // namespace
+
 WaterEditor::WaterEditor(Data* data, QWidget* parent)
     : QDialog(parent),
       mData(data),
@@ -29,7 +64,8 @@ WaterEditor::WaterEditor(Data* data, QWidget* parent)
       mSaveButton(nullptr),
       mStatusLabel(nullptr),
       mSelectedName(),
-      mSelectedValue()
+      mSelectedValue(),
+      mSelectedType()
 {
     LOG_INFO("WaterEditor created");
     setupUI();
@@ -77,6 +113,8 @@ void WaterEditor::setupUI()
 
     auto* buttonBar = new QHBoxLayout();
     mAddSettingButton = new QPushButton("Add Setting");
+    mAddSettingButton->setEnabled(false);
+    mAddSettingButton->setToolTip("Adding water settings is not yet supported.");
     buttonBar->addWidget(mAddSettingButton);
 
     mEditButton = new QPushButton("Edit");
@@ -89,7 +127,7 @@ void WaterEditor::setupUI()
 
     buttonBar->addStretch();
 
-    mSaveButton = new QPushButton("Save Changes");
+    mSaveButton = new QPushButton("Export Settings...");
     buttonBar->addWidget(mSaveButton);
 
     mainLayout->addLayout(buttonBar);
@@ -156,6 +194,7 @@ void WaterEditor::loadSettings()
                 item->setText(2, value);
                 item->setData(0, Qt::UserRole, name);
                 item->setData(0, Qt::UserRole + 1, value);
+                item->setData(0, Qt::UserRole + 2, QStringLiteral("GLOB"));
                 waterCount++;
             }
         }
@@ -200,6 +239,7 @@ void WaterEditor::loadSettings()
                 item->setText(2, value);
                 item->setData(0, Qt::UserRole, name);
                 item->setData(0, Qt::UserRole + 1, value);
+                item->setData(0, Qt::UserRole + 2, QStringLiteral("GMST"));
                 waterCount++;
             }
         }
@@ -227,10 +267,12 @@ void WaterEditor::onNodeSelected(QTreeWidgetItem* item, int column)
 
     QString name = item->data(0, Qt::UserRole).toString();
     QString value = item->data(0, Qt::UserRole + 1).toString();
+    QString type = item->data(0, Qt::UserRole + 2).toString();
 
     if (!name.isEmpty()) {
         mSelectedName = name;
         mSelectedValue = value;
+        mSelectedType = type;
         showSettingDetails(name, value);
     }
 }
@@ -276,9 +318,53 @@ void WaterEditor::onEditSetting()
 
     if (!ok) return;
 
-    LOG_INFO(QString("Updated setting '%1' from '%2' to '%3'")
-        .arg(mSelectedName).arg(mSelectedValue).arg(newValue));
+    if (mSelectedType == QLatin1String("GLOB"))
+    {
+        auto& coll = mData->getGlobCollection();
+        int idx = coll.searchId(mSelectedName);
+        if (idx < 0)
+        {
+            LOG_WARNING(QString("Cannot edit global '%1': not found in globals").arg(mSelectedName));
+            return;
+        }
+
+        GlobalVariable original = coll.getRecord(idx).get();
+        GlobalVariable edited = original;
+        applySettingValue(edited, newValue);
+
+        if (mData->getUndoStack())
+        {
+            auto* cmd = new EditRecordCommand<GlobalVariable>(
+                &coll, idx, original, edited,
+                QStringLiteral("Edit Global Variable: %1").arg(mSelectedName));
+            cmd && !(original == edited) ? mData->getUndoStack()->push(cmd) : delete cmd;
+        }
+    }
+    else
+    {
+        auto& coll = mData->getGameSettings();
+        int idx = coll.searchId(mSelectedName);
+        if (idx < 0)
+        {
+            LOG_WARNING(QString("Cannot edit setting '%1': not found in game settings").arg(mSelectedName));
+            return;
+        }
+
+        GameSetting original = coll.getRecord(idx).get();
+        GameSetting edited = original;
+        applySettingValue(edited, newValue);
+
+        if (mData->getUndoStack())
+        {
+            auto* cmd = new EditRecordCommand<GameSetting>(
+                &coll, idx, original, edited,
+                QStringLiteral("Edit Game Setting: %1").arg(mSelectedName));
+            cmd && !(original == edited) ? mData->getUndoStack()->push(cmd) : delete cmd;
+        }
+    }
+
     mSelectedValue = newValue;
+    LOG_INFO(QString("Updated setting '%1' to '%2'").arg(mSelectedName).arg(newValue));
     refreshTree();
 }
 
@@ -292,9 +378,27 @@ void WaterEditor::onDeleteSetting()
         QMessageBox::Yes | QMessageBox::No);
 
     if (reply == QMessageBox::Yes) {
-        LOG_INFO(QString("Deleted setting '%1'").arg(mSelectedName));
+        bool removed = false;
+        if (mSelectedType == QLatin1String("GLOB"))
+        {
+            removed = mData->getGlobCollection().removeRecordWithUndo(mSelectedName, mData->getUndoStack());
+        }
+        else
+        {
+            removed = mData->getGameSettings().removeRecordWithUndo(mSelectedName, mData->getUndoStack());
+        }
+
+        if (removed)
+        {
+            LOG_INFO(QString("Deleted setting '%1'").arg(mSelectedName));
+        }
+        else
+        {
+            LOG_WARNING(QString("Could not delete setting '%1': not found").arg(mSelectedName));
+        }
         mSelectedName.clear();
         mSelectedValue.clear();
+        mSelectedType.clear();
         refreshTree();
     }
 }

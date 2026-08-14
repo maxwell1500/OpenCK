@@ -57,6 +57,9 @@ void CellTransitionsEditor::setupUI()
     topBar->addWidget(searchEdit, 1);
     mainLayout->addLayout(topBar);
 
+    auto* infoLabel = new QLabel("Read-only overview. Cell-to-cell transitions are not yet editable.");
+    mainLayout->addWidget(infoLabel);
+
     auto* splitter = new QSplitter(Qt::Horizontal, this);
 
     mTree = new QTreeWidget();
@@ -82,18 +85,18 @@ void CellTransitionsEditor::setupUI()
     mEditButton = new QPushButton("Edit");
     mDeleteButton = new QPushButton("Delete");
 
-    // Transition editing is permanently disabled: the plugin format stores
-    // no cell-connection data (see docs/REMAINING_WORK_PLAN.md Phase D).
-    mAddTransitionButton->setEnabled(false);
-    mEditButton->setEnabled(false);
-    mDeleteButton->setEnabled(false);
+    // Hidden, not just disabled: the plugin format stores no cell-connection
+    // data (see docs/REMAINING_WORK_PLAN.md Phase D), so these actions are dead.
+    mAddTransitionButton->setVisible(false);
+    mEditButton->setVisible(false);
+    mDeleteButton->setVisible(false);
     buttonBar->addWidget(mAddTransitionButton);
     buttonBar->addWidget(mEditButton);
     buttonBar->addWidget(mDeleteButton);
 
     buttonBar->addStretch();
 
-    mSaveButton = new QPushButton("Save Changes");
+    mSaveButton = new QPushButton("Export Worldspaces...");
     buttonBar->addWidget(mSaveButton);
 
     mainLayout->addLayout(buttonBar);
@@ -102,9 +105,6 @@ void CellTransitionsEditor::setupUI()
     mainLayout->addWidget(mStatusLabel);
 
     connect(mTree, &QTreeWidget::itemClicked, this, &CellTransitionsEditor::onNodeSelected);
-    connect(mAddTransitionButton, &QPushButton::clicked, this, &CellTransitionsEditor::onAddTransition);
-    connect(mEditButton, &QPushButton::clicked, this, &CellTransitionsEditor::onEditTransition);
-    connect(mDeleteButton, &QPushButton::clicked, this, &CellTransitionsEditor::onDeleteTransition);
     connect(mSaveButton, &QPushButton::clicked, this, &CellTransitionsEditor::onSave);
 }
 
@@ -156,9 +156,6 @@ void CellTransitionsEditor::onNodeSelected(QTreeWidgetItem* item, int column)
             mSelectedWorldspace = ws;
             showWorldspaceDetails(ws);
         }
-    } else if (type == "CEL_") {
-        QString cellName = item->text(0);
-        showCellDetails(nullptr);
     }
 }
 

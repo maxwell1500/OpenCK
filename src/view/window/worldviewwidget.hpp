@@ -47,6 +47,7 @@ struct WorldRefInstance {
     float scale = 1.0f;
     QString editorId;
     WorldRefMesh* mesh = nullptr;
+    int dataIndex = -1;
 };
 
 class WorldViewWidget : public QWidget

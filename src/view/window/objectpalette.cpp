@@ -62,8 +62,7 @@ ObjectPalette::ObjectPalette(Data* data, QWidget* parent) :
     QWidget(parent),
     mData(data),
     currentCell(nullptr),
-    placementMode(false),
-    nextRefFormId(0x80000000)
+    placementMode(false)
 {
     setupUI();
     populateObjectList();
@@ -209,7 +208,6 @@ void ObjectPalette::clear()
 {
     currentCell = nullptr;
     placements.clear();
-    nextRefFormId = 0x80000000;
     objectCountLabel->setText("Objects: 0");
     statusLabel->setText("Cleared");
 }
@@ -374,6 +372,8 @@ void ObjectPalette::onLoadPlacementClicked()
         QString name;
         in >> name >> p.x >> p.y >> p.z >> p.rotX >> p.rotY >> p.rotZ >> p.scale >> p.active;
         p.baseObjectName = name;
+        // Form IDs are re-allocated from the document on sync; the name is
+        // the stable identity in the placement file.
         p.baseObjectFormId = 0;
         placements.append(p);
     }
@@ -440,7 +440,7 @@ void ObjectPalette::syncPlacementsToCell()
             QDataStream out(&data, QIODevice::WriteOnly);
             out.setByteOrder(QDataStream::LittleEndian);
 
-            quint32 refFormId = nextRefFormId++;
+            quint32 refFormId = allocateRefFormId();
             quint32 baseObj = p.baseObjectFormId;
             float px = p.x;
             float py = p.y;
@@ -466,6 +466,24 @@ float ObjectPalette::snapToGrid(float value, int gridSize) const
     return std::round(value / gridSize) * gridSize;
 }
 
+quint32 ObjectPalette::allocateRefFormId()
+{
+    // Form IDs come from the document's allocator (plugin load-order
+    // index, collision-checked), never a fabricated counter.
+    if (mData)
+    {
+        try
+        {
+            return mData->createNewRecord(CkId::Type_Refr_, QString());
+        }
+        catch (const std::exception& e)
+        {
+            LOG_WARNING(QString("ObjectPalette: %1").arg(e.what()));
+        }
+    }
+    return 0x80000000u;
+}
+
 void ObjectPalette::syncPlacementsToRefrCollection()
 {
     if (!mData) {
@@ -476,7 +494,7 @@ void ObjectPalette::syncPlacementsToRefrCollection()
         RefrRecord ref;
         ref.blank();
         ref.initComponents();
-        ref.formId = nextRefFormId++;
+        ref.formId = allocateRefFormId();
         ref.baseId = p.baseObjectFormId;
         ref.posX = p.x;
         ref.posY = p.y;

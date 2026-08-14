@@ -44,6 +44,7 @@ private:
 
     QString mSelectedName;
     QString mSelectedValue;
+    QString mSelectedType;
 };
 
 #endif // WATEREDITOR_HPP

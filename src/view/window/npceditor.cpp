@@ -16,6 +16,7 @@
 #include <QScrollBar>
 #include <QMessageBox>
 #include <QDataStream>
+#include <QInputDialog>
 
 static constexpr NAME makeName(const char s[4])
 {
@@ -50,6 +51,14 @@ static QVector<RawSubRecord>::const_iterator findSubRecord(const QVector<RawSubR
             return it;
     }
     return records.end();
+}
+
+static quint32 parseHexFormId(const QString& text, bool* ok)
+{
+    QString clean = text.trimmed();
+    if (clean.startsWith("0x", Qt::CaseInsensitive))
+        clean = clean.mid(2);
+    return clean.trimmed().toUInt(ok, 16);
 }
 
 NpcEditor::NpcEditor(Data* data, NpcRecord* npc, QWidget* parent)
@@ -328,7 +337,14 @@ void NpcEditor::setupUI()
         layout->addLayout(buttonRow);
 
         connect(addButton, &QPushButton::clicked, this, [this]() {
-            addSpellRow("NewSpell");
+            bool ok = false;
+            QString text = QInputDialog::getText(this, "Add Spell",
+                "Enter the spell's Form ID in hex (e.g. 0x0001A2B3):", QLineEdit::Normal, "0x", &ok);
+            if (!ok) return;
+            bool parsed = false;
+            quint32 val = parseHexFormId(text, &parsed);
+            if (!parsed || val == 0) return;
+            addSpellRow(QString::number(val));
         });
         connect(removeButton, &QPushButton::clicked, this, [this]() {
             delete mSpellsList->currentItem();
@@ -362,7 +378,14 @@ void NpcEditor::setupUI()
         layout->addLayout(buttonRow);
 
         connect(addButton, &QPushButton::clicked, this, [this]() {
-            addInventoryRow("FormID", "1", "None", false);
+            bool ok = false;
+            QString text = QInputDialog::getText(this, "Add Item",
+                "Enter the item's Form ID in hex (e.g. 0x0001A2B3):", QLineEdit::Normal, "0x", &ok);
+            if (!ok) return;
+            bool parsed = false;
+            quint32 val = parseHexFormId(text, &parsed);
+            if (!parsed || val == 0) return;
+            addInventoryRow(QString::number(val), "1", "None", false);
         });
         connect(removeButton, &QPushButton::clicked, this, [this]() {
             int row = mInventoryTable->currentRow();
@@ -391,7 +414,14 @@ void NpcEditor::setupUI()
         layout->addLayout(buttonRow);
 
         connect(addButton, &QPushButton::clicked, this, [this]() {
-            addRelationshipRow("NewFaction");
+            bool ok = false;
+            QString text = QInputDialog::getText(this, "Add Relationship",
+                "Enter the faction's Form ID in hex (e.g. 0x0001A2B3):", QLineEdit::Normal, "0x", &ok);
+            if (!ok) return;
+            bool parsed = false;
+            quint32 val = parseHexFormId(text, &parsed);
+            if (!parsed || val == 0) return;
+            addRelationshipRow(QString::number(val));
         });
         connect(removeButton, &QPushButton::clicked, this, [this]() {
             delete mRelationshipsList->currentItem();
@@ -589,17 +619,24 @@ void NpcEditor::saveToNpc()
     }
 
     mRecord->inventoryItems.clear();
+    QStringList skippedInventory;
     for (int i = 0; i < mInventoryTable->rowCount(); i++)
     {
         QTableWidgetItem* formItem = mInventoryTable->item(i, 0);
-        if (formItem) {
-            QString text = formItem->text();
-            bool ok = false;
-            quint32 val = text.toUInt(&ok);
-            if (ok && val != 0) {
-                mRecord->inventoryItems.push_back(val);
-            }
+        QString text = formItem ? formItem->text() : QString();
+        bool ok = false;
+        quint32 val = text.toUInt(&ok);
+        if (ok && val != 0) {
+            mRecord->inventoryItems.push_back(val);
+        } else {
+            skippedInventory << QString("%1: '%2'").arg(i + 1).arg(text);
         }
+    }
+    if (!skippedInventory.isEmpty())
+    {
+        QMessageBox::warning(this, "Invalid Inventory Items",
+            QString("The following inventory rows were skipped because their Form ID is not a valid number:\n%1")
+                .arg(skippedInventory.join("\n")));
     }
 
     mRecord->relationships.clear();
@@ -817,6 +854,8 @@ void NpcEditor::addInventoryRow(const QString& formId, const QString& count, con
     mInventoryTable->setItem(row, 0, formItem);
     
     auto* countItem = new QTableWidgetItem(count);
+    countItem->setFlags(countItem->flags() & ~Qt::ItemIsEditable);
+    countItem->setToolTip("not persisted");
     mInventoryTable->setItem(row, 1, countItem);
     
     auto* equippedWidget = new QWidget();
@@ -825,6 +864,8 @@ void NpcEditor::addInventoryRow(const QString& formId, const QString& count, con
     equippedLayout->setAlignment(Qt::AlignCenter);
     auto* equippedCheck = new QCheckBox();
     equippedCheck->setChecked(equipped);
+    equippedCheck->setEnabled(false);
+    equippedCheck->setToolTip("not persisted");
     equippedLayout->addWidget(equippedCheck);
     mInventoryTable->setCellWidget(row, 2, equippedWidget);
     
@@ -833,6 +874,8 @@ void NpcEditor::addInventoryRow(const QString& formId, const QString& count, con
                          "Amulet", "Ring", "Feet", "Calves", "Shield", "Tail",
                          "LongHair", "Circlet", "Ears", "Weapon", "Ammo"});
     slotCombo->setCurrentText(slot);
+    slotCombo->setEnabled(false);
+    slotCombo->setToolTip("not persisted");
     mInventoryTable->setCellWidget(row, 3, slotCombo);
     
     auto* removeBtn = new QPushButton("X");

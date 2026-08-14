@@ -1518,9 +1518,9 @@ void ObjectWindowModel::initCategories(Data* data)
 
     addCategory("Creature", CkId::Type_Crea_);
     addCategory("Leveled Actor", CkId::Type_Lvlc_);
-    addCategory("Leveled NPC", CkId::Type_None);
+    addCategory("Leveled NPC", CkId::Type_Lvln_);
     addCategory("Actor Values", CkId::Type_Avif_);
-    addCategory("Voice Types", CkId::Type_None);
+    addCategory("Voice Types", CkId::Type_Vtyp_);
 
     addCategory("Ammo", CkId::Type_Ammo_);
     addCategory("Key", CkId::Type_Keym_);
@@ -1541,19 +1541,19 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Hazard", CkId::Type_Hazd_);
     addCategory("Idle Marker", CkId::Type_Idlm_);
     addCategory("Light", CkId::Type_Ligh_);
-    addCategory("Acoustic Space", CkId::Type_None);
+    addCategory("Acoustic Space", CkId::Type_Aspc_);
     addCategory("Image Space", CkId::Type_Imgs_);
 
     addCategory("Combat Style", CkId::Type_Csty_);
     addCategory("Encounter Zone", CkId::Type_Eczn_);
-    addCategory("Body Part", CkId::Type_None);
+    addCategory("Body Part", CkId::Type_Bptd_);
     addCategory("Head Part", CkId::Type_Hdpt_);
     addCategory("Keyword", CkId::Type_Kywd_);
-    addCategory("Camera Path", CkId::Type_None);
-    addCategory("Camera Shot", CkId::Type_None);
+    addCategory("Camera Path", CkId::Type_Cpth_);
+    addCategory("Camera Shot", CkId::Type_Cams_);
     addCategory("Impact Data", CkId::Type_Ipct_);
-    addCategory("Lens Flare", CkId::Type_None);
-    addCategory("Speech Challenge", CkId::Type_None);
+    addCategory("Lens Flare", CkId::Type_Lens_);
+    addCategory("Speech Challenge", CkId::Type_Spch_);
 
     addCategory("Music Type", CkId::Type_Must_);
     addCategory("Music Track", CkId::Type_Musc_);
@@ -1629,7 +1629,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Placement Material", CkId::Type_Pcmt_);
     addCategory("Particle Decal", CkId::Type_Pdcl_);
     addCategory("Particle Emitter", CkId::Type_Pgre_);
-    addCategory("Voice Type", CkId::Type_None);
+    addCategory("Voice Type", CkId::Type_Vtyp_);
     addCategory("Material Type", CkId::Type_Matt_);
     addCategory("Movement Type", CkId::Type_Movt_);
 
@@ -1639,7 +1639,7 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Reverb", CkId::Type_Revb_);
     addCategory("Shout", CkId::Type_Shou_);
 
-    addCategory("Topic", CkId::Type_None);
+    addCategory("Topic", CkId::Type_Dial_);
     addCategory("Scene", CkId::Type_Scen_);
     addCategory("Message", CkId::Type_Mesg_);
     addCategory("Note", CkId::Type_Note_);
@@ -1651,12 +1651,10 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("Effect Shader", CkId::Type_Efsh_);
     addCategory("Art Object", CkId::Type_Artv_);
     addCategory("Water Shader", CkId::Type_Wate_);
-    addCategory("Weather Shader", CkId::Type_None);
-    addCategory("Power", CkId::Type_None);
-    addCategory("Default Object", CkId::Type_None);
-    addCategory("Association Type", CkId::Type_None);
-    addCategory("Biome", CkId::Type_None);
-    addCategory("Snap Template", CkId::Type_None);
+    addCategory("Weather Shader", CkId::Type_Wths_);
+    addCategory("Default Object", CkId::Type_Dobj_);
+    addCategory("Biome", CkId::Type_Biom_);
+    addCategory("Snap Template", CkId::Type_Stmp_);
     addCategory("Apparatus", CkId::Type_Appa_);
     addCategory("Birthsign", CkId::Type_Bsgn_);
     addCategory("Clothing", CkId::Type_Clot_);
@@ -2554,12 +2552,62 @@ void ObjectWindowModel::fetchMore(const QModelIndex& parent)
 
     cat.pendingMaterialize = false;
 
-    // Materialize synchronously, then rebuild the whole model. The reset
-    // happens inside fetchMore(), which Qt permits (the view re-expands
-    // from its saved state after modelReset); no deferred work is queued
-    // so no call can outlive the document's Data.
+    // Materialize the master records of this type, then append rows to
+    // this category only. A full model reset is not allowed here:
+    // fetchMore() runs inside the view's expansion handling and
+    // beginResetModel/endResetModel re-entering QTreeView crashes it.
+    const int firstNew = cat.visibleRecords.size();
     mData->ensureTypeLoaded(cat.typeId);
-    setData(mData);
+
+    BaseCollection* coll = mData->getCollectionByType(static_cast<CkId::Type>(cat.typeId));
+    if (!coll)
+        return;
+
+    const int end = coll->size();
+    QVector<VisibleRecord> added;
+    for (int i = firstNew; i < end; ++i)
+    {
+        VisibleRecord rec;
+        rec.actualIndex = i;
+        rec.editorId = coll->getId(i);
+        rec.formId = formatFormId(coll->getFormId(i));
+        added.append(rec);
+    }
+
+    // Keep inserted rows consistent with any active filters.
+    const QString lowerFilter = mFilter.toLower();
+    if (!lowerFilter.isEmpty())
+    {
+        QVector<VisibleRecord> filtered;
+        for (const auto& rec : added)
+        {
+            if (rec.editorId.toLower().contains(lowerFilter)
+                || rec.formId.toLower().contains(lowerFilter))
+                filtered.append(rec);
+        }
+        added = filtered;
+    }
+    if (mActiveObjectFilter.count() > 0)
+    {
+        QVector<VisibleRecord> filtered;
+        for (const auto& rec : added)
+        {
+            QJsonObject record;
+            record.insert(QStringLiteral("EditorID"), rec.editorId);
+            record.insert(QStringLiteral("FormID"), rec.formId);
+            record.insert(QStringLiteral("Type"), cat.name);
+            if (mActiveObjectFilter.matches(record))
+                filtered.append(rec);
+        }
+        added = filtered;
+    }
+
+    if (added.isEmpty())
+        return;
+
+    beginInsertRows(parent, firstNew, firstNew + added.size() - 1);
+    cat.visibleRecords.append(added);
+    endInsertRows();
 }
 
 QVariant ObjectWindowModel::data(const QModelIndex& index, int role) const
@@ -2597,7 +2645,15 @@ QVariant ObjectWindowModel::data(const QModelIndex& index, int role) const
         switch (index.column())
         {
         case 0:
-            return cat.name;
+        {
+            QString label = cat.name;
+            if (cat.pendingMaterialize)
+            {
+                label += QStringLiteral(" (%1 deferred)")
+                    .arg(cat.totalRecords - cat.parsedCount);
+            }
+            return label;
+        }
         case 1:
             return QString();
         case 2:

@@ -261,6 +261,18 @@ std::tuple<QStringList, int> DataTable::getFiles() const
         }
     }
 
+    // The loader treats the last file as the edited plugin (masters before
+    // it are indexed/deferred). Move the active file to the end so opening
+    // a plugin with its masters loads the plugin eagerly, not whichever
+    // master happened to be appended last.
+    if (active_ >= 0 && active_ != files.size() - 1)
+    {
+        const QString activeName = files.at(active_);
+        files.removeAt(active_);
+        files << activeName;
+        active_ = files.size() - 1;
+    }
+
     return std::make_tuple(files, active_);
 }
 

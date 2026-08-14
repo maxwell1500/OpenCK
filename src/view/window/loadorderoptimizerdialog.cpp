@@ -10,6 +10,42 @@
 #include <QDir>
 #include <QTreeWidgetItem>
 
+// The official base masters for each supported game; used by the validator
+// and auto-fix instead of assuming Skyrim for every load order.
+static QStringList baseMastersForGame(GameId game)
+{
+    switch (game)
+    {
+    case Game_Morrowind:
+        return { QStringLiteral("Morrowind.esm"), QStringLiteral("Tribunal.esm"),
+                 QStringLiteral("Bloodmoon.esm") };
+    case Game_Oblivion:
+        return { QStringLiteral("Oblivion.esm") };
+    case Game_Fallout3:
+        return { QStringLiteral("Fallout3.esm"), QStringLiteral("Anchorage.esm"),
+                 QStringLiteral("ThePitt.esm"), QStringLiteral("BrokenSteel.esm"),
+                 QStringLiteral("PointLookout.esm"), QStringLiteral("Zeta.esm") };
+    case Game_FalloutNewVegas:
+        return { QStringLiteral("FalloutNV.esm"), QStringLiteral("DeadMoney.esm"),
+                 QStringLiteral("HonestHearts.esm"), QStringLiteral("OldWorldBlues.esm"),
+                 QStringLiteral("LonesomeRoad.esm"), QStringLiteral("GunRunnersArsenal.esm") };
+    case Game_Fallout4:
+        return { QStringLiteral("Fallout4.esm"), QStringLiteral("DLCRobot.esm"),
+                 QStringLiteral("DLCworkshop01.esm"), QStringLiteral("DLCCoast.esm"),
+                 QStringLiteral("DLCworkshop02.esm"), QStringLiteral("DLCworkshop03.esm"),
+                 QStringLiteral("DLCNukaWorld.esm") };
+    case Game_Starfield:
+        return { QStringLiteral("Starfield.esm") };
+    case Game_Skyrim:
+    case Game_SkyrimSpecialEdition:
+    case Game_SkyrimAnniversaryEdition:
+    default:
+        return { QStringLiteral("Skyrim.esm"), QStringLiteral("Update.esm"),
+                 QStringLiteral("Dawnguard.esm"), QStringLiteral("Hearthfires.esm"),
+                 QStringLiteral("Dragonborn.esm") };
+    }
+}
+
 LoadOrderOptimizerDialog::LoadOrderOptimizerDialog(Data* data, QWidget* parent)
     : QDialog(parent)
     , mData(data)
@@ -611,7 +647,8 @@ void LoadOrderOptimizerDialog::validate()
     }
 
     // Check 4: Base masters at top
-    QStringList baseMasters = {"Skyrim.esm", "Update.esm"};
+    const QStringList baseMasters =
+        baseMastersForGame(mData ? mData->getPaths().gameId : Game_None);
     bool baseMastersAtTop = true;
     int baseMasterCount = 0;
     for (int i = 0; i < currentOrder.size(); i++)
@@ -634,7 +671,7 @@ void LoadOrderOptimizerDialog::validate()
 
     if (topCount == baseMasterCount || baseMasterCount == 0)
     {
-        out << "[PASS] Base masters (Skyrim.esm, Update.esm) are at the top\n";
+        out << "[PASS] Base masters (" << baseMasters.join(", ") << ") are at the top\n";
         passed++;
     }
     else
@@ -711,7 +748,8 @@ void LoadOrderOptimizerDialog::autoFix()
     int fixCount = 0;
 
     // Fix 1: Move base masters to the top
-    QStringList baseMasters = {"Skyrim.esm", "Update.esm", "Dawnguard.esm", "Hearthfires.esm", "Dragonborn.esm"};
+    const QStringList baseMasters =
+        baseMastersForGame(mData ? mData->getPaths().gameId : Game_None);
     for (const QString& baseMaster : baseMasters)
     {
         int idx = currentOrder.indexOf(baseMaster);

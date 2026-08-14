@@ -33,6 +33,8 @@
 #include <cmath>
 
 #include "model/world/data.hpp"
+#include "model/tools/editrecordcommand.hpp"
+#include "model/tools/undostack.hpp"
 #include "libs/files/esm/cellrecord.hpp"
 #include "libs/files/esm/landrecord.hpp"
 #include "libs/files/esm/refrecord.hpp"
@@ -577,6 +579,7 @@ void WorldViewWidget::loadCellReferences(qint32 cellX, qint32 cellY)
             inst.scale = ref.scale;
             inst.editorId = ref.editorId;
             inst.mesh = nullptr;
+            inst.dataIndex = i;
             refInstances.append(inst);
         }
     }
@@ -949,6 +952,29 @@ void WorldViewWidget::showRefEditor(int index)
             static_cast<float>(rotY->value()),
             static_cast<float>(rotZ->value()));
         inst.scale = static_cast<float>(scaleSpin->value());
+
+        if (data && inst.dataIndex >= 0) {
+            auto& coll = data->getRefrCollection();
+            if (inst.dataIndex < coll.size()) {
+                RefrRecord original = coll.getRecord(inst.dataIndex).get();
+                RefrRecord edited = original;
+                edited.posX = static_cast<float>(posX->value());
+                edited.posY = static_cast<float>(posY->value());
+                edited.posZ = static_cast<float>(posZ->value());
+                edited.rotX = static_cast<float>(rotX->value());
+                edited.rotY = static_cast<float>(rotY->value());
+                edited.rotZ = static_cast<float>(rotZ->value());
+                edited.scale = static_cast<float>(scaleSpin->value());
+                auto* cmd = new EditRecordCommand<RefrRecord>(
+                    &coll, inst.dataIndex, original, edited,
+                    QStringLiteral("Transform Reference 0x%1").arg(edited.formId, 8, 16, QChar('0')));
+                if (UndoStack* undo = data->getUndoStack(); undo && cmd->hasChanged())
+                    undo->push(cmd);
+                else
+                    delete cmd;
+            }
+        }
+
         buildReferences();
         glWidget->update();
     }
