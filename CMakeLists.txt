@@ -63,11 +63,8 @@ set(ESM_SOURCES
     libs/files/esm/lcrt.cpp
     libs/files/esm/records.cpp
     libs/files/esm/tes4.cpp
-    libs/files/esm/variant.cpp
-    libs/files/esm/skyrimgameparser.cpp
-    libs/files/esm/obliviongameparser.cpp
-    libs/files/esm/morrowindgameparser.cpp
-    libs/files/esm/npcrecord.cpp
+libs/files/esm/variant.cpp
+libs/files/esm/npcrecord.cpp
     libs/files/esm/weaprecord.cpp
     libs/files/esm/armorrecord.cpp
     libs/files/esm/spellrecord.cpp
@@ -284,11 +281,6 @@ set(ESM_HEADERS
     libs/files/esm/records.hpp
     libs/files/esm/tes4.hpp
     libs/files/esm/variant.hpp
-    libs/files/esm/igameparser.hpp
-    libs/files/esm/skyrimgameparser.hpp
-    libs/files/esm/obliviongameparser.hpp
-    libs/files/esm/morrowindgameparser.hpp
-    libs/files/esm/gameparserfactory.hpp
     libs/files/esm/npcrecord.hpp
     libs/files/esm/weaprecord.hpp
     libs/files/esm/armorrecord.hpp

@@ -26,7 +26,6 @@ void TestCtdaConditions::testPackUnpackBase()
     in.runOn = CtdaCondition::RunOn::Target;
     in.reference = 0x00001234;
     in.unk1 = 0xAA;
-    in.unk2 = 0xBB;
 
     const QByteArray packed = in.pack();
     QCOMPARE(packed.size(), 28);
@@ -42,7 +41,6 @@ void TestCtdaConditions::testPackUnpackBase()
     QCOMPARE(out.runOn, CtdaCondition::RunOn::Target);
     QCOMPARE(out.reference, static_cast<quint32>(0x00001234));
     QCOMPARE(out.unk1, static_cast<quint32>(0xAA));
-    QCOMPARE(out.unk2, static_cast<quint32>(0xBB));
 }
 
 void TestCtdaConditions::testPackUnpackExtended()
@@ -51,8 +49,8 @@ void TestCtdaConditions::testPackUnpackExtended()
     in.extendedBytes = true;
     in.comparison = CtdaCondition::Comparison::LessThan;
     in.functionId = 0x40;
+    in.unk2 = 0x2222;
     in.unk3 = 0x1111;
-    in.unk4 = 0x2222;
 
     const QByteArray packed = in.pack();
     QCOMPARE(packed.size(), 36);
@@ -62,8 +60,8 @@ void TestCtdaConditions::testPackUnpackExtended()
     QVERIFY(out.extendedBytes);
     QCOMPARE(out.comparison, CtdaCondition::Comparison::LessThan);
     QCOMPARE(out.functionId, static_cast<quint32>(0x40));
+    QCOMPARE(out.unk2, static_cast<quint32>(0x2222));
     QCOMPARE(out.unk3, static_cast<quint32>(0x1111));
-    QCOMPARE(out.unk4, static_cast<quint32>(0x2222));
 }
 
 void TestCtdaConditions::testUnpackBadSize()

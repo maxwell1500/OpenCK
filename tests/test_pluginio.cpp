@@ -24,6 +24,7 @@ private slots:
     void testRoundTrip_ArmorRecord();
     void testMastersList();
     void testEmptyPlugin();
+    void testNumRecordsPatchedByClose();
 };
 
 void TestPluginIO::testEsmWriter_TES4Header()
@@ -71,7 +72,6 @@ void TestPluginIO::testEsmReader_TES4Header()
     writer.setVersion(1.0f);
     writer.setAuthor("Test Author");
     writer.setDescription("Test Description");
-    writer.setNumRecords(3);
     writer.addMaster("Skyrim.esm", 1000000);
     
     writer.save(file);
@@ -86,7 +86,9 @@ void TestPluginIO::testEsmReader_TES4Header()
     QVERIFY(author.startsWith("Test Author"));
     QString description = reader.getHeader().description;
     QVERIFY(description.startsWith("Test Description"));
-    QCOMPARE(reader.getHeader().numRecords, 3);
+    // close() patches HEDR.numRecords with the actual number of records
+    // written (only TES4 itself here), overriding any preset value.
+    QCOMPARE(reader.getHeader().numRecords, 0);
     QCOMPARE(reader.getHeader().masters.size(), 1);
     QString masterName = reader.getHeader().masters[0].name;
     QVERIFY(masterName.startsWith("Skyrim.esm"));
@@ -282,8 +284,35 @@ void TestPluginIO::testEmptyPlugin()
     ESMReader reader(filePath);
     reader.open();
     
-    QCOMPARE(reader.getHeader().numRecords, 1);
+    QCOMPARE(reader.getHeader().numRecords, 0);
     QVERIFY(reader.getHeader().masters.isEmpty());
+}
+
+void TestPluginIO::testNumRecordsPatchedByClose()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    QString filePath = tempDir.path() + "/patched.esm";
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+
+    ESMWriter writer;
+    writer.setVersion(1.0f);
+    writer.save(file);
+
+    RecHeader recHeader;
+    recHeader.id = 0x001234;
+    writer.startRecord('NPC_', recHeader);
+    writer.writeSubZString('EDID', QStringLiteral("PatchedNPC"));
+    writer.endRecord();
+
+    writer.close();
+    file.close();
+
+    ESMReader reader(filePath);
+    reader.open();
+    QCOMPARE(reader.getHeader().numRecords, 1);
 }
 
 QTEST_MAIN(TestPluginIO)
