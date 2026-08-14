@@ -300,9 +300,6 @@ public:
     QString className() const override { return QStringLiteral("TESValue"); }
     static QString staticClassName() { return QStringLiteral("TESValue"); }
 
-    // We don't claim DATA here; the record loader dispatches to us
-    // via the explicit (component, subrecord) pair it built for
-    // each record type. See load-by-dispatch in tescomponents.cpp.
     bool canHandle(quint32) const override { return false; }
     void handleSubrecord(quint32, ESMReader&) override {}
 

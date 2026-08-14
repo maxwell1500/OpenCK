@@ -56,6 +56,7 @@ struct CreatureRecord {
     quint32 formId = 0;
     quint32 flags = 0;
     CreaData creaData = {};
+    bool hasData = false;
     QString fullName;
 
     QVector<RawSubRecord> rawSubRecords;
@@ -71,6 +72,7 @@ inline bool operator==(const CreatureRecord& l, const CreatureRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && std::memcmp(&l.creaData, &r.creaData, sizeof(CreaData)) == 0
+        && l.hasData == r.hasData
         && l.fullName == r.fullName
         && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }

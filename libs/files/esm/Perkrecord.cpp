@@ -29,10 +29,13 @@ void PerkRecord::load(ESMReader& esm, bool)
             case 'DESC': description = esm.readZString(); break;
             case 'CTDA':
             {
-                quint32 count = esm.readType<quint32>();
-                conditions.resize(count);
-                for (int i = 0; i < count; i++)
-                    conditions[i] = esm.readType<quint32>();
+                // 32-byte condition struct; no parsed model — preserve
+                // the bytes so loading stays aligned and saving is
+                // lossless.
+                RawSubRecord raw;
+                raw.name = sub;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
                 break;
             }
             default:
@@ -58,11 +61,6 @@ void PerkRecord::save(ESMWriter& esm) const
     esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('DESC', description);
     components.saveAll(esm);
-    esm.startSubRecord('CTDA');
-    esm.writeType<quint32>(conditions.size());
-    for (auto cond : conditions)
-        esm.writeType<quint32>(cond);
-    esm.endSubRecord();
 
     for (const auto& raw : rawSubRecords)
     {

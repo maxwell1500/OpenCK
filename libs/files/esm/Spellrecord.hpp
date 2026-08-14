@@ -13,6 +13,7 @@ struct SpellRecord {
     QString fullName;
     quint32 formId = 0;
     quint32 flags = 0;
+    quint32 spellType = 0;
     quint32 cost = 0;
     quint32 castingSound = 0;
     QVector<quint32> effects;
@@ -27,7 +28,7 @@ struct SpellRecord {
 inline bool operator==(const SpellRecord& l, const SpellRecord& r)
 {
     return l.editorId == r.editorId && l.fullName == r.fullName && l.formId == r.formId && l.flags == r.flags
-        && l.cost == r.cost && l.castingSound == r.castingSound
+        && l.spellType == r.spellType && l.cost == r.cost && l.castingSound == r.castingSound
         && l.effects == r.effects && l.enchantment == r.enchantment
         && l.rawSubRecords == r.rawSubRecords;
 }

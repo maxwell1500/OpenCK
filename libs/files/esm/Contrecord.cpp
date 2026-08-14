@@ -28,7 +28,7 @@ void ContRecord::load(ESMReader& esm, bool)
         {
             case 'EDID': editorId = esm.readZString(); break;
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
-            case 'DATA': flags = esm.readType<quint8>(); break;
+            case 'DATA': flags = esm.readType<quint32>(); break;
             case 'COCT': inventoryControl = esm.readType<quint32>(); break;
             default:
             {
@@ -54,9 +54,8 @@ void ContRecord::save(ESMWriter& esm) const
     if (model) model->modelPath = modelPath;
 
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
     components.saveAll(esm);
-    esm.writeSubData<quint8>('DATA', flags);
+    esm.writeSubData<quint32>('DATA', flags);
     esm.writeSubData<quint32>('COCT', inventoryControl);
 
     for (const auto& raw : rawSubRecords)

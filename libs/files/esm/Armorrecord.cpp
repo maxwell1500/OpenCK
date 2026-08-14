@@ -36,7 +36,6 @@ void ArmorRecord::load(ESMReader& esm, bool)
             case 'DNAM': armorRating = esm.readType<quint32>(); break;
             case 'DATA': {
                 value = esm.readType<quint32>();
-                health = esm.readType<quint16>();
                 weight = esm.readType<float>();
                 break;
             }
@@ -72,7 +71,6 @@ void ArmorRecord::save(ESMWriter& esm) const
     esm.writeSubData<quint32>('DNAM', armorRating);
     esm.startSubRecord('DATA');
     esm.writeType<quint32>(value);
-    esm.writeType<quint16>(static_cast<quint16>(health));
     esm.writeType<float>(weight);
     esm.endSubRecord();
 

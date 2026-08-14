@@ -33,8 +33,9 @@ void ShouRecord::load(ESMReader& esm, bool)
             case 'FULL': fullName = esm.readZString(); break;
             case 'SNAM':
             {
+                // Skyrim writes one SNAM per shout word (12 bytes each).
+                // Append per subrecord; cleared in blank().
                 const quint32 n = static_cast<quint32>(esm.subLeft()) / 12;
-                words.clear();
                 for (quint32 i = 0; i < n; ++i)
                 {
                     ShoutWord w;
@@ -62,17 +63,12 @@ void ShouRecord::save(ESMWriter& esm) const
     esm.writeSubZString('EDID', editorId);
     if (!fullName.isEmpty())
         esm.writeSubZString('FULL', fullName);
-    if (!words.isEmpty())
+    for (const ShoutWord& w : words)
     {
-        QByteArray data;
-        for (const ShoutWord& w : words)
-        {
-            data.append(reinterpret_cast<const char*>(&w.wordFormId), 4);
-            data.append(reinterpret_cast<const char*>(&w.spellFormId), 4);
-            data.append(reinterpret_cast<const char*>(&w.recoveryTime), 4);
-        }
         esm.startSubRecord('SNAM');
-        esm.writeRawData(data.constData(), data.size());
+        esm.writeType<quint32>(w.wordFormId);
+        esm.writeType<quint32>(w.spellFormId);
+        esm.writeType<float>(w.recoveryTime);
         esm.endSubRecord();
     }
 

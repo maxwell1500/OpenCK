@@ -27,7 +27,8 @@ struct LvliRecord {
     quint32 formId = 0;
     quint32 flags = 0;
     quint8 chanceNone = 0;
-    quint8 listFlags = 0;
+    quint8 levelFlags = 0;
+    quint32 levelFlagsSize = 1;
     QVector<LvloEntry> entries;
     QVector<RawSubRecord> rawSubRecords;
 
@@ -41,7 +42,8 @@ struct LvliRecord {
 inline bool operator==(const LvliRecord& l, const LvliRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
-        && l.chanceNone == r.chanceNone && l.listFlags == r.listFlags
+        && l.chanceNone == r.chanceNone && l.levelFlags == r.levelFlags
+        && l.levelFlagsSize == r.levelFlagsSize
         && l.entries == r.entries
         && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }

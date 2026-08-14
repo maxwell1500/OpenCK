@@ -43,14 +43,19 @@ void NpcRecord::load(ESMReader& esm, bool)
             case 'EDID': editorId = esm.readZString(); break;
             case 'RNAM': race = esm.readType<quint32>(); break;
             case 'CNAM': class_ = esm.readType<quint32>(); break;
-            case 'ANAM': faction = esm.readType<quint32>(); break;
+            case 'ANAM':
+                faction = esm.readType<quint32>();
+                factionIds.append(faction);
+                break;
             case 'CNTO':
             {
-                quint32 count = esm.readType<quint32>();
-                inventoryItems.resize(count);
-                for (int i = 0; i < count; i++)
+                // One CNTO subrecord per inventory entry: itemId (u32)
+                // followed by count (s32). The struct models item ids
+                // only; counts are consumed to stay aligned.
+                if (esm.subLeft() >= 8)
                 {
-                    inventoryItems[i] = esm.readType<quint32>();
+                    inventoryItems.append(esm.readType<quint32>());
+                    esm.readType<qint32>();
                 }
                 break;
             }
@@ -107,14 +112,22 @@ void NpcRecord::save(ESMWriter& esm) const
     components.saveAll(esm);
     esm.writeSubData<quint32>('RNAM', race);
     esm.writeSubData<quint32>('CNAM', class_);
-    esm.writeSubData<quint32>('ANAM', faction);
-    esm.startSubRecord('CNTO');
-    esm.writeType<quint32>(inventoryItems.size());
+    if (!factionIds.isEmpty())
+    {
+        for (quint32 f : factionIds)
+            esm.writeSubData<quint32>('ANAM', f);
+    }
+    else
+    {
+        esm.writeSubData<quint32>('ANAM', faction);
+    }
     for (auto item : inventoryItems)
     {
+        esm.startSubRecord('CNTO');
         esm.writeType<quint32>(item);
+        esm.writeType<qint32>(1);
+        esm.endSubRecord();
     }
-    esm.endSubRecord();
 
     for (const auto& raw : rawSubRecords)
     {
@@ -196,6 +209,7 @@ void NpcRecord::blank()
     spells.clear();
     inventoryItems.clear();
     relationships.clear();
+    factionIds.clear();
     rawSubRecords.clear();
     initComponents();
 }

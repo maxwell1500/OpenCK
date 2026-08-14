@@ -36,10 +36,14 @@ void PackageRecord::load(ESMReader& esm, bool)
             case 'PLDT': targetType = esm.readType<quint32>(); break;
             case 'PTDT':
             {
-                quint32 count = esm.readType<quint32>();
-                targetIds.resize(count);
-                for (quint32 i = 0; i < count; i++)
-                    targetIds[i] = esm.readType<quint32>();
+                // Fixed 12-byte target data struct: target mode (u32),
+                // target id (u32), count (s32). One subrecord per target.
+                if (esm.subLeft() >= 12)
+                {
+                    esm.readType<quint32>();
+                    targetIds.append(esm.readType<quint32>());
+                    esm.readType<qint32>();
+                }
                 break;
             }
             case 'CTDA':
@@ -87,11 +91,14 @@ void PackageRecord::save(ESMWriter& esm) const
     components.saveAll(esm);
     esm.writeSubData<quint32>('PKDT', packageType);
     esm.writeSubData<quint32>('PLDT', targetType);
-    esm.startSubRecord('PTDT');
-    esm.writeType<quint32>(targetIds.size());
     for (quint32 id : targetIds)
+    {
+        esm.startSubRecord('PTDT');
+        esm.writeType<quint32>(0);
         esm.writeType<quint32>(id);
-    esm.endSubRecord();
+        esm.writeType<qint32>(1);
+        esm.endSubRecord();
+    }
 
     for (const CtdaCondition& condition : conditions)
     {

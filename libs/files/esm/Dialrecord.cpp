@@ -31,6 +31,7 @@ void DialRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
+            case 'FULL': topicName = esm.readZString(); break;
             default:
             {
                 RawSubRecord raw;
@@ -49,6 +50,8 @@ void DialRecord::save(ESMWriter& esm) const
     if (auto* f = static_cast<tescomponents::TESFlags_Component*>(const_cast<DialRecord*>(this)->components.findByName(QStringLiteral("TESFlags")))) { f->flags = flags; }
 
     esm.writeSubZString('EDID', editorId);
+    if (!topicName.isEmpty())
+        esm.writeSubZString('FULL', topicName);
     components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)

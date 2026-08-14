@@ -29,18 +29,22 @@ void FactRecord::load(ESMReader& esm, bool)
             case 'FULL': factionName = esm.readZString(); break;
             case 'XNAM':
             {
-                quint32 count = esm.readType<quint32>();
-                relations.resize(count);
-                for (int i = 0; i < count; i++)
-                    relations[i] = esm.readType<quint32>();
+                // Fixed-size relation struct (faction id, reaction mod,
+                // flags); no parsed model yet — preserve raw.
+                RawSubRecord raw;
+                raw.name = sub;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
                 break;
             }
             case 'RNAM':
             {
-                quint32 count = esm.readType<quint32>();
-                ranks.resize(count);
-                for (int i = 0; i < count; i++)
-                    ranks[i] = esm.readZString();
+                // Rank data; a zstring in Morrowind, a fixed struct in
+                // Skyrim/Starfield. Preserve raw for lossless round-trip.
+                RawSubRecord raw;
+                raw.name = sub;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
                 break;
             }
             default:
@@ -66,16 +70,6 @@ void FactRecord::save(ESMWriter& esm) const
     esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubZString('FULL', factionName);
     components.saveAll(esm);
-    esm.startSubRecord('RNAM');
-    esm.writeType<quint32>(ranks.size());
-    for (auto rank : ranks)
-        esm.writeZString(rank);
-    esm.endSubRecord();
-    esm.startSubRecord('XNAM');
-    esm.writeType<quint32>(relations.size());
-    for (auto rel : relations)
-        esm.writeType<quint32>(rel);
-    esm.endSubRecord();
 
     for (const auto& raw : rawSubRecords)
     {

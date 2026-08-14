@@ -34,7 +34,23 @@ void AmmoRecord::load(ESMReader& esm, bool)
                 ammoFlags = esm.readType<quint32>();
                 weight = esm.readType<float>();
                 value = esm.readType<quint32>();
-                damage = esm.readType<float>();
+                dataSize = 16;
+                damage = 0.0f;
+                if (esm.subLeft() >= 2)
+                {
+                    damage = static_cast<float>(esm.readType<quint16>());
+                    dataSize += 2;
+                }
+                if (esm.subLeft() >= 2)
+                {
+                    esm.skip(2);
+                    dataSize += 2;
+                }
+                if (esm.subLeft() > 0)
+                {
+                    dataSize += static_cast<int>(esm.subLeft());
+                    esm.skip(static_cast<int>(esm.subLeft()));
+                }
                 handled = true;
                 break;
             }
@@ -85,7 +101,10 @@ void AmmoRecord::save(ESMWriter& esm) const
     esm.writeType<quint32>(ammoFlags);
     esm.writeType<float>(weight);
     esm.writeType<quint32>(value);
-    esm.writeType<float>(damage);
+    if (dataSize >= 18)
+        esm.writeType<quint16>(static_cast<quint16>(damage));
+    if (dataSize >= 20)
+        esm.writeType<quint16>(0);
     esm.endSubRecord();
 
     components.saveAll(esm);
@@ -112,6 +131,7 @@ void AmmoRecord::blank()
     value = 0;
     damage = 0.0f;
     enchantmentCharge = 0.0f;
+    dataSize = 20;
     rawSubRecords.clear();
     components.clear();
 }

@@ -293,6 +293,7 @@ public:
     {
         return subrecordName == NAME('NAME')
             || subrecordName == NAME('DATA')
+            || subrecordName == NAME('XSCL')
             || subrecordName == NAME('XOWN')
             || subrecordName == NAME('DNAM')
             || subrecordName == NAME('XESP')
@@ -313,6 +314,12 @@ public:
             rotX = esm.readType<float>();
             rotY = esm.readType<float>();
             rotZ = esm.readType<float>();
+            // Starfield/Skyrim DATA is 24 bytes (no scale); some legacy
+            // records carry a 7th float. Only read it when it is present.
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                scale = esm.readType<float>();
+            break;
+        case NAME('XSCL'):
             scale = esm.readType<float>();
             break;
         case NAME('XOWN'):
@@ -348,8 +355,9 @@ public:
         esm.writeType<float>(rotX);
         esm.writeType<float>(rotY);
         esm.writeType<float>(rotZ);
-        esm.writeType<float>(scale);
         esm.endSubRecord();
+        if (scale != 1.0f)
+            esm.writeSubData<float>(NAME('XSCL'), scale);
         if (owner != 0)
             esm.writeSubData<quint32>(NAME('XOWN'), owner);
         if (lockLevel != 0)
@@ -571,9 +579,10 @@ public:
     {
         if (subrecordName == NAME('SPLO'))
         {
+            // Skyrim/CREA write one SPLO per spell (4 bytes each).
+            // Append per subrecord; the vector is cleared at record
+            // init (initComponents() constructs fresh components).
             qint64 count = esm.subLeft() / 4;
-            spells.clear();
-            spells.reserve(count);
             for (qint64 i = 0; i < count; ++i)
                 spells.append(esm.readType<quint32>());
         }
@@ -581,11 +590,8 @@ public:
 
     void save(ESMWriter& esm) const override
     {
-        if (spells.isEmpty()) return;
-        esm.startSubRecord(NAME('SPLO'));
         for (quint32 id : spells)
-            esm.writeType<quint32>(id);
-        esm.endSubRecord();
+            esm.writeSubData<quint32>(NAME('SPLO'), id);
     }
 
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
@@ -1046,9 +1052,9 @@ public:
             break;
         case NAME('PNAM'):
         {
+            // Skyrim writes one PNAM per head part (4 bytes each).
+            // Append per subrecord; cleared at record init.
             qint64 n = esm.subLeft() / 4;
-            headParts.clear();
-            headParts.reserve(n);
             for (qint64 i = 0; i < n; ++i)
                 headParts.append(esm.readType<quint32>());
             break;
@@ -1091,13 +1097,8 @@ public:
             esm.writeSubData<quint32>(NAME('ENAM'), eyesFormId);
         if (faceTextureFormId != 0)
             esm.writeSubData<quint32>(NAME('QNAM'), faceTextureFormId);
-        if (!headParts.isEmpty())
-        {
-            esm.startSubRecord(NAME('PNAM'));
-            for (quint32 p : headParts)
-                esm.writeType<quint32>(p);
-            esm.endSubRecord();
-        }
+        for (quint32 p : headParts)
+            esm.writeSubData<quint32>(NAME('PNAM'), p);
         if (!faceMorphSym.isEmpty())
         {
             esm.startSubRecord(NAME('NAMA'));

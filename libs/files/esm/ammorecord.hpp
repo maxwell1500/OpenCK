@@ -23,6 +23,7 @@ struct AmmoRecord {
     quint32 value = 0;
     float damage = 0.0f;
     float enchantmentCharge = 0.0f;
+    int dataSize = 20;
     QVector<RawSubRecord> rawSubRecords;
 
     openck::FormComponents components;
@@ -40,6 +41,7 @@ inline bool operator==(const AmmoRecord& l, const AmmoRecord& r)
         && l.ammoFlags == r.ammoFlags && l.weight == r.weight
         && l.value == r.value && l.damage == r.damage
         && l.enchantmentCharge == r.enchantmentCharge
+        && l.dataSize == r.dataSize
         && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 

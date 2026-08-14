@@ -4,9 +4,11 @@
 
 namespace
 {
-constexpr int kBaseBytes = 28;
-constexpr int kExtendedBytes = 36;
-constexpr int kHeaderBytes = 4;
+constexpr int kSkyrimBytes = 20;   // real Skyrim CTDA short form
+constexpr int kBaseBytes = 28;     // editor layout with reference + unk1/unk2
+constexpr int kFalloutBytes = 32;  // real Fallout 4 / Starfield CTDA
+constexpr int kExtendedBytes = 36; // editor extended layout
+constexpr int kHeaderBytes = 4;    // count prefix of a packed CTDA list
 }
 
 QString CtdaCondition::comparisonName(Comparison comparison)
@@ -42,7 +44,14 @@ QString CtdaCondition::runOnName(RunOn runOn)
 
 QByteArray CtdaCondition::pack() const
 {
-    QByteArray bytes(extendedBytes ? kExtendedBytes : kBaseBytes, Qt::Uninitialized);
+    if (!raw.isEmpty())
+        return raw;
+
+    // Editor layout: 28 bytes through unk1, 36 bytes adding unk2/unk3.
+    // Unk4 has no byte slot in either layout; it is only preserved via
+    // raw when a 40-byte payload was parsed.
+    const int size = extendedBytes ? kExtendedBytes : kBaseBytes;
+    QByteArray bytes(size, Qt::Uninitialized);
     quint8* p = reinterpret_cast<quint8*>(bytes.data());
     p[0] = static_cast<quint8>(comparison);
     p[1] = 0;
@@ -54,37 +63,48 @@ QByteArray CtdaCondition::pack() const
     memcpy(p + 16, &runOn, 4);
     memcpy(p + 20, &reference, 4);
     memcpy(p + 24, &unk1, 4);
-    memcpy(p + 28, &unk2, 4);
-    if (extendedBytes)
-    {
+    if (size >= 32)
+        memcpy(p + 28, &unk2, 4);
+    if (size >= 36)
         memcpy(p + 32, &unk3, 4);
-        memcpy(p + 36, &unk4, 4);
-    }
     return bytes;
 }
 
 bool CtdaCondition::unpack(const QByteArray& bytes, CtdaCondition& out)
 {
     const int size = bytes.size();
-    if (size != kBaseBytes && size != kExtendedBytes)
+    if (size != kSkyrimBytes && size != kBaseBytes
+        && size != kFalloutBytes && size != kExtendedBytes)
         return false;
 
     const quint8* p = reinterpret_cast<const quint8*>(bytes.constData());
     out.comparison = static_cast<Comparison>(p[0] & 0x07);
     out.flags = p[2];
-    memcpy(&out.functionId, p + 4, 4);
-    memcpy(&out.param1, p + 8, 4);
-    memcpy(&out.param2, p + 12, 4);
-    memcpy(&out.runOn, p + 16, 4);
-    memcpy(&out.reference, p + 20, 4);
-    memcpy(&out.unk1, p + 24, 4);
-    memcpy(&out.unk2, p + 28, 4);
+    out.functionId = 0;
+    out.param1 = 0;
+    out.param2 = 0;
+    out.runOn = RunOn::Subject;
+    out.reference = 0;
+    out.unk1 = 0;
+    out.unk2 = 0;
+    out.unk3 = 0;
+    out.unk4 = 0;
+
+    if (size >= 8)  memcpy(&out.functionId, p + 4, 4);
+    if (size >= 12) memcpy(&out.param1, p + 8, 4);
+    if (size >= 16) memcpy(&out.param2, p + 12, 4);
+    if (size >= 20) memcpy(&out.runOn, p + 16, 4);
+    if (size >= 24) memcpy(&out.reference, p + 20, 4);
+    if (size >= 28) memcpy(&out.unk1, p + 24, 4);
+    if (size >= 32) memcpy(&out.unk2, p + 28, 4);
+
     out.extendedBytes = (size == kExtendedBytes);
     if (out.extendedBytes)
     {
         memcpy(&out.unk3, p + 32, 4);
-        memcpy(&out.unk4, p + 36, 4);
     }
+
+    out.raw = bytes;
     return true;
 }
 
@@ -100,10 +120,20 @@ QVector<CtdaCondition> CtdaCondition::unpackList(const QByteArray& bytes)
 
     int offset = kHeaderBytes;
     const int payload = bytes.size() - kHeaderBytes;
-    // Lists are uniform within a record: choose the stride that divides the
-    // payload exactly (36-byte FO4/SF, else 28-byte Skyrim).
-    const int stride = (payload > 0 && payload % kExtendedBytes == 0)
-        ? kExtendedBytes : kBaseBytes;
+    // Lists are uniform within a record: pick the stride that divides the
+    // payload exactly, preferring the editor/FO4 sizes.
+    const int strides[] = { kExtendedBytes, kBaseBytes, kFalloutBytes, kSkyrimBytes };
+    int stride = 0;
+    for (int s : strides)
+    {
+        if (payload > 0 && payload % s == 0)
+        {
+            stride = s;
+            break;
+        }
+    }
+    if (stride == 0)
+        stride = kBaseBytes;
     for (quint32 i = 0; i < count; i++)
     {
         if (offset + stride > bytes.size())
@@ -111,7 +141,7 @@ QVector<CtdaCondition> CtdaCondition::unpackList(const QByteArray& bytes)
         CtdaCondition condition;
         if (!unpack(bytes.mid(offset, stride), condition))
             break;
-        offset += condition.extendedBytes ? kExtendedBytes : kBaseBytes;
+        offset += stride;
         conditions.append(condition);
     }
     return conditions;

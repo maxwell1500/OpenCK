@@ -29,11 +29,7 @@ void BookRecord::load(ESMReader& esm, bool)
         {
             case 'EDID': editorId = esm.readZString(); break;
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
-            case 'DATA':
-            {
-                pages = esm.readZString();
-                break;
-            }
+            case 'DATA': flags = esm.readType<quint32>(); break;
             default:
             {
                 RawSubRecord raw;
@@ -59,7 +55,7 @@ void BookRecord::save(ESMWriter& esm) const
 
     esm.writeSubZString('EDID', editorId);
     esm.writeSubData<quint32>('FNAM', flags);
-    esm.writeSubZString('DATA', pages);
+    esm.writeSubData<quint32>('DATA', flags);
     components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)

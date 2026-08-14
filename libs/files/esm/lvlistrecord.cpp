@@ -15,18 +15,40 @@ void LvliRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); handled = true; break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
             case 'LVLD': chanceNone = esm.readType<quint8>(); handled = true; break;
-            case 'LVLF': listFlags = esm.readType<quint8>(); handled = true; break;
-            case 'DATA': listFlags = esm.readType<quint8>(); handled = true; break;
+            case 'LVLF':
+            {
+                if (esm.subLeft() >= 4)
+                {
+                    levelFlags = static_cast<quint8>(esm.readType<quint32>());
+                    levelFlagsSize = 4;
+                    if (esm.subLeft() > 0)
+                        esm.skip(static_cast<int>(esm.subLeft()));
+                    handled = true;
+                }
+                else if (esm.subLeft() >= 1)
+                {
+                    levelFlags = esm.readType<quint8>();
+                    levelFlagsSize = 1;
+                    if (esm.subLeft() > 0)
+                        esm.skip(static_cast<int>(esm.subLeft()));
+                    handled = true;
+                }
+                break;
+            }
             case 'LVLO':
             {
-                LvloEntry entry;
-                entry.level = esm.readType<qint16>();
-                entry.formId = esm.readType<quint32>();
-                entry.count = esm.readType<qint16>();
-                entries.append(entry);
-                handled = true;
+                if (esm.subLeft() >= 8)
+                {
+                    LvloEntry entry;
+                    entry.level = esm.readType<qint16>();
+                    entry.formId = esm.readType<quint32>();
+                    entry.count = esm.readType<qint16>();
+                    entries.append(entry);
+                    if (esm.subLeft() > 0)
+                        esm.skip(static_cast<int>(esm.subLeft()));
+                    handled = true;
+                }
                 break;
             }
             default: break;
@@ -54,9 +76,11 @@ void LvliRecord::load(ESMReader& esm, bool)
 void LvliRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint8>('LVLD', chanceNone);
-    esm.writeSubData<quint8>('DATA', listFlags);
+    if (levelFlagsSize >= 4)
+        esm.writeSubData<quint32>('LVLF', levelFlags);
+    else
+        esm.writeSubData<quint8>('LVLF', levelFlags);
 
     for (const auto& entry : entries)
     {
@@ -83,7 +107,8 @@ void LvliRecord::blank()
     formId = 0;
     flags = 0;
     chanceNone = 0;
-    listFlags = 0;
+    levelFlags = 0;
+    levelFlagsSize = 1;
     entries.clear();
     rawSubRecords.clear();
     components.clear();

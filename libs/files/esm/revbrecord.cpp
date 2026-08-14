@@ -32,17 +32,15 @@ void RevbRecord::load(ESMReader& esm, bool)
             case 'EDID': editorId = esm.readZString(); break;
             case 'DATA':
             {
-                if (esm.subLeft() >= 16)
+                // Keep the whole reverb payload for a byte-exact round-trip
+                // and surface the leading flags field for the editor.
+                esm.readRawSubData(data);
+                if (data.size() >= 4)
                 {
-                    esm.skip(static_cast<int>(esm.recLeft()) - 4);
-                    flags = esm.readType<quint32>();
-                }
-                else
-                {
-                    RawSubRecord raw;
-                    raw.name = sub;
-                    esm.readRawSubData(raw.data);
-                    rawSubRecords.push_back(raw);
+                    flags = static_cast<quint8>(data[0])
+                        | (static_cast<quint8>(data[1]) << 8)
+                        | (static_cast<quint8>(data[2]) << 16)
+                        | (static_cast<quint8>(data[3]) << 24);
                 }
                 break;
             }
@@ -61,13 +59,23 @@ void RevbRecord::load(ESMReader& esm, bool)
 void RevbRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.startSubRecord('DATA');
-    // 12 float reverb params + flags.
-    static const float zero[12] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                                    0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-    esm.writeRawData(reinterpret_cast<const char*>(zero), sizeof(zero));
-    esm.writeRawData(reinterpret_cast<const char*>(&flags), 4);
-    esm.endSubRecord();
+
+    if (!data.isEmpty())
+    {
+        esm.startSubRecord(static_cast<NAME>('DATA'));
+        esm.writeRawData(data.constData(), data.size());
+        esm.endSubRecord();
+    }
+    else if (flags != 0)
+    {
+        // Freshly created records persist their flags in a 40-byte DATA
+        // subrecord matching the real layout.
+        esm.startSubRecord(static_cast<NAME>('DATA'));
+        esm.writeType<quint32>(flags);
+        for (int i = 0; i < 9; ++i)
+            esm.writeType<quint32>(0);
+        esm.endSubRecord();
+    }
 
     for (const auto& raw : rawSubRecords)
     {
@@ -82,6 +90,7 @@ void RevbRecord::blank()
     editorId.clear();
     formId = 0;
     flags = 0;
+    data.clear();
     rawSubRecords.clear();
     initComponents();
 }

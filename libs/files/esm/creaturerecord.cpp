@@ -23,41 +23,52 @@ void CreatureRecord::load(ESMReader& esm, bool)
         case 'EDID': editorId = esm.readZString(); handled = true; break;
         case 'DATA':
         {
-            creaData.type = esm.readType<quint32>();
-            creaData.acrobatics = esm.readType<quint16>();
-            creaData.armorer = esm.readType<quint16>();
-            creaData.athletics = esm.readType<quint16>();
-            creaData.blade = esm.readType<quint16>();
-            creaData.block = esm.readType<quint16>();
-            creaData.blunt = esm.readType<quint16>();
-            creaData.handToHand = esm.readType<quint16>();
-            creaData.heavyArmor = esm.readType<quint16>();
-            creaData.alchemy = esm.readType<quint16>();
-            creaData.alteration = esm.readType<quint16>();
-            creaData.conjuration = esm.readType<quint16>();
-            creaData.destruction = esm.readType<quint16>();
-            creaData.illusion = esm.readType<quint16>();
-            creaData.mysticism = esm.readType<quint16>();
-            creaData.restoration = esm.readType<quint16>();
-            creaData.lightArmor = esm.readType<quint16>();
-            creaData.marksman = esm.readType<quint16>();
-            creaData.mercantile = esm.readType<quint16>();
-            creaData.security = esm.readType<quint16>();
-            creaData.sneak = esm.readType<quint16>();
-            creaData.speechcraft = esm.readType<quint16>();
-            creaData.health = esm.readType<quint16>();
-            creaData.magicka = esm.readType<quint16>();
-            creaData.fatigue = esm.readType<quint16>();
-            creaData.damage = esm.readType<quint16>();
-            creaData.strength = esm.readType<quint16>();
-            creaData.intelligence = esm.readType<quint16>();
-            creaData.willpower = esm.readType<quint16>();
-            creaData.agility = esm.readType<quint16>();
-            creaData.speed = esm.readType<quint16>();
-            creaData.endurance = esm.readType<quint16>();
-            creaData.personality = esm.readType<quint16>();
-            creaData.luck = esm.readType<quint16>();
-            creaData.xp = esm.readType<quint16>();
+            if (esm.subLeft() == static_cast<qint64>(sizeof(CreaData)))
+            {
+                creaData.type = esm.readType<quint32>();
+                creaData.acrobatics = esm.readType<quint16>();
+                creaData.armorer = esm.readType<quint16>();
+                creaData.athletics = esm.readType<quint16>();
+                creaData.blade = esm.readType<quint16>();
+                creaData.block = esm.readType<quint16>();
+                creaData.blunt = esm.readType<quint16>();
+                creaData.handToHand = esm.readType<quint16>();
+                creaData.heavyArmor = esm.readType<quint16>();
+                creaData.alchemy = esm.readType<quint16>();
+                creaData.alteration = esm.readType<quint16>();
+                creaData.conjuration = esm.readType<quint16>();
+                creaData.destruction = esm.readType<quint16>();
+                creaData.illusion = esm.readType<quint16>();
+                creaData.mysticism = esm.readType<quint16>();
+                creaData.restoration = esm.readType<quint16>();
+                creaData.lightArmor = esm.readType<quint16>();
+                creaData.marksman = esm.readType<quint16>();
+                creaData.mercantile = esm.readType<quint16>();
+                creaData.security = esm.readType<quint16>();
+                creaData.sneak = esm.readType<quint16>();
+                creaData.speechcraft = esm.readType<quint16>();
+                creaData.health = esm.readType<quint16>();
+                creaData.magicka = esm.readType<quint16>();
+                creaData.fatigue = esm.readType<quint16>();
+                creaData.damage = esm.readType<quint16>();
+                creaData.strength = esm.readType<quint16>();
+                creaData.intelligence = esm.readType<quint16>();
+                creaData.willpower = esm.readType<quint16>();
+                creaData.agility = esm.readType<quint16>();
+                creaData.speed = esm.readType<quint16>();
+                creaData.endurance = esm.readType<quint16>();
+                creaData.personality = esm.readType<quint16>();
+                creaData.luck = esm.readType<quint16>();
+                creaData.xp = esm.readType<quint16>();
+                hasData = true;
+            }
+            else
+            {
+                RawSubRecord raw;
+                raw.name = sub;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
+            }
             handled = true;
             break;
         }
@@ -93,43 +104,46 @@ void CreatureRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
 
-    esm.startSubRecord('DATA');
-    esm.writeType<quint32>(creaData.type);
-    esm.writeType<quint16>(creaData.acrobatics);
-    esm.writeType<quint16>(creaData.armorer);
-    esm.writeType<quint16>(creaData.athletics);
-    esm.writeType<quint16>(creaData.blade);
-    esm.writeType<quint16>(creaData.block);
-    esm.writeType<quint16>(creaData.blunt);
-    esm.writeType<quint16>(creaData.handToHand);
-    esm.writeType<quint16>(creaData.heavyArmor);
-    esm.writeType<quint16>(creaData.alchemy);
-    esm.writeType<quint16>(creaData.alteration);
-    esm.writeType<quint16>(creaData.conjuration);
-    esm.writeType<quint16>(creaData.destruction);
-    esm.writeType<quint16>(creaData.illusion);
-    esm.writeType<quint16>(creaData.mysticism);
-    esm.writeType<quint16>(creaData.restoration);
-    esm.writeType<quint16>(creaData.lightArmor);
-    esm.writeType<quint16>(creaData.marksman);
-    esm.writeType<quint16>(creaData.mercantile);
-    esm.writeType<quint16>(creaData.security);
-    esm.writeType<quint16>(creaData.sneak);
-    esm.writeType<quint16>(creaData.speechcraft);
-    esm.writeType<quint16>(creaData.health);
-    esm.writeType<quint16>(creaData.magicka);
-    esm.writeType<quint16>(creaData.fatigue);
-    esm.writeType<quint16>(creaData.damage);
-    esm.writeType<quint16>(creaData.strength);
-    esm.writeType<quint16>(creaData.intelligence);
-    esm.writeType<quint16>(creaData.willpower);
-    esm.writeType<quint16>(creaData.agility);
-    esm.writeType<quint16>(creaData.speed);
-    esm.writeType<quint16>(creaData.endurance);
-    esm.writeType<quint16>(creaData.personality);
-    esm.writeType<quint16>(creaData.luck);
-    esm.writeType<quint16>(creaData.xp);
-    esm.endSubRecord();
+    if (hasData)
+    {
+        esm.startSubRecord('DATA');
+        esm.writeType<quint32>(creaData.type);
+        esm.writeType<quint16>(creaData.acrobatics);
+        esm.writeType<quint16>(creaData.armorer);
+        esm.writeType<quint16>(creaData.athletics);
+        esm.writeType<quint16>(creaData.blade);
+        esm.writeType<quint16>(creaData.block);
+        esm.writeType<quint16>(creaData.blunt);
+        esm.writeType<quint16>(creaData.handToHand);
+        esm.writeType<quint16>(creaData.heavyArmor);
+        esm.writeType<quint16>(creaData.alchemy);
+        esm.writeType<quint16>(creaData.alteration);
+        esm.writeType<quint16>(creaData.conjuration);
+        esm.writeType<quint16>(creaData.destruction);
+        esm.writeType<quint16>(creaData.illusion);
+        esm.writeType<quint16>(creaData.mysticism);
+        esm.writeType<quint16>(creaData.restoration);
+        esm.writeType<quint16>(creaData.lightArmor);
+        esm.writeType<quint16>(creaData.marksman);
+        esm.writeType<quint16>(creaData.mercantile);
+        esm.writeType<quint16>(creaData.security);
+        esm.writeType<quint16>(creaData.sneak);
+        esm.writeType<quint16>(creaData.speechcraft);
+        esm.writeType<quint16>(creaData.health);
+        esm.writeType<quint16>(creaData.magicka);
+        esm.writeType<quint16>(creaData.fatigue);
+        esm.writeType<quint16>(creaData.damage);
+        esm.writeType<quint16>(creaData.strength);
+        esm.writeType<quint16>(creaData.intelligence);
+        esm.writeType<quint16>(creaData.willpower);
+        esm.writeType<quint16>(creaData.agility);
+        esm.writeType<quint16>(creaData.speed);
+        esm.writeType<quint16>(creaData.endurance);
+        esm.writeType<quint16>(creaData.personality);
+        esm.writeType<quint16>(creaData.luck);
+        esm.writeType<quint16>(creaData.xp);
+        esm.endSubRecord();
+    }
 
     components.saveAll(esm);
 
@@ -145,6 +159,7 @@ void CreatureRecord::blank()
 {
     editorId = ""; formId = 0; flags = 0;
     std::memset(&creaData, 0, sizeof(CreaData));
+    hasData = false;
     fullName = "";
     rawSubRecords.clear();
     components.clear();

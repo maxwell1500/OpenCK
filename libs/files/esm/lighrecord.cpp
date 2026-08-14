@@ -32,6 +32,8 @@ void LighRecord::load(ESMReader& esm, bool)
                 lightFlags = esm.readType<quint32>();
                 falloff = esm.readType<float>();
                 fov = esm.readType<float>();
+                value = esm.readType<quint32>();
+                weight = esm.readType<float>();
                 handled = true;
                 break;
             }
@@ -84,6 +86,8 @@ void LighRecord::save(ESMWriter& esm) const
     esm.writeType<quint32>(lightFlags);
     esm.writeType<float>(falloff);
     esm.writeType<float>(fov);
+    esm.writeType<quint32>(value);
+    esm.writeType<float>(weight);
     esm.endSubRecord();
     if (fade != 0.0f)
         esm.writeSubData<float>('FNDS', fade);

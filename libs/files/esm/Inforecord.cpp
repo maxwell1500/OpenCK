@@ -33,13 +33,23 @@ void InfoRecord::load(ESMReader& esm, bool)
             case 'CNAM': responseText = esm.readZString(); break;
             case 'CTDA':
             {
-                quint32 count = esm.readType<quint32>();
-                conditionIds.resize(count);
-                for (int i = 0; i < count; i++)
-                    conditionIds[i] = esm.readType<quint32>();
+                // Each CTDA is a 32-byte condition struct. There is no
+                // parsed condition model yet, so preserve the bytes for
+                // a lossless round-trip instead of misparsing them.
+                RawSubRecord raw;
+                raw.name = sub;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
                 break;
             }
-            case 'TLOI': targetId = esm.readType<quint32>(); break;
+            case 'TLOI':
+            {
+                if (esm.subLeft() >= 4)
+                    targetId = esm.readType<quint32>();
+                if (esm.subLeft() > 0)
+                    esm.skip(static_cast<int>(esm.subLeft()));
+                break;
+            }
             default:
             {
                 RawSubRecord raw;
@@ -66,11 +76,6 @@ void InfoRecord::save(ESMWriter& esm) const
     components.saveAll(esm);
 
     esm.writeSubZString('CNAM', responseText);
-    esm.startSubRecord('CTDA');
-    esm.writeType<quint32>(conditionIds.size());
-    for (quint32 id : conditionIds)
-        esm.writeType<quint32>(id);
-    esm.endSubRecord();
     esm.writeSubData<quint32>('TLOI', targetId);
 
     for (const auto& raw : rawSubRecords)

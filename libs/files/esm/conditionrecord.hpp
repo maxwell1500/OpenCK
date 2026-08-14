@@ -56,16 +56,24 @@ struct CtdaCondition
     static QString comparisonName(Comparison comparison);
     static QString runOnName(RunOn runOn);
 
-    // Byte layout: the 28-byte Skyrim form, or 36-byte FO4/SF form when
-    // extendedBytes is true. Fixed 28 bytes is assumed for parsing when the
-    // payload is exactly 28; 36-byte payloads set extendedBytes.
+    // Raw payload captured on unpack(). pack() re-emits these bytes exactly so
+    // real files round-trip losslessly; the typed fields below are only used to
+    // rebuild the payload for conditions created/edited from scratch.
+    QByteArray raw;
+
+    // Byte layout accepted by unpack(): the 20-byte Skyrim short form, the
+    // 28-byte editor layout, the 32-byte Fallout 4 / Starfield form, and the
+    // 36-byte extended layout. extendedBytes selects the 36-byte form for
+    // freshly packed conditions.
     bool extendedBytes = false;
 
-    // Packs to the 28- or 36-byte binary layout.
+    // Packs to the 28- or 36-byte binary layout (or re-emits raw bytes when
+    // this condition was parsed from a real payload).
     QByteArray pack() const;
 
-    // Parses a single condition from the payload. Accepts 28- or 36-byte
-    // inputs; returns false for other sizes.
+    // Parses a single condition from the payload. Accepts 20-, 28-, 32- or
+    // 36-byte inputs and keeps the raw bytes for a lossless round-trip;
+    // returns false for other sizes.
     static bool unpack(const QByteArray& bytes, CtdaCondition& out);
 
     // Loads a counted CTDA list (header count + packed conditions).
@@ -75,7 +83,8 @@ struct CtdaCondition
 
 inline bool operator==(const CtdaCondition& l, const CtdaCondition& r)
 {
-    return l.comparison == r.comparison && l.flags == r.flags
+    return l.raw == r.raw
+        && l.comparison == r.comparison && l.flags == r.flags
         && l.functionId == r.functionId && l.param1 == r.param1
         && l.param2 == r.param2 && l.runOn == r.runOn
         && l.reference == r.reference && l.unk1 == r.unk1 && l.unk2 == r.unk2

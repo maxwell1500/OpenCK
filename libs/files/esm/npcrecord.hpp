@@ -105,6 +105,7 @@ struct NpcRecord
     QVector<quint32> spells;
     QVector<quint32> inventoryItems;
     QVector<quint32> relationships;
+    QVector<quint32> factionIds;
 
     QVector<RawSubRecord> rawSubRecords;
 
@@ -167,6 +168,7 @@ inline bool operator==(const NpcRecord& l, const NpcRecord& r)
         && l.aiFactionTargetClassTargetHazard == r.aiFactionTargetClassTargetHazard
         && l.spells == r.spells && l.inventoryItems == r.inventoryItems
         && l.relationships == r.relationships
+        && l.factionIds == r.factionIds
         && l.components == r.components
         && l.rawSubRecords == r.rawSubRecords;
 }

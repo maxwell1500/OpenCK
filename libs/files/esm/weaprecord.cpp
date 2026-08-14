@@ -33,14 +33,18 @@ void WeaponRecord::load(ESMReader& esm, bool)
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
             case 'DATA': {
                 weaponType = esm.readType<quint32>();
-                weight = esm.readType<float>();
+                speed = esm.readType<float>();
+                reach = esm.readType<float>();
+                flags = esm.readType<quint32>();
                 value = esm.readType<quint32>();
+                weight = esm.readType<float>();
                 break;
             }
             case 'DNAM': {
-                damage = esm.readType<float>();
-                speed = esm.readType<float>();
-                reach = esm.readType<float>();
+                RawSubRecord raw;
+                raw.name = sub;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
                 break;
             }
             case 'EAMT': enchantment = esm.readType<quint32>(); break;
@@ -78,13 +82,11 @@ void WeaponRecord::save(ESMWriter& esm) const
     esm.writeSubData<quint32>('FNAM', flags);
     esm.startSubRecord('DATA');
     esm.writeType<quint32>(weaponType);
-    esm.writeType<float>(weight);
-    esm.writeType<quint32>(value);
-    esm.endSubRecord();
-    esm.startSubRecord('DNAM');
-    esm.writeType<float>(damage);
     esm.writeType<float>(speed);
     esm.writeType<float>(reach);
+    esm.writeType<quint32>(flags);
+    esm.writeType<quint32>(value);
+    esm.writeType<float>(weight);
     esm.endSubRecord();
     esm.writeSubData<quint32>('EAMT', enchantment);
     esm.writeSubData<quint32>('MDOB', magicSchool);
