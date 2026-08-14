@@ -95,9 +95,7 @@ void LvlcRecord::save(ESMWriter& esm) const
 
     for (const auto& raw : rawSubRecords)
     {
-        esm.startSubRecord(raw.name);
-        esm.writeRawData(raw.data.data(), raw.data.size());
-        esm.endSubRecord();
+        esm.writeRawSubRecord(raw);
     }
 }
 

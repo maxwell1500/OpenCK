@@ -1115,9 +1115,7 @@ public:
         }
         for (const auto& raw : rawSub)
         {
-            esm.startSubRecord(raw.name);
-            esm.writeRawData(raw.data.data(), raw.data.size());
-            esm.endSubRecord();
+            esm.writeRawSubRecord(raw);
         }
     }
 

@@ -121,9 +121,7 @@ void QuestRecord::save(ESMWriter& esm) const
 
     for (const auto& raw : rawSubRecords)
     {
-        esm.startSubRecord(raw.name);
-        esm.writeRawData(raw.data.data(), raw.data.size());
-        esm.endSubRecord();
+        esm.writeRawSubRecord(raw);
     }
 
     for (int i = 0; i < stageIds.size(); ++i)
@@ -136,9 +134,7 @@ void QuestRecord::save(ESMWriter& esm) const
         {
             for (const auto& raw : stageExtra[i])
             {
-                esm.startSubRecord(raw.name);
-                esm.writeRawData(raw.data.data(), raw.data.size());
-                esm.endSubRecord();
+                esm.writeRawSubRecord(raw);
             }
         }
     }
@@ -153,9 +149,7 @@ void QuestRecord::save(ESMWriter& esm) const
         {
             for (const auto& raw : objectiveExtra[i])
             {
-                esm.startSubRecord(raw.name);
-                esm.writeRawData(raw.data.data(), raw.data.size());
-                esm.endSubRecord();
+                esm.writeRawSubRecord(raw);
             }
         }
     }
@@ -170,9 +164,7 @@ void QuestRecord::save(ESMWriter& esm) const
         {
             for (const auto& raw : aliasExtra[i])
             {
-                esm.startSubRecord(raw.name);
-                esm.writeRawData(raw.data.data(), raw.data.size());
-                esm.endSubRecord();
+                esm.writeRawSubRecord(raw);
             }
         }
     }

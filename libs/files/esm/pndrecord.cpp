@@ -74,9 +74,7 @@ void PndRecord::save(ESMWriter& esm) const
             if (rawIdx < rawSubRecords.size())
             {
                 const RawSubRecord& raw = rawSubRecords[rawIdx++];
-                esm.startSubRecord(raw.name);
-                esm.writeRawData(raw.data.data(), raw.data.size());
-                esm.endSubRecord();
+                esm.writeRawSubRecord(raw);
             }
             break;
         }

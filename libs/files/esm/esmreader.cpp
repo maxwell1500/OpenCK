@@ -199,6 +199,7 @@ RecHeader ESMReader::readHeader()
     esm.subLeft = 0;
 
     header.flags.val = readType<quint32>(true);
+    mCurrentHeaderFlags = header.flags.val;
     header.id = readType<quint32>(true);
     mCurrentFormId = header.id;
     header.vcDay = readType<quint8>(true);
@@ -337,7 +338,27 @@ NAME ESMReader::readNSubHeader()
     }
 
     NAME name{ readName() };
-    quint16 sz = readType<quint16>();
+    quint32 sz = readType<quint16>();
+
+    // XXXX is the extended-size prefix for subrecords larger than 64 KiB:
+    // its 4-byte payload is the real size of the NEXT subrecord, whose own
+    // size field is 0. Without this, the following data is misread as
+    // subrecord headers and the whole record desyncs.
+    if (name == NAME('XXXX') && sz == 4 && esm.recLeft >= 10)
+    {
+        const quint32 extendedSize = readType<quint32>();
+        name = readName();
+        readType<quint16>();        // the real subrecord's size field (0)
+        sz = extendedSize;
+    }
+
+    // A subrecord can never extend past its record. Some records carry a
+    // few trailing bytes beyond their subrecords; without this clamp the
+    // tail would be misread as a subrecord with a huge size and the reader
+    // would run past the record end.
+    if (sz > esm.recLeft)
+        sz = static_cast<quint32>(qMax<qint64>(0, esm.recLeft));
+
     esm.subLeft = sz;
 
     return name;

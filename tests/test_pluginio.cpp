@@ -25,6 +25,7 @@ private slots:
     void testMastersList();
     void testEmptyPlugin();
     void testNumRecordsPatchedByClose();
+    void testLargeSubrecordRoundTrip();
 };
 
 void TestPluginIO::testEsmWriter_TES4Header()
@@ -313,6 +314,73 @@ void TestPluginIO::testNumRecordsPatchedByClose()
     ESMReader reader(filePath);
     reader.open();
     QCOMPARE(reader.getHeader().numRecords, 1);
+}
+
+// A raw subrecord larger than 64 KiB must be written with the XXXX
+// extended-size prefix and read back byte-identically.
+void TestPluginIO::testLargeSubrecordRoundTrip()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    QString filePath = tempDir.path() + "/large.esm";
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+
+    QByteArray big(70000, '\xAB');
+    RawSubRecord raw;
+    raw.name = static_cast<NAME>('BIGD');
+    raw.data = big;
+
+    {
+        ESMWriter writer;
+        writer.setVersion(1.0f);
+        writer.save(file);
+        RecHeader recHeader;
+        recHeader.id = 0x002345;
+        writer.startRecord('WRLD', recHeader);
+        writer.writeSubZString('EDID', QStringLiteral("LargeSub"));
+        writer.writeRawSubRecord(raw);
+        writer.endRecord();
+        writer.close();
+        file.close();
+    }
+
+    // Reload and verify the big payload survives exactly.
+    ESMReader reader(filePath);
+    reader.open();
+    bool found = false;
+    QByteArray loaded;
+    while (reader.isLeft())
+    {
+        const NAME name = reader.readName();
+        if (name == static_cast<NAME>('GRUP'))
+        {
+            reader.skipGrupHeader();
+            continue;
+        }
+        reader.readHeader();
+        while (reader.isRecLeft())
+        {
+            const NAME sub = reader.readNSubHeader();
+            if (sub == 0)
+                break;
+            if (sub == static_cast<NAME>('BIGD'))
+            {
+                reader.readRawSubData(loaded);
+                found = true;
+            }
+            else
+            {
+                reader.skip(static_cast<int>(reader.subLeft()));
+            }
+        }
+        if (found)
+            break;
+    }
+    QVERIFY(found);
+    QCOMPARE(loaded.size(), big.size());
+    QCOMPARE(loaded, big);
 }
 
 QTEST_MAIN(TestPluginIO)

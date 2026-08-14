@@ -81,6 +81,6 @@ void NavmRecord::save(ESMWriter& esm) const {
         esm.endSubRecord();
     }
     components.saveAll(esm);
-    for (const auto& raw : rawSubRecords) { esm.startSubRecord(raw.name); esm.writeRawData(raw.data.data(), raw.data.size()); esm.endSubRecord(); }
+    for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
 void NavmRecord::blank() { editorId = ""; formId = 0; flags = 0; cellFormId = 0; vertices.clear(); triangles.clear(); coverData.clear(); externalConnections.clear(); rawSubRecords.clear(); components.clear(); }

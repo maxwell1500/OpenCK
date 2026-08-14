@@ -27,6 +27,6 @@ void ScriptRecord::save(ESMWriter& esm) const {
     if (!scriptText.isEmpty()) esm.writeSubZString('SCTX', scriptText);
     for (quint32 ro : refObjects) esm.writeSubData<quint32>('SCRO', ro);
     components.saveAll(esm);
-    for (const auto& raw : rawSubRecords) { esm.startSubRecord(raw.name); esm.writeRawData(raw.data.data(), raw.data.size()); esm.endSubRecord(); }
+    for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
 void ScriptRecord::blank() { editorId = ""; formId = 0; flags = 0; scriptText = ""; compiledData.clear(); scriptType = 0; refObjects.clear(); rawSubRecords.clear(); components.clear(); }

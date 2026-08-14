@@ -76,7 +76,7 @@ void LvspRecord::save(ESMWriter& esm) const
     }
     components.saveAll(esm);
     for (const auto& raw : rawSubRecords) {
-        esm.startSubRecord(raw.name); esm.writeRawData(raw.data.data(), raw.data.size()); esm.endSubRecord();
+        esm.writeRawSubRecord(raw);
     }
 }
 

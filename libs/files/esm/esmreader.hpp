@@ -50,6 +50,7 @@ public:
     QString readSubZString(NAME name);
 
     quint32 currentFormId() const { return mCurrentFormId; }
+    quint32 currentHeaderFlags() const { return mCurrentHeaderFlags; }
 
     bool isLeft();
     bool isRecLeft();
@@ -144,6 +145,7 @@ private:
 
     ESMFile esm;
     quint32 mCurrentFormId = 0;
+    quint32 mCurrentHeaderFlags = 0;
     qint64 mGrupEnd = 0;
 
     uchar* m_mapped = nullptr;

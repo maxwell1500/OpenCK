@@ -21,6 +21,6 @@ void OutfitRecord::save(ESMWriter& esm) const {
     esm.writeSubZString('EDID', editorId);
     for (quint32 fid : itemFormIds) esm.writeSubData<quint32>('INAM', fid);
     components.saveAll(esm);
-    for (const auto& raw : rawSubRecords) { esm.startSubRecord(raw.name); esm.writeRawData(raw.data.data(), raw.data.size()); esm.endSubRecord(); }
+    for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
 void OutfitRecord::blank() { editorId = ""; formId = 0; flags = 0; itemFormIds.clear(); rawSubRecords.clear(); components.clear(); }

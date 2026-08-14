@@ -16,6 +16,6 @@ void NoteRecord::load(ESMReader& esm, bool) {
 void NoteRecord::save(ESMWriter& esm) const {
     esm.writeSubZString('EDID', editorId);
     components.saveAll(esm);
-    for (const auto& raw : rawSubRecords) { esm.startSubRecord(raw.name); esm.writeRawData(raw.data.data(), raw.data.size()); esm.endSubRecord(); }
+    for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
 void NoteRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); }

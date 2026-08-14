@@ -3,6 +3,7 @@
 
 #include "common.hpp"
 #include "tes4.hpp"
+#include "records.hpp"
 
 #include <QDataStream>
 #include <QFile>
@@ -69,6 +70,11 @@ public:
     {
         stream.writeRawData(data, size);
     }
+
+    // Writes a raw-preserved subrecord, emitting the XXXX extended-size
+    // prefix when the payload exceeds 64 KiB (the on-disk size field is a
+    // u16 and cannot represent it).
+    void writeRawSubRecord(const RawSubRecord& raw);
 
     void close();
 

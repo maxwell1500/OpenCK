@@ -21,6 +21,6 @@ void BsgnRecord::save(ESMWriter& esm) const {
     esm.writeSubZString('EDID', editorId);
     components.saveAll(esm);
     for (quint32 sid : spellFormIds) esm.writeSubData<quint32>('TNAM', sid);
-    for (const auto& raw : rawSubRecords) { esm.startSubRecord(raw.name); esm.writeRawData(raw.data.data(), raw.data.size()); esm.endSubRecord(); }
+    for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
 void BsgnRecord::blank() { editorId = ""; formId = 0; flags = 0; spellFormIds.clear(); rawSubRecords.clear(); components.clear(); }

@@ -137,6 +137,28 @@ void ESMWriter::writeSubZString(NAME name, const QString &str)
     endSubRecord();
 }
 
+void ESMWriter::writeRawSubRecord(const RawSubRecord& raw)
+{
+    const qint32 size = static_cast<qint32>(raw.data.size());
+    if (size > 0xFFFF)
+    {
+        // Extended-size subrecord: XXXX prefix carries the real size, then
+        // the subrecord header with a 0 size field.
+        writeType<NAME>(swapName(NAME('XXXX')));
+        writeType<quint16>(4);
+        writeType<quint32>(static_cast<quint32>(size));
+        writeType<NAME>(swapName(raw.name));
+        writeType<quint16>(0);
+        writeRawData(raw.data.constData(), size);
+    }
+    else
+    {
+        startSubRecord(raw.name);
+        writeRawData(raw.data.constData(), size);
+        endSubRecord();
+    }
+}
+
 void ESMWriter::close()
 {
     // Do not include TES4 record in numRecords
