@@ -21,6 +21,12 @@ struct QuestRecord {
     QVector<quint32> aliasIds;
     QString dialogueView;
     QVector<quint32> scriptIds;
+    QVector<quint8> stageFlags;
+    QVector<quint32> objectiveFlags;
+    QVector<quint32> aliasFlags;
+    QVector<QVector<RawSubRecord>> stageExtra;
+    QVector<QVector<RawSubRecord>> objectiveExtra;
+    QVector<QVector<RawSubRecord>> aliasExtra;
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
@@ -35,7 +41,11 @@ inline bool operator==(const QuestRecord& l, const QuestRecord& r)
         && l.questType == r.questType && l.stageIds == r.stageIds
         && l.stageDescriptions == r.stageDescriptions && l.objectiveIds == r.objectiveIds
         && l.aliasIds == r.aliasIds && l.dialogueView == r.dialogueView
-        && l.scriptIds == r.scriptIds && l.components == r.components && l.rawSubRecords == r.rawSubRecords;
+        && l.scriptIds == r.scriptIds && l.components == r.components
+        && l.stageFlags == r.stageFlags && l.objectiveFlags == r.objectiveFlags
+        && l.aliasFlags == r.aliasFlags
+        && l.stageExtra == r.stageExtra && l.objectiveExtra == r.objectiveExtra
+        && l.aliasExtra == r.aliasExtra && l.rawSubRecords == r.rawSubRecords;
 }
 
 inline bool operator!=(const QuestRecord& l, const QuestRecord& r)
