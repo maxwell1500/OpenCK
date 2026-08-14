@@ -211,6 +211,7 @@
 #include <QObject>
 #include <QStringList>
 #include <QMap>
+#include <QHash>
 #include <QVector>
 
 class MacroCommand;
@@ -288,6 +289,15 @@ public:
     /// those records into their collections. Returns the number of records
     /// parsed. No-op (0) when the type has no deferred master records.
     int ensureTypeLoaded(int typeId);
+
+    // Cell-children tracking for the save path. While the edited file is
+    // parsed eagerly, each REFR/ACHR records the CELL it is a child of, so
+    // saving can rebuild the cell-children GRUPs instead of emitting a flat
+    // list of references.
+    quint32 parentCellOfRefr(quint32 refrFormId) const
+    {
+        return m_refrParentCell.value(refrFormId, 0);
+    }
 
     /// \brief Register a Qt model for a record type
     /// \param model Pointer to QAbstractItemModel subclass
@@ -1918,6 +1928,11 @@ private:
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;
     UndoStack* mUndoStack;
     QMap<int, UndoStack*> mPluginUndoStacks;
+
+    // Cell-children tracking for saving: which REFR/ACHR record belongs to
+    // which CELL, discovered while parsing the edited file's structure.
+    quint32 m_lastCellFormId = 0;
+    QHash<quint32, quint32> m_refrParentCell;
 
 private slots:
     void dataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);

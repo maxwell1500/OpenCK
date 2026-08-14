@@ -2,6 +2,7 @@
 #define IDCOLLECTION_HPP
 
 #include "../../../libs/files/esm/esmreader.hpp"
+#include "../../../libs/files/log/logger.hpp"
 #include "collection.hpp"
 
 template<typename ESXRecord, typename IdAccessorT = IdAccessor<ESXRecord>>
@@ -42,6 +43,17 @@ int IdCollection<ESXRecord, IdAccessorT>::load(ESMReader& esm, bool base)
 {
     ESXRecord record;
     loadRecord(record, esm, base);
+
+    if (esm.recLeft() != 0)
+    {
+        // A loader that does not consume exactly its declared record size
+        // desyncs every following record in the file. Surface it loudly so
+        // misparses are caught against real data instead of producing
+        // silently corrupted records.
+        LOG_WARNING(QString("Record %1 left %2 unconsumed bytes in record")
+            .arg(IdAccessorT().getId(record))
+            .arg(esm.recLeft()));
+    }
 
     QString id = IdAccessorT().getId(record);
     int index = this->searchId(id);

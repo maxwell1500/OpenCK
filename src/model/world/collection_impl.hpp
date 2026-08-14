@@ -74,6 +74,23 @@ bool Collection<ESXRecord, IdAccessorT>::isRecordModified(int index) const
 }
 
 template<typename ESXRecord, typename IdAccessorT>
+int Collection<ESXRecord, IdAccessorT>::countModifiedRecords() const
+{
+    int n = 0;
+    for (const auto& rec : records)
+    {
+        if (rec.state == State_Modified || rec.state == State_ModifiedOnly
+            || rec.state == State_Deleted)
+            ++n;
+    }
+    // Removed records are saved through mDeletedFormIds; the save loop
+    // deduplicates with any State_Deleted records still present, so an
+    // over-count here only ever causes an empty group to be emitted.
+    n += mDeletedFormIds.size();
+    return n;
+}
+
+template<typename ESXRecord, typename IdAccessorT>
 void Collection<ESXRecord, IdAccessorT>::saveModifiedRecords(ESMWriter& writer, uint32_t recordType) const
 {
     for (const auto& record : records)
@@ -90,10 +107,12 @@ void Collection<ESXRecord, IdAccessorT>::saveModifiedRecords(ESMWriter& writer, 
         else if (record.state == State_Deleted)
         {
             RecHeader delHeader;
+            delHeader.flags.val = 0x00002000;   // Deleted
             if constexpr (HasFormIdField<ESXRecord>::value)
                 delHeader.id = record.get().formId;
             writer.startRecord(static_cast<NAME>(recordType), delHeader);
             writer.startSubRecord(static_cast<NAME>('DELE'));
+            writer.writeType<quint32>(0);
             writer.endSubRecord();
             writer.endRecord();
         }
@@ -116,9 +135,11 @@ void Collection<ESXRecord, IdAccessorT>::saveModifiedRecords(ESMWriter& writer, 
         if (!stillExists)
         {
             RecHeader delHeader;
+            delHeader.flags.val = 0x00002000;   // Deleted
             delHeader.id = formId;
             writer.startRecord(static_cast<NAME>(recordType), delHeader);
             writer.startSubRecord(static_cast<NAME>('DELE'));
+            writer.writeType<quint32>(0);
             writer.endSubRecord();
             writer.endRecord();
         }

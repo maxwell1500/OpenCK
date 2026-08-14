@@ -43,6 +43,7 @@ public:
 
 private:
     void createNew();
+    void writeCellChildrenGroups(ESMWriter& writer, quint32 cellId);
 
     FilePaths paths;
     QStringList contentFiles;

@@ -1353,11 +1353,22 @@ bool Data::continueLoading(Messages& messages)
             case 'CLAS': classCollection.load(*reader, base); break;
             case 'FACT': factCollection.load(*reader, base);   break;
             case 'PERK': perkCollection.load(*reader, base);   break;
-            case 'CELL': cellCollection.load(*reader, base);   break;
-            case 'WRLD': worldspaceCollection.load(*reader, base); break;
+            case 'CELL': cellCollection.load(*reader, base);
+                if (!base && cellCollection.size() > 0)
+                    m_lastCellFormId = cellCollection.getRecord(cellCollection.size() - 1).get().formId;
+                break;
+            case 'WRLD': worldspaceCollection.load(*reader, base);
+                m_lastCellFormId = 0;
+                break;
             case 'LCTN': locationCollection.load(*reader, base); break;
             case 'PNDT': planetCollection.load(*reader, base); break;
-            case 'REFR': refrCollection.load(*reader, base);   break;
+            case 'REFR': refrCollection.load(*reader, base);
+                if (!base && refrCollection.size() > 0)
+                {
+                    const quint32 fid = refrCollection.getRecord(refrCollection.size() - 1).get().formId;
+                    m_refrParentCell[fid] = m_lastCellFormId;
+                }
+                break;
             case 'MATL': materialCollection.load(*reader, base); break;
             case 'LAND': landCollection.load(*reader, base); break;
             case 'SOUN': sounCollection.load(*reader, base); break;
@@ -1428,7 +1439,13 @@ bool Data::continueLoading(Messages& messages)
             case 'AACT': aactCollection.load(*reader, base); break;
             case 'AAMD': aamdCollection.load(*reader, base); break;
             case 'AAPD': aapdCollection.load(*reader, base); break;
-            case 'ACHR': achrCollection.load(*reader, base); break;
+            case 'ACHR': achrCollection.load(*reader, base);
+                if (!base && achrCollection.size() > 0)
+                {
+                    const quint32 fid = achrCollection.getRecord(achrCollection.size() - 1).get().formId;
+                    m_refrParentCell[fid] = m_lastCellFormId;
+                }
+                break;
             case 'ADDN': addnCollection.load(*reader, base); break;
             case 'AFFE': affeCollection.load(*reader, base); break;
             case 'AMBS': ambsCollection.load(*reader, base); break;
@@ -4207,8 +4224,19 @@ MacroCommand* Data::createMacroCommand(const QString& description)
 
 quint32 Data::createNewRecord(CkId::Type type, const QString& editorId)
 {
-    int baseRange = 0x4000 + static_cast<int>(type);
     QString finalEditorId = editorId.isEmpty() ? "new" : editorId.toLower();
+
+    // Bethesda form IDs: the high byte is the plugin's load-order index
+    // (0x00..0xFD); light plugins use the 0xFE prefix with a separate
+    // index space. The edited plugin is the last content file.
+    int editedIndex = static_cast<int>(getContentFiles().size()) - 1;
+    if (editedIndex < 0)
+        editedIndex = 0;
+    quint32 base = 0;
+    if (editedIndex < 0xFE)
+        base = static_cast<quint32>(editedIndex) << 24;
+    else
+        base = 0xFE000000u;
 
     auto collections = allCollections();
     QSet<quint32> usedFormIds;
@@ -4219,8 +4247,10 @@ quint32 Data::createNewRecord(CkId::Type type, const QString& editorId)
         }
     }
 
-    for (int i = baseRange; i < baseRange + 32768; ++i) {
-        quint32 formId = static_cast<quint32>(i);
+    // Allocate sequentially from the top of the local id space so the
+    // next object id stays dense and collision-free.
+    for (quint32 id = 0x800; id < 0x100000; ++id) {
+        quint32 formId = base | id;
         if (!usedFormIds.contains(formId)) {
             LOG_INFO(QString("Created new record '%1' with FormID 0x%2")
                      .arg(finalEditorId, QString::number(formId, 16).toUpper()));

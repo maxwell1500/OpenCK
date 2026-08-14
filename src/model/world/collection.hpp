@@ -36,8 +36,15 @@ void IdAccessor<ESXRecord>::setId(ESXRecord& record, const QString& id) const
 template<typename ESXRecord>
 QString IdAccessor<ESXRecord>::getId(const ESXRecord& record) const
 {
-    // Try editorId first (most record types use this), fall back to id
-    return record.editorId;
+    // Try editorId first (most record types use this), fall back to the
+    // form id for placed records (REFR/ACHR and others) that carry none.
+    if (!record.editorId.isEmpty())
+        return record.editorId;
+
+    if constexpr (HasFormIdField<ESXRecord>::value)
+        return QStringLiteral("%1").arg(record.formId, 8, 16, QLatin1Char('0'));
+
+    return QString();
 }
 
 template<typename ESXRecord, typename IdAccessorT = IdAccessor<ESXRecord>>
@@ -108,6 +115,7 @@ public:
     void setFormId(int index, quint32 formId) override;
     bool containsFormId(quint32 formId) const override;
     bool isRecordModified(int index) const override;
+    int countModifiedRecords() const override;
     void saveModifiedRecords(ESMWriter& writer, uint32_t recordType) const override;
 
     // Undo-aware operations

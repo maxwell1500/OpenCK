@@ -7,7 +7,9 @@
 #include <QDataStream>
 #include <QFile>
 
-const quint8 numRecordsPos = 28;
+// Absolute file offset of the HEDR numRecords field: TES4 record header
+// (24) + 'HEDR' name (4) + subrecord size (2) + version float (4).
+const quint8 numRecordsPos = 34;
 
 class ESMWriter
 {
@@ -17,6 +19,7 @@ public:
     void setAuthor(const QString& author);
     void setDescription(const QString& description);
     void setNumRecords(qint32 numRecords);
+    void setNextObjectId(quint32 nextObjectId);
     void clearMasters();
     void addMaster(QString name, quint64 size = 0);
 
@@ -32,6 +35,12 @@ public:
     void endRecord();
     void startSubRecord(NAME name);
     void endSubRecord();
+    // Top-level / children GRUP blocks (24-byte group header with a
+    // size-patched at endGrup). label is the 4-byte record type for a
+    // top-level group (type 0) or the owning cell's form id & 0xFFFFFF
+    // for a cell-children group (type 6).
+    void startGrup(quint32 label, quint32 groupType);
+    void endGrup();
 
     template<typename T>
     void writeType(T data)
@@ -70,6 +79,7 @@ private:
     qint64 recPos;
     qint64 subSizePos;
     qint64 subPos;
+    qint64 grupSizePos;
 
     QByteArray buf;
     QDataStream stream;

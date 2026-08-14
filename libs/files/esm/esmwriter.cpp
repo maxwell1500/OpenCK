@@ -27,6 +27,11 @@ void ESMWriter::setNumRecords(qint32 numRecords)
     header.numRecords = numRecords;
 }
 
+void ESMWriter::setNextObjectId(quint32 nextObjectId)
+{
+    header.nextObjectID = nextObjectId;
+}
+
 void ESMWriter::clearMasters()
 {
     header.masters.clear();
@@ -85,6 +90,33 @@ void ESMWriter::endSubRecord()
     qint64 currentPos{ stream.device()->pos() };
     stream.device()->seek(subSizePos);
     writeType<quint16>(static_cast<quint16>(currentPos - subPos));
+    stream.device()->seek(currentPos);
+}
+
+void ESMWriter::startGrup(quint32 label, quint32 groupType)
+{
+    writeType<NAME>(swapName(NAME('GRUP')));
+    grupSizePos = stream.device()->pos();
+    writeType<quint32>(0);      // size, patched in endGrup
+    // Top-level group labels are record-type names stored as ASCII; cell
+    // children group labels are the owning cell's form id, stored raw.
+    writeType<quint32>(groupType == 0 ? swapName(label) : label);
+    writeType<quint32>(groupType);
+    writeType<quint8>(0);       // vc day
+    writeType<quint8>(0);       // vc month
+    writeType<quint8>(0);       // recent user
+    writeType<quint8>(0);       // current user
+    writeType<quint32>(0);      // unknown
+}
+
+void ESMWriter::endGrup()
+{
+    qint64 currentPos{ stream.device()->pos() };
+    // The group size excludes the 'GRUP' name and the size field itself
+    // (matches ESMReader::skipGrupHeader, which adds grupSize to the
+    // position following the size field).
+    stream.device()->seek(grupSizePos);
+    writeType<quint32>(static_cast<quint32>(currentPos - grupSizePos - 4));
     stream.device()->seek(currentPos);
 }
 
