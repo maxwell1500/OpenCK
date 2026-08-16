@@ -6,6 +6,7 @@
 #include "logger.hpp"
 #include "npcrecord.hpp"
 #include "records.hpp"
+#include "../libs/components/tier3_components.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -76,8 +77,12 @@ NpcEditor::NpcEditor(Data* data, NpcRecord* npc, QWidget* parent)
       mHealthSpin(nullptr),
       mMagickaSpin(nullptr),
       mStaminaSpin(nullptr),
-      mAggroRadiusSpin(nullptr),
-      mCombatSpin(nullptr),
+      mAggressionSpin(nullptr),
+      mConfidenceSpin(nullptr),
+      mMoralitySpin(nullptr),
+      mEnergySpin(nullptr),
+      mMoodSpin(nullptr),
+      mDispositionSpin(nullptr),
       mSpellsList(nullptr),
       mInventoryTable(nullptr),
       mRelationshipsList(nullptr),
@@ -307,13 +312,29 @@ void NpcEditor::setupUI()
         auto* layout = new QFormLayout(aiTab);
         layout->setContentsMargins(10, 5, 10, 5);
 
-        mAggroRadiusSpin = new QSpinBox();
-        mAggroRadiusSpin->setRange(0, 65535);
-        layout->addRow("Aggro Radius:", mAggroRadiusSpin);
+        mAggressionSpin = new QSpinBox();
+        mAggressionSpin->setRange(0, 5);
+        layout->addRow("Aggression:", mAggressionSpin);
 
-        mCombatSpin = new QSpinBox();
-        mCombatSpin->setRange(0, 65535);
-        layout->addRow("Combat:", mCombatSpin);
+        mConfidenceSpin = new QSpinBox();
+        mConfidenceSpin->setRange(0, 5);
+        layout->addRow("Confidence:", mConfidenceSpin);
+
+        mMoralitySpin = new QSpinBox();
+        mMoralitySpin->setRange(0, 4);
+        layout->addRow("Morality:", mMoralitySpin);
+
+        mEnergySpin = new QSpinBox();
+        mEnergySpin->setRange(0, 255);
+        layout->addRow("Energy:", mEnergySpin);
+
+        mMoodSpin = new QSpinBox();
+        mMoodSpin->setRange(-32768, 32767);
+        layout->addRow("Mood:", mMoodSpin);
+
+        mDispositionSpin = new QSpinBox();
+        mDispositionSpin->setRange(0, 255);
+        layout->addRow("Disposition:", mDispositionSpin);
 
         mTabWidget->addTab(aiTab, "AI");
     }
@@ -457,8 +478,17 @@ void NpcEditor::loadFromNpc()
     mHealthSpin->setValue(mRecord->health);
     mMagickaSpin->setValue(mRecord->magicka);
     mStaminaSpin->setValue(mRecord->stamina);
-    mAggroRadiusSpin->setValue(mRecord->aiAggroRadius);
-    mCombatSpin->setValue(mRecord->aiCombat);
+
+    if (auto* aiComp = static_cast<tescomponents::TESAIForm_Component*>(
+            mRecord->components.findByName("TESAIForm")))
+    {
+        mAggressionSpin->setValue(aiComp->aggression);
+        mConfidenceSpin->setValue(aiComp->confidence);
+        mMoralitySpin->setValue(aiComp->morality);
+        mEnergySpin->setValue(aiComp->energy);
+        mMoodSpin->setValue(aiComp->mood);
+        mDispositionSpin->setValue(aiComp->disposition);
+    }
 
     mSexCombo->setCurrentIndex(mRecord->sex == 1 ? 1 : 0);
 
@@ -592,8 +622,18 @@ void NpcEditor::saveToNpc()
     mRecord->health = mHealthSpin->value();
     mRecord->magicka = mMagickaSpin->value();
     mRecord->stamina = mStaminaSpin->value();
-    mRecord->aiAggroRadius = mAggroRadiusSpin->value();
-    mRecord->aiCombat = mCombatSpin->value();
+
+    if (auto* aiComp = static_cast<tescomponents::TESAIForm_Component*>(
+            mRecord->components.findByName("TESAIForm")))
+    {
+        aiComp->aggression = static_cast<quint8>(mAggressionSpin->value());
+        aiComp->confidence = static_cast<quint8>(mConfidenceSpin->value());
+        aiComp->morality = static_cast<quint8>(mMoralitySpin->value());
+        aiComp->energy = static_cast<quint8>(mEnergySpin->value());
+        aiComp->mood = static_cast<qint16>(mMoodSpin->value());
+        aiComp->disposition = static_cast<quint8>(mDispositionSpin->value());
+    }
+
     mRecord->sex = mSexCombo->currentIndex();
 
     bool ok = false;

@@ -508,51 +508,6 @@ QJsonObject DataExporter::recordToJSON(const BaseRecord& record, CkId::Type type
         obj["classId"] = toJV(npc.class_);
         obj["faction"] = toJV(npc.faction);
         obj["sex"] = toJV(npc.sex);
-        obj["aiIndex"] = toJV(npc.aiIndex);
-        obj["aiGlobal"] = toJV(npc.aiGlobal);
-        obj["aiFacet"] = toJV(npc.aiFacet);
-        obj["aiRank"] = toJV(npc.aiRank);
-        obj["aiFaction"] = toJV(npc.aiFaction);
-        obj["aiSound"] = toJV(npc.aiSound);
-        obj["aiAlert"] = toJV(npc.aiAlert);
-        obj["aiCombat"] = toJV(npc.aiCombat);
-        obj["aiHazard"] = toJV(npc.aiHazard);
-        obj["aiClass"] = toJV(npc.aiClass);
-        obj["aiRace"] = toJV(npc.aiRace);
-        obj["aiCompany"] = toJV(npc.aiCompany);
-        obj["aiAggroRadius"] = toJV(npc.aiAggroRadius);
-        obj["aiFactionRank"] = toJV(npc.aiFactionRank);
-        obj["aiFactionBase"] = toJV(npc.aiFactionBase);
-        obj["aiFactionMember"] = toJV(npc.aiFactionMember);
-        obj["aiFactionTarget"] = toJV(npc.aiFactionTarget);
-        obj["aiFactionTargetRank"] = toJV(npc.aiFactionTargetRank);
-        obj["aiFactionTargetBase"] = toJV(npc.aiFactionTargetBase);
-        obj["aiFactionTargetMember"] = toJV(npc.aiFactionTargetMember);
-        obj["aiFactionTargetClass"] = toJV(npc.aiFactionTargetClass);
-        obj["aiFactionTargetRace"] = toJV(npc.aiFactionTargetRace);
-        obj["aiFactionTargetCompany"] = toJV(npc.aiFactionTargetCompany);
-        obj["aiFactionTargetFacet"] = toJV(npc.aiFactionTargetFacet);
-        obj["aiFactionTargetSound"] = toJV(npc.aiFactionTargetSound);
-        obj["aiFactionTargetAlert"] = toJV(npc.aiFactionTargetAlert);
-        obj["aiFactionTargetCombat"] = toJV(npc.aiFactionTargetCombat);
-        obj["aiFactionTargetHazard"] = toJV(npc.aiFactionTargetHazard);
-        obj["aiFactionTargetClassRank"] = toJV(npc.aiFactionTargetClassRank);
-        obj["aiFactionTargetClassBase"] = toJV(npc.aiFactionTargetClassBase);
-        obj["aiFactionTargetClassMember"] = toJV(npc.aiFactionTargetClassMember);
-        obj["aiFactionTargetClassFacet"] = toJV(npc.aiFactionTargetClassFacet);
-        obj["aiFactionTargetClassSound"] = toJV(npc.aiFactionTargetClassSound);
-        obj["aiFactionTargetClassAlert"] = toJV(npc.aiFactionTargetClassAlert);
-        obj["aiFactionTargetClassCombat"] = toJV(npc.aiFactionTargetClassCombat);
-        obj["aiFactionTargetClassHazard"] = toJV(npc.aiFactionTargetClassHazard);
-        obj["aiFactionTargetClassTarget"] = toJV(npc.aiFactionTargetClassTarget);
-        obj["aiFactionTargetClassTargetRank"] = toJV(npc.aiFactionTargetClassTargetRank);
-        obj["aiFactionTargetClassTargetBase"] = toJV(npc.aiFactionTargetClassTargetBase);
-        obj["aiFactionTargetClassTargetMember"] = toJV(npc.aiFactionTargetClassTargetMember);
-        obj["aiFactionTargetClassTargetFacet"] = toJV(npc.aiFactionTargetClassTargetFacet);
-        obj["aiFactionTargetClassTargetSound"] = toJV(npc.aiFactionTargetClassTargetSound);
-        obj["aiFactionTargetClassTargetAlert"] = toJV(npc.aiFactionTargetClassTargetAlert);
-        obj["aiFactionTargetClassTargetCombat"] = toJV(npc.aiFactionTargetClassTargetCombat);
-        obj["aiFactionTargetClassTargetHazard"] = toJV(npc.aiFactionTargetClassTargetHazard);
         jsonVecU32(obj, "spells", npc.spells);
         jsonVecU32(obj, "inventoryItems", npc.inventoryItems);
         jsonVecU32(obj, "relationships", npc.relationships);
@@ -965,7 +920,6 @@ QStringList DataExporter::recordToCSVFields(const BaseRecord& record, CkId::Type
             headers << "Flags" << "FullName" << "Level"
                     << "Health" << "Magicka" << "Stamina" << "Intelligence"
                     << "Race" << "ClassId" << "Faction" << "Sex"
-                    << "AiAggroRadius" << "AiCombat"
                     << "Spells" << "InventoryItems" << "Relationships";
         }
         fields << QString::number(npc.flags) << npc.fullName
@@ -974,7 +928,6 @@ QStringList DataExporter::recordToCSVFields(const BaseRecord& record, CkId::Type
                << QString::number(npc.stamina) << QString::number(npc.intelligence)
                << QString::number(npc.race) << QString::number(npc.class_)
                << QString::number(npc.faction) << QString::number(npc.sex)
-               << QString::number(npc.aiAggroRadius) << QString::number(npc.aiCombat)
                << vecU32Csv(npc.spells) << vecU32Csv(npc.inventoryItems)
                << vecU32Csv(npc.relationships);
         break;
@@ -1395,8 +1348,6 @@ QDomElement DataExporter::recordToXML(const BaseRecord& record, CkId::Type type,
         addInt("classId", npc.class_);
         addInt("faction", npc.faction);
         addInt("sex", npc.sex);
-        addInt("aiAggroRadius", npc.aiAggroRadius);
-        addInt("aiCombat", npc.aiCombat);
         addVecU32("spells", npc.spells);
         addVecU32("inventoryItems", npc.inventoryItems);
         addVecU32("relationships", npc.relationships);

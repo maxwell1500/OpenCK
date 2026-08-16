@@ -1837,6 +1837,13 @@ void MainWindow::on_actionObjectPalette_triggered()
 {
     if (objectPalette)
     {
+        if (objectWindowDock)
+        {
+            if (CellRecord* cell = objectWindowDock->getSelectedCell())
+            {
+                objectPalette->loadCell(cell);
+            }
+        }
         objectPalette->show();
         objectPalette->raise();
         objectPalette->activateWindow();

@@ -470,6 +470,7 @@ public:
     void load(ESMReader& esm) override {}
 
     QVector<quint32> keywords;
+    quint32 spelling = NAME('CNAM');
 
     QString name() const override { return QStringLiteral("Keywords"); }
     QString className() const override { return QStringLiteral("BGSKeywordForm"); }
@@ -485,6 +486,7 @@ public:
     {
         if (subrecordName == NAME('CNAM') || subrecordName == NAME('KWDA'))
         {
+            spelling = subrecordName;
             const qint64 n = esm.subLeft() / 4;
             keywords.clear();
             keywords.reserve(n);
@@ -498,7 +500,7 @@ public:
     void save(ESMWriter& esm) const override
     {
         if (keywords.isEmpty()) return;
-        esm.startSubRecord(NAME('CNAM'));
+        esm.startSubRecord(spelling);
         for (quint32 kw : keywords)
         {
             esm.writeType<quint32>(kw);
@@ -518,19 +520,23 @@ public:
     {
         auto c = std::make_unique<BGSKeywordForm_Component>();
         c->keywords = keywords;
+        c->spelling = spelling;
         return c;
     }
 
     void copyFrom(const Component* other) override
     {
         if (!other || other->className() != className()) return;
-        keywords = static_cast<const BGSKeywordForm_Component*>(other)->keywords;
+        const auto* o = static_cast<const BGSKeywordForm_Component*>(other);
+        keywords = o->keywords;
+        spelling = o->spelling;
     }
 
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
-        return keywords == static_cast<const BGSKeywordForm_Component*>(other)->keywords;
+        const auto* o = static_cast<const BGSKeywordForm_Component*>(other);
+        return keywords == o->keywords && spelling == o->spelling;
     }
 
     void mergeWith(const Component* other) override

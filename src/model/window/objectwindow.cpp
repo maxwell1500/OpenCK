@@ -11,12 +11,17 @@ ObjectWindowModel::ObjectWindowModel(QObject* parent)
     : QAbstractItemModel(parent),
       mData(nullptr)
 {
+    mMaterializeTimer.setInterval(20);
+    mMaterializeTimer.setSingleShot(false);
+    connect(&mMaterializeTimer, &QTimer::timeout, this, &ObjectWindowModel::materializeTick);
 }
 
 void ObjectWindowModel::setData(Data* data)
 {
     beginResetModel();
 
+    mMaterializeTimer.stop();
+    mJob.active = false;
     mData = data;
     mCategories.clear();
     mGroups.clear();
@@ -2529,41 +2534,25 @@ bool ObjectWindowModel::canFetchMore(const QModelIndex& parent) const
     return mCategories[group.categoryIndices[categoryRow]].pendingMaterialize;
 }
 
-void ObjectWindowModel::fetchMore(const QModelIndex& parent)
+void ObjectWindowModel::appendMaterializedRows(int groupRow, int categoryRow, int firstNew, const QModelIndex& parent)
 {
     if (!mData || !parent.isValid())
         return;
-
-    quintptr internal = parent.internalId();
-    if (internal == kGroupInternalId || (internal & kRecordBit))
-        return;
-
-    int groupRow = static_cast<int>((internal >> 16) & 0xFFFF);
-    int categoryRow = parent.row();
     if (groupRow < 0 || groupRow >= mGroups.size())
         return;
     const auto& group = mGroups[groupRow];
     if (categoryRow < 0 || categoryRow >= group.categoryIndices.size())
         return;
-
     Category& cat = mCategories[group.categoryIndices[categoryRow]];
-    if (!cat.pendingMaterialize)
-        return;
-
-    cat.pendingMaterialize = false;
-
-    // Materialize the master records of this type, then append rows to
-    // this category only. A full model reset is not allowed here:
-    // fetchMore() runs inside the view's expansion handling and
-    // beginResetModel/endResetModel re-entering QTreeView crashes it.
-    const int firstNew = cat.visibleRecords.size();
-    mData->ensureTypeLoaded(cat.typeId);
 
     BaseCollection* coll = mData->getCollectionByType(static_cast<CkId::Type>(cat.typeId));
     if (!coll)
         return;
 
     const int end = coll->size();
+    if (firstNew >= end)
+        return;
+
     QVector<VisibleRecord> added;
     for (int i = firstNew; i < end; ++i)
     {
@@ -2608,6 +2597,96 @@ void ObjectWindowModel::fetchMore(const QModelIndex& parent)
     beginInsertRows(parent, firstNew, firstNew + added.size() - 1);
     cat.visibleRecords.append(added);
     endInsertRows();
+}
+
+void ObjectWindowModel::startMaterializeTimer()
+{
+    mMaterializeTimer.stop();
+    mMaterializeTimer.start(20);
+}
+
+void ObjectWindowModel::materializeTick()
+{
+    if (!mData || !mJob.active)
+    {
+        mMaterializeTimer.stop();
+        return;
+    }
+
+    const int typeId = mJob.typeId;
+    const int firstNew = mJob.firstNew;
+    mData->materializeNextBatch(typeId, 256);
+
+    const QModelIndex groupNode = index(mJob.groupRow, 0, QModelIndex());
+    const QModelIndex parentIdx = index(mJob.categoryRow, 0, groupNode);
+    appendMaterializedRows(mJob.groupRow, mJob.categoryRow, firstNew, parentIdx);
+    mJob.firstNew = mCategories[mJob.flatId].visibleRecords.size();
+
+    if (!mData->isMaterializing())
+    {
+        mMaterializeTimer.stop();
+        Category& cat = mCategories[mJob.flatId];
+        cat.pendingMaterialize = false;
+        mJob.active = false;
+        if (parentIdx.isValid())
+            emit dataChanged(parentIdx, parentIdx);
+    }
+}
+
+void ObjectWindowModel::fetchMore(const QModelIndex& parent)
+{
+    if (!mData || !parent.isValid())
+        return;
+
+    quintptr internal = parent.internalId();
+    if (internal == kGroupInternalId || (internal & kRecordBit))
+        return;
+
+    int groupRow = static_cast<int>((internal >> 16) & 0xFFFF);
+    int categoryRow = parent.row();
+    if (groupRow < 0 || groupRow >= mGroups.size())
+        return;
+    const auto& group = mGroups[groupRow];
+    if (categoryRow < 0 || categoryRow >= group.categoryIndices.size())
+        return;
+
+    Category& cat = mCategories[group.categoryIndices[categoryRow]];
+    if (!cat.pendingMaterialize)
+        return;
+
+    // Small types (or types already fully parsed) load synchronously;
+    // anything with deferred master records is materialized in 20 ms
+    // slices so expanding a huge category never freezes the UI. Row
+    // insertion is still done with beginInsertRows/endInsertRows on the
+    // UI thread (a full model reset inside fetchMore crashes QTreeView).
+    if (mData->isMaterializing())
+        return;
+    if (!mData->beginTypeMaterialization(cat.typeId))
+    {
+        cat.pendingMaterialize = false;
+        return;
+    }
+
+    mJob.typeId = cat.typeId;
+    mJob.groupRow = groupRow;
+    mJob.categoryRow = categoryRow;
+    mJob.flatId = group.categoryIndices[categoryRow];
+    mJob.firstNew = cat.visibleRecords.size();
+    mJob.active = true;
+
+    mData->materializeNextBatch(mJob.typeId, 256);
+    appendMaterializedRows(mJob.groupRow, mJob.categoryRow, mJob.firstNew, parent);
+    mJob.firstNew = mCategories[mJob.flatId].visibleRecords.size();
+
+    if (mData->isMaterializing())
+    {
+        startMaterializeTimer();
+    }
+    else
+    {
+        cat.pendingMaterialize = false;
+        mJob.active = false;
+    }
 }
 
 QVariant ObjectWindowModel::data(const QModelIndex& index, int role) const

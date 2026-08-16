@@ -4,9 +4,11 @@
 #include <QAbstractItemModel>
 #include <QStringList>
 #include <QVector>
+#include <QTimer>
 #include <functional>
 
 #include "../tools/objectwindowfilter.hpp"
+#include "../world/ckid.hpp"
 
 class Data;
 
@@ -49,6 +51,9 @@ public slots:
     // Returns the most recently applied structured filter (may be empty).
     ObjectWindowFilter activeObjectFilter() const { return mActiveObjectFilter; }
 
+private slots:
+    void materializeTick();
+
 private:
     struct VisibleRecord
     {
@@ -78,6 +83,8 @@ private:
     void initCategories(Data* data);
     QString formatFormId(quint32 formId) const;
     void rebuildAllRecords();
+    void appendMaterializedRows(int groupRow, int categoryRow, int firstNew, const QModelIndex& parent);
+    void startMaterializeTimer();
 
     bool isGroupNode(const QModelIndex& index) const;
     bool isCategoryNode(const QModelIndex& index) const;
@@ -93,6 +100,22 @@ private:
     QVector<CategoryGroup> mGroups;
     QString mFilter;
     ObjectWindowFilter mActiveObjectFilter;
+
+    // Time-sliced deferred-master materialization driven by a QTimer so the
+    // UI thread never blocks inside fetchMore(). Row insertion still happens
+    // with beginInsertRows/endInsertRows on the UI thread (never a model
+    // reset while QTreeView is expanding).
+    QTimer mMaterializeTimer;
+    struct MaterializeJob
+    {
+        int typeId = CkId::Type_None;
+        int groupRow = -1;
+        int categoryRow = -1;
+        int flatId = -1;
+        int firstNew = 0;
+        bool active = false;
+    };
+    MaterializeJob mJob;
 };
 
 #endif // OBJECTWINDOW_H

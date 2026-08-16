@@ -26,7 +26,10 @@
 #include "../../libs/files/esm/refrecord.hpp"
 #include "../../model/world/data.hpp"
 #include "../../model/world/idcollection.hpp"
+#include "../../model/world/idtable.hpp"
 #include "../../model/world/record.hpp"
+#include "../../model/tools/addrecordcommand.hpp"
+#include "../../model/tools/undostack.hpp"
 #include "../../libs/files/esm/weaprecord.hpp"
 #include "../../libs/files/esm/armorrecord.hpp"
 #include "../../libs/files/esm/spellrecord.hpp"
@@ -340,8 +343,7 @@ void ObjectPalette::onSavePlacementClicked()
         .arg(placement.baseObjectName)
         .arg(placement.baseObjectFormId, 8, 16, QChar('0')));
 
-    syncPlacementsToCell();
-    syncPlacementsToRefrCollection();
+    applyPlacement(placement);
 }
 
 void ObjectPalette::onLoadPlacementClicked()
@@ -372,17 +374,19 @@ void ObjectPalette::onLoadPlacementClicked()
         QString name;
         in >> name >> p.x >> p.y >> p.z >> p.rotX >> p.rotY >> p.rotZ >> p.scale >> p.active;
         p.baseObjectName = name;
-        // Form IDs are re-allocated from the document on sync; the name is
-        // the stable identity in the placement file.
-        p.baseObjectFormId = 0;
+        // Resolve a stable form ID from the saved name so the placed
+        // reference gets a real base object instead of 0.
+        p.baseObjectFormId = resolveFormIdFromName(name);
         placements.append(p);
     }
 
     objectCountLabel->setText(QString("Objects: %1").arg(placements.size()));
     statusLabel->setText(QString("Loaded %1 placements").arg(count));
 
-    syncPlacementsToCell();
-    syncPlacementsToRefrCollection();
+    for (const auto& p : placements)
+    {
+        applyPlacement(p);
+    }
 }
 
 void ObjectPalette::onTogglePlacementMode()
@@ -410,103 +414,128 @@ void ObjectPalette::paintEvent(QPaintEvent* event)
     }
 }
 
-void ObjectPalette::syncPlacementsToCell()
-{
-    if (!currentCell) {
-        return;
-    }
-
-    // Remove existing REFR subrecords from cell
-    for (int i = currentCell->rawSubRecords.size() - 1; i >= 0; i--) {
-        if (currentCell->rawSubRecords[i].name == 'REFR') {
-            currentCell->rawSubRecords.removeAt(i);
-        }
-    }
-
-    // Also remove old PLOC for cleanup
-    for (int i = currentCell->rawSubRecords.size() - 1; i >= 0; i--) {
-        if (currentCell->rawSubRecords[i].name == 'PLOC') {
-            currentCell->rawSubRecords.removeAt(i);
-        }
-    }
-
-    // Add new REFR placement data
-    if (!placements.isEmpty()) {
-        for (const auto& p : placements) {
-            RawSubRecord refRecord;
-            refRecord.name = 'REFR';
-
-            QByteArray data;
-            QDataStream out(&data, QIODevice::WriteOnly);
-            out.setByteOrder(QDataStream::LittleEndian);
-
-            quint32 refFormId = allocateRefFormId();
-            quint32 baseObj = p.baseObjectFormId;
-            float px = p.x;
-            float py = p.y;
-            float pz = p.z;
-            float rx = p.rotX;
-            float ry = p.rotY;
-            float rz = p.rotZ;
-            float sc = p.scale;
-            quint32 flags = p.active ? 0 : 0x01;
-
-            out << refFormId << baseObj << px << py << pz << rx << ry << rz << sc << flags;
-
-            refRecord.data = data;
-            currentCell->rawSubRecords.append(refRecord);
-        }
-    }
-
-    LOG_INFO(QString("Synced %1 REFR placements to cell %2").arg(placements.size()).arg(currentCell->editorId));
-}
-
 float ObjectPalette::snapToGrid(float value, int gridSize) const
 {
     return std::round(value / gridSize) * gridSize;
 }
 
+quint32 ObjectPalette::resolveFormIdFromName(const QString& editorId) const
+{
+    if (!mData)
+        return 0;
+    auto findIn = [&editorId](const auto& collection) -> quint32 {
+        const int i = collection.searchId(editorId);
+        if (i < 0)
+            return 0;
+        return collection.getFormId(i);
+    };
+    quint32 id = findIn(mData->getWeaponCollection());
+    if (id) return id;
+    id = findIn(mData->getArmorCollection());
+    if (id) return id;
+    id = findIn(mData->getSpellCollection());
+    if (id) return id;
+    id = findIn(mData->getActiCollection());
+    if (id) return id;
+    id = findIn(mData->getAlchCollection());
+    if (id) return id;
+    id = findIn(mData->getBookCollection());
+    if (id) return id;
+    id = findIn(mData->getContCollection());
+    if (id) return id;
+    id = findIn(mData->getIngrCollection());
+    if (id) return id;
+    id = findIn(mData->getMiscCollection());
+    if (id) return id;
+    id = findIn(mData->getTreeCollection());
+    if (id) return id;
+    id = findIn(mData->getGameSettings());
+    if (id) return id;
+    return findIn(mData->getStatCollection());
+}
+
+void ObjectPalette::applyPlacement(const Placement& p)
+{
+    if (!mData)
+        return;
+
+    quint32 refFormId = 0;
+    try
+    {
+        refFormId = mData->createNewRecord(CkId::Type_Refr_, QString());
+    }
+    catch (const std::exception& e)
+    {
+        LOG_WARNING(QString("ObjectPalette: %1").arg(e.what()));
+        return;
+    }
+    if (refFormId == 0)
+        return;
+
+    RefrRecord ref;
+    ref.blank();
+    ref.initComponents();
+    ref.formId = refFormId;
+    ref.baseId = p.baseObjectFormId;
+    ref.posX = p.x;
+    ref.posY = p.y;
+    ref.posZ = p.z;
+    ref.rotX = p.rotX;
+    ref.rotY = p.rotY;
+    ref.rotZ = p.rotZ;
+    ref.scale = p.scale;
+    ref.initiallyDisabled = !p.active;
+    ref.editorId = QString("REFR_%1").arg(ref.formId, 8, 16, QChar('0')).toUpper();
+
+    auto& coll = mData->getRefrCollection();
+    if (mData->getUndoStack())
+    {
+        const int index = coll.getAppendIndex(ref.editorId, CkId::Type_Refr_);
+        Record<RefrRecord> rec(State_ModifiedOnly, nullptr, &ref);
+        IdTable* table = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Refr_));
+        if (table)
+        {
+            mData->getUndoStack()->push(
+                new AddRecordCommand(table, &coll, index, rec,
+                    QString("Place %1").arg(p.baseObjectName)));
+        }
+        else
+        {
+            mData->addRef(ref);
+        }
+    }
+    else
+    {
+        mData->addRef(ref);
+    }
+
+    if (currentCell)
+        mData->setRefrParentCell(refFormId, currentCell->formId);
+}
+
 quint32 ObjectPalette::allocateRefFormId()
 {
     // Form IDs come from the document's allocator (plugin load-order
-    // index, collision-checked), never a fabricated counter.
+    // index, collision-checked). There is no fabricated constant fallback:
+    // if no form id can be allocated there is no valid record to make.
     if (mData)
     {
-        try
-        {
-            return mData->createNewRecord(CkId::Type_Refr_, QString());
-        }
-        catch (const std::exception& e)
-        {
-            LOG_WARNING(QString("ObjectPalette: %1").arg(e.what()));
-        }
+        return mData->createNewRecord(CkId::Type_Refr_, QString());
     }
-    return 0x80000000u;
+    return 0;
+}
+
+void ObjectPalette::syncPlacementsToCell()
+{
+    // Placements are real REFR records in the reference collection (see
+    // applyPlacement); a CELL stores no REFR subrecord bytes. Nothing to do.
+    LOG_INFO("ObjectPalette: placements live in the reference collection, not as CELL subrecords");
 }
 
 void ObjectPalette::syncPlacementsToRefrCollection()
 {
-    if (!mData) {
-        return;
+    for (const auto& p : placements)
+    {
+        applyPlacement(p);
     }
-
-    for (const auto& p : placements) {
-        RefrRecord ref;
-        ref.blank();
-        ref.initComponents();
-        ref.formId = allocateRefFormId();
-        ref.baseId = p.baseObjectFormId;
-        ref.posX = p.x;
-        ref.posY = p.y;
-        ref.posZ = p.z;
-        ref.rotX = p.rotX;
-        ref.rotY = p.rotY;
-        ref.rotZ = p.rotZ;
-        ref.scale = p.scale;
-        ref.initiallyDisabled = !p.active;
-        ref.editorId = QString("REFR_%1").arg(ref.formId, 8, 16, QChar('0')).toUpper();
-        mData->addRef(ref);
-    }
-
-    LOG_INFO(QString("Synced %1 placements to RefrCollection").arg(placements.size()));
 }

@@ -7,17 +7,20 @@ namespace openck {
 class FormComponents;
 }
 
+class Data;
+
 class WorldspaceDataWidget : public QWidget
 {
     Q_OBJECT
 
 public:
     explicit WorldspaceDataWidget(void* recordPtr, openck::FormComponents* components,
-                                  QWidget* parent = nullptr);
+                                  Data* data, QWidget* parent = nullptr);
     ~WorldspaceDataWidget() override;
 
 private:
     void* m_recordPtr;
+    Data* m_data;
 };
 
 #endif // WORLDSPACEDATAWIDGET_HPP

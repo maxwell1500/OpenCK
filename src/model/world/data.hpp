@@ -290,6 +290,28 @@ public:
     /// parsed. No-op (0) when the type has no deferred master records.
     int ensureTypeLoaded(int typeId);
 
+    /// \brief Begins a time-sliced materialization of one type from the
+    /// deferred-master index. Parsing happens in bounded batches via
+    /// materializeNextBatch() so the UI thread never blocks on a multi-GB
+    /// master. Returns false when the type has no deferred records (or one
+    /// is already in flight).
+    bool beginTypeMaterialization(int typeId);
+
+    /// \brief Parses up to \p maxRecords deferred-master records of the type
+    /// started with beginTypeMaterialization(). Returns the number parsed;
+    /// the materialization is complete (and the index restored) once
+    /// isMaterializing() returns false.
+    int materializeNextBatch(int typeId, int maxRecords);
+
+    /// \brief True between beginTypeMaterialization() and completion.
+    bool isMaterializing() const { return m_matting; }
+
+    /// \brief Form IDs of the non-interior CELL records that belong to the
+    /// given worldspace, derived from the flat record stream while loading
+    /// (cells physically nested under a WRLD's groups are attributed to it).
+    /// Empty when the worldspace (or its cells) has not been loaded.
+    QVector<quint32> cellsInWorldspace(quint32 worldspaceId);
+
     // Cell-children tracking for the save path. While the edited file is
     // parsed eagerly, each REFR/ACHR records the CELL it is a child of, so
     // saving can rebuild the cell-children GRUPs instead of emitting a flat
@@ -297,6 +319,13 @@ public:
     quint32 parentCellOfRefr(quint32 refrFormId) const
     {
         return m_refrParentCell.value(refrFormId, 0);
+    }
+
+    /// \brief Attach a placed reference to its CELL so the save path can
+    /// emit the cell-children GRUPs instead of a flat reference list.
+    void setRefrParentCell(quint32 refrFormId, quint32 cellFormId)
+    {
+        m_refrParentCell[refrFormId] = cellFormId;
     }
 
     /// \brief Register a Qt model for a record type
@@ -1718,6 +1747,19 @@ private:
     QVector<MasterIndexEntry> m_masterIndex;
     QStringList m_deferredMasterFiles;
     QString m_lastPreloadPath;
+
+    // Time-sliced materialization state (see beginTypeMaterialization /
+    // materializeNextBatch). All access stays on the main thread.
+    void finishTypeMaterialization();
+    QVector<MasterIndexEntry> m_pendingMaterialize;
+    NAME m_matType = 0;
+    int m_matPos = 0;
+    int m_matFile = -1;
+    int m_matLoaded = 0;
+    int m_matTypeId = 0;
+    bool m_matting = false;
+    bool m_matPrevBase = false;
+
     static NAME typeNameFor(int typeId);
     
     IdCollection<GameSetting> gameSettings;
@@ -1933,6 +1975,12 @@ private:
     // which CELL, discovered while parsing the edited file's structure.
     quint32 m_lastCellFormId = 0;
     QHash<quint32, quint32> m_refrParentCell;
+
+    // Worldspace-membership tracking for the cell list: the CELL records
+    // physically following a WRLD record belong to that worldspace. Used by
+    // cellsInWorldspace() and to populate WorldspaceRecord::cellIds.
+    quint32 m_lastWorldspaceFormId = 0;
+    QHash<quint32, quint32> m_cellParentWorldspace;
 
 private slots:
     void dataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);

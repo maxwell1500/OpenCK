@@ -69,12 +69,6 @@ void TestExportImport::testJsonRoundTrip_NPC()
     npc.faction = 5;
     npc.formId = 0x00012345;
     npc.flags = 0;
-    npc.aiIndex = 2;
-    npc.aiGlobal = 0;
-    npc.aiFacet = 1;
-    npc.aiRank = 3;
-    npc.aiFaction = 4;
-    npc.aiAggroRadius = 100;
     npc.spells = {100, 200, 300};
     npc.inventoryItems = {1000, 2000};
     npc.relationships = {500};
@@ -110,11 +104,6 @@ void TestExportImport::testJsonRoundTrip_NPC()
     QCOMPARE(imported.sex, 1u);
     QCOMPARE(imported.class_, 3u);
     QCOMPARE(imported.faction, 5u);
-    QCOMPARE(imported.aiIndex, 2u);
-    QCOMPARE(imported.aiFacet, 1u);
-    QCOMPARE(imported.aiRank, 3u);
-    QCOMPARE(imported.aiFaction, 4u);
-    QCOMPARE(imported.aiAggroRadius, 100u);
     QCOMPARE(imported.spells, QVector<quint32>({100, 200, 300}));
     QCOMPARE(imported.inventoryItems, QVector<quint32>({1000, 2000}));
     QCOMPARE(imported.relationships, QVector<quint32>({500}));

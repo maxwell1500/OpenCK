@@ -342,7 +342,8 @@ public:
         }
         else
         {
-            const auto& cellIds = ws->cellIds;
+            const QVector<quint32> cellIds =
+                mData ? mData->cellsInWorldspace(ws->formId) : QVector<quint32>();
             for (int i = 0; i < n; ++i)
             {
                 const auto& rec = cells.getRecord(i);

@@ -109,6 +109,8 @@ public:
 
     QString soundFile;
     quint32 soundFlags = 0;
+    quint32 flagsSpelling = NAME('SNDX');
+    bool hasFlags = false;
 
     QString name() const override { return QStringLiteral("Sound Descriptor"); }
     QString className() const override { return QStringLiteral("BGSSoundDescriptor"); }
@@ -129,6 +131,8 @@ public:
         }
         else if (subrecordName == NAME('SNDD') || subrecordName == NAME('SNDX'))
         {
+            flagsSpelling = subrecordName;
+            hasFlags = true;
             soundFlags = esm.readType<quint32>();
         }
     }
@@ -139,9 +143,9 @@ public:
         {
             esm.writeSubZString(NAME('FNAM'), soundFile);
         }
-        if (soundFlags != 0)
+        if (hasFlags || soundFlags != 0)
         {
-            esm.writeSubData<quint32>(NAME('SNDX'), soundFlags);
+            esm.writeSubData<quint32>(flagsSpelling, soundFlags);
         }
     }
 
@@ -160,6 +164,8 @@ public:
         auto c = std::make_unique<BGSSoundDescriptor_Component>();
         c->soundFile = soundFile;
         c->soundFlags = soundFlags;
+        c->flagsSpelling = flagsSpelling;
+        c->hasFlags = hasFlags;
         return c;
     }
 
@@ -169,13 +175,16 @@ public:
         const auto* o = static_cast<const BGSSoundDescriptor_Component*>(other);
         soundFile = o->soundFile;
         soundFlags = o->soundFlags;
+        flagsSpelling = o->flagsSpelling;
+        hasFlags = o->hasFlags;
     }
 
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
         const auto* o = static_cast<const BGSSoundDescriptor_Component*>(other);
-        return soundFile == o->soundFile && soundFlags == o->soundFlags;
+        return soundFile == o->soundFile && soundFlags == o->soundFlags
+            && flagsSpelling == o->flagsSpelling && hasFlags == o->hasFlags;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }
@@ -193,6 +202,8 @@ public:
 
     QString sunTexture;
     quint32 weatherFlags = 0;
+    quint32 flagsSpelling = NAME('FNAM');
+    bool hasFlags = false;
 
     QString name() const override { return QStringLiteral("Weather Data"); }
     QString className() const override { return QStringLiteral("TESWeatherData"); }
@@ -213,6 +224,8 @@ public:
         }
         else if (subrecordName == NAME('FNAM') || subrecordName == NAME('FLAG'))
         {
+            flagsSpelling = subrecordName;
+            hasFlags = true;
             weatherFlags = esm.readType<quint32>();
         }
     }
@@ -223,9 +236,9 @@ public:
         {
             esm.writeSubZString(NAME('SNAM'), sunTexture);
         }
-        if (weatherFlags != 0)
+        if (hasFlags || weatherFlags != 0)
         {
-            esm.writeSubData<quint32>(NAME('FNAM'), weatherFlags);
+            esm.writeSubData<quint32>(flagsSpelling, weatherFlags);
         }
     }
 
@@ -244,6 +257,8 @@ public:
         auto c = std::make_unique<TESWeatherData_Component>();
         c->sunTexture = sunTexture;
         c->weatherFlags = weatherFlags;
+        c->flagsSpelling = flagsSpelling;
+        c->hasFlags = hasFlags;
         return c;
     }
 
@@ -253,13 +268,16 @@ public:
         const auto* o = static_cast<const TESWeatherData_Component*>(other);
         sunTexture = o->sunTexture;
         weatherFlags = o->weatherFlags;
+        flagsSpelling = o->flagsSpelling;
+        hasFlags = o->hasFlags;
     }
 
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
         const auto* o = static_cast<const TESWeatherData_Component*>(other);
-        return sunTexture == o->sunTexture && weatherFlags == o->weatherFlags;
+        return sunTexture == o->sunTexture && weatherFlags == o->weatherFlags
+            && flagsSpelling == o->flagsSpelling && hasFlags == o->hasFlags;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }
@@ -835,6 +853,7 @@ public:
     void load(ESMReader& esm) override {}
 
     QVector<qint32> skillValues;
+    QVector<quint32> loadedIds;
     QVector<RawSubRecord> rawSub;
 
     QString name() const override { return QStringLiteral("Skills"); }
@@ -855,17 +874,32 @@ public:
             if (skillId >= static_cast<quint32>(skillValues.size()))
                 skillValues.resize(skillId + 1);
             skillValues[skillId] = val;
+            if (!loadedIds.contains(skillId))
+                loadedIds.append(skillId);
         }
     }
 
     void save(ESMWriter& esm) const override
     {
-        for (int i = 0; i < skillValues.size(); ++i)
+        if (loadedIds.isEmpty())
         {
-            if (skillValues[i] == 0) continue;
+            for (int i = 0; i < skillValues.size(); ++i)
+            {
+                if (skillValues[i] == 0) continue;
+                esm.startSubRecord(NAME('SKIL'));
+                esm.writeType<quint32>(static_cast<quint32>(i));
+                esm.writeType<qint32>(skillValues[i]);
+                esm.endSubRecord();
+            }
+            return;
+        }
+        for (quint32 id : loadedIds)
+        {
+            if (id >= static_cast<quint32>(skillValues.size()))
+                continue;
             esm.startSubRecord(NAME('SKIL'));
-            esm.writeType<quint32>(static_cast<quint32>(i));
-            esm.writeType<qint32>(skillValues[i]);
+            esm.writeType<quint32>(id);
+            esm.writeType<qint32>(skillValues[id]);
             esm.endSubRecord();
         }
     }
@@ -894,17 +928,21 @@ public:
     {
         auto c = std::make_unique<TESSkills_Component>();
         c->skillValues = skillValues;
+        c->loadedIds = loadedIds;
         return c;
     }
     void copyFrom(const Component* other) override
     {
         if (!other || other->className() != className()) return;
-        skillValues = static_cast<const TESSkills_Component*>(other)->skillValues;
+        const auto* o = static_cast<const TESSkills_Component*>(other);
+        skillValues = o->skillValues;
+        loadedIds = o->loadedIds;
     }
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
-        return skillValues == static_cast<const TESSkills_Component*>(other)->skillValues;
+        const auto* o = static_cast<const TESSkills_Component*>(other);
+        return skillValues == o->skillValues && loadedIds == o->loadedIds;
     }
     void mergeWith(const Component* other) override { copyFrom(other); }
 };
@@ -923,7 +961,9 @@ public:
     void load(ESMReader& esm) override {}
 
     QVector<qint32> attributes;
+    QVector<quint32> loadedIds;
     QVector<RawSubRecord> rawSub;
+    quint32 spelling = NAME('ATTR');
 
     QString name() const override { return QStringLiteral("Attributes"); }
     QString className() const override { return QStringLiteral("TESAttributes"); }
@@ -939,25 +979,52 @@ public:
     {
         if (subrecordName == NAME('ATTR'))
         {
+            spelling = NAME('ATTR');
             qint64 count = esm.subLeft() / 2;
             attributes.clear();
+            loadedIds.clear();
             attributes.reserve(count);
             for (qint64 i = 0; i < count; ++i)
+            {
                 attributes.append(esm.readType<qint16>());
+                loadedIds.append(static_cast<quint32>(i));
+            }
         }
         else if (subrecordName == NAME('BYDT'))
         {
+            spelling = NAME('BYDT');
             quint8 attrId = esm.readType<quint8>();
             qint32 val = esm.readType<qint32>();
             if (attrId >= static_cast<quint32>(attributes.size()))
                 attributes.resize(attrId + 1);
             attributes[attrId] = val;
+            if (!loadedIds.contains(attrId))
+                loadedIds.append(attrId);
         }
     }
 
     void save(ESMWriter& esm) const override
     {
         if (attributes.isEmpty()) return;
+        if (spelling == NAME('BYDT'))
+        {
+            const QVector<quint32> ids = loadedIds.isEmpty() ? [&] {
+                QVector<quint32> all;
+                for (int i = 0; i < attributes.size(); ++i)
+                    all.append(static_cast<quint32>(i));
+                return all;
+            }() : loadedIds;
+            for (quint32 id : ids)
+            {
+                if (id >= static_cast<quint32>(attributes.size()))
+                    continue;
+                esm.startSubRecord(NAME('BYDT'));
+                esm.writeType<quint8>(static_cast<quint8>(id));
+                esm.writeType<qint32>(attributes[id]);
+                esm.endSubRecord();
+            }
+            return;
+        }
         esm.startSubRecord(NAME('ATTR'));
         for (qint32 a : attributes)
             esm.writeType<qint16>(static_cast<qint16>(a));
@@ -983,17 +1050,25 @@ public:
     {
         auto c = std::make_unique<TESAttributes_Component>();
         c->attributes = attributes;
+        c->loadedIds = loadedIds;
+        c->spelling = spelling;
         return c;
     }
     void copyFrom(const Component* other) override
     {
         if (!other || other->className() != className()) return;
-        attributes = static_cast<const TESAttributes_Component*>(other)->attributes;
+        const auto* o = static_cast<const TESAttributes_Component*>(other);
+        attributes = o->attributes;
+        loadedIds = o->loadedIds;
+        spelling = o->spelling;
     }
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
-        return attributes == static_cast<const TESAttributes_Component*>(other)->attributes;
+        const auto* o = static_cast<const TESAttributes_Component*>(other);
+        return attributes == o->attributes
+            && loadedIds == o->loadedIds
+            && spelling == o->spelling;
     }
     void mergeWith(const Component* other) override { copyFrom(other); }
 };

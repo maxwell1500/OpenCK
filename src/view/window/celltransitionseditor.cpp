@@ -176,7 +176,8 @@ void CellTransitionsEditor::showWorldspaceDetails(const WorldspaceRecord* ws)
         .arg(ws->mapNwX).arg(ws->mapNwY).arg(ws->mapSeX).arg(ws->mapSeY);
     text += QString("<p><b>Map Scale:</b> %1</p>").arg(ws->mapScale(), 0, 'f', 2);
     text += QString("<p><b>LOD Bias:</b> %1</p>").arg(ws->mapLodBias, 0, 'f', 2);
-    text += QString("<p><b>Stored Cells:</b> %1</p>").arg(ws->cellIds.size());
+    text += QString("<p><b>Stored Cells:</b> %1</p>")
+        .arg(mData ? static_cast<int>(mData->cellsInWorldspace(ws->formId).size()) : 0);
     text += "<p><b>Note:</b> Add/Edit/Delete transition actions are permanently disabled - the "
             "plugin format stores no cell-connection data "
             "(see docs/REMAINING_WORK_PLAN.md Phase D).</p>";

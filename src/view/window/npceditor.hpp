@@ -54,8 +54,12 @@ private:
     QSpinBox* mMagickaSpin;
     QSpinBox* mStaminaSpin;
 
-    QSpinBox* mAggroRadiusSpin;
-    QSpinBox* mCombatSpin;
+    QSpinBox* mAggressionSpin;
+    QSpinBox* mConfidenceSpin;
+    QSpinBox* mMoralitySpin;
+    QSpinBox* mEnergySpin;
+    QSpinBox* mMoodSpin;
+    QSpinBox* mDispositionSpin;
 
     QListWidget* mSpellsList;
     QTableWidget* mInventoryTable;

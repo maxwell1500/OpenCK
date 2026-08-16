@@ -78,6 +78,11 @@ private:
     };
     QVector<Placement> placements;
 
+    quint32 allocateRefFormId();
+    float snapToGrid(float value, int gridSize) const;
+    quint32 resolveFormIdFromName(const QString& editorId) const;
+    void applyPlacement(const Placement& placement);
+
     // UI elements
     QLineEdit* searchEdit;
     QPushButton* saveButton;
@@ -108,9 +113,6 @@ private:
 
     bool placementMode;
     QString selectedObject;
-
-    quint32 allocateRefFormId();
-    float snapToGrid(float value, int gridSize) const;
 };
 
 #endif // OBJECTPALETTE_HPP

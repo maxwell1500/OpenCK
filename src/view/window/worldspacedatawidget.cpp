@@ -2,6 +2,7 @@
 
 #include "../libs/files/esm/worldspacerecord.hpp"
 #include "../libs/components/formcomponents.hpp"
+#include "../../model/world/data.hpp"
 
 #include <QDoubleSpinBox>
 #include <QFormLayout>
@@ -13,9 +14,11 @@
 
 WorldspaceDataWidget::WorldspaceDataWidget(void* recordPtr,
                                            openck::FormComponents*,
+                                           Data* data,
                                            QWidget* parent)
     : QWidget(parent)
     , m_recordPtr(recordPtr)
+    , m_data(data)
 {
     auto* mainLayout = new QVBoxLayout(this);
 
@@ -128,13 +131,16 @@ WorldspaceDataWidget::WorldspaceDataWidget(void* recordPtr,
         const int maxY = qMax(rec->mapNwY, rec->mapSeY);
         const int cellW = rec->mapWidth > 0 ? maxX - minX + 1 : 0;
         const int cellH = rec->mapHeight > 0 ? maxY - minY + 1 : 0;
+                const int storedCells = m_data
+            ? static_cast<int>(m_data->cellsInWorldspace(rec->formId).size())
+            : static_cast<int>(rec->cellIds.size());
         gridLabel->setText(QStringLiteral(
             "Map size: %1 x %2 cells\n"
             "Cell range: (%3, %4) .. (%5, %6)\n"
             "Stored cells: %7")
             .arg(rec->mapWidth).arg(rec->mapHeight)
             .arg(minX).arg(minY).arg(maxX).arg(maxY)
-            .arg(rec->cellIds.size())
+            .arg(storedCells)
             + (cellW == 0 || cellH == 0 ? QString()
                 : QStringLiteral("\nExtent: %1 x %2 cells").arg(cellW).arg(cellH)));
 

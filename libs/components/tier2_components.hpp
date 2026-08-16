@@ -39,6 +39,11 @@ public:
     QString maleWorldPath;
     QString femaleWorldPath;
     quint32 bipedFlags = 0;
+    quint32 maleSpelling = NAME('BNAM');
+    quint32 flagsSpelling = NAME('BMDT');
+    bool hasMale = false;
+    bool hasFlags = false;
+    QVector<RawSubRecord> rawSub;
 
     QString name() const override { return QStringLiteral("Biped Model"); }
     QString className() const override { return QStringLiteral("TESBipedModel"); }
@@ -59,36 +64,55 @@ public:
         switch (subrecordName)
         {
             case NAME('BNAM'):
+                maleSpelling = NAME('BNAM');
+                hasMale = true;
+                maleWorldPath = esm.readZString();
+                break;
             case NAME('CNAM'):
+                maleSpelling = NAME('CNAM');
+                hasMale = true;
                 maleWorldPath = esm.readZString();
                 break;
             case NAME('FNAM'):
                 femaleWorldPath = esm.readZString();
                 break;
             case NAME('INDX'):
+                flagsSpelling = NAME('INDX');
+                hasFlags = true;
                 bipedFlags = esm.readType<quint32>();
                 break;
             case NAME('BMDT'):
+                flagsSpelling = NAME('BMDT');
+                hasFlags = true;
                 bipedFlags = esm.readType<quint32>();
                 break;
+            case NAME('INDT'):
             default:
+                RawSubRecord raw;
+                raw.name = subrecordName;
+                esm.readRawSubData(raw.data);
+                rawSub.push_back(raw);
                 break;
         }
     }
 
     void save(ESMWriter& esm) const override
     {
-        if (bipedFlags != 0)
+        if (hasFlags || bipedFlags != 0)
         {
-            esm.writeSubData<quint32>(NAME('BMDT'), bipedFlags);
+            esm.writeSubData<quint32>(flagsSpelling, bipedFlags);
         }
-        if (!maleWorldPath.isEmpty())
+        if (hasMale || !maleWorldPath.isEmpty())
         {
-            esm.writeSubZString(NAME('BNAM'), maleWorldPath);
+            esm.writeSubZString(maleSpelling, maleWorldPath);
         }
         if (!femaleWorldPath.isEmpty())
         {
             esm.writeSubZString(NAME('FNAM'), femaleWorldPath);
+        }
+        for (const auto& raw : rawSub)
+        {
+            esm.writeRawSubRecord(raw);
         }
     }
 
@@ -110,6 +134,11 @@ public:
         c->maleWorldPath = maleWorldPath;
         c->femaleWorldPath = femaleWorldPath;
         c->bipedFlags = bipedFlags;
+        c->maleSpelling = maleSpelling;
+        c->flagsSpelling = flagsSpelling;
+        c->hasMale = hasMale;
+        c->hasFlags = hasFlags;
+        c->rawSub = rawSub;
         return c;
     }
 
@@ -120,6 +149,11 @@ public:
         maleWorldPath = o->maleWorldPath;
         femaleWorldPath = o->femaleWorldPath;
         bipedFlags = o->bipedFlags;
+        maleSpelling = o->maleSpelling;
+        flagsSpelling = o->flagsSpelling;
+        hasMale = o->hasMale;
+        hasFlags = o->hasFlags;
+        rawSub = o->rawSub;
     }
 
     bool isEqualTo(const Component* other) const override
@@ -128,7 +162,12 @@ public:
         const auto* o = static_cast<const TESBipedModel_Component*>(other);
         return maleWorldPath == o->maleWorldPath
             && femaleWorldPath == o->femaleWorldPath
-            && bipedFlags == o->bipedFlags;
+            && bipedFlags == o->bipedFlags
+            && maleSpelling == o->maleSpelling
+            && flagsSpelling == o->flagsSpelling
+            && hasMale == o->hasMale
+            && hasFlags == o->hasFlags
+            && rawSub == o->rawSub;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }
@@ -145,6 +184,7 @@ public:
 
     quint32 enchantmentFormId = 0;
     quint32 maxCharge = 0;
+    quint32 spelling = NAME('ENAM');
 
     QString name() const override { return QStringLiteral("Enchantment"); }
     QString className() const override { return QStringLiteral("TESEnchantableForm"); }
@@ -160,6 +200,7 @@ public:
     {
         if (subrecordName == NAME('ENAM') || subrecordName == NAME('ANAM'))
         {
+            spelling = subrecordName;
             enchantmentFormId = esm.readType<quint32>();
         }
     }
@@ -168,7 +209,7 @@ public:
     {
         if (enchantmentFormId != 0)
         {
-            esm.writeSubData<quint32>(NAME('ENAM'), enchantmentFormId);
+            esm.writeSubData<quint32>(spelling, enchantmentFormId);
         }
     }
 
@@ -187,6 +228,7 @@ public:
         auto c = std::make_unique<TESEnchantableForm_Component>();
         c->enchantmentFormId = enchantmentFormId;
         c->maxCharge = maxCharge;
+        c->spelling = spelling;
         return c;
     }
 
@@ -196,6 +238,7 @@ public:
         const auto* o = static_cast<const TESEnchantableForm_Component*>(other);
         enchantmentFormId = o->enchantmentFormId;
         maxCharge = o->maxCharge;
+        spelling = o->spelling;
     }
 
     bool isEqualTo(const Component* other) const override
@@ -203,7 +246,8 @@ public:
         if (!other || other->className() != className()) return false;
         const auto* o = static_cast<const TESEnchantableForm_Component*>(other);
         return enchantmentFormId == o->enchantmentFormId
-            && maxCharge == o->maxCharge;
+            && maxCharge == o->maxCharge
+            && spelling == o->spelling;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }
@@ -222,6 +266,8 @@ public:
 
     quint32 pickupSound = 0;
     quint32 putdownSound = 0;
+    quint32 pickupSpelling = NAME('YNAM');
+    quint32 putdownSpelling = NAME('ZNAM');
 
     QString name() const override { return QStringLiteral("Pickup / Putdown Sounds"); }
     QString className() const override { return QStringLiteral("BGSPickupPutdownSounds"); }
@@ -239,10 +285,12 @@ public:
     {
         if (subrecordName == NAME('YNAM') || subrecordName == NAME('PICK'))
         {
+            pickupSpelling = subrecordName;
             pickupSound = esm.readType<quint32>();
         }
         else if (subrecordName == NAME('ZNAM') || subrecordName == NAME('PUTD'))
         {
+            putdownSpelling = subrecordName;
             putdownSound = esm.readType<quint32>();
         }
     }
@@ -251,11 +299,11 @@ public:
     {
         if (pickupSound != 0)
         {
-            esm.writeSubData<quint32>(NAME('YNAM'), pickupSound);
+            esm.writeSubData<quint32>(pickupSpelling, pickupSound);
         }
         if (putdownSound != 0)
         {
-            esm.writeSubData<quint32>(NAME('ZNAM'), putdownSound);
+            esm.writeSubData<quint32>(putdownSpelling, putdownSound);
         }
     }
 
@@ -274,6 +322,8 @@ public:
         auto c = std::make_unique<BGSPickupPutdownSounds_Component>();
         c->pickupSound = pickupSound;
         c->putdownSound = putdownSound;
+        c->pickupSpelling = pickupSpelling;
+        c->putdownSpelling = putdownSpelling;
         return c;
     }
 
@@ -283,13 +333,17 @@ public:
         const auto* o = static_cast<const BGSPickupPutdownSounds_Component*>(other);
         pickupSound = o->pickupSound;
         putdownSound = o->putdownSound;
+        pickupSpelling = o->pickupSpelling;
+        putdownSpelling = o->putdownSpelling;
     }
 
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
         const auto* o = static_cast<const BGSPickupPutdownSounds_Component*>(other);
-        return pickupSound == o->pickupSound && putdownSound == o->putdownSound;
+        return pickupSound == o->pickupSound && putdownSound == o->putdownSound
+            && pickupSpelling == o->pickupSpelling
+            && putdownSpelling == o->putdownSpelling;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }

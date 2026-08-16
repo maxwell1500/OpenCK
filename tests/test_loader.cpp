@@ -2,6 +2,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QFile>
+#include <cstdio>
 
 #include "../../src/model/doc/documentmediator.hpp"
 #include "../../src/model/doc/document.hpp"
@@ -9,6 +10,7 @@
 #include "../../src/model/window/objectwindow.hpp"
 #include "../../libs/files/esm/esmwriter.hpp"
 #include "../../libs/files/esm/npcrecord.hpp"
+#include "../../libs/files/esm/worldspacerecord.hpp"
 #include "../../libs/files/log/logger.hpp"
 
 // Loader protocol test against the live Document/Loader/Data pipeline.
@@ -339,11 +341,43 @@ void TestLoaderSinglePass::testRealSeydaNeenDocument()
     QCOMPARE(model.rowCount(wrldCategory), 1);
     QVERIFY(model.canFetchMore(wrldCategory));
 
+    // Materialization of a large type is time-sliced (20 ms timer batches)
+    // so the UI never freezes; the test snakes the event loop until the
+    // category is fully drained.
     model.fetchMore(wrldCategory);
 
+    QTRY_VERIFY_WITH_TIMEOUT(!model.canFetchMore(wrldCategory), 120000);
     QVERIFY(model.rowCount(wrldCategory) > 1);
-    QVERIFY(!model.canFetchMore(wrldCategory));
     qDebug() << "worldspaces after expand:" << model.rowCount(wrldCategory);
+
+// Worldspace-to-cell mapping is derived while loading: Data exposes each
+// worldspace's non-interior cells; the fix for "Stored Cells: 0" is that a
+// worldspace with grid cells actually reports them.
+{
+    int totalMapped = 0;
+    const auto& wsc = data.getWorldspaceCollection();
+    for (int i = 0; i < wsc.size(); ++i)
+    {
+        const WorldspaceRecord& ws = wsc.getRecord(i).get();
+        const QVector<quint32> mapped = data.cellsInWorldspace(ws.formId);
+        totalMapped += mapped.size();
+        for (quint32 c : mapped)
+        {
+            // Every reported cell is a real (non-deleted) cell in the
+            // collection.
+            bool found = false;
+            const auto& cells = data.getCellCollection();
+            for (int ci = 0; ci < cells.size(); ++ci)
+            {
+                const auto& cellRec = cells.getRecord(ci);
+                if (cellRec.isDeleted()) continue;
+                if (cellRec.get().formId == c) { found = true; break; }
+            }
+            QVERIFY(found);
+        }
+    }
+    QVERIFY(totalMapped > 0);
+}
 
     // Click every worldspace row the way the Inspector wiring does.
     for (int r = 0; r < model.rowCount(wrldCategory); ++r)

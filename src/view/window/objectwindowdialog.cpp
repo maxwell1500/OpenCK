@@ -6,6 +6,8 @@
 #include "../../model/world/collection.hpp"
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/addrecordcommand.hpp"
+#include "../../model/world/idtable.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../view/messageboxhelper.hpp"
 #include "qtformdialogmanager.hpp"
@@ -39,6 +41,7 @@
 #include "nifpreviewdialog.hpp"
 #include "nifcomparisondialog.hpp"
 #include "../../../libs/files/esm/glob.hpp"
+#include "../../../libs/files/esm/gmst.hpp"
 #include "../../../libs/files/esm/packagerecord.hpp"
 #include "../../../libs/files/esm/classrecord.hpp"
 #include "../../../libs/files/esm/factrecord.hpp"
@@ -217,8 +220,8 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
             });
         QtFormDialogManager::instance().registerFactory(
             QStringLiteral("WRLD"),
-            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
-                return new WorldspaceDataWidget(recPtr, comps, parent);
+            [this](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
+                return new WorldspaceDataWidget(recPtr, comps, mData, parent);
             });
         QtFormDialogManager::instance().registerFactory(
             QStringLiteral("LCTN"),
@@ -352,6 +355,10 @@ void ObjectWindowDialog::setupUI()
     auto* buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
 
+    mAddButton = new QPushButton("Add...");
+    mAddButton->setToolTip("Create a new record of the selected category");
+    buttonLayout->addWidget(mAddButton);
+
     mEditButton = new QPushButton("Edit...");
     mEditButton->setToolTip("Edit the selected record");
     buttonLayout->addWidget(mEditButton);
@@ -372,6 +379,7 @@ void ObjectWindowDialog::setupUI()
     connect(mEditButton, &QPushButton::clicked, this, &ObjectWindowDialog::editSelected);
     connect(mDeleteButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSelected);
     connect(mCloneButton, &QPushButton::clicked, this, &ObjectWindowDialog::cloneSelected);
+    connect(mAddButton, &QPushButton::clicked, this, &ObjectWindowDialog::addRecordInSelectedCategory);
     connect(saveLayoutButton, &QPushButton::clicked, this, &ObjectWindowDialog::saveColumnLayout);
     connect(mColumnLayoutCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &ObjectWindowDialog::loadColumnLayout);
@@ -380,6 +388,7 @@ void ObjectWindowDialog::setupUI()
     connect(mTreeView, &QTreeView::doubleClicked, this, &ObjectWindowDialog::onDoubleClick);
     connect(mTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
         [this](const QModelIndex& current, const QModelIndex&) {
+            updateAddButton(current);
             if (current.isValid() && mModel->isRecord(current)) {
                 int cat = mModel->getCategoryIndex(current);
                 int rec = mModel->getRecordIndex(current);
@@ -476,6 +485,16 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
     }
     else
     {
+        int categoryId = getSelectedCategoryId(index);
+        CkId::Type type = categoryId >= 0
+            ? static_cast<CkId::Type>(mModel->getCategoryType(categoryId))
+            : CkId::Type_None;
+        if (type == CkId::Type_Glob_ || type == CkId::Type_Gmst)
+        {
+            QAction* addAction = mContextMenu->addAction("Add Record...");
+            connect(addAction, &QAction::triggered, this, &ObjectWindowDialog::addRecordInSelectedCategory);
+        }
+
         QAction* collapseAllAction = mContextMenu->addAction("Collapse All");
         QAction* expandAllAction = mContextMenu->addAction("Expand All");
 
@@ -483,6 +502,122 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
         connect(expandAllAction, &QAction::triggered, mTreeView, &QTreeView::expandAll);
     }
 }
+void ObjectWindowDialog::updateAddButton(const QModelIndex& index)
+{
+    bool enabled = false;
+    if (index.isValid() && mModel && !mModel->isRecord(index))
+    {
+        int categoryId = getSelectedCategoryId(index);
+        if (categoryId >= 0)
+        {
+            CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
+            enabled = (type == CkId::Type_Glob_ || type == CkId::Type_Gmst);
+        }
+    }
+    if (mAddButton)
+        mAddButton->setEnabled(enabled);
+}
+
+void ObjectWindowDialog::addRecordInSelectedCategory()
+{
+    if (!mData || !mModel)
+        return;
+    const QModelIndex index = mTreeView ? mTreeView->currentIndex() : QModelIndex();
+    if (!index.isValid() || mModel->isRecord(index))
+        return;
+
+    int categoryId = getSelectedCategoryId(index);
+    if (categoryId < 0)
+        return;
+    CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
+
+    if (type == CkId::Type_Glob_)
+    {
+        GlobalVariable newGlob;
+        newGlob.blank();
+        newGlob.editorId = QStringLiteral("new");
+
+        GlobVarEditor editor(mData, &newGlob, this);
+        if (editor.exec() != QDialog::Accepted)
+            return;
+        if (newGlob.editorId.isEmpty())
+            return;
+
+        auto& coll = mData->getGlobCollection();
+        if (coll.searchId(newGlob.editorId) >= 0)
+        {
+            QMessageBox::warning(this, "Add Global",
+                QString("A global named '%1' already exists.").arg(newGlob.editorId));
+            return;
+        }
+
+        const int indexInColl = coll.getAppendIndex(newGlob.editorId, type);
+        Record<GlobalVariable> rec(State_ModifiedOnly, nullptr, &newGlob);
+        IdTable* table = qobject_cast<IdTable*>(mData->getTableModel(type));
+        if (table)
+        {
+            mData->getUndoStack()->push(
+                new AddRecordCommand(table, &coll, indexInColl, rec,
+                    QString("Add Global: %1").arg(newGlob.editorId)));
+        }
+        else
+        {
+            coll.appendRecord(rec, type);
+        }
+        LOG_INFO(QString("Added global '%1'").arg(newGlob.editorId));
+        return;
+    }
+
+    if (type == CkId::Type_Gmst)
+    {
+        bool ok = false;
+        const QString editorId = QInputDialog::getText(this, "Add Game Setting",
+            "Editor ID for the new game setting:", QLineEdit::Normal, "sNewSetting", &ok);
+        if (!ok || editorId.trimmed().isEmpty())
+            return;
+        const QString finalId = editorId.trimmed();
+
+        auto& coll = mData->getGameSettings();
+        if (coll.searchId(finalId) >= 0)
+        {
+            QMessageBox::warning(this, "Add Game Setting",
+                QString("A game setting named '%1' already exists.").arg(finalId));
+            return;
+        }
+
+        GameSetting gs;
+        gs.blank();
+        gs.editorId = finalId;
+        try
+        {
+            gs.formId = mData->createNewRecord(CkId::Type_Gmst, finalId);
+        }
+        catch (const std::exception&)
+        {
+            gs.formId = 0;
+        }
+
+        const int indexInColl = coll.getAppendIndex(finalId, type);
+        Record<GameSetting> rec(State_ModifiedOnly, nullptr, &gs);
+        IdTable* table = qobject_cast<IdTable*>(mData->getTableModel(type));
+        if (table)
+        {
+            mData->getUndoStack()->push(
+                new AddRecordCommand(table, &coll, indexInColl, rec,
+                    QString("Add Game Setting: %1").arg(finalId)));
+        }
+        else
+        {
+            coll.appendRecord(rec, type);
+        }
+        LOG_INFO(QString("Added game setting '%1'").arg(finalId));
+        return;
+    }
+
+    QMessageBox::information(this, "Add Record",
+        "Adding records of this type from the Object Window is not supported yet.");
+}
+
 void ObjectWindowDialog::editSelected()
 {
     QModelIndex index = mTreeView->currentIndex();

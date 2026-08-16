@@ -88,6 +88,8 @@ public slots:
 private:
     void setupUI();
     void updateContextMenu(const QModelIndex& index);
+    void addRecordInSelectedCategory();
+    void updateAddButton(const QModelIndex& index);
     int getSelectedCategoryId(const QModelIndex& index) const;
     QString getModelPathForRecord(int categoryId, int recordIndex) const;
     void refreshSavedFilters();
@@ -104,6 +106,7 @@ private:
     QPushButton* mEditButton;
     QPushButton* mDeleteButton;
     QPushButton* mCloneButton;
+    QPushButton* mAddButton;
     QLabel* mStatusLabel;
 
     QMenu* mContextMenu;

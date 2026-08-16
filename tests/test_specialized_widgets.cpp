@@ -62,7 +62,7 @@ int main(int argc, char** argv)
         rec.music = 4;
         rec.terrain = 5;
 
-        WorldspaceDataWidget w(&rec, &rec.components);
+        WorldspaceDataWidget w(&rec, &rec.components, nullptr);
         CHECK(w.layout() != nullptr);
         auto* idEdit = w.findChild<QLineEdit*>(QStringLiteral("editorId"));
         CHECK(idEdit && idEdit->text() == QStringLiteral("Tamriel"));

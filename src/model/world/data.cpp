@@ -1354,10 +1354,20 @@ bool Data::continueLoading(Messages& messages)
             case 'FACT': factCollection.load(*reader, base);   break;
             case 'PERK': perkCollection.load(*reader, base);   break;
             case 'CELL': cellCollection.load(*reader, base);
-                if (!base && cellCollection.size() > 0)
-                    m_lastCellFormId = cellCollection.getRecord(cellCollection.size() - 1).get().formId;
+                if (cellCollection.size() > 0)
+                {
+                    const quint32 cfid = cellCollection.getRecord(cellCollection.size() - 1).get().formId;
+                    if (!base)
+                        m_lastCellFormId = cfid;
+                    m_cellParentWorldspace[cfid] = m_lastWorldspaceFormId;
+                }
                 break;
             case 'WRLD': worldspaceCollection.load(*reader, base);
+                if (worldspaceCollection.size() > 0)
+                    m_lastWorldspaceFormId =
+                        worldspaceCollection.getRecord(worldspaceCollection.size() - 1).get().formId;
+                else
+                    m_lastWorldspaceFormId = 0;
                 m_lastCellFormId = 0;
                 break;
             case 'LCTN': locationCollection.load(*reader, base); break;
@@ -1803,46 +1813,83 @@ int Data::masterIndexCount(int typeId) const
     return count;
 }
 
-int Data::ensureTypeLoaded(int typeId)
+QVector<quint32> Data::cellsInWorldspace(quint32 worldspaceId)
+{
+    QVector<quint32> out;
+    if (worldspaceId == 0)
+        return out;
+    const auto& cells = cellCollection;
+    for (int i = 0; i < cells.size(); ++i)
+    {
+        const Record<CellRecord>& rec = cells.getRecord(i);
+        if (rec.isDeleted())
+            continue;
+        if (m_cellParentWorldspace.value(rec.get().formId, 0) == worldspaceId)
+            out.append(rec.get().formId);
+    }
+    return out;
+}
+
+bool Data::beginTypeMaterialization(int typeId)
 {
     const NAME name = typeNameFor(typeId);
-    if (name == 0)
-        return 0;
+    if (name == 0 || m_matting)
+        return false;
 
-    int loaded = 0;
-    Messages messages(Message::Error);
-    const bool prevBase = base;
-    base = true;
-
-    for (int f = 0; f < m_deferredMasterFiles.size(); ++f)
+    m_pendingMaterialize.clear();
+    for (const MasterIndexEntry& entry : m_masterIndex)
     {
-        bool hasEntries = false;
-        for (const MasterIndexEntry& entry : m_masterIndex)
-        {
-            if (entry.fileIndex == f && entry.type == name)
-            {
-                hasEntries = true;
-                break;
-            }
-        }
-        if (!hasEntries)
-            continue;
+        if (entry.type == name)
+            m_pendingMaterialize.append(entry);
+    }
+    if (m_pendingMaterialize.isEmpty())
+        return false;
 
-        // Reopen this master (header parse only) so its records can be read.
-        reader.reset(new ESMReader(m_deferredMasterFiles[f], paths));
-        reader->open();
+    m_matType = name;
+    m_matTypeId = typeId;
+    m_matPos = 0;
+    m_matFile = -1;
+    m_matLoaded = 0;
+    m_matPrevBase = base;
+    m_matting = true;
+    base = true;
+    return true;
+}
 
-        for (const MasterIndexEntry& entry : m_masterIndex)
+int Data::materializeNextBatch(int typeId, int maxRecords)
+{
+    if (!m_matting || typeNameFor(typeId) != m_matType)
+        return 0;
+    if (maxRecords <= 0)
+        maxRecords = 4096;
+
+    Messages messages(Message::Error);
+    int processed = 0;
+    while (processed < maxRecords && m_matPos < m_pendingMaterialize.size())
+    {
+        const MasterIndexEntry& entry = m_pendingMaterialize[m_matPos];
+        ++m_matPos;
+        if (entry.fileIndex != m_matFile)
         {
-            if (entry.fileIndex != f || entry.type != name)
-                continue;
-            reader->seekTo(entry.offset);
-            if (continueLoading(messages))
-                break;
-            ++loaded;
+            m_matFile = entry.fileIndex;
+            reader.reset(new ESMReader(m_deferredMasterFiles[m_matFile], paths));
+            reader->open();
         }
+        reader->seekTo(entry.offset);
+        if (!continueLoading(messages))
+            ++m_matLoaded;
+        ++processed;
     }
 
+    if (m_matPos >= m_pendingMaterialize.size())
+    {
+        finishTypeMaterialization();
+    }
+    return processed;
+}
+
+void Data::finishTypeMaterialization()
+{
     // Restore the reader to the edited file so post-load state matches
     // the pre-materialization state.
     if (!m_lastPreloadPath.isEmpty())
@@ -1850,18 +1897,31 @@ int Data::ensureTypeLoaded(int typeId)
         reader.reset(new ESMReader(m_lastPreloadPath, paths));
         reader->open();
     }
-    base = prevBase;
+    base = m_matPrevBase;
 
     // Consume the materialized entries so repeated calls are no-ops.
     m_masterIndex.erase(
         std::remove_if(m_masterIndex.begin(), m_masterIndex.end(),
-            [name](const MasterIndexEntry& e) { return e.type == name; }),
+            [this](const MasterIndexEntry& e) { return e.type == m_matType; }),
         m_masterIndex.end());
 
     LOG_INFO(QString("Data::ensureTypeLoaded: %1 -> %2 record(s)")
-        .arg(CkId(static_cast<CkId::Type>(typeId)).getTypeName())
-        .arg(loaded));
-    return loaded;
+        .arg(CkId(static_cast<CkId::Type>(m_matTypeId)).getTypeName())
+        .arg(m_matLoaded));
+
+    m_matting = false;
+    m_pendingMaterialize.clear();
+}
+
+int Data::ensureTypeLoaded(int typeId)
+{
+    if (!beginTypeMaterialization(typeId))
+        return 0;
+    while (m_matting)
+    {
+        materializeNextBatch(typeId, 4096);
+    }
+    return m_matLoaded;
 }
 
 const IdCollection<GameSetting>& Data::getGameSettings() const
