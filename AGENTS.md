@@ -4,6 +4,10 @@ This file describes the architecture, conventions, and gotchas an AI coding
 agent needs to know to be productive in this codebase. Read it before
 making non-trivial changes.
 
+**`REMAINING.md` is the single source of truth for outstanding work.** Do not
+create new planning/roadmap/debt/status documents; update `REMAINING.md` when
+you complete an item or discover genuinely new remaining work.
+
 ## What OpenCK is
 
 OpenCK is a C++/Qt6 open-source recreation of Bethesda's Creation Kit,
