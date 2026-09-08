@@ -111,6 +111,12 @@ target_link_libraries(test_editrecordcommand PRIVATE openck_model test_stubs Qt6
 target_include_directories(test_editrecordcommand PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_editrecordcommand)
 
+# Editor write-back smoke tests
+add_executable(test_editor_writeback test_editor_writeback.cpp)
+target_link_libraries(test_editor_writeback PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_editor_writeback PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_editor_writeback)
+
 # Undo stack tests
 add_executable(test_undostack test_undostack.cpp)
 target_link_libraries(test_undostack PRIVATE openck_model test_stubs Qt6::Test)
@@ -264,6 +270,12 @@ target_include_directories(test_scanbtd PRIVATE ${TEST_INCLUDE_DIRS})
 add_executable(test_meshprobe test_meshprobe.cpp)
 target_link_libraries(test_meshprobe PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_meshprobe PRIVATE ${TEST_INCLUDE_DIRS})
+
+# Diagnostic: subrecord-level diff of a source plugin against its untouched
+# round-trip save (test_subrecord_diff <source> <saved>). Exit 0 = identical.
+add_executable(test_subrecord_diff test_subrecord_diff.cpp)
+target_link_libraries(test_subrecord_diff PRIVATE openck_esm Qt6::Core)
+target_include_directories(test_subrecord_diff PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — needs a real Starfield install.
 
 # BTDX v2 GNRL writer round-trip (create -> open/extract).
@@ -777,6 +789,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
     test_scenrecord test_scriptflagfile test_searchalgorithm test_shortcutmanager
     test_specialized_widgets test_spellchecker test_starfieldesm test_subrecord_roundtrip
+    test_subrecord_diff
     test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
     test_thememanager test_tier3_components test_undostack test_warningsdock

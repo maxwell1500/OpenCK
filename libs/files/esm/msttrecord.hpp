@@ -15,6 +15,8 @@ struct MsttRecord {
     quint32 flags = 0;
     QString modelPath;
     quint32 msttFlags = 0;
+    quint8 fnamWidth = 4;
+    quint8 dataWidth = 4;
     QVector<RawSubRecord> rawSubRecords;
 
     openck::FormComponents components;

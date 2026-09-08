@@ -7,6 +7,7 @@
 #include "../../model/world/columns.hpp"
 #include "../../libs/files/esm/dialrecord.hpp"
 #include "../../libs/files/esm/inforecord.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 
 #include "logger.hpp"
 
@@ -116,6 +117,20 @@ void DialogueEditorWidget::saveDialogue()
     }
 
     DialRecord& dial = dialCollection.getRecord(dialIndex).get();
+
+    {
+        auto results = ColumnValidator::validateDial(dial, mData);
+        QStringList errorMessages;
+        for (const auto& r : results) {
+            if (r.severity == ColumnValidator::Severity::Error) {
+                errorMessages << QString("%1: %2").arg(r.field, r.message);
+            }
+        }
+        if (!errorMessages.isEmpty()) {
+            QMessageBox::warning(this, tr("Validation Errors"), errorMessages.join("\n"));
+            return;
+        }
+    }
     
     dial.topicName = topicEdit->text();
     

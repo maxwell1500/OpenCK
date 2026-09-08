@@ -2,6 +2,38 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 
+namespace
+{
+// Starfield writes some TTSM flag subrecords shorter than 32 bits (observed:
+// 1-byte DATA/FNAM). Read only what is declared, little-endian, so the
+// stream never advances past the record end (which desynced every following
+// record in the file).
+quint32 readFlagsLE(ESMReader& esm, NAME sub, quint8& width)
+{
+    qint64 n = esm.subLeft();
+    if (n <= 0)
+    {
+        width = 0;
+        return 0;
+    }
+    if (n > 4)
+        n = 4;
+    width = static_cast<quint8>(n);
+    quint32 v = 0;
+    for (qint64 i = 0; i < n; ++i)
+        v |= quint32(esm.readType<quint8>()) << (8 * i);
+    return v;
+}
+
+void writeFlagsWidth(ESMWriter& esm, NAME sub, quint32 value, quint8 width)
+{
+    esm.startSubRecord(sub);
+    for (int i = 0; i < width; ++i)
+        esm.writeType<quint8>(static_cast<quint8>((value >> (8 * i)) & 0xFF));
+    esm.endSubRecord();
+}
+}
+
 void MsttRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
@@ -18,8 +50,8 @@ void MsttRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); handled = true; break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
-            case 'DATA': msttFlags = esm.readType<quint32>(); handled = true; break;
+            case 'FNAM': case 'FLAG': flags = readFlagsLE(esm, sub, fnamWidth); handled = true; break;
+            case 'DATA': msttFlags = readFlagsLE(esm, sub, dataWidth); handled = true; break;
             default: break;
         }
         if (handled) continue;
@@ -51,8 +83,8 @@ void MsttRecord::load(ESMReader& esm, bool)
 void MsttRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
-    esm.writeSubData<quint32>('DATA', msttFlags);
+    writeFlagsWidth(esm, NAME('FNAM'), flags, fnamWidth);
+    writeFlagsWidth(esm, NAME('DATA'), msttFlags, dataWidth);
 
     components.saveAll(esm);
 

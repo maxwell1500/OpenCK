@@ -30,10 +30,14 @@ void AmmoRecord::load(ESMReader& esm, bool)
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
             case 'DATA':
             {
-                speed = esm.readType<float>();
-                ammoFlags = esm.readType<quint32>();
-                weight = esm.readType<float>();
-                value = esm.readType<quint32>();
+                // Skyrim AMMO DATA is 16-20 bytes; Starfield writes shorter
+                // variants (8 bytes observed). Guard every field so exactly
+                // the declared bytes are consumed - a fixed-size read walked
+                // past the record end and desynced the stream.
+                speed = esm.subLeft() >= 4 ? esm.readType<float>() : 0.0f;
+                ammoFlags = esm.subLeft() >= 4 ? esm.readType<quint32>() : 0;
+                weight = esm.subLeft() >= 4 ? esm.readType<float>() : 0.0f;
+                value = esm.subLeft() >= 4 ? esm.readType<quint32>() : 0;
                 dataSize = 16;
                 damage = 0.0f;
                 if (esm.subLeft() >= 2)
@@ -56,23 +60,25 @@ void AmmoRecord::load(ESMReader& esm, bool)
             }
             default: break;
         }
-        if (handled) continue;
-
-        for (auto& c : components.all())
+        if (!handled)
         {
-            if (c->canHandle(sub))
+            for (auto& c : components.all())
             {
-                c->handleSubrecord(sub, esm);
-                handled = true;
-                break;
+                if (c->canHandle(sub))
+                {
+                    c->handleSubrecord(sub, esm);
+                    handled = true;
+                    break;
+                }
             }
         }
-        if (handled) continue;
-
-        RawSubRecord raw;
-        raw.name = sub;
-        esm.readRawSubData(raw.data);
-        rawSubRecords.push_back(raw);
+        if (!handled)
+        {
+            RawSubRecord raw;
+            raw.name = sub;
+            esm.readRawSubData(raw.data);
+            rawSubRecords.push_back(raw);
+        }
     }
 
     if (auto* n = static_cast<tescomponents::TESFullName_Component*>(

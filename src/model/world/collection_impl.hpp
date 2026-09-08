@@ -146,6 +146,121 @@ void Collection<ESXRecord, IdAccessorT>::saveModifiedRecords(ESMWriter& writer, 
     }
 }
 
+namespace
+{
+inline quint64 saveSkipKey(uint32_t recordType, quint32 formId)
+{
+    return (static_cast<quint64>(recordType) << 32) | formId;
+}
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+bool Collection<ESXRecord, IdAccessorT>::isRecordSaveable(int index) const
+{
+    if (index < 0 || index >= records.size())
+        return false;
+    const auto state = records.at(index).state;
+    return state == State_Modified || state == State_ModifiedOnly
+        || state == State_Deleted;
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+bool Collection<ESXRecord, IdAccessorT>::saveRecordAt(ESMWriter& writer, uint32_t recordType, int index) const
+{
+    if (index < 0 || index >= records.size())
+        return false;
+    const auto& record = records.at(index);
+    if (record.state == State_Modified || record.state == State_ModifiedOnly)
+    {
+        RecHeader recHeader;
+        if constexpr (HasFormIdField<ESXRecord>::value)
+            recHeader.id = record.get().formId;
+        writer.startRecord(static_cast<NAME>(recordType), recHeader);
+        record.get().save(writer);
+        writer.endRecord();
+        return true;
+    }
+    else if (record.state == State_Deleted)
+    {
+        RecHeader delHeader;
+        delHeader.flags.val = 0x00002000;   // Deleted
+        if constexpr (HasFormIdField<ESXRecord>::value)
+            delHeader.id = record.get().formId;
+        writer.startRecord(static_cast<NAME>(recordType), delHeader);
+        writer.startSubRecord(static_cast<NAME>('DELE'));
+        writer.writeType<quint32>(0);
+        writer.endSubRecord();
+        writer.endRecord();
+        return true;
+    }
+    return false;
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+void Collection<ESXRecord, IdAccessorT>::saveModifiedRecordsExcept(ESMWriter& writer, uint32_t recordType,
+    const QSet<quint64>& skipKeys) const
+{
+    for (const auto& record : records)
+    {
+        if (record.state != State_Modified && record.state != State_ModifiedOnly
+            && record.state != State_Deleted)
+            continue;
+        quint32 formId = 0;
+        if constexpr (HasFormIdField<ESXRecord>::value)
+            formId = record.get().formId;
+        if (skipKeys.contains(saveSkipKey(recordType, formId)))
+            continue;
+        if (record.state == State_Deleted)
+        {
+            RecHeader delHeader;
+            delHeader.flags.val = 0x00002000;   // Deleted
+            if constexpr (HasFormIdField<ESXRecord>::value)
+                delHeader.id = record.get().formId;
+            writer.startRecord(static_cast<NAME>(recordType), delHeader);
+            writer.startSubRecord(static_cast<NAME>('DELE'));
+            writer.writeType<quint32>(0);
+            writer.endSubRecord();
+            writer.endRecord();
+        }
+        else
+        {
+            RecHeader recHeader;
+            if constexpr (HasFormIdField<ESXRecord>::value)
+                recHeader.id = record.get().formId;
+            writer.startRecord(static_cast<NAME>(recordType), recHeader);
+            record.get().save(writer);
+            writer.endRecord();
+        }
+    }
+
+    for (quint32 formId : mDeletedFormIds)
+    {
+        bool stillExists = false;
+        if constexpr (HasFormIdField<ESXRecord>::value)
+        {
+            for (const auto& record : records)
+            {
+                if (!record.isErased() && record.get().formId == formId)
+                {
+                    stillExists = true;
+                    break;
+                }
+            }
+        }
+        if (!stillExists)
+        {
+            RecHeader delHeader;
+            delHeader.flags.val = 0x00002000;   // Deleted
+            delHeader.id = formId;
+            writer.startRecord(static_cast<NAME>(recordType), delHeader);
+            writer.startSubRecord(static_cast<NAME>('DELE'));
+            writer.writeType<quint32>(0);
+            writer.endSubRecord();
+            writer.endRecord();
+        }
+    }
+}
+
 // ─── Undo-aware operations ────────────────────────────────────────────────
 
 template<typename ESXRecord, typename IdAccessorT>

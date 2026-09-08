@@ -213,6 +213,7 @@ private:
     QPoint lastMousePos;
     QVector<float> originalHeightmap;
     bool hasOriginalState;
+    QRect strokeDirtyRect;
 
     // Texture layer data
     QVector<TextureLayer> textureLayers;

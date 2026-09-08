@@ -44,6 +44,18 @@
 #include <memory>
 #include <vector>
 
+namespace {
+// Default (unconstrained) ranges for the numeric properties. Constants are
+// used instead of std::numeric_limits<...>::min()/max() because Windows
+// headers define min/max as macros unless NOMINMAX is set, and this header
+// is consumed by targets that do not define it.
+constexpr qint64 kDefaultIntMin = -2147483647LL - 1;
+constexpr qint64 kDefaultIntMax = 2147483647LL;
+constexpr quint64 kDefaultUIntMax = 0xFFFFFFFFULL;
+constexpr double kDefaultFloatMin = -3.4028234663852886e+38;  // ~-FLT_MAX
+constexpr double kDefaultFloatMax = 3.4028234663852886e+38;   // ~FLT_MAX
+} // namespace
+
 class Component;
 
 /// Abstract base for a single editable property rendered in the property grid.
@@ -101,61 +113,98 @@ private:
     bool* m_storage;
 };
 
-/// Signed 32-bit integer property editor bound to a qint32 field.
+/// Signed 32-bit integer property editor bound to a qint32 field. Any
+/// caller-supplied value is clamped to [minimum, maximum] so an out-of-range
+/// edit can never reach the record / file.
 class IntEditorProperty : public EditorProperty
 {
 public:
-    IntEditorProperty(QString name, qint32* storage)
-        : m_name(std::move(name)), m_storage(storage) {}
+    IntEditorProperty(QString name, qint32* storage,
+        qint64 minimum = kDefaultIntMin,
+        qint64 maximum = kDefaultIntMax)
+        : m_name(std::move(name)), m_storage(storage), m_min(minimum), m_max(maximum) {}
 
     QString name() const override { return m_name; }
     QVariant value() const override { return m_storage ? QVariant(*m_storage) : QVariant(); }
     void setValue(const QVariant& v) override
     {
-        if (m_storage) *m_storage = v.toInt();
+        if (m_storage)
+        {
+            const qint64 clamped = qBound(m_min, static_cast<qint64>(v.toLongLong()), m_max);
+            *m_storage = static_cast<qint32>(clamped);
+        }
     }
+
+    qint64 minimum() const { return m_min; }
+    qint64 maximum() const { return m_max; }
 
 private:
     QString m_name;
     qint32* m_storage;
+    qint64 m_min;
+    qint64 m_max;
 };
 
-/// Unsigned 32-bit integer property editor bound to a quint32 field.
+/// Unsigned 32-bit integer property editor bound to a quint32 field, clamped
+/// to [minimum, maximum] on write.
 class UIntEditorProperty : public EditorProperty
 {
 public:
-    UIntEditorProperty(QString name, quint32* storage)
-        : m_name(std::move(name)), m_storage(storage) {}
+    UIntEditorProperty(QString name, quint32* storage,
+        quint64 minimum = 0,
+        quint64 maximum = kDefaultUIntMax)
+        : m_name(std::move(name)), m_storage(storage), m_min(minimum), m_max(maximum) {}
 
     QString name() const override { return m_name; }
     QVariant value() const override { return m_storage ? QVariant(*m_storage) : QVariant(); }
     void setValue(const QVariant& v) override
     {
-        if (m_storage) *m_storage = v.toUInt();
+        if (m_storage)
+        {
+            const quint64 clamped = qBound(m_min, static_cast<quint64>(v.toULongLong()), m_max);
+            *m_storage = static_cast<quint32>(clamped);
+        }
     }
+
+    quint64 minimum() const { return m_min; }
+    quint64 maximum() const { return m_max; }
 
 private:
     QString m_name;
     quint32* m_storage;
+    quint64 m_min;
+    quint64 m_max;
 };
 
-/// Single-precision float property editor bound to a float field.
+/// Single-precision float property editor bound to a float field, clamped to
+/// [minimum, maximum] on write.
 class FloatEditorProperty : public EditorProperty
 {
 public:
-    FloatEditorProperty(QString name, float* storage)
-        : m_name(std::move(name)), m_storage(storage) {}
+    FloatEditorProperty(QString name, float* storage,
+        double minimum = kDefaultFloatMin,
+        double maximum = kDefaultFloatMax)
+        : m_name(std::move(name)), m_storage(storage), m_min(minimum), m_max(maximum) {}
 
     QString name() const override { return m_name; }
     QVariant value() const override { return m_storage ? QVariant(*m_storage) : QVariant(); }
     void setValue(const QVariant& v) override
     {
-        if (m_storage) *m_storage = v.toFloat();
+        if (m_storage)
+        {
+            const double clamped = qBound(m_min, static_cast<double>(v.toDouble()), m_max);
+            *m_storage = static_cast<float>(clamped);
+        }
     }
+
+    double minimum() const { return m_min; }
+    double maximum() const { return m_max; }
 
 private:
     QString m_name;
     float* m_storage;
+    double m_min;
+    double m_max;
 };
 
 /// String property editor bound to a QString field.

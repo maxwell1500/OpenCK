@@ -1,5 +1,6 @@
 #include "esmwriter.hpp"
 
+#include "../log/logger.hpp"
 #include "common.hpp"
 
 ESMWriter::ESMWriter()
@@ -53,6 +54,7 @@ void ESMWriter::save(QFile& file)
     stream.setDevice(&file);
     stream.setByteOrder(QDataStream::LittleEndian);
     recordsWritten = 0;
+    grupSizePosStack.clear();
 
     RecHeader tes4Header;
     tes4Header.flags.val = mFileFlags;
@@ -96,7 +98,7 @@ void ESMWriter::endSubRecord()
 void ESMWriter::startGrup(quint32 label, quint32 groupType)
 {
     writeType<NAME>(swapName(NAME('GRUP')));
-    grupSizePos = stream.device()->pos();
+    grupSizePosStack.append(stream.device()->pos());
     writeType<quint32>(0);      // size, patched in endGrup
     // Top-level group labels are record-type names stored as ASCII; cell
     // children group labels are the owning cell's form id, stored raw.
@@ -111,10 +113,18 @@ void ESMWriter::startGrup(quint32 label, quint32 groupType)
 
 void ESMWriter::endGrup()
 {
+    if (grupSizePosStack.isEmpty())
+    {
+        LOG_WARNING(QStringLiteral("ESMWriter::endGrup without open grup"));
+        return;
+    }
     qint64 currentPos{ stream.device()->pos() };
     // The group size excludes the 'GRUP' name and the size field itself
     // (matches ESMReader::skipGrupHeader, which adds grupSize to the
-    // position following the size field).
+    // position following the size field). Inner groups are counted as part
+    // of the outer group's payload, so pop the stack: this patches the
+    // most recently opened (innermost) group.
+    const qint64 grupSizePos = grupSizePosStack.takeLast();
     stream.device()->seek(grupSizePos);
     writeType<quint32>(static_cast<quint32>(currentPos - grupSizePos - 4));
     stream.device()->seek(currentPos);

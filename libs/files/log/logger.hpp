@@ -35,6 +35,7 @@ public:
         if (m_file.isOpen()) {
             m_file.close();
         }
+        m_warnings.clear();
         QString resolved = logFile;
         if (resolved.isEmpty())
         {
@@ -87,6 +88,9 @@ public:
             m_preInitBuffer.append(logLine);
         }
 
+        if (static_cast<int>(level) == static_cast<int>(LogLevel::Warning))
+            m_warnings.append(message);
+
         if (m_initialized) {
             if (level <= LogLevel::Info) {
                 printf("%s\n", logLine.toUtf8().constData());
@@ -111,6 +115,24 @@ public:
     QString logFilePath() const {
         QMutexLocker locker(&m_mutex);
         return m_initialized && m_file.isOpen() ? m_file.fileName() : QString();
+    }
+
+    // Every LOG_WARNING message emitted since init() (or since the last
+    // clearWarnings()). Lets the real-data tests assert the loaders reached
+    // zero warnings instead of grepping a log file.
+    QStringList warnings() const {
+        QMutexLocker locker(&m_mutex);
+        return m_warnings;
+    }
+
+    int warningCount() const {
+        QMutexLocker locker(&m_mutex);
+        return m_warnings.size();
+    }
+
+    void clearWarnings() {
+        QMutexLocker locker(&m_mutex);
+        m_warnings.clear();
     }
 
     ~Logger() {
@@ -141,6 +163,7 @@ private:
     QTextStream m_fileStream;
     LogLevel m_minLevel;
     QStringList m_preInitBuffer;
+    QStringList m_warnings;
     bool m_initialized;
 };
 

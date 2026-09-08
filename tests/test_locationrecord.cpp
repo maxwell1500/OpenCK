@@ -76,6 +76,7 @@ void TestLocationRecord::testRoundTripLinkedRefs()
         QVERIFY(loaded.editorId.startsWith(QStringLiteral("TestLocation")));
         QCOMPARE(loaded.formId, static_cast<quint32>(0x33445));
         QCOMPARE(loaded.flags, static_cast<quint32>(2));
+        QCOMPARE(loaded.locationName, QStringLiteral("Test Place"));
         QCOMPARE(loaded.parentId, static_cast<quint32>(0x10000));
         QCOMPARE(loaded.x, static_cast<quint32>(10));
         QCOMPARE(loaded.y, static_cast<quint32>(20));

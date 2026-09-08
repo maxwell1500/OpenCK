@@ -108,3 +108,5 @@ _CPack_Packages/
 *.tgz
 *.zip
 *.exe
+
+/build-asan/

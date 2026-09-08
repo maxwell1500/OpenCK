@@ -6,6 +6,7 @@
 #include "../../model/world/collection.hpp"
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/navmeshgenerator.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/cellrecord.hpp"
@@ -277,6 +278,15 @@ void NavmeshEditor::onSave()
         if (record.state == State_Erased) continue;
 
         const CellRecord& cell = record.get();
+        auto results = ColumnValidator::validateCell(cell, mData);
+        for (const auto& r : results) {
+            if (r.severity == ColumnValidator::Severity::Error) {
+                QMessageBox::warning(this, tr("Validation Error"),
+                    QString("%1: %2").arg(r.field, r.message));
+                file.close();
+                return;
+            }
+        }
         RecHeader recHeader;
         recHeader.id = cell.formId;
         writer.startRecord('CEL_', recHeader);

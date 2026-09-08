@@ -38,15 +38,18 @@ private:
 void TestUndoStack::testPushUndo()
 {
     UndoStack stack;
-    stack.push(new StubCommand("cmd1"));
+    StubCommand* cmd = new StubCommand("cmd1");
+    stack.push(cmd);
 
     QVERIFY(stack.canUndo());
     QCOMPARE(stack.undoCount(), 1);
+    QCOMPARE(cmd->executeCount(), 1);
 
     stack.undo();
 
     QVERIFY(!stack.canUndo());
     QCOMPARE(stack.undoCount(), 0);
+    QCOMPARE(cmd->undoCount(), 1);
 }
 
 void TestUndoStack::testPushRedo()
@@ -54,12 +57,14 @@ void TestUndoStack::testPushRedo()
     UndoStack stack;
     StubCommand* cmd = new StubCommand("cmd1");
     stack.push(cmd);
+    QCOMPARE(cmd->executeCount(), 1);
 
     stack.undo();
     QVERIFY(stack.canRedo());
+    QCOMPARE(cmd->undoCount(), 1);
 
     stack.redo();
-    QCOMPARE(cmd->executeCount(), 1);
+    QCOMPARE(cmd->executeCount(), 2);
     QVERIFY(!stack.canRedo());
 }
 
@@ -133,14 +138,16 @@ void TestUndoStack::testMacroCommand()
     stack.push(macro);
 
     QCOMPARE(stack.currentDescription(), QString("macro1"));
+    QCOMPARE(a->executeCount(), 1);
+    QCOMPARE(b->executeCount(), 1);
 
     stack.undo();
     QCOMPARE(a->undoCount(), 1);
     QCOMPARE(b->undoCount(), 1);
 
     stack.redo();
-    QCOMPARE(a->executeCount(), 1);
-    QCOMPARE(b->executeCount(), 1);
+    QCOMPARE(a->executeCount(), 2);
+    QCOMPARE(b->executeCount(), 2);
 }
 
 QTEST_MAIN(TestUndoStack)

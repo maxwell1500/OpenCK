@@ -21,6 +21,60 @@ namespace {
 
 constexpr quint32 ESL_MASK = 0x00000FFF;  // 4096 local IDs (0x000-0xFFF)
 
+// 4-byte tag -> printable name for diagnostics.
+QString recordName(quint32 n)
+{
+    QString out;
+    out += QChar((n >> 24) & 0xFF);
+    out += QChar((n >> 16) & 0xFF);
+    out += QChar((n >> 8) & 0xFF);
+    out += QChar(n & 0xFF);
+    return out;
+}
+
+// Fail-loud scan: after the known raw-subrecord rewrites ran, any opaque
+// payload that still holds a value equal to an old FormID the map remaps was
+// an unhandled FormID reference (the rewrite pass would have replaced it),
+// so the compaction must be refused rather than leave the file desynced.
+//
+// Scans only 4-byte-aligned u32 slots (FormID references in Bethesda payloads
+// are u32-aligned) to avoid flagging arbitrary mid-payload data, and skips
+// the subrecords documented as primitive descriptors that carry no FormIDs
+// (XPRM: bounds/color/shape; verified against real Starfield.esm). Returns a
+// human-readable location of the first stale reference, or empty when clean.
+QString scanStaleRawReferences(const QVector<QPair<IRecordCollection*, int>>& owned,
+    const QHash<quint32, quint32>& map)
+{
+    for (const auto& entry : owned)
+    {
+        IRecordCollection* col = entry.first;
+        const int i = entry.second;
+        const quint32 own = col->getFormId(i);
+
+        const QVector<RawSubPayload> raws = col->rawSubRecordsAt(i);
+        for (const RawSubPayload& raw : raws)
+        {
+            if (raw.name == static_cast<quint32>(NAME('XPRM')))
+                continue;  // primitive descriptor, no FormID slots
+            for (int off = 0; off + 4 <= raw.data.size(); off += 4)
+            {
+                quint32 v = 0;
+                std::memcpy(&v, raw.data.constData() + off, 4);
+                const auto it = map.constFind(v);
+                if (it != map.constEnd() && it.value() != v)
+                {
+                    return QString("record %1, sub %2 @ byte %3 = stale FormID 0x%4")
+                        .arg(own, 8, 16, QChar('0'))
+                        .arg(recordName(raw.name))
+                        .arg(off)
+                        .arg(v, 8, 16, QChar('0'));
+                }
+            }
+        }
+    }
+    return QString();
+}
+
 // Rewrite the quint32 FormID stored at byte `offset` of a raw subrecord
 // payload through the old->new map. Truncated payloads are left alone.
 void rewriteRawFormId(QByteArray& data, int offset, const QHash<quint32, quint32>& map)
@@ -485,21 +539,11 @@ int FormIdCompactor::compact()
 
     mRemapped = 0;
     mRewritten = 0;
-    for (const auto& entry : owned)
-    {
-        IRecordCollection* col = entry.first;
-        const int idx = entry.second;
-        const quint32 oldId = col->getFormId(idx);
-        auto it = map.constFind(oldId);
-        if (it != map.constEnd() && it.value() != oldId)
-        {
-            col->setFormId(idx, it.value());
-            ++mRemapped;
-        }
-    }
 
     // Rewrite typed reference fields, raw-subrecord payloads, and component
-    // FormIDs for the record types that carry them.
+    // FormIDs for the record types that carry them. Runs before any FormID
+    // is remapped so the stale-reference scan below sees already-rewritten
+    // payloads (handled subrecords no longer hold the old IDs).
     for (const auto& tc : mData.allCollectionsWithTypes())
     {
         IRecordCollection* col = tc.collection;
@@ -526,6 +570,33 @@ int FormIdCompactor::compact()
         rewriteTyped<FlorRecord>(col, map, mRewritten);
         rewriteTyped<LocationRecord>(col, map, mRewritten);
         rewriteTyped<CreatureRecord>(col, map, mRewritten);
+    }
+
+    // Fail loudly when any opaque raw payload still holds a FormID that the
+    // known rewrites would have replaced: compacting would desync the file.
+    // Checked before the FormIDs are remapped so a refusal leaves the
+    // records' formIds untouched (no partial compaction).
+    {
+        const QString stale = scanStaleRawReferences(owned, map);
+        if (!stale.isEmpty())
+        {
+            LOG_ERROR(QString("FormIdCompactor: refusing compaction, unhandled opaque FormID reference: %1")
+                .arg(stale));
+            return -2;
+        }
+    }
+
+    for (const auto& entry : owned)
+    {
+        IRecordCollection* col = entry.first;
+        const int idx = entry.second;
+        const quint32 oldId = col->getFormId(idx);
+        auto it = map.constFind(oldId);
+        if (it != map.constEnd() && it.value() != oldId)
+        {
+            col->setFormId(idx, it.value());
+            ++mRemapped;
+        }
     }
 
     LOG_INFO(QString("FormIdCompactor: remapped %1 of %2 owned records into the ESL range")

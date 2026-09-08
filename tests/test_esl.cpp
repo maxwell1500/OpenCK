@@ -61,6 +61,7 @@ private slots:
     void testCompactorRewritesStarfieldLctnRawLayouts();
     void testCompactorLeavesXprmByteIdentical();
     void testCompactorTooManyRecords();
+    void testCompactorRefusesUnhandledOpaqueReference();
     void testLightMasterFlagRoundTrip();
 };
 
@@ -482,6 +483,43 @@ void TestEsl::testCompactorTooManyRecords()
 
     FormIdCompactor compactor(data);
     QCOMPARE(compactor.compact(), -1); // exceeds the ESL ceiling
+}
+
+void TestEsl::testCompactorRefusesUnhandledOpaqueReference()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& statCol = data.getStatCollection();
+
+    // Owned record the raw subrecord below points at (a target that WILL be
+    // remapped by compaction).
+    StatRecord target;
+    target.editorId = "targetstat";
+    target.formId = 0x00100100;
+    statCol.add(target);
+
+    // A raw-only record (StatRecord has no FormID rewrite handler) carries an
+    // opaque subrecord the compactor cannot interpret that references the
+    // target. Compaction must refuse (return -2) instead of silently leaving
+    // a stale FormID, and must not partially remap the file.
+    StatRecord holder;
+    holder.editorId = "holderstat";
+    holder.formId = 0x00100200;
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XTST');
+        raw.data = rawFormId(0x00100100);
+        holder.rawSubRecords.push_back(raw);
+    }
+    statCol.add(holder);
+
+    FormIdCompactor compactor(data);
+    QCOMPARE(compactor.compact(), -2);
+    QCOMPARE(compactor.ownedRecordCount(), 2);
+    QCOMPARE(compactor.remappedCount(), 0);
+    // Refusal must not partially remap records.
+    QCOMPARE(statCol.getFormId(statCol.searchId("targetstat")), 0x00100100u);
+    QCOMPARE(statCol.getFormId(statCol.searchId("holderstat")), 0x00100200u);
 }
 
 void TestEsl::testLightMasterFlagRoundTrip()

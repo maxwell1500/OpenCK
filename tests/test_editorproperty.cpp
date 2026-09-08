@@ -20,6 +20,9 @@ private slots:
     void BoolEditorPropertyGetSet();
     void IntEditorPropertyGetSet();
     void FloatEditorPropertyGetSet();
+    void IntEditorPropertyClampsToRange();
+    void UIntEditorPropertyClampsToRange();
+    void FloatEditorPropertyClampsToRange();
     void StringEditorPropertyGetSet();
     void FormEditorPropertyGetSet();
     void FormArrayEditorPropertyGetSet();
@@ -71,6 +74,54 @@ void TestEditorProperty::FloatEditorPropertyGetSet()
     QCOMPARE(prop.value().toFloat(), 3.14f);
     prop.setValue(-2.5f);
     QCOMPARE(prop.value().toFloat(), -2.5f);
+}
+
+void TestEditorProperty::IntEditorPropertyClampsToRange()
+{
+    qint32 storage = 0;
+    IntEditorProperty prop(QStringLiteral("Level"), &storage, 0, 255);
+
+    QCOMPARE(prop.minimum(), static_cast<qint64>(0));
+    QCOMPARE(prop.maximum(), static_cast<qint64>(255));
+
+    prop.setValue(-5);
+    QCOMPARE(storage, 0);
+    prop.setValue(500);
+    QCOMPARE(storage, 255);
+    prop.setValue(42);
+    QCOMPARE(storage, 42);
+}
+
+void TestEditorProperty::UIntEditorPropertyClampsToRange()
+{
+    quint32 storage = 0;
+    UIntEditorProperty prop(QStringLiteral("Count"), &storage, 1, 100);
+
+    QCOMPARE(prop.minimum(), static_cast<quint64>(1));
+    QCOMPARE(prop.maximum(), static_cast<quint64>(100));
+
+    prop.setValue(0);
+    QCOMPARE(storage, 1u);
+    prop.setValue(100000);
+    QCOMPARE(storage, 100u);
+    prop.setValue(7);
+    QCOMPARE(storage, 7u);
+}
+
+void TestEditorProperty::FloatEditorPropertyClampsToRange()
+{
+    float storage = 0.0f;
+    FloatEditorProperty prop(QStringLiteral("Scale"), &storage, 0.0, 10.0);
+
+    QCOMPARE(prop.minimum(), 0.0);
+    QCOMPARE(prop.maximum(), 10.0);
+
+    prop.setValue(-3.0);
+    QCOMPARE(storage, 0.0f);
+    prop.setValue(55.5);
+    QCOMPARE(storage, 10.0f);
+    prop.setValue(2.5);
+    QCOMPARE(storage, 2.5f);
 }
 
 void TestEditorProperty::StringEditorPropertyGetSet()

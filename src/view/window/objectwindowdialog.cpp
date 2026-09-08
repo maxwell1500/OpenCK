@@ -3052,7 +3052,7 @@ void ObjectWindowDialog::batchReferenceActions()
         return;
     }
 
-    const auto& collection = mData->getRefrCollection();
+    auto& collection = mData->getRefrCollection();
     const int collectionSize = collection.size();
 
     QVector<CellRefEntry> refs;
@@ -3113,14 +3113,14 @@ void ObjectWindowDialog::batchReferenceActions()
         rec.scale = entry.scale;
         rec.initiallyDisabled = entry.isDisabled();
 
-        auto& record = const_cast<IdCollection<RefrRecord>&>(collection).getRecord(recordIndices[i]);
+        auto& record = collection.getRecord(recordIndices[i]);
         if (record.get() == rec)
             continue;
 
         if (mData->getUndoStack())
         {
             mData->getUndoStack()->push(new EditRecordCommand<RefrRecord>(
-                &const_cast<IdCollection<RefrRecord>&>(collection), recordIndices[i],
+                &collection, recordIndices[i],
                 record.get(), rec, "Batch reference actions"));
         }
         ++changed;

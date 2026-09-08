@@ -3,6 +3,7 @@
 #include "../../model/world/data.hpp"
 #include "../../model/world/collection.hpp"
 #include "../../model/world/idcollection.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/worldspacerecord.hpp"
@@ -256,6 +257,15 @@ void CellTransitionsEditor::onSave()
         if (wsRecord.state == State_Erased) continue;
 
         const WorldspaceRecord& ws = wsRecord.get();
+        auto results = ColumnValidator::validateWorldspace(ws, mData);
+        for (const auto& r : results) {
+            if (r.severity == ColumnValidator::Severity::Error) {
+                QMessageBox::warning(this, tr("Validation Error"),
+                    QString("%1: %2").arg(r.field, r.message));
+                file.close();
+                return;
+            }
+        }
         RecHeader recHeader;
         recHeader.id = ws.formId;
         writer.startRecord('WRLD', recHeader);

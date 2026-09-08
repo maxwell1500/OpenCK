@@ -6,6 +6,7 @@
 #include "../../model/world/ckid.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/tools/undostack.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/packagerecord.hpp"
@@ -289,6 +290,15 @@ void AIPackageEditor::onSave()
     {
         if (record.state == State_Modified || record.state == State_ModifiedOnly)
         {
+            auto results = ColumnValidator::validatePackage(record.get(), mData);
+            for (const auto& r : results) {
+                if (r.severity == ColumnValidator::Severity::Error) {
+                    QMessageBox::warning(this, tr("Validation Error"),
+                        QString("%1: %2").arg(r.field, r.message));
+                    saveFile.close();
+                    return;
+                }
+            }
             RecHeader recHeader;
             recHeader.id = record.get().formId;
             writer.startRecord('PACK', recHeader);

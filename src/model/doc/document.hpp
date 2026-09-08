@@ -8,6 +8,7 @@
 #include "../../../libs/files/filepaths.hpp"
 
 #include <QObject>
+#include <QSet>
 #include <memory>
 
 class ESMReader;
@@ -44,6 +45,7 @@ public:
 private:
     void createNew();
     void writeCellChildrenGroups(ESMWriter& writer, quint32 cellId);
+    void markCellChildrenWritten(quint32 cellId, QSet<quint64>& written) const;
 
     FilePaths paths;
     QStringList contentFiles;

@@ -17,6 +17,7 @@ void RefrRecord::load(ESMReader& esm, bool)
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        if (sub == 0) break;
         bool handled = false;
         for (auto& c : components.all())
         {
@@ -73,7 +74,10 @@ void RefrRecord::save(ESMWriter& esm) const
         comp->scriptIds = scriptIds;
     }
 
-    esm.writeSubZString('EDID', editorId);
+    // Placed references usually carry no EDID; writing an empty one emits
+    // a 1-byte NUL subrecord that breaks payload-identical round-trips.
+    if (!editorId.isEmpty())
+        esm.writeSubZString('EDID', editorId);
     components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)

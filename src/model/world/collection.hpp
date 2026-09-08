@@ -17,6 +17,12 @@ struct HasFormIdField : std::false_type {};
 template<typename T>
 struct HasFormIdField<T, std::void_t<decltype(std::declval<T>().formId)>> : std::true_type {};
 
+template<typename T, typename = void>
+struct HasRawSubRecords : std::false_type {};
+
+template<typename T>
+struct HasRawSubRecords<T, std::void_t<decltype(std::declval<T>().rawSubRecords)>> : std::true_type {};
+
 const int NOT_FOUND = -1;
 
 template<typename ESXRecord>
@@ -116,7 +122,12 @@ public:
     bool containsFormId(quint32 formId) const override;
     bool isRecordModified(int index) const override;
     int countModifiedRecords() const override;
+    bool isRecordSaveable(int index) const override;
     void saveModifiedRecords(ESMWriter& writer, uint32_t recordType) const override;
+    bool saveRecordAt(ESMWriter& writer, uint32_t recordType, int index) const override;
+    void saveModifiedRecordsExcept(ESMWriter& writer, uint32_t recordType,
+        const QSet<quint64>& skipKeys) const override;
+    QVector<RawSubPayload> rawSubRecordsAt(int index) const override;
 
     // Undo-aware operations
     bool removeRecordWithUndo(const QString& id, UndoStack* undoStack) override;
@@ -530,6 +541,20 @@ bool Collection<ESXRecord, IdAccessorT>::reorderRows(int baseIndex, const QVecto
 
 // Deep-copy a single record for move/drag-drop reordering (see BaseCollection::cloneRecord).
 // Reuses Record<ESXRecord>::clone(), which returns a deep copy as std::unique_ptr<BaseRecord>.
+template<typename ESXRecord, typename IdAccessorT>
+QVector<RawSubPayload> Collection<ESXRecord, IdAccessorT>::rawSubRecordsAt(int index) const
+{
+    QVector<RawSubPayload> out;
+    if constexpr (HasRawSubRecords<ESXRecord>::value)
+    {
+        if (index < 0 || index >= static_cast<int>(records.size()))
+            return out;
+        for (const auto& raw : records.at(index).get().rawSubRecords)
+            out.append({ static_cast<quint32>(raw.name), raw.data });
+    }
+    return out;
+}
+
 template<typename ESXRecord, typename IdAccessorT>
 std::unique_ptr<BaseRecord> Collection<ESXRecord, IdAccessorT>::cloneRecordAt(int index) const
 {

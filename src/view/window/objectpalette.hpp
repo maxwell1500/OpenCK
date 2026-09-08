@@ -51,6 +51,7 @@ protected:
 private slots:
     void onSearchTextChanged(const QString& text);
     void onObjectSelected(const QModelIndex& index);
+    void onAddPlacementClicked();
     void onSavePlacementClicked();
     void onLoadPlacementClicked();
     void onTogglePlacementMode();
@@ -87,6 +88,7 @@ private:
     QLineEdit* searchEdit;
     QPushButton* saveButton;
     QPushButton* loadButton;
+    QPushButton* addPlacementButton;
     QPushButton* placementModeButton;
     QLabel* statusLabel;
     QLabel* objectCountLabel;

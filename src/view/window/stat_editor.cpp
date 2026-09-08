@@ -1,6 +1,7 @@
 ﻿#include "stat_editor.hpp"
 
 #include "../../model/world/data.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 #include "../../../libs/files/esm/statrecord.hpp"
 
 #include <QVBoxLayout>
@@ -68,23 +69,21 @@ void StatEditor::saveToStat()
 
 bool StatEditor::validate()
 {
-    QString editorId = mEditorIdEdit->text().trimmed();
-    if (editorId.isEmpty())
+    const QString editorId = mEditorIdEdit->text().trimmed();
+
+    StatRecord probe = *mStat;
+    probe.editorId = editorId;
+    const auto results = ColumnValidator::validateStat(probe, static_cast<Data*>(mData));
+    for (const auto& r : results)
     {
-        QMessageBox::warning(this, "Validation Error", "Editor ID cannot be empty.");
+        if (r.severity != ColumnValidator::Severity::Error)
+            continue;
+        // The record's own unchanged editor id is the existing index, not a duplicate.
+        if (r.field == QStringLiteral("EditorID") && editorId == mStat->editorId)
+            continue;
+        QMessageBox::warning(this, "Validation Error", r.message);
         return false;
     }
-
-    auto* data = static_cast<Data*>(mData);
-    if (data && data->getStatCollection().searchId(editorId) >= 0)
-    {
-        if (editorId != mStat->editorId)
-        {
-            QMessageBox::warning(this, "Validation Error", "A static with this Editor ID already exists.");
-            return false;
-        }
-    }
-
     return true;
 }
 

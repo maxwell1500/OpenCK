@@ -24,19 +24,23 @@ set(CMAKE_DEBUG_POSTFIX d)
 # ─── Qt6 ──────────────────────────────────────────────────────────────────
 # Search common Qt6 install locations on Windows before falling back to
 # CMAKE_PREFIX_PATH. This makes "cmake -B build" work out-of-the-box when
-# Qt is installed at the standard path (C:\Qt\6.7.3\msvc2019_64) without
-# requiring the user to pass -DCMAKE_PREFIX_PATH manually.
+# Qt is installed at the standard path without requiring the user to pass
+# -DCMAKE_PREFIX_PATH manually.
 if(WIN32 AND NOT DEFINED CMAKE_PREFIX_PATH)
-    set(_qt6_search_paths
-        "C:/Qt/6.7.3/msvc2019_64"
-        "C:/Qt/6.7.2/msvc2019_64"
-        "C:/Qt/6.7.1/msvc2019_64"
-        "C:/Qt/6.7.0/msvc2019_64"
-    )
-    foreach(_path IN LISTS _qt6_search_paths)
-        if(EXISTS "${_path}/lib/cmake/Qt6/Qt6Config.cmake")
-            list(APPEND CMAKE_PREFIX_PATH "${_path}")
-            message(STATUS "Found Qt6 at ${_path}")
+    set(_qt6_found FALSE)
+    file(GLOB _qt6_dirs "C:/Qt/6.*")
+    list(SORT _qt6_dirs ORDER DESC)
+    foreach(_qt_dir IN LISTS _qt6_dirs)
+        file(GLOB _qt6_abi "${_qt_dir}/msvc*")
+        foreach(_path IN LISTS _qt6_abi)
+            if(EXISTS "${_path}/lib/cmake/Qt6/Qt6Config.cmake")
+                list(APPEND CMAKE_PREFIX_PATH "${_path}")
+                message(STATUS "Found Qt6 at ${_path}")
+                set(_qt6_found TRUE)
+                break()
+            endif()
+        endforeach()
+        if(_qt6_found)
             break()
         endif()
     endforeach()

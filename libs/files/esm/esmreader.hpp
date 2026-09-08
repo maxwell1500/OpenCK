@@ -51,6 +51,8 @@ public:
 
     quint32 currentFormId() const { return mCurrentFormId; }
     quint32 currentHeaderFlags() const { return mCurrentHeaderFlags; }
+    void setCurrentRecordName(NAME n) { mCurrentRecordName = n; }
+    NAME currentRecordName() const { return mCurrentRecordName; }
 
     bool isLeft();
     bool isRecLeft();
@@ -146,6 +148,7 @@ private:
     ESMFile esm;
     quint32 mCurrentFormId = 0;
     quint32 mCurrentHeaderFlags = 0;
+    NAME mCurrentRecordName = 0;
     qint64 mGrupEnd = 0;
 
     uchar* m_mapped = nullptr;

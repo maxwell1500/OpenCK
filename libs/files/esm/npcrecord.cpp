@@ -25,7 +25,23 @@ void NpcRecord::load(ESMReader& esm, bool)
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
-        if (sub == 0) break;
+        if (sub == 0)
+        {
+            // Some compressed NPC records embed non-subrecord binary blobs
+            // (NUL names, sometimes with a zero size field). Capture them
+            // verbatim - name=0 + declared size round-trips to identical
+            // bytes - and keep draining: readNSubHeader always consumes at
+            // least its 6-byte header once recLeft >= 6, so this terminates.
+            if (esm.recLeft() > 0 || esm.subLeft() > 0)
+            {
+                RawSubRecord raw;
+                raw.name = 0;
+                esm.readRawSubData(raw.data);
+                rawSubRecords.push_back(raw);
+                continue;
+            }
+            break;
+        }
         bool handled = false;
         for (auto& c : components.all())
         {

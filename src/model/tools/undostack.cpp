@@ -22,6 +22,7 @@ void UndoStack::push(Command* command)
 
     mHistory.append(command);
     mPosition++;
+    command->execute();
 }
 
 void UndoStack::undo()

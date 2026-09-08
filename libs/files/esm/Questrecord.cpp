@@ -24,6 +24,23 @@ void QuestRecord::load(ESMReader& esm, bool)
         esm.readRawSubData(raw.data);
         dest->push_back(raw);
     };
+    // Preserve a subrecord into the last entry of a per-stage/objective/alias
+    // extra vector. If that group has no current entry (the subrecord arrived
+    // before any INDX/QOBJ/ALST), fall back to the top-level raw list so we
+    // never call QVector::last() on an empty vector.
+    auto rawPreserveGroup = [&](NAME n, QVector<QVector<RawSubRecord>>& outer) {
+        if (!outer.isEmpty())
+        {
+            RawSubRecord raw;
+            raw.name = n;
+            esm.readRawSubData(raw.data);
+            outer.last().push_back(raw);
+        }
+        else
+        {
+            rawPreserve(n, &rawSubRecords);
+        }
+    };
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
@@ -39,8 +56,8 @@ void QuestRecord::load(ESMReader& esm, bool)
             case 'EDID': editorId = esm.readZString(); break;
             case 'DNAM': rawPreserve(sub, &rawSubRecords); break;
             case 'CTDA':
-                if (group == Objective) rawPreserve(sub, &objectiveExtra.last());
-                else if (group == Alias) rawPreserve(sub, &aliasExtra.last());
+                if (group == Objective) rawPreserveGroup(sub, objectiveExtra);
+                else if (group == Alias) rawPreserveGroup(sub, aliasExtra);
                 else rawPreserve(sub, &rawSubRecords);
                 break;
             case 'INDX':
@@ -51,17 +68,20 @@ void QuestRecord::load(ESMReader& esm, bool)
                 stageExtra.append(QVector<RawSubRecord>());
                 break;
             case 'QSDT':
-                if (group == Stage) stageFlags.last() = esm.readType<quint8>();
-                else rawPreserve(sub, &rawSubRecords);
+                if (group == Stage && !stageFlags.isEmpty())
+                    stageFlags.last() = esm.readType<quint8>();
+                else
+                    rawPreserve(sub, &rawSubRecords);
                 break;
             case 'CNAM':
-                if (group == Stage) stageDescriptions.last() = esm.readZString();
+                if (group == Stage && !stageDescriptions.isEmpty())
+                    stageDescriptions.last() = esm.readZString();
                 else if (group == Top) questDesc = esm.readZString();
-                else if (group == Alias) rawPreserve(sub, &aliasExtra.last());
-                else rawPreserve(sub, &objectiveExtra.last());
+                else if (group == Alias) rawPreserveGroup(sub, aliasExtra);
+                else rawPreserveGroup(sub, objectiveExtra);
                 break;
             case 'SCHR': case 'SCDA': case 'SCRO': case 'SCTX': case 'SLSD':
-                if (group == Stage) rawPreserve(sub, &stageExtra.last());
+                if (group == Stage) rawPreserveGroup(sub, stageExtra);
                 else rawPreserve(sub, &rawSubRecords);
                 break;
             case 'QOBJ':
@@ -77,13 +97,13 @@ void QuestRecord::load(ESMReader& esm, bool)
                 break;
             case 'NAM1':
                 if (group == Top) dialogueView = esm.readZString();
-                else if (group == Objective) rawPreserve(sub, &objectiveExtra.last());
-                else if (group == Alias) rawPreserve(sub, &aliasExtra.last());
+                else if (group == Objective) rawPreserveGroup(sub, objectiveExtra);
+                else if (group == Alias) rawPreserveGroup(sub, aliasExtra);
                 else rawPreserve(sub, &rawSubRecords);
                 break;
             case 'NAM2':
-                if (group == Objective) rawPreserve(sub, &objectiveExtra.last());
-                else if (group == Alias) rawPreserve(sub, &aliasExtra.last());
+                if (group == Objective) rawPreserveGroup(sub, objectiveExtra);
+                else if (group == Alias) rawPreserveGroup(sub, aliasExtra);
                 else rawPreserve(sub, &rawSubRecords);
                 break;
             case 'ALST':
@@ -98,11 +118,11 @@ void QuestRecord::load(ESMReader& esm, bool)
                 else rawPreserve(sub, &rawSubRecords);
                 break;
             case 'ALID':
-                if (group == Alias) rawPreserve(sub, &aliasExtra.last());
+                if (group == Alias) rawPreserveGroup(sub, aliasExtra);
                 else rawPreserve(sub, &rawSubRecords);
                 break;
             default:
-                if (group == Alias) rawPreserve(sub, &aliasExtra.last());
+                if (group == Alias) rawPreserveGroup(sub, aliasExtra);
                 else rawPreserve(sub, &rawSubRecords);
                 break;
         }

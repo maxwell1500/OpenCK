@@ -6,6 +6,7 @@
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/tools/undostack.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/glob.hpp"
@@ -440,6 +441,15 @@ void WaterEditor::onSave()
                        name.contains("sea", Qt::CaseInsensitive);
 
         if (isWater) {
+            auto results = ColumnValidator::validateGlobal(glob, mData);
+            for (const auto& r : results) {
+                if (r.severity == ColumnValidator::Severity::Error) {
+                    QMessageBox::warning(this, tr("Validation Error"),
+                        QString("%1: %2").arg(r.field, r.message));
+                    file.close();
+                    return;
+                }
+            }
             writer.startRecord('GLOB');
             glob.save(writer);
             writer.endRecord();

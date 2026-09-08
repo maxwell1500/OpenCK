@@ -268,7 +268,10 @@ public:
     int preload(const QString& filename, bool base);
 
     /// \brief TES4 header of the last preloaded plugin (for flag preservation).
-    const Header& getReaderHeader() const { return reader ? reader->getHeader() : m_fallbackHeader; }
+    // Returns by VALUE on purpose: reader->getHeader() resolves to the
+    // by-value overload here, and binding that temporary to a returned
+    // reference left every caller holding a dangling reference.
+    Header getReaderHeader() const { return reader ? reader->getHeader() : m_fallbackHeader; }
 
     /// \brief Continue loading records from preloaded files
     /// \param messages Reference to messages container for progress reporting
@@ -312,6 +315,12 @@ public:
     /// Empty when the worldspace (or its cells) has not been loaded.
     QVector<quint32> cellsInWorldspace(quint32 worldspaceId);
 
+    /// \brief Form IDs of the INFO records attached to the given DIAL,
+    /// derived from the flat record stream while loading (INFO records
+    /// physically nested under a DIAL's branch are attributed to it).
+    /// Empty when the dialogue (or its responses) has not been loaded.
+    QVector<quint32> infosUnderDial(quint32 dialFormId);
+
     // Cell-children tracking for the save path. While the edited file is
     // parsed eagerly, each REFR/ACHR records the CELL it is a child of, so
     // saving can rebuild the cell-children GRUPs instead of emitting a flat
@@ -327,6 +336,18 @@ public:
     {
         m_refrParentCell[refrFormId] = cellFormId;
     }
+
+    // One record of the edited plugin in file sequence (GRUPs excluded).
+    struct PluginRecordRef
+    {
+        NAME type = 0;
+        quint32 formId = 0;
+    };
+
+    /// \brief Flat load order of the edited plugin's own records, recorded
+    /// during eager load. The save path replays it so an untouched
+    /// round-trip preserves the source layout instead of regrouping by type.
+    const QVector<PluginRecordRef>& pluginOrder() const { return m_pluginOrder; }
 
     /// \brief Register a Qt model for a record type
     /// \param model Pointer to QAbstractItemModel subclass
@@ -1759,6 +1780,7 @@ private:
     int m_matTypeId = 0;
     bool m_matting = false;
     bool m_matPrevBase = false;
+    int m_matLimit = 0;
 
     static NAME typeNameFor(int typeId);
     
@@ -1970,6 +1992,7 @@ private:
     QMap<CkId::Type, QAbstractItemModel*> modelIndexes;
     UndoStack* mUndoStack;
     QMap<int, UndoStack*> mPluginUndoStacks;
+    quint32 mNextLocalId = 0x800;
 
     // Cell-children tracking for saving: which REFR/ACHR record belongs to
     // which CELL, discovered while parsing the edited file's structure.
@@ -1981,6 +2004,17 @@ private:
     // cellsInWorldspace() and to populate WorldspaceRecord::cellIds.
     quint32 m_lastWorldspaceFormId = 0;
     QHash<quint32, quint32> m_cellParentWorldspace;
+
+    // Dialogue-branch tracking: the INFO records physically following a DIAL
+    // record belong to that dialogue. Used by infosUnderDial() so the
+    // dialogue editor can walk a topic's responses.
+    quint32 m_lastDialFormId = 0;
+    QHash<quint32, quint32> m_infoParentDial;
+
+    // Flat load order of the edited plugin's own records, recorded during
+    // eager load (GRUP headers excluded). Lets the save path replay the
+    // source layout so an untouched round-trip is payload-identical.
+    QVector<PluginRecordRef> m_pluginOrder;
 
 private slots:
     void dataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);

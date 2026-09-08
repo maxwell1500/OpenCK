@@ -50,8 +50,11 @@ int IdCollection<ESXRecord, IdAccessorT>::load(ESMReader& esm, bool base)
         // desyncs every following record in the file. Surface it loudly so
         // misparses are caught against real data instead of producing
         // silently corrupted records.
-        LOG_WARNING(QString("Record %1 left %2 unconsumed bytes in record")
+        const NAME recName = esm.currentRecordName();
+        LOG_WARNING(QString("Record %1 [%2 0x%3] left %4 unconsumed bytes in record")
             .arg(IdAccessorT().getId(record))
+            .arg(QString::fromLatin1(reinterpret_cast<const char*>(&recName), 4))
+            .arg(esm.currentFormId(), 8, 16, QChar('0'))
             .arg(esm.recLeft()));
     }
 

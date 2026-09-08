@@ -166,12 +166,17 @@ void Variant::load(ESMReader& esm, Format format, const QString& editorId)
             }
             else
             {
-                throw std::runtime_error("Invalid format in GMST record.");
+                // Unknown GMST type prefix: drain the DATA payload bytes
+                // losslessly so the record survives round-trip.
+                setType(Var_None);
+                esm.readRawSubData(rawData);
             }
         }
         else
         {
-            throw std::runtime_error("No EditorID provided for GMST record.");
+            // Unknown GLOB type byte: drain the FLTV payload losslessly.
+            setType(Var_None);
+            esm.readSubData<float>('FLTV');
         }
 
         break;
@@ -226,6 +231,10 @@ void Variant::write(ESMWriter& esm, Format format) const
         else if (type == Var_String)
         {
             esm.writeZString(data.toString().toUtf8());
+        }
+        else if (type == Var_None && !rawData.isEmpty())
+        {
+            esm.writeRawData(rawData.constData(), rawData.size());
         }
         else
         {

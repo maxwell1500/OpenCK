@@ -23,8 +23,10 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QInputDialog>
+#include <QMessageBox>
 #include <QMap>
 #include <QDebug>
+#include <algorithm>
 
 #include "../../libs/files/esm/cellrecord.hpp"
 #include "../../libs/files/esm/landrecord.hpp"
@@ -33,6 +35,8 @@
 #include "../../model/world/record.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../model/tools/landscapeeditcommand.hpp"
+#include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 #include "brushtool.hpp"
 #include "logger.hpp"
 #include "../../model/tools/brushalphamask.hpp"
@@ -535,11 +539,21 @@ void LandscapeEditor::saveHeightmap(LandRecord& rec)
 {
     saveToLand(&rec);
     if (mData) {
-        const auto& landCollection = mData->getLandCollection();
+        auto& landCollection = mData->getLandCollection();
         for (int i = 0; i < landCollection.size(); ++i) {
-            Record<LandRecord>& record = const_cast<IdCollection<LandRecord>&>(landCollection).getRecord(i);
+            Record<LandRecord>& record = landCollection.getRecord(i);
             if (&record.get() == &rec) {
-                record.setModified(rec);
+                LandRecord originalState = record.get();
+                if (mData->getUndoStack()) {
+                    auto* cmd = new EditRecordCommand<LandRecord>(&landCollection, i, originalState, rec, "Edit Landscape Heightmap");
+                    if (cmd->hasChanged()) {
+                        mData->getUndoStack()->push(cmd);
+                    } else {
+                        delete cmd;
+                    }
+                } else {
+                    record.setModified(rec);
+                }
                 break;
             }
         }
@@ -609,14 +623,38 @@ void LandscapeEditor::saveWaterToCell()
         return;
     }
 
+    {
+        auto results = ColumnValidator::validateCell(*currentCell, mData);
+        QStringList errorMessages;
+        for (const auto& r : results) {
+            if (r.severity == ColumnValidator::Severity::Error) {
+                errorMessages << QString("%1: %2").arg(r.field, r.message);
+            }
+        }
+        if (!errorMessages.isEmpty()) {
+            QMessageBox::warning(this, tr("Validation Errors"), errorMessages.join("\n"));
+            return;
+        }
+    }
+
     currentCell->hasWaterHeight = waterEnabledCheckBox->isChecked();
     currentCell->waterHeight = static_cast<float>(waterHeightSpinBox->value());
 
-    const auto& cellCollection = mData->getCellCollection();
+    auto& cellCollection = mData->getCellCollection();
     for (int i = 0; i < cellCollection.size(); ++i) {
-        Record<CellRecord>& record = const_cast<IdCollection<CellRecord>&>(cellCollection).getRecord(i);
+        Record<CellRecord>& record = cellCollection.getRecord(i);
         if (&record.get() == currentCell) {
-            record.setModified(*currentCell);
+            CellRecord originalState = record.get();
+            if (mData->getUndoStack()) {
+                auto* cmd = new EditRecordCommand<CellRecord>(&cellCollection, i, originalState, *currentCell, "Edit Water Height");
+                if (cmd->hasChanged()) {
+                    mData->getUndoStack()->push(cmd);
+                } else {
+                    delete cmd;
+                }
+            } else {
+                record.setModified(*currentCell);
+            }
             break;
         }
     }
@@ -840,6 +878,7 @@ void LandscapeEditor::mousePressEvent(QMouseEvent* event)
             if (!hasOriginalState) {
                 originalHeightmap = heightmap;
                 hasOriginalState = true;
+                strokeDirtyRect = QRect(0, 0, 0, 0);
             }
             int x = event->pos().x() / terrainSize;
             int y = event->pos().y() / terrainSize;
@@ -884,13 +923,29 @@ void LandscapeEditor::mouseMoveEvent(QMouseEvent* event)
 void LandscapeEditor::mouseReleaseEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton && hasOriginalState && mUndoStack) {
-        if (heightmap != originalHeightmap) {
+        if (!strokeDirtyRect.isNull() && heightmap != originalHeightmap) {
+            int rx = qMax(0, strokeDirtyRect.x());
+            int ry = qMax(0, strokeDirtyRect.y());
+            int rw = qMin(strokeDirtyRect.right(), terrainSize - 1) - rx + 1;
+            int rh = qMin(strokeDirtyRect.bottom(), terrainSize - 1) - ry + 1;
+
+            QVector<float> origRegion, newRegion;
+            origRegion.resize(rw * rh);
+            newRegion.resize(rw * rh);
+            for (int row = 0; row < rh; ++row) {
+                std::copy_n(originalHeightmap.constData() + (ry + row) * terrainSize + rx, rw,
+                            origRegion.data() + row * rw);
+                std::copy_n(heightmap.constData() + (ry + row) * terrainSize + rx, rw,
+                            newRegion.data() + row * rw);
+            }
+
             LandscapeEditCommand* cmd = new LandscapeEditCommand(
-                &heightmap, terrainSize, originalHeightmap, heightmap);
+                &heightmap, terrainSize, rx, ry, rw, rh, origRegion, newRegion);
             mUndoStack->push(cmd);
         }
         hasOriginalState = false;
         originalHeightmap.clear();
+        strokeDirtyRect = QRect();
     }
     dragging = false;
     setCursor(Qt::ArrowCursor);
@@ -1065,7 +1120,7 @@ void LandscapeEditor::onPasteHeightmapClicked()
 
     if (mData && currentCell && currentLand && mUndoStack) {
         QVector<float>* heightmapPtr = &heightmap;
-        mUndoStack->push(new LandscapeEditCommand(heightmapPtr, terrainSize, originalHeightmap, copiedHeightmap));
+        mUndoStack->push(new LandscapeEditCommand(heightmapPtr, terrainSize, 0, 0, terrainSize, terrainSize, originalHeightmap, copiedHeightmap));
     } else {
         heightmap = copiedHeightmap;
     }
@@ -1138,7 +1193,7 @@ void LandscapeEditor::onPasteRegionClicked()
 
     if (mData && currentCell && currentLand && mUndoStack) {
         QVector<float>* heightmapPtr = &heightmap;
-        mUndoStack->push(new LandscapeEditCommand(heightmapPtr, terrainSize, before, heightmap));
+        mUndoStack->push(new LandscapeEditCommand(heightmapPtr, terrainSize, 0, 0, terrainSize, terrainSize, before, heightmap));
     }
     statusLabel->setText("Terrain region pasted");
     glWidget->update();
@@ -1199,7 +1254,7 @@ void LandscapeEditor::onImportR32Clicked()
 
     if (mUndoStack) {
         mUndoStack->push(new LandscapeEditCommand(
-            &heightmap, terrainSize, originalHeightmap, heightmap));
+            &heightmap, terrainSize, 0, 0, terrainSize, terrainSize, originalHeightmap, heightmap));
     }
 
     statusLabel->setText(QString("Imported %1x%1 R32 heightmap (range %2..%3)")
@@ -1256,6 +1311,15 @@ void LandscapeEditor::applyBrush(int x, int y)
     const BrushDefinition* brush = nullptr;
     if (activeBrushIndex >= 0 && activeBrushIndex < brushes.size()) {
         brush = &brushes[activeBrushIndex];
+    }
+
+    if (hasOriginalState) {
+        QRect brushRect(x - radius, y - radius, 2 * radius + 1, 2 * radius + 1);
+        brushRect = brushRect.intersected(QRect(0, 0, terrainSize, terrainSize));
+        if (strokeDirtyRect.isNull())
+            strokeDirtyRect = brushRect;
+        else
+            strokeDirtyRect = strokeDirtyRect.united(brushRect);
     }
 
     for (int dy = -radius; dy <= radius; dy++) {

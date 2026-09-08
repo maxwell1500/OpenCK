@@ -1,6 +1,7 @@
 ﻿#include "tree_editor.hpp"
 
 #include "../../model/world/data.hpp"
+#include "../../model/tools/columnvalidator.hpp"
 #include "../../../libs/files/esm/treerecord.hpp"
 
 #include <QVBoxLayout>
@@ -68,23 +69,21 @@ void TreeEditor::saveToTree()
 
 bool TreeEditor::validate()
 {
-    QString editorId = mEditorIdEdit->text().trimmed();
-    if (editorId.isEmpty())
+    const QString editorId = mEditorIdEdit->text().trimmed();
+
+    TreeRecord probe = *mTree;
+    probe.editorId = editorId;
+    const auto results = ColumnValidator::validateTree(probe, static_cast<Data*>(mData));
+    for (const auto& r : results)
     {
-        QMessageBox::warning(this, "Validation Error", "Editor ID cannot be empty.");
+        if (r.severity != ColumnValidator::Severity::Error)
+            continue;
+        // The record's own unchanged editor id is the existing index, not a duplicate.
+        if (r.field == QStringLiteral("EditorID") && editorId == mTree->editorId)
+            continue;
+        QMessageBox::warning(this, "Validation Error", r.message);
         return false;
     }
-
-    auto* data = static_cast<Data*>(mData);
-    if (data && data->getTreeCollection().searchId(editorId) >= 0)
-    {
-        if (editorId != mTree->editorId)
-        {
-            QMessageBox::warning(this, "Validation Error", "A tree with this Editor ID already exists.");
-            return false;
-        }
-    }
-
     return true;
 }
 

@@ -8,7 +8,21 @@ void OutfitRecord::load(ESMReader& esm, bool) {
         bool handled = false;
         switch (sub) {
         case 'EDID': editorId = esm.readZString(); handled = true; break;
-        case 'INAM': case 'DATA': itemFormIds.append(esm.readType<quint32>()); handled = true; break;
+        // Some outfits carry an empty (0-byte) DATA marker; reading a fixed
+        // 32-bit value there walked past the record end and desynced the
+        // stream. Only consume what was declared.
+        case 'INAM': case 'DATA':
+            if (esm.subLeft() >= 4)
+                itemFormIds.append(esm.readType<quint32>());
+            else if (esm.subLeft() > 0)
+            {
+                quint32 v = 0;
+                const int n = static_cast<int>(esm.subLeft());
+                for (int i = 0; i < n; ++i)
+                    v |= quint32(esm.readType<quint8>()) << (8 * i);
+                itemFormIds.append(v);
+            }
+            handled = true; break;
         default: break;
         }
         if (handled) continue;

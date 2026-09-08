@@ -59,7 +59,11 @@ public:
     void setFormId(int, quint32) override {}
     bool containsFormId(quint32) const override { return false; }
     bool isRecordModified(int) const override { return false; }
+    bool isRecordSaveable(int) const override { return false; }
     void saveModifiedRecords(ESMWriter&, uint32_t) const override {}
+    bool saveRecordAt(ESMWriter&, uint32_t, int) const override { return false; }
+    void saveModifiedRecordsExcept(ESMWriter& writer, uint32_t recordType,
+        const QSet<quint64>&) const override { saveModifiedRecords(writer, recordType); }
 
     // Undo-aware operations (implemented in Collection<T>)
     virtual bool removeRecordWithUndo(const QString& id, UndoStack* undoStack) = 0;

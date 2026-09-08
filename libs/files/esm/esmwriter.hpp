@@ -85,7 +85,7 @@ private:
     qint64 recPos;
     qint64 subSizePos;
     qint64 subPos;
-    qint64 grupSizePos;
+    QVector<qint64> grupSizePosStack;
 
     QByteArray buf;
     QDataStream stream;

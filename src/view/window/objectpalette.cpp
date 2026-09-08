@@ -178,9 +178,11 @@ void ObjectPalette::setupUI()
     auto* buttonLayout = new QHBoxLayout();
     saveButton = new QPushButton("Save Placement");
     loadButton = new QPushButton("Load Placement");
+    addPlacementButton = new QPushButton("Add Placement");
     placementModeButton = new QPushButton("Toggle Placement Mode");
     buttonLayout->addWidget(saveButton);
     buttonLayout->addWidget(loadButton);
+    buttonLayout->addWidget(addPlacementButton);
     buttonLayout->addWidget(placementModeButton, 1);
     mainLayout->addLayout(buttonLayout);
 
@@ -194,6 +196,7 @@ void ObjectPalette::setupUI()
     connect(objectListView, &QListView::clicked, this, &ObjectPalette::onObjectSelected);
     connect(saveButton, &QPushButton::clicked, this, &ObjectPalette::onSavePlacementClicked);
     connect(loadButton, &QPushButton::clicked, this, &ObjectPalette::onLoadPlacementClicked);
+    connect(addPlacementButton, &QPushButton::clicked, this, &ObjectPalette::onAddPlacementClicked);
     connect(placementModeButton, &QPushButton::clicked, this, &ObjectPalette::onTogglePlacementMode);
 }
 
@@ -280,7 +283,7 @@ void ObjectPalette::onObjectSelected(const QModelIndex& index)
     }
 }
 
-void ObjectPalette::onSavePlacementClicked()
+void ObjectPalette::onAddPlacementClicked()
 {
     if (!currentCell) {
         statusLabel->setText("No cell loaded");
@@ -346,9 +349,52 @@ void ObjectPalette::onSavePlacementClicked()
     applyPlacement(placement);
 }
 
+void ObjectPalette::onSavePlacementClicked()
+{
+    if (placements.isEmpty())
+    {
+        statusLabel->setText("Nothing to save");
+        return;
+    }
+
+    QString fileName = QFileDialog::getSaveFileName(this, "Save Placement", "",
+        "Placement Files (*.placement)");
+    if (fileName.isEmpty())
+    {
+        return;
+    }
+    if (!fileName.endsWith(QStringLiteral(".placement"), Qt::CaseInsensitive))
+        fileName += QStringLiteral(".placement");
+
+    // Binary QDataStream, little-endian, exactly the format onLoadPlacementClicked
+    // reads back (the previous "save" never wrote a file at all).
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly))
+    {
+        statusLabel->setText("Failed to save");
+        return;
+    }
+
+    QByteArray buffer;
+    QDataStream out(&buffer, QIODevice::WriteOnly);
+    out.setByteOrder(QDataStream::LittleEndian);
+
+    out << placements.size();
+    for (const Placement& p : placements)
+    {
+        out << p.baseObjectName << p.x << p.y << p.z
+            << p.rotX << p.rotY << p.rotZ
+            << p.scale << p.active;
+    }
+    file.write(buffer);
+    file.close();
+
+    statusLabel->setText(QString("Saved %1 placements").arg(placements.size()));
+}
+
 void ObjectPalette::onLoadPlacementClicked()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, "Load Placement", "", "Placement Files (*.json)");
+    QString fileName = QFileDialog::getOpenFileName(this, "Load Placement", "", "Placement Files (*.placement)");
     if (fileName.isEmpty()) {
         return;
     }

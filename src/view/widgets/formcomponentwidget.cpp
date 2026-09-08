@@ -38,42 +38,55 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
         });
         return cb;
     }
-    if (dynamic_cast<IntEditorProperty*>(prop) ||
-        dynamic_cast<UIntEditorProperty*>(prop))
+if (auto* ip = dynamic_cast<IntEditorProperty*>(prop))
     {
         auto* sb = new QSpinBox(parent);
-        sb->setRange(INT_MIN, INT_MAX);
-        sb->setValue(prop->value().toInt());
+        const qint64 lo = qMax<qint64>(ip->minimum(), static_cast<qint64>(INT_MIN));
+        const qint64 hi = qMin<qint64>(ip->maximum(), static_cast<qint64>(INT_MAX));
+        sb->setRange(static_cast<int>(lo), static_cast<int>(hi));
+        sb->setValue(ip->value().toInt());
         QObject::connect(sb, qOverload<int>(&QSpinBox::valueChanged), parent,
-            [prop](int v) { prop->setValue(v); });
+            [ip](int v) { ip->setValue(v); });
         return sb;
     }
-    if (dynamic_cast<FloatEditorProperty*>(prop))
+    if (auto* up = dynamic_cast<UIntEditorProperty*>(prop))
+    {
+        auto* sb = new QSpinBox(parent);
+        const quint64 lo = qMin<quint64>(up->minimum(), static_cast<quint64>(INT_MAX));
+        const quint64 hi = qMin<quint64>(up->maximum(), static_cast<quint64>(INT_MAX));
+        sb->setRange(static_cast<int>(lo), static_cast<int>(hi));
+        sb->setValue(static_cast<int>(qMin<quint64>(up->value().toULongLong(),
+                                                    static_cast<quint64>(INT_MAX))));
+        QObject::connect(sb, qOverload<int>(&QSpinBox::valueChanged), parent,
+            [up](int v) { up->setValue(v); });
+        return sb;
+    }
+    if (auto* fp = dynamic_cast<FloatEditorProperty*>(prop))
     {
         auto* sb = new QDoubleSpinBox(parent);
-        sb->setRange(-1.0e9, 1.0e9);
+        sb->setRange(qMax<double>(-1.0e9, fp->minimum()), qMin<double>(1.0e9, fp->maximum()));
         sb->setDecimals(2);
         sb->setSingleStep(0.1);
-        sb->setValue(prop->value().toDouble());
+        sb->setValue(fp->value().toDouble());
         QObject::connect(sb, qOverload<double>(&QDoubleSpinBox::valueChanged), parent,
-            [prop](double v) { prop->setValue(v); });
+            [fp](double v) { fp->setValue(v); });
         return sb;
     }
-    if (dynamic_cast<FormEditorProperty*>(prop))
+    if (auto* fep = dynamic_cast<FormEditorProperty*>(prop))
     {
         auto* le = new QLineEdit(parent);
         le->setPlaceholderText(QStringLiteral("0x00000000"));
-        le->setText(QString::number(prop->value().toUInt(), 16));
-        QObject::connect(le, &QLineEdit::editingFinished, parent, [le, prop]() {
+        le->setText(QString::number(fep->value().toUInt(), 16));
+        QObject::connect(le, &QLineEdit::editingFinished, parent, [le, fep]() {
             QString text = le->text().trimmed();
             if (text.startsWith(QStringLiteral("0x"))) text.remove(0, 2);
             bool ok = false;
             quint32 v = text.toUInt(&ok, 16);
-            if (ok) prop->setValue(v);
+            if (ok) fep->setValue(v);
         });
         return le;
     }
-    if (dynamic_cast<FormArrayEditorProperty*>(prop))
+    if (auto* fap = dynamic_cast<FormArrayEditorProperty*>(prop))
     {
         // Render as a compact list with add/remove buttons. The
         // form picker (full editor) is a future enhancement; for

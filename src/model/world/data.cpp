@@ -1318,6 +1318,7 @@ bool Data::continueLoading(Messages& messages)
                 .arg(pos, 0, 16)
                 .arg(firstBytes, 8, 16, QChar('0')));
             name = reader->readName();
+            reader->setCurrentRecordName(name);
 
             LOG_DEBUG(QString("Loading record type: %1%2%3%4")
                 .arg(QChar(static_cast<char>((name >> 24) & 0xFF)))
@@ -1335,8 +1336,18 @@ bool Data::continueLoading(Messages& messages)
             case 'SPEL': spellCollection.load(*reader, base);  break;
             case 'MGEF': magicCollection.load(*reader, base); break;
             case 'QUST': questCollection.load(*reader, base); break;
-            case 'DIAL': dialCollection.load(*reader, base);   break;
-            case 'INFO': infoCollection.load(*reader, base);   break;
+            case 'DIAL': dialCollection.load(*reader, base);
+                if (dialCollection.size() > 0)
+                    m_lastDialFormId =
+                        dialCollection.getRecord(dialCollection.size() - 1).get().formId;
+                break;
+            case 'INFO': infoCollection.load(*reader, base);
+                if (infoCollection.size() > 0)
+                {
+                    const quint32 fid = infoCollection.getRecord(infoCollection.size() - 1).get().formId;
+                    m_infoParentDial[fid] = m_lastDialFormId;
+                }
+                break;
             case 'GLOB': globCollection.load(*reader, base);   break;
             case 'LCRT': lcrtCollection.load(*reader, base);   break;
             case 'PACK': packCollection.load(*reader, base);   break;
@@ -1569,6 +1580,12 @@ bool Data::continueLoading(Messages& messages)
                 break;
             }
             }
+
+            // Record the edited plugin's own load order (masters are only
+            // indexed, and materialized records parse with base=true, so
+            // neither pollutes it). The save path replays this sequence.
+            if (name != static_cast<NAME>('GRUP') && name != 0 && !base)
+                m_pluginOrder.append({ name, reader->currentFormId() });
         }
         catch (const std::exception& e)
         {
@@ -1830,6 +1847,23 @@ QVector<quint32> Data::cellsInWorldspace(quint32 worldspaceId)
     return out;
 }
 
+QVector<quint32> Data::infosUnderDial(quint32 dialFormId)
+{
+    QVector<quint32> out;
+    if (dialFormId == 0)
+        return out;
+    const auto& infos = infoCollection;
+    for (int i = 0; i < infos.size(); ++i)
+    {
+        const Record<InfoRecord>& rec = infos.getRecord(i);
+        if (rec.isDeleted())
+            continue;
+        if (m_infoParentDial.value(rec.get().formId, 0) == dialFormId)
+            out.append(rec.get().formId);
+    }
+    return out;
+}
+
 bool Data::beginTypeMaterialization(int typeId)
 {
     const NAME name = typeNameFor(typeId);
@@ -1850,6 +1884,14 @@ bool Data::beginTypeMaterialization(int typeId)
     m_matPos = 0;
     m_matFile = -1;
     m_matLoaded = 0;
+    // OPENCK_TEST_PER_TYPE_LIMIT (default 0 = unlimited) caps how many
+    // master records of each type are materialized. Used to keep full
+    // heap-validation / page-heap runs within memory limits while still
+    // exercising every type's parser.
+    {
+        const QByteArray env = qgetenv("OPENCK_TEST_PER_TYPE_LIMIT");
+        m_matLimit = env.isEmpty() ? 0 : env.toInt();
+    }
     m_matPrevBase = base;
     m_matting = true;
     base = true;
@@ -1879,6 +1921,11 @@ int Data::materializeNextBatch(int typeId, int maxRecords)
         if (!continueLoading(messages))
             ++m_matLoaded;
         ++processed;
+        if (m_matLimit > 0 && m_matLoaded >= m_matLimit)
+        {
+            finishTypeMaterialization();
+            return processed;
+        }
     }
 
     if (m_matPos >= m_pendingMaterialize.size())
@@ -3204,6 +3251,7 @@ bool Data::removeRecord(CkId::Type type, const QString& id)
 {
     BaseCollection* col = getCollectionByType(type);
     if (!col) return false;
+    mNextLocalId = 0x800;
     return col->removeRecordWithUndo(id, mUndoStack);
 }
 
@@ -4286,9 +4334,6 @@ quint32 Data::createNewRecord(CkId::Type type, const QString& editorId)
 {
     QString finalEditorId = editorId.isEmpty() ? "new" : editorId.toLower();
 
-    // Bethesda form IDs: the high byte is the plugin's load-order index
-    // (0x00..0xFD); light plugins use the 0xFE prefix with a separate
-    // index space. The edited plugin is the last content file.
     int editedIndex = static_cast<int>(getContentFiles().size()) - 1;
     if (editedIndex < 0)
         editedIndex = 0;
@@ -4307,11 +4352,13 @@ quint32 Data::createNewRecord(CkId::Type type, const QString& editorId)
         }
     }
 
-    // Allocate sequentially from the top of the local id space so the
-    // next object id stays dense and collision-free.
-    for (quint32 id = 0x800; id < 0x100000; ++id) {
+    if (mNextLocalId < 0x800)
+        mNextLocalId = 0x800;
+
+    for (quint32 id = mNextLocalId; id < 0x100000; ++id) {
         quint32 formId = base | id;
         if (!usedFormIds.contains(formId)) {
+            mNextLocalId = id + 1;
             LOG_INFO(QString("Created new record '%1' with FormID 0x%2")
                      .arg(finalEditorId, QString::number(formId, 16).toUpper()));
             return formId;

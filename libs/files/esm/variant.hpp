@@ -1,6 +1,7 @@
 #ifndef VARIANT_H
 #define VARIANT_H
 
+#include <QByteArray>
 #include <QVariant>
 
 class ESMReader;
@@ -61,11 +62,13 @@ public:
     void write(ESMWriter& esm, Format format) const;
 
     const QVariant& getData() const;
+    const QByteArray& getRawData() const { return rawData; }
 
 private:
     VariantType type;
     QVariant data;
     LString lstring;
+    QByteArray rawData;
 };
 
 bool operator==(const Variant& l, const Variant& r);

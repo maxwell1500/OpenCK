@@ -323,37 +323,91 @@ public:
         switch (subrecordName)
         {
         case NAME('NAME'):
-            baseId = esm.readType<quint32>();
+            // Starfield writes some NAME subrecords shorter than 32 bits.
+            // Read only declared bytes LE so the stream never overruns.
+            if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
+            {
+                quint32 v = 0;
+                qint64 n = esm.subLeft();
+                for (qint64 i = 0; i < n; ++i)
+                    v |= quint32(esm.readType<quint8>()) << (8 * i);
+                baseId = v;
+            }
+            else
+                baseId = esm.readType<quint32>();
             break;
         case NAME('DATA'):
-            posX = esm.readType<float>();
-            posY = esm.readType<float>();
-            posZ = esm.readType<float>();
-            rotX = esm.readType<float>();
-            rotY = esm.readType<float>();
-            rotZ = esm.readType<float>();
+            // DATA is 6 floats (24B) plus an optional 7th scale float.
+            // Short variants exist; never read past the declared size.
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                posX = esm.readType<float>();
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                posY = esm.readType<float>();
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                posZ = esm.readType<float>();
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                rotX = esm.readType<float>();
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                rotY = esm.readType<float>();
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                rotZ = esm.readType<float>();
             // Starfield/Skyrim DATA is 24 bytes (no scale); some legacy
             // records carry a 7th float. Only read it when it is present.
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
                 scale = esm.readType<float>();
             break;
         case NAME('XSCL'):
-            scale = esm.readType<float>();
+            if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+                scale = esm.readType<float>();
             break;
         case NAME('XOWN'):
-            owner = esm.readType<quint32>();
+            if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
+            {
+                quint32 v = 0;
+                qint64 n = esm.subLeft();
+                for (qint64 i = 0; i < n; ++i)
+                    v |= quint32(esm.readType<quint8>()) << (8 * i);
+                owner = v;
+            }
+            else
+                owner = esm.readType<quint32>();
             break;
         case NAME('DNAM'):
-            lockLevel = esm.readType<quint32>();
+            if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
+            {
+                quint32 v = 0;
+                qint64 n = esm.subLeft();
+                for (qint64 i = 0; i < n; ++i)
+                    v |= quint32(esm.readType<quint8>()) << (8 * i);
+                lockLevel = v;
+            }
+            else
+                lockLevel = esm.readType<quint32>();
             break;
         case NAME('XESP'):
-            initiallyDisabled = (esm.readType<quint32>() != 0);
+            // Observed as 1-byte in the wild; read declared bytes LE.
+            if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
+            {
+                quint32 v = 0;
+                qint64 n = esm.subLeft();
+                for (qint64 i = 0; i < n; ++i)
+                    v |= quint32(esm.readType<quint8>()) << (8 * i);
+                initiallyDisabled = (v != 0);
+            }
+            else
+                initiallyDisabled = (esm.readType<quint32>() != 0);
             break;
         case NAME('SCRI'):
         {
+            if (esm.subLeft() <= 0)
+            {
+                scriptIds.clear();
+                break;
+            }
             qint64 n = esm.subLeft() / 4;
             scriptIds.clear();
-            scriptIds.reserve(n);
+            if (n > 0)
+                scriptIds.reserve(n);
             for (qint64 i = 0; i < n; ++i)
                 scriptIds.append(esm.readType<quint32>());
             break;
@@ -806,10 +860,10 @@ public:
             std::vector<EnumEditorProperty::Entry>{
                 {"Any", 0}, {"Low", 1}, {"Standard", 2},
                 {"High", 3}, {"None", 4}}));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Energy"), reinterpret_cast<qint32*>(&energy)));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood"), reinterpret_cast<qint32*>(&mood)));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood Speed"), reinterpret_cast<qint32*>(&moodSpeed)));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Disposition"), reinterpret_cast<qint32*>(&disposition)));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Energy"), reinterpret_cast<qint32*>(&energy), 0, 255));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood"), reinterpret_cast<qint32*>(&mood), -32768, 32767));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood Speed"), reinterpret_cast<qint32*>(&moodSpeed), 0, 255));
+        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Disposition"), reinterpret_cast<qint32*>(&disposition), 0, 255));
         return out;
     }
 

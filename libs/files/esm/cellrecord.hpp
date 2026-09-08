@@ -15,16 +15,32 @@ struct CellRecord
 {
     openck::FormComponents components;
     QString editorId;
-    quint32 formId;
-    quint8 flags;
-    quint32 cellX;
-    quint32 cellY;
-    quint32 owner;
-    quint32 lockLevel;
+    quint32 formId = 0;
+    quint32 flags = 0;
+    // Width the DATA flags were stored with (Starfield writes 4 bytes,
+    // older games 1); preserved so an untouched save is payload-identical.
+    quint8 dataWidth = 1;
+    // Bytes past the decoded prefix that a variant-width subrecord carried
+    // (exterior XCLC is 12 bytes, not 8). Re-emitted verbatim on save.
+    QByteArray dataExtra;
+    quint32 cellX = 0;
+    quint32 cellY = 0;
+    QByteArray xclcExtra;
+    quint32 owner = 0;
+    quint32 lockLevel = 0;
     QString cellName;
     bool hasWaterHeight = false;
     float waterHeight = 0.0f;
     QVector<RawSubRecord> rawSubRecords;
+    // Subrecord order seen at load, so an untouched save re-emits the
+    // record payload-identical (the snapshot gate compares positionally).
+    QVector<NAME> loadOrder;
+    bool hasData = false;
+    bool hasFull = false;
+    bool hasXclc = false;
+    bool hasOwner = false;
+    bool hasLock = false;
+    bool hasXclw = false;
 
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

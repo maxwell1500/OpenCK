@@ -316,8 +316,9 @@ void ESMReader::restoreStreamFromCompression()
     // read will be misaligned. This is logged as a warning.
     if (esm.recLeft != 0)
     {
-        LOG_WARNING(QString("ESMReader: restoreStreamFromCompression with recLeft=%1, possible misalignment")
-            .arg(esm.recLeft));
+        LOG_WARNING(QString("ESMReader: restoreStreamFromCompression with recLeft=%1, possible misalignment (record 0x%2)")
+            .arg(esm.recLeft)
+            .arg(mCurrentFormId, 8, 16, QChar('0')));
     }
 }
 
@@ -419,7 +420,8 @@ int ESMReader::recordCount()
 void ESMReader::skipRecord()
 {
     readHeader();
-    skip(esm.recLeft);
+    if (esm.recLeft > 0)
+        skip(static_cast<int>(esm.recLeft));
     // readHeader may have switched reads to a decompression buffer;
     // restore the file stream so the next record is read from the file.
     restoreStreamFromCompression();

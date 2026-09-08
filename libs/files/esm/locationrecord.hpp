@@ -15,14 +15,22 @@ struct LocationRecord
 {
     openck::FormComponents components;
     QString editorId;
-    quint32 formId;
-    quint32 flags;
+    quint32 formId = 0;
+    quint32 flags = 0;
     QString locationName;
-    quint32 parentId;
-    quint32 x;
-    quint32 y;
-    quint32 z;
+    quint32 parentId = 0;
+    quint32 x = 0;
+    quint32 y = 0;
+    quint32 z = 0;
     QVector<RawSubRecord> rawSubRecords;
+    // Subrecord order seen at load, so an untouched save re-emits the
+    // record payload-identical (the snapshot gate compares positionally).
+    QVector<NAME> loadOrder;
+    bool hasFlags = false;
+    quint32 flagsSpelling = NAME('FNAM');
+    bool hasFull = false;
+    bool hasParent = false;
+    bool hasData = false;
 
     // One linked-reference group (Skyrim LCTN): an XNAM subrecord holds the
     // LocationRefType (LCRT) form ID, followed by one LNAM subrecord per
