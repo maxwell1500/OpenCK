@@ -48,6 +48,10 @@ QString Editor::getDataPath(const QString& applicationName)
     }
     conf.endGroup();
 
+    const QByteArray envDataDir = qgetenv("OPENCK_DATA_DIR");
+    if (!envDataDir.isEmpty() && QDir(QString::fromLocal8Bit(envDataDir)).exists())
+        dataPath = QString::fromLocal8Bit(envDataDir);
+
     // If the stored path doesn't exist, try auto-detection
     if (!QDir(dataPath).exists())
     {

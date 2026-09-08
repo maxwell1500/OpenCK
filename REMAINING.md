@@ -244,8 +244,12 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 ## 4. Test infrastructure
 
 1. **`OPENCK_DATA_DIR`** env var honored by all real-data tests (currently
-   hardcoded to `C:/XboxGames/Starfield/Content/Data`); skip cleanly when
-   absent.
+    hardcoded to `C:/XboxGames/Starfield/Content/Data`); skip cleanly when
+    absent.
+
+    **Status 2026-09-08:** `editor.cpp` now checks `OPENCK_DATA_DIR` env var
+    (takes priority over config file, before auto-detection). Tests still
+    hardcode the path; they should read the env var too.
 2. **Materialization matrix test** — index count vs. loaded count vs. warning
    count for every type from a full master load; assert warnings == 0 or an
    explicitly shrinking allowlist.
