@@ -2,6 +2,7 @@
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
 #include "../../components/tier3_components.hpp"
+#include <cstring>
 
 void DialRecord::initComponents()
 {
@@ -32,6 +33,20 @@ void DialRecord::load(ESMReader& esm, bool)
         {
             case 'EDID': editorId = esm.readZString(); break;
             case 'FULL': topicName = esm.readZString(); break;
+            case 'INAM':
+            {
+                QByteArray data;
+                esm.readRawSubData(data);
+                hasInam = true;
+                responseIds.clear();
+                for (int i = 0; i + 4 <= data.size(); i += 4)
+                {
+                    quint32 id;
+                    memcpy(&id, data.constData() + i, 4);
+                    responseIds.append(id);
+                }
+                break;
+            }
             default:
             {
                 RawSubRecord raw;
@@ -52,6 +67,17 @@ void DialRecord::save(ESMWriter& esm) const
     esm.writeSubZString('EDID', editorId);
     if (!topicName.isEmpty())
         esm.writeSubZString('FULL', topicName);
+    if (hasInam)
+    {
+        RawSubRecord raw;
+        raw.name = 'INAM';
+        raw.data.resize(responseIds.size() * 4);
+        for (int i = 0; i < responseIds.size(); ++i)
+        {
+            memcpy(raw.data.data() + i * 4, &responseIds[i], 4);
+        }
+        esm.writeRawSubRecord(raw);
+    }
     components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)
@@ -70,6 +96,7 @@ void DialRecord::blank()
     conditionIds.clear();
     animationIds.clear();
     emotionIds.clear();
+    hasInam = false;
     rawSubRecords.clear();
     initComponents();
 }

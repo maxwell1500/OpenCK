@@ -140,7 +140,17 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
    compacted.
 
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
-   parsed but not walked into a DIAL→INFO tree for the dialogue editor.
+    parsed but not walked into a DIAL→INFO tree for the dialogue editor.
+
+    **Status 2026-09-08:** `DialRecord::load()` now parses INAM into
+    `responseIds` (was falling through to `rawSubRecords`). `save()`
+    re-emits INAM from `responseIds` when `hasInam` is set. Round-trip
+    verified by `testSyntheticMultiTypeRoundTrip` (DIAL with 2 response
+    IDs round-trips identically). Remaining: `DialogueTreeEditor`
+    should use `responseIds` (now populated) to show INFO children;
+    `DialogueEditorWidget::populateTree()` should use
+    `infosUnderDial()`; `addInfo` should update `responseIds` and
+    `m_infoParentDial`.
 
  5. **Master-record state machine on save.** Verify that a materialized
     (deferred) master record saved without edits is not emitted as an override,

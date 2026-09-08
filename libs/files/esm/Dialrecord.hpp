@@ -18,6 +18,7 @@ struct DialRecord {
     QVector<quint32> conditionIds;
     QVector<quint32> animationIds;
     QVector<quint32> emotionIds;
+    bool hasInam = false;
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
@@ -31,7 +32,8 @@ inline bool operator==(const DialRecord& l, const DialRecord& r)
         && l.formId == r.formId && l.flags == r.flags
         && l.topicName == r.topicName && l.responseIds == r.responseIds
         && l.conditionIds == r.conditionIds && l.animationIds == r.animationIds
-        && l.emotionIds == r.emotionIds && l.rawSubRecords == r.rawSubRecords;
+        && l.emotionIds == r.emotionIds && l.hasInam == r.hasInam
+        && l.rawSubRecords == r.rawSubRecords;
 }
 
 inline bool operator!=(const DialRecord& l, const DialRecord& r)

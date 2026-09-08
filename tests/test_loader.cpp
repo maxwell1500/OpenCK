@@ -148,6 +148,7 @@ EarlyPageHeap g_earlyPageHeap;
 #include "../../libs/files/esm/worldspacerecord.hpp"
 #include "../../libs/files/esm/glob.hpp"
 #include "../../libs/files/esm/Statrecord.hpp"
+#include "../../libs/files/esm/Dialrecord.hpp"
 #include "../../libs/files/esm/subrecordsnapshot.hpp"
 #include "../../libs/files/log/logger.hpp"
 
@@ -752,6 +753,18 @@ void TestLoaderSinglePass::testSyntheticMultiTypeRoundTrip()
             RecHeader h; h.id = 0x804;
             writer.startRecord('WRLD', h);
             wrl.save(writer);
+            writer.endRecord();
+        }
+        {
+            DialRecord dial;
+            dial.editorId = QStringLiteral("SynthDIAL");
+            dial.formId = 0x805;
+            dial.topicName = QStringLiteral("Synthetic Topic");
+            dial.hasInam = true;
+            dial.responseIds = { 0x806, 0x807 };
+            RecHeader h; h.id = 0x805;
+            writer.startRecord('DIAL', h);
+            dial.save(writer);
             writer.endRecord();
         }
 
