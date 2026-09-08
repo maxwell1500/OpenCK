@@ -203,21 +203,35 @@ void DialogueEditorWidget::onEditCondition()
 void DialogueEditorWidget::onAddInfo()
 {
     LOG_DEBUG("Add info clicked");
-    
-    if (!mData) return;
+
+    if (!mData || currentDialId.isEmpty()) return;
+
+    auto& dialCollection = mData->getDialCollection();
+    int dialIdx = dialCollection.searchId(currentDialId);
+    if (dialIdx < 0) return;
+
+    const QString editorId = QString("NewInfo_%1").arg(mData->getInfoCollection().size());
+    const quint32 newFormId = mData->createNewRecord(CkId::Type_Info_, editorId);
+
+    InfoRecord newInfo;
+    newInfo.editorId = editorId;
+    newInfo.formId = newFormId;
+    newInfo.responseText = QStringLiteral("New dialogue response");
+    newInfo.flags = 0;
 
     auto& infoCollection = mData->getInfoCollection();
-    
-    InfoRecord newInfo;
-    newInfo.editorId = QString("NewInfo_%1").arg(infoCollection.size());
-    newInfo.formId = 0;
-    newInfo.responseText = "New dialogue response";
-    newInfo.flags = 0;
-    
     infoCollection.add(newInfo);
+
+    DialRecord& dial = dialCollection.getRecord(dialIdx).get();
+    dial.responseIds.append(newFormId);
+    dial.hasInam = true;
+    dialCollection.getRecord(dialIdx).setModified(dial);
+
+    mData->setInfoParentDial(newFormId, dial.formId);
     populateTree();
-    
-    LOG_INFO(QString("Added new info record: %1").arg(newInfo.editorId));
+
+    LOG_INFO(QString("Added new info '%1' (0x%2) under DIAL '%3'")
+        .arg(editorId).arg(newFormId, 8, 16, Qt::CaseLower, QChar('0')).arg(currentDialId));
 }
 
 void DialogueEditorWidget::onRemoveInfo()

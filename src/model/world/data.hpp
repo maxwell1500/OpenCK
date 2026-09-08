@@ -337,6 +337,12 @@ public:
         m_refrParentCell[refrFormId] = cellFormId;
     }
 
+    /// \brief Link an INFO record to its parent DIAL (for tree walking).
+    void setInfoParentDial(quint32 infoFormId, quint32 dialFormId)
+    {
+        m_infoParentDial[infoFormId] = dialFormId;
+    }
+
     // One record of the edited plugin in file sequence (GRUPs excluded).
     struct PluginRecordRef
     {
