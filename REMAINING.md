@@ -116,9 +116,12 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
       `IRecordCollection` hooks: `isRecordSaveable`,
       `saveRecordAt` (returns whether anything was written),
       `saveModifiedRecordsExcept`.
-    Remaining: corpus beyond Vvardenfell.esp (Starfield.esm-scale round-trip
-    is not gated), the ~36 `Variant::load` GMST/GLOB LOG_ERRORs (errors, not
-    warnings — outside both gates).
+    **Status 2026-09-08:** `testSyntheticMultiTypeRoundTrip` added — writes a
+    plugin with NPC_/GLOB/STAT/WRLD records, loads, saves untouched, and
+    asserts subrecord-identical output. Always runs (no real-data dependency).
+    Remaining: full Starfield.esm-scale round-trip (3.8M records) is a CI/
+    nightly job, not a unit test. The ~36 `Variant::load` GMST/GLOB LOG_ERRORs
+    (errors, not warnings — outside both gates) remain.
 
     **Status 2026-09-04:** `LocationRecord::locationName` is persisted now.
     `FULL` was consumed as an opaque raw (the shared
@@ -139,10 +142,14 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
    parsed but not walked into a DIAL→INFO tree for the dialogue editor.
 
-5. **Master-record state machine on save.** Verify that a materialized
-   (deferred) master record saved without edits is not emitted as an override,
-   and that an edit promotes base → modified correctly (State_Base /
-   State_Modified / State_ModifiedOnly) across the corpus save path.
+ 5. **Master-record state machine on save.** Verify that a materialized
+    (deferred) master record saved without edits is not emitted as an override,
+    and that an edit promotes base → modified correctly (State_Base /
+    State_Modified / State_ModifiedOnly) across the corpus save path.
+
+    **Status 2026-09-08:** Verified. `testMasterRecordSaveStateMachine` passes:
+    master record materializes as `State_Base`, is NOT emitted on untouched
+    save, promotes to `State_Modified` on edit, and IS emitted as an override.
 
 6. **ObjectPalette save/load asymmetry.** "Save Placement" never writes a file
    (it only appends in-memory) while "Load Placement" reads a binary file.

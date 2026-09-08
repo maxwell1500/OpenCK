@@ -146,6 +146,8 @@ EarlyPageHeap g_earlyPageHeap;
 #include "../../libs/files/esm/esmwriter.hpp"
 #include "../../libs/files/esm/npcrecord.hpp"
 #include "../../libs/files/esm/worldspacerecord.hpp"
+#include "../../libs/files/esm/glob.hpp"
+#include "../../libs/files/esm/Statrecord.hpp"
 #include "../../libs/files/esm/subrecordsnapshot.hpp"
 #include "../../libs/files/log/logger.hpp"
 
@@ -167,6 +169,7 @@ private slots:
     void testSaveRoundTripGRUP();
     void testFormIdAllocation();
     void testSaveRoundTripSubrecordIdentical();
+    void testSyntheticMultiTypeRoundTrip();
     void testMasterRecordSaveStateMachine();
     void testMaterializationMatrixZeroWarnings();
     void testDialInfoParentWalking();
@@ -690,6 +693,110 @@ void TestLoaderSinglePass::testFormIdAllocation()
     QCOMPARE(a >> 24, static_cast<quint32>(0x01));
     QVERIFY((a & 0xFFFFFF) >= 0x800);
     qDebug() << "allocated form id" << QString::number(a, 16);
+}
+
+// Synthetic multi-type round-trip: write a plugin with one record of each
+// major type, load it, save untouched, and verify the subrecord payloads
+// are identical. Always runs (no real-data dependency).
+void TestLoaderSinglePass::testSyntheticMultiTypeRoundTrip()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString pluginPath = tmp.filePath("synth_roundtrip.esp");
+
+    {
+        QFile file(pluginPath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        ESMWriter writer;
+        writer.setAuthor("Synthetic Round-Trip Test");
+        writer.save(file);
+
+        {
+            NpcRecord npc;
+            npc.editorId = QStringLiteral("SynthNPC");
+            npc.formId = 0x801;
+            npc.fullName = QStringLiteral("Synthetic NPC");
+            npc.level = 10;
+            RecHeader h; h.id = 0x801;
+            writer.startRecord('NPC_', h);
+            npc.save(writer);
+            writer.endRecord();
+        }
+        {
+            GlobalVariable glob;
+            glob.editorId = QStringLiteral("SynthGlob");
+            glob.value = Variant(quint32(42));
+            glob.constant = false;
+            RecHeader h; h.id = 0x802;
+            writer.startRecord('GLOB', h);
+            glob.save(writer);
+            writer.endRecord();
+        }
+        {
+            StatRecord stat;
+            stat.editorId = QStringLiteral("SynthStat");
+            stat.formId = 0x803;
+            stat.iconPath = QStringLiteral("icons\\test.dds");
+            stat.modelPath = QStringLiteral("meshes\\test.nif");
+            stat.flags = 0;
+            RecHeader h; h.id = 0x803;
+            writer.startRecord('STAT', h);
+            stat.save(writer);
+            writer.endRecord();
+        }
+        {
+            WorldspaceRecord wrl;
+            wrl.editorId = QStringLiteral("SynthWRLD");
+            wrl.formId = 0x804;
+            wrl.name = QStringLiteral("Synthetic World");
+            RecHeader h; h.id = 0x804;
+            writer.startRecord('WRLD', h);
+            wrl.save(writer);
+            writer.endRecord();
+        }
+
+        writer.close();
+        file.close();
+    }
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+
+    Document* doc = mediator.makeDocument(
+        QStringList{ QStringLiteral("synth_roundtrip.esp") },
+        tmp.path() + QStringLiteral("/synth_roundtrip.esp"), false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(doc);
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+
+    QTemporaryDir out;
+    const QString savedPath = out.path() + QStringLiteral("/synth_saved.esp");
+    doc->save(savedPath);
+    QVERIFY(QFileInfo::exists(savedPath));
+
+    const auto src = openck::collectRecordSnapshots(pluginPath);
+    const auto dst = openck::collectRecordSnapshots(savedPath);
+
+    QCOMPARE(src.size(), dst.size());
+    QStringList diffs;
+    const int n = qMin(src.size(), dst.size());
+    for (int i = 0; i < n; ++i)
+    {
+        if (src.at(i) != dst.at(i))
+            diffs.append(QStringLiteral("%1: %2 0x%3 (subs %4 -> %5)")
+                .arg(i)
+                .arg(openck::snapshotName(src.at(i).type))
+                .arg(src.at(i).formId, 8, 16, QChar('0'))
+                .arg(src.at(i).subs.size())
+                .arg(dst.at(i).subs.size()));
+    }
+    if (!diffs.isEmpty())
+        qWarning().noquote() << "synthetic round-trip diffs:\n" << diffs.join(QStringLiteral("\n"));
+    QVERIFY2(diffs.isEmpty(),
+        qPrintable(QStringLiteral("synthetic round-trip is not payload-identical (%1 differ)")
+            .arg(diffs.size())));
+    qDebug() << "synthetic multi-type round-trip OK" << src.size() << "records";
 }
 
 // Untouched round-trip must be payload-identical (Phase 1.2): load SeydaNeen
