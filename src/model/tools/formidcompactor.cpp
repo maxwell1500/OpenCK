@@ -41,10 +41,12 @@ QString recordName(quint32 n)
 // are u32-aligned) to avoid flagging arbitrary mid-payload data, and skips
 // the subrecords documented as primitive descriptors that carry no FormIDs
 // (XPRM: bounds/color/shape; verified against real Starfield.esm). Returns a
-// human-readable location of the first stale reference, or empty when clean.
+// multi-line diagnostic listing every stale reference found, or empty when
+// clean.
 QString scanStaleRawReferences(const QVector<QPair<IRecordCollection*, int>>& owned,
     const QHash<quint32, quint32>& map)
 {
+    QStringList lines;
     for (const auto& entry : owned)
     {
         IRecordCollection* col = entry.first;
@@ -55,7 +57,7 @@ QString scanStaleRawReferences(const QVector<QPair<IRecordCollection*, int>>& ow
         for (const RawSubPayload& raw : raws)
         {
             if (raw.name == static_cast<quint32>(NAME('XPRM')))
-                continue;  // primitive descriptor, no FormID slots
+                continue;
             for (int off = 0; off + 4 <= raw.data.size(); off += 4)
             {
                 quint32 v = 0;
@@ -63,16 +65,23 @@ QString scanStaleRawReferences(const QVector<QPair<IRecordCollection*, int>>& ow
                 const auto it = map.constFind(v);
                 if (it != map.constEnd() && it.value() != v)
                 {
-                    return QString("record %1, sub %2 @ byte %3 = stale FormID 0x%4")
+                    lines.append(QString("  record 0x%1, sub %2 @ byte %3: stale FormID 0x%4 (should be 0x%5)")
                         .arg(own, 8, 16, QChar('0'))
                         .arg(recordName(raw.name))
                         .arg(off)
-                        .arg(v, 8, 16, QChar('0'));
+                        .arg(v, 8, 16, QChar('0'))
+                        .arg(it.value(), 8, 16, QChar('0')));
                 }
             }
         }
     }
-    return QString();
+    if (lines.isEmpty())
+        return QString();
+    return QString("%1 unhandled opaque FormID reference(s) found:\n%2\n"
+        "These subrecord layouts are not yet documented for rewrite.\n"
+        "File desync would occur if compaction proceeded.")
+        .arg(lines.size())
+        .arg(lines.join('\n'));
 }
 
 // Rewrite the quint32 FormID stored at byte `offset` of a raw subrecord
@@ -580,8 +589,8 @@ int FormIdCompactor::compact()
         const QString stale = scanStaleRawReferences(owned, map);
         if (!stale.isEmpty())
         {
-            LOG_ERROR(QString("FormIdCompactor: refusing compaction, unhandled opaque FormID reference: %1")
-                .arg(stale));
+            mRefusalMessage = stale;
+            LOG_ERROR(QString("FormIdCompactor: refusing compaction:\n%1").arg(stale));
             return -2;
         }
     }

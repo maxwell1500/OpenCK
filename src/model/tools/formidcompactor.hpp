@@ -52,11 +52,18 @@ public:
     /// and component-held FormIDs).
     int rewrittenReferences() const { return mRewritten; }
 
+    /// Full diagnostic when compact() returns -2: lists every unhandled
+    /// opaque FormID reference found (record, subrecord name, byte offset,
+    /// stale FormID). Empty when compaction succeeded or was refused for
+    /// another reason (ESL ceiling).
+    QString refusalMessage() const { return mRefusalMessage; }
+
 private:
     Data& mData;
     int mOwned = 0;
     int mRemapped = 0;
     int mRewritten = 0;
+    QString mRefusalMessage;
 };
 
 #endif // FORMIDCOMPACTOR_H

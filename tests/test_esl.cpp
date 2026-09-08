@@ -520,6 +520,11 @@ void TestEsl::testCompactorRefusesUnhandledOpaqueReference()
     // Refusal must not partially remap records.
     QCOMPARE(statCol.getFormId(statCol.searchId("targetstat")), 0x00100100u);
     QCOMPARE(statCol.getFormId(statCol.searchId("holderstat")), 0x00100200u);
+    // The diagnostic must name the offending subrecord and stale FormID.
+    const QString msg = compactor.refusalMessage();
+    QVERIFY2(msg.contains("XTST"), qPrintable(msg));
+    QVERIFY2(msg.contains("0x00100100"), qPrintable(msg));
+    QVERIFY2(msg.contains("0x00100200"), qPrintable(msg));
 }
 
 void TestEsl::testLightMasterFlagRoundTrip()
