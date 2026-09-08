@@ -142,20 +142,31 @@ void DialogueEditorWidget::populateTree()
     if (!mData) return;
 
     treeWidget->clear();
+    if (currentDialId.isEmpty()) return;
 
+    auto& dialCollection = mData->getDialCollection();
+    int dialIdx = dialCollection.searchId(currentDialId);
+    if (dialIdx < 0) return;
+
+    const DialRecord& dial = dialCollection.getRecord(dialIdx).get();
     const auto& infoCollection = mData->getInfoCollection();
     int count = 0;
 
-    for (int i = 0; i < infoCollection.size(); i++) {
-        const auto& infoRecord = infoCollection.getRecord(i);
-        auto* item = new QTreeWidgetItem(treeWidget);
-        item->setText(0, infoRecord.get().editorId);
-        item->setText(1, "Info");
-        item->setText(2, "");
-        count++;
+    for (quint32 responseId : dial.responseIds) {
+        for (int i = 0; i < infoCollection.size(); i++) {
+            const InfoRecord& info = infoCollection.getRecord(i).get();
+            if (info.formId == responseId) {
+                auto* item = new QTreeWidgetItem(treeWidget);
+                item->setText(0, info.editorId);
+                item->setText(1, "Info");
+                item->setText(2, info.responseText.left(50));
+                count++;
+                break;
+            }
+        }
     }
 
-    LOG_INFO(QString("Loaded %1 info nodes").arg(count));
+    LOG_INFO(QString("Loaded %1 info nodes for DIAL '%1'").arg(count).arg(currentDialId));
 }
 
 void DialogueEditorWidget::updateEditor()
