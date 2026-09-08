@@ -41,6 +41,7 @@
       <addaction name="actionCreateArchive"/>
       <addaction name="actionCompilePapyrusScripts"/>
       <addaction name="actionCompactSmallMaster"/>
+      <addaction name="actionConvertToESL"/>
       <addaction name="separator"/>
       <addaction name="actionPreferences"/>
       <addaction name="actionValidate"/>
@@ -383,10 +384,15 @@
       </property>
      </action>
      <action name="actionCompactSmallMaster">
-      <property name="text">
-       <string>Compact Small Master...</string>
-      </property>
-     </action>
+       <property name="text">
+        <string>Compact Small Master...</string>
+       </property>
+      </action>
+      <action name="actionConvertToESL">
+       <property name="text">
+        <string>Convert to ESL (Light Master)...</string>
+       </property>
+      </action>
       <action name="actionSaveLayout">
       <property name="text">
        <string>Save Layout...</string>

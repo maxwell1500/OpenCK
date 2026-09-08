@@ -14,6 +14,7 @@
 #include "../../model/tools/perforcerepository.hpp"
 #include "../../model/tools/primitivemeshgenerator.hpp"
 #include "../../model/tools/plugincompactor.hpp"
+#include "../../model/tools/formidcompactor.hpp"
 #include "../../model/tools/bnetclient.hpp"
 #include "../../model/doc/messages.hpp"
 #include "filepaths.hpp"
@@ -2710,6 +2711,63 @@ void MainWindow::on_actionCompactSmallMaster_triggered()
             .arg(result.renumbered)
             .arg(result.repointedReferences)
             .arg(result.skippedMasterOwned));
+}
+
+void MainWindow::on_actionConvertToESL_triggered()
+{
+    LOG_DEBUG("Convert to ESL triggered");
+
+    if (!mData) {
+        QMessageBox::information(this, "Convert to ESL",
+            "No document is currently loaded.\n\n"
+            "Open a plugin file first via File > Data.");
+        return;
+    }
+
+    FormIdCompactor compactor(*mData);
+    const int owned = compactor.ownedRecordCount();
+    if (owned == 0) {
+        QMessageBox::information(this, "Convert to ESL",
+            "No owned (modified/new) records found.\n\n"
+            "Add or modify records before converting to ESL.");
+        return;
+    }
+
+    auto ret = QMessageBox::question(this, "Convert to ESL (Light Master)",
+        QString("This will remap %1 owned record(s) into the ESL FormID range\n"
+                "0x000-0xFFF so the plugin can be saved as a .esl (light master).\n\n"
+                "Maximum: 4096 records. High master bits are preserved.\n\n"
+                "Continue?").arg(owned),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (ret != QMessageBox::Yes) return;
+
+    const int result = compactor.compact();
+    if (result == -1) {
+        QMessageBox::critical(this, "Convert to ESL",
+            QString("Plugin owns %1 records, exceeding the ESL ceiling of 4096.\n\n"
+                    "Remove records or split the plugin before converting.").arg(owned));
+        return;
+    }
+    if (result == -2) {
+        QMessageBox::critical(this, "Convert to ESL",
+            QString("Compaction refused — unhandled FormID reference detected.\n\n%1")
+                .arg(compactor.refusalMessage()));
+        return;
+    }
+
+    QString savePath = QFileDialog::getSaveFileName(this, "Save as ESL",
+        QString(), "Light Master (*.esl)");
+    if (savePath.isEmpty()) return;
+
+    mData->getData().getPaths().dataDir.setPath(QFileInfo(savePath).absolutePath());
+    emit actionSaveAs_triggered();
+
+    QMessageBox::information(this, "Convert to ESL",
+        QString("Successfully remapped %1 record(s).\n"
+                "References rewritten: %2\n\n"
+                "Save the file as .esl to complete the conversion.")
+            .arg(result)
+            .arg(compactor.rewrittenReferences()));
 }
 
 void MainWindow::on_actionSaveAllButton_triggered()

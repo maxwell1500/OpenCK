@@ -155,6 +155,7 @@ private slots:
     void on_actionFactionEditor_triggered();
     void on_actionCompilePapyrusScripts_triggered();
     void on_actionCompactSmallMaster_triggered();
+    void on_actionConvertToESL_triggered();
     void on_actionSaveAllButton_triggered();
     void on_actionCheckOut_triggered();
     void on_actionCheckIn_triggered();
