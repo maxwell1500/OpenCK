@@ -134,10 +134,19 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     `test_locationrecord` asserts the name survives a save/load cycle.
 
 3. **FormIdCompactor leaves opaque FormID references stale.** `XPRM` and other
-   opaque Starfield raw payloads are not rewritten on compaction
-   (`formidcompactor.cpp::rewriteRawSubRecords` only handles the known set).
-   Either decode-and-rewrite or fail loudly when such a payload would be
-   compacted.
+    opaque Starfield raw payloads are not rewritten on compaction
+    (`formidcompactor.cpp::rewriteRawSubRecords` only handles the known set).
+    Either decode-and-rewrite or fail loudly when such a payload would be
+    compacted.
+
+    **Status 2026-09-08:** The "fail loudly" half is complete with enhanced
+    diagnostics. `scanStaleRawReferences` now collects ALL stale references
+    (not just the first) and the refusal message lists every offending
+    record/subrecord/byte-offset with the stale and expected FormIDs. New
+    `refusalMessage()` accessor exposes the full diagnostic to callers.
+    `XPRM` is correctly excluded (no FormID slots). Remaining: document and
+    add rewrites for the still-unknown Starfield subrecord layouts so real
+    plugins can be compacted instead of refused.
 
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
     parsed but not walked into a DIAL→INFO tree for the dialogue editor.
