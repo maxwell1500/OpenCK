@@ -140,13 +140,15 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     compacted.
 
     **Status 2026-09-08:** The "fail loudly" half is complete with enhanced
-    diagnostics. `scanStaleRawReferences` now collects ALL stale references
-    (not just the first) and the refusal message lists every offending
-    record/subrecord/byte-offset with the stale and expected FormIDs. New
-    `refusalMessage()` accessor exposes the full diagnostic to callers.
-    `XPRM` is correctly excluded (no FormID slots). Remaining: document and
-    add rewrites for the still-unknown Starfield subrecord layouts so real
-    plugins can be compacted instead of refused.
+    diagnostics. `scanStaleRawReferences` collects ALL stale references and
+    the refusal message lists every offending record/subrecord/byte-offset
+    with the stale and expected FormIDs. `refusalMessage()` exposes the full
+    diagnostic to callers. `XPRM` is correctly excluded. A "Convert to ESL
+    (Light Master)..." menu action (File menu) now wires the compactor into
+    the UI: prompts the user, shows the diagnostic on refusal, and offers
+    Save As .esl on success. Remaining: document and add rewrites for the
+    still-unknown Starfield subrecord layouts so real plugins can be
+    compacted instead of refused.
 
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
     parsed but not walked into a DIAL→INFO tree for the dialogue editor.
