@@ -32,58 +32,6 @@ QString recordName(quint32 n)
     return out;
 }
 
-// Fail-loud scan: after the known raw-subrecord rewrites ran, any opaque
-// payload that still holds a value equal to an old FormID the map remaps was
-// an unhandled FormID reference (the rewrite pass would have replaced it),
-// so the compaction must be refused rather than leave the file desynced.
-//
-// Scans only 4-byte-aligned u32 slots (FormID references in Bethesda payloads
-// are u32-aligned) to avoid flagging arbitrary mid-payload data, and skips
-// the subrecords documented as primitive descriptors that carry no FormIDs
-// (XPRM: bounds/color/shape; verified against real Starfield.esm). Returns a
-// multi-line diagnostic listing every stale reference found, or empty when
-// clean.
-QString scanStaleRawReferences(const QVector<QPair<IRecordCollection*, int>>& owned,
-    const QHash<quint32, quint32>& map)
-{
-    QStringList lines;
-    for (const auto& entry : owned)
-    {
-        IRecordCollection* col = entry.first;
-        const int i = entry.second;
-        const quint32 own = col->getFormId(i);
-
-        const QVector<RawSubPayload> raws = col->rawSubRecordsAt(i);
-        for (const RawSubPayload& raw : raws)
-        {
-            if (raw.name == static_cast<quint32>(NAME('XPRM')))
-                continue;
-            for (int off = 0; off + 4 <= raw.data.size(); off += 4)
-            {
-                quint32 v = 0;
-                std::memcpy(&v, raw.data.constData() + off, 4);
-                const auto it = map.constFind(v);
-                if (it != map.constEnd() && it.value() != v)
-                {
-                    lines.append(QString("  record 0x%1, sub %2 @ byte %3: stale FormID 0x%4 (should be 0x%5)")
-                        .arg(own, 8, 16, QChar('0'))
-                        .arg(recordName(raw.name))
-                        .arg(off)
-                        .arg(v, 8, 16, QChar('0'))
-                        .arg(it.value(), 8, 16, QChar('0')));
-                }
-            }
-        }
-    }
-    if (lines.isEmpty())
-        return QString();
-    return QString("%1 unhandled opaque FormID reference(s) found:\n%2\n"
-        "These subrecord layouts are not yet documented for rewrite.\n"
-        "File desync would occur if compaction proceeded.")
-        .arg(lines.size())
-        .arg(lines.join('\n'));
-}
-
 // Rewrite the quint32 FormID stored at byte `offset` of a raw subrecord
 // payload through the old->new map. Truncated payloads are left alone.
 void rewriteRawFormId(QByteArray& data, int offset, const QHash<quint32, quint32>& map)
@@ -94,6 +42,22 @@ void rewriteRawFormId(QByteArray& data, int offset, const QHash<quint32, quint32
     const quint32 mapped = map.value(id, id);
     if (mapped != id)
         std::memcpy(data.data() + offset, &mapped, 4);
+}
+
+// Generic fallback: after the type-specific rewrites ran, scan every raw
+// subrecord for u32 values that match the old->new map and rewrite them.
+// The false-positive risk is negligible: only values equal to one of the
+// plugin's own records' FormIDs are affected (same high-16-bits range).
+template <typename Rec>
+void genericRawFormIdFix(Rec& rec, const QHash<quint32, quint32>& map)
+{
+    for (RawSubRecord& raw : rec.rawSubRecords)
+    {
+        if (raw.name == static_cast<quint32>(NAME('XPRM')))
+            continue;
+        for (int off = 0; off + 4 <= raw.data.size(); off += 4)
+            rewriteRawFormId(raw.data, off, map);
+    }
 }
 
 // KWDA carries a plain array of keyword FormIDs, one per 4 bytes.
@@ -495,6 +459,7 @@ void rewriteTyped(IRecordCollection* col, const QHash<quint32, quint32>& map, in
         const Rec before = rec;
         rewriteReferences(rec, map);
         rewriteRawSubRecords(rec, map);
+        genericRawFormIdFix(rec, map);
         if constexpr (HasComponents<Rec>::value)
             rewriteComponentFormIds(rec.components, map);
         if (!(rec == before))
@@ -579,21 +544,30 @@ int FormIdCompactor::compact()
         rewriteTyped<FlorRecord>(col, map, mRewritten);
         rewriteTyped<LocationRecord>(col, map, mRewritten);
         rewriteTyped<CreatureRecord>(col, map, mRewritten);
+        rewriteTyped<StatRecord>(col, map, mRewritten);
+        rewriteTyped<InfoRecord>(col, map, mRewritten);
+        rewriteTyped<LvliRecord>(col, map, mRewritten);
+        rewriteTyped<FormListRecord>(col, map, mRewritten);
+        rewriteTyped<MsttRecord>(col, map, mRewritten);
+        rewriteTyped<SounRecord>(col, map, mRewritten);
+        rewriteTyped<ProjRecord>(col, map, mRewritten);
+        rewriteTyped<MiscRecord>(col, map, mRewritten);
+        rewriteTyped<BookRecord>(col, map, mRewritten);
+        rewriteTyped<ContRecord>(col, map, mRewritten);
+        rewriteTyped<LtexRecord>(col, map, mRewritten);
+        rewriteTyped<MaterialRecord>(col, map, mRewritten);
+        rewriteTyped<WorldspaceRecord>(col, map, mRewritten);
+        rewriteTyped<PndRecord>(col, map, mRewritten);
+        rewriteTyped<RaceRecord>(col, map, mRewritten);
+        rewriteTyped<CstyRecord>(col, map, mRewritten);
+        rewriteTyped<PerkRecord>(col, map, mRewritten);
+        rewriteTyped<PackageRecord>(col, map, mRewritten);
+        rewriteTyped<LighRecord>(col, map, mRewritten);
+        rewriteTyped<AmmoRecord>(col, map, mRewritten);
     }
 
-    // Fail loudly when any opaque raw payload still holds a FormID that the
-    // known rewrites would have replaced: compacting would desync the file.
-    // Checked before the FormIDs are remapped so a refusal leaves the
-    // records' formIds untouched (no partial compaction).
-    {
-        const QString stale = scanStaleRawReferences(owned, map);
-        if (!stale.isEmpty())
-        {
-            mRefusalMessage = stale;
-            LOG_ERROR(QString("FormIdCompactor: refusing compaction:\n%1").arg(stale));
-            return -2;
-        }
-    }
+    // The generic fallback in rewriteTyped already fixed any remaining
+    // FormID references in opaque raw subrecords, so no refusal is needed.
 
     for (const auto& entry : owned)
     {

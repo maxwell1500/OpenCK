@@ -150,6 +150,8 @@ EarlyPageHeap g_earlyPageHeap;
 #include "../../libs/files/esm/Statrecord.hpp"
 #include "../../libs/files/esm/Dialrecord.hpp"
 #include "../../libs/files/esm/subrecordsnapshot.hpp"
+#include <cstring>
+#include <QTextStream>
 #include "../../libs/files/log/logger.hpp"
 
 // Loader protocol test against the live Document/Loader/Data pipeline.
@@ -175,6 +177,7 @@ private slots:
     void testMaterializationMatrixZeroWarnings();
     void testDialInfoParentWalking();
     void testGrupSizeConsistent();
+    void testDiscoverFormIdSubrecordLayouts();
 
 private:
     static bool writeTestPlugin(const QString& path)
@@ -1149,6 +1152,91 @@ void TestLoaderSinglePass::testGrupSizeConsistent()
 
     qDebug() << "nested grup sizes:" << groups.at(0).declaredSize
              << "(outer)" << groups.at(1).declaredSize << "(inner)";
+}
+
+void TestLoaderSinglePass::testDiscoverFormIdSubrecordLayouts()
+{
+    const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    const QString esmPath = dir + "/Starfield.esm";
+    if (!QFileInfo::exists(esmPath))
+        QSKIP("Starfield.esm not found");
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+
+    Document* doc = mediator.makeDocument(
+        QStringList{ QStringLiteral("Starfield.esm") },
+        dir + "/Starfield.esm", false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(dir);
+    mediator.insertDocument(doc);
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 600000);
+
+    Data& data = doc->getData();
+
+    // Collect all known FormIDs.
+    QSet<quint32> formIds;
+    for (const auto& tc : data.allCollectionsWithTypes())
+    {
+        IRecordCollection* col = tc.collection;
+        if (!col) continue;
+        for (int i = 0; i < col->count(); ++i)
+        {
+            quint32 fid = col->getFormId(i);
+            if (fid != 0)
+                formIds.insert(fid);
+        }
+    }
+
+    // Scan raw subrecords for FormID references.
+    QHash<QString, int> hits;
+    int totalRecords = 0;
+    for (const auto& tc : data.allCollectionsWithTypes())
+    {
+        IRecordCollection* col = tc.collection;
+        if (!col) continue;
+        QString typeName = CkId(tc.type).getTypeName();
+        for (int i = 0; i < col->count(); ++i)
+        {
+            ++totalRecords;
+            auto raws = col->rawSubRecordsAt(i);
+            for (const auto& raw : raws)
+            {
+                QString subStr = QString::fromLatin1(reinterpret_cast<const char*>(&raw.name), 4);
+                for (int off = 0; off + 4 <= raw.data.size(); off += 4)
+                {
+                    quint32 v = 0;
+                    std::memcpy(&v, raw.data.constData() + off, 4);
+                    if (formIds.contains(v))
+                    {
+                        hits[typeName + '|' + subStr + '|' + QString::number(off)]++;
+                    }
+                }
+            }
+        }
+    }
+
+    QFile diagFile(QStringLiteral("C:/Users/max/AppData/Local/Temp/opencode/formid_layouts.txt"));
+    diagFile.open(QIODevice::WriteOnly | QIODevice::Text);
+    QTextStream diag(&diagFile);
+    diag << "Records: " << totalRecords << "\n";
+    diag << "Known FormIDs: " << formIds.size() << "\n";
+    diag << "Distinct (type, sub, offset) hits: " << hits.size() << "\n";
+    diag << "=== FILTERED (offset < 128, count >= 5) ===\n";
+    int filteredCount = 0;
+    for (auto it = hits.constBegin(); it != hits.constEnd(); ++it)
+    {
+        const QStringList parts = it.key().split('|');
+        if (parts.size() < 3) continue;
+        int off = parts[2].toInt();
+        if (off < 128 && it.value() >= 5)
+        {
+            diag << it.key() << " x" << it.value() << "\n";
+            ++filteredCount;
+        }
+    }
+    diag << "Filtered count: " << filteredCount << "\n";
+    diagFile.close();
 }
 
 QTEST_GUILESS_MAIN(TestLoaderSinglePass)

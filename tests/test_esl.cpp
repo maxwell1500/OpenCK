@@ -61,7 +61,7 @@ private slots:
     void testCompactorRewritesStarfieldLctnRawLayouts();
     void testCompactorLeavesXprmByteIdentical();
     void testCompactorTooManyRecords();
-    void testCompactorRefusesUnhandledOpaqueReference();
+    void testCompactorFixesUnhandledOpaqueReference();
     void testLightMasterFlagRoundTrip();
 };
 
@@ -485,7 +485,7 @@ void TestEsl::testCompactorTooManyRecords()
     QCOMPARE(compactor.compact(), -1); // exceeds the ESL ceiling
 }
 
-void TestEsl::testCompactorRefusesUnhandledOpaqueReference()
+void TestEsl::testCompactorFixesUnhandledOpaqueReference()
 {
     FilePaths paths(QCoreApplication::applicationName());
     Data data(QStringList(), paths);
@@ -498,10 +498,9 @@ void TestEsl::testCompactorRefusesUnhandledOpaqueReference()
     target.formId = 0x00100100;
     statCol.add(target);
 
-    // A raw-only record (StatRecord has no FormID rewrite handler) carries an
-    // opaque subrecord the compactor cannot interpret that references the
-    // target. Compaction must refuse (return -2) instead of silently leaving
-    // a stale FormID, and must not partially remap the file.
+    // A raw-only record (StatRecord has no specific FormID rewrite handler)
+    // carries an opaque subrecord that references the target. The generic
+    // fallback should rewrite the FormID in-place during compaction.
     StatRecord holder;
     holder.editorId = "holderstat";
     holder.formId = 0x00100200;
@@ -514,17 +513,21 @@ void TestEsl::testCompactorRefusesUnhandledOpaqueReference()
     statCol.add(holder);
 
     FormIdCompactor compactor(data);
-    QCOMPARE(compactor.compact(), -2);
+    QCOMPARE(compactor.compact(), 2);
     QCOMPARE(compactor.ownedRecordCount(), 2);
-    QCOMPARE(compactor.remappedCount(), 0);
-    // Refusal must not partially remap records.
-    QCOMPARE(statCol.getFormId(statCol.searchId("targetstat")), 0x00100100u);
-    QCOMPARE(statCol.getFormId(statCol.searchId("holderstat")), 0x00100200u);
-    // The diagnostic must name the offending subrecord and stale FormID.
-    const QString msg = compactor.refusalMessage();
-    QVERIFY2(msg.contains("XTST"), qPrintable(msg));
-    QVERIFY2(msg.contains("0x00100100"), qPrintable(msg));
-    QVERIFY2(msg.contains("0x00100200"), qPrintable(msg));
+    QCOMPARE(compactor.remappedCount(), 2);
+    // Both records should be remapped into the ESL range.
+    const quint32 newTarget = statCol.getFormId(statCol.searchId("targetstat"));
+    const quint32 newHolder = statCol.getFormId(statCol.searchId("holderstat"));
+    QVERIFY(newTarget != 0x00100100u);
+    QVERIFY(newHolder != 0x00100200u);
+    // The raw subrecord should now reference the new target FormID.
+    const auto raws = statCol.rawSubRecordsAt(statCol.searchId("holderstat"));
+    QCOMPARE(raws.size(), 1);
+    QCOMPARE(static_cast<quint32>(
+        (quint8)raws[0].data[0] | (quint8)raws[0].data[1] << 8
+        | (quint8)raws[0].data[2] << 16 | (quint8)raws[0].data[3] << 24),
+        newTarget);
 }
 
 void TestEsl::testLightMasterFlagRoundTrip()
