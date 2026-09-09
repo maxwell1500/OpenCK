@@ -259,8 +259,8 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     absent.
 
     **Status 2026-09-08:** `editor.cpp` now checks `OPENCK_DATA_DIR` env var
-    (takes priority over config file, before auto-detection). Tests still
-    hardcode the path; they should read the env var too.
+    (takes priority over config file, before auto-detection). All real-data
+    tests now read the env var with fallback to the hardcoded path.
 2. **Materialization matrix test** — index count vs. loaded count vs. warning
    count for every type from a full master load; assert warnings == 0 or an
    explicitly shrinking allowlist.
