@@ -225,8 +225,16 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 ## 3. Editor / feature gaps
 
 1. **Dialogue editor.** Conditional response editing (quest-stage conditions,
-   variable checks), voice-file association (`.wav` links), and quest-graph
-   stage editing (flags/indices/objectives) are not implemented.
+    variable checks), voice-file association (`.wav` links), and quest-graph
+    stage editing (flags/indices/objectives) are not implemented.
+
+    **Status 2026-09-08:** INFO records now parse CTDA into
+    `QVector<CtdaCondition>` (was opaque raw) and re-emit on save. VMAP
+    (voice file) is parsed and saved. The condition table in
+    `InfoDataWidget` and `DialogueTreeEditor` display CtdaCondition
+    fields. Remaining: quest-graph stage editing (QUST INDX/QSDT/QASD
+    groups) and the condition function dropdown needs a proper function
+    ID → name lookup table.
 2. **Animation timeline.** `NifKeyframeData`/`NiTransformData` block parsing,
    a timeline widget, keyframe undo commands, NIF write-back, and in-viewport
    preview (Phase5 scope) are not built; the timeline editor for SCEN is
