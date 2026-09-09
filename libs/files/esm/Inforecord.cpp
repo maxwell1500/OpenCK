@@ -33,13 +33,26 @@ void InfoRecord::load(ESMReader& esm, bool)
             case 'CNAM': responseText = esm.readZString(); break;
             case 'CTDA':
             {
-                // Each CTDA is a 32-byte condition struct. There is no
-                // parsed condition model yet, so preserve the bytes for
-                // a lossless round-trip instead of misparsing them.
-                RawSubRecord raw;
-                raw.name = sub;
-                esm.readRawSubData(raw.data);
-                rawSubRecords.push_back(raw);
+                QByteArray bytes;
+                esm.readRawSubData(bytes);
+                CtdaCondition condition;
+                if (CtdaCondition::unpack(bytes, condition))
+                {
+                    conditions.append(condition);
+                }
+                else
+                {
+                    const QVector<CtdaCondition> parsed = CtdaCondition::unpackList(bytes);
+                    if (!parsed.isEmpty())
+                        conditions.append(parsed);
+                    else
+                    {
+                        RawSubRecord raw;
+                        raw.name = sub;
+                        raw.data = bytes;
+                        rawSubRecords.push_back(raw);
+                    }
+                }
                 break;
             }
             case 'TLOI':
@@ -77,6 +90,14 @@ void InfoRecord::save(ESMWriter& esm) const
 
     esm.writeSubZString('CNAM', responseText);
     esm.writeSubData<quint32>('TLOI', targetId);
+
+    for (const CtdaCondition& condition : conditions)
+    {
+        const QByteArray bytes = condition.pack();
+        esm.startSubRecord('CTDA');
+        esm.writeRawData(bytes.constData(), bytes.size());
+        esm.endSubRecord();
+    }
 
     for (const auto& raw : rawSubRecords)
     {

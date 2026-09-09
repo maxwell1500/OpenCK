@@ -2,6 +2,7 @@
 #define InfoRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "conditionrecord.hpp"
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVariant>
@@ -30,7 +31,7 @@ struct InfoRecord {
     QString responseText;
     QString voiceFile;
     QVector<quint32> conditionIds;
-    QVector<DialogueCondition> conditions;
+    QVector<CtdaCondition> conditions;
     QString scriptFragment;
     quint32 targetId;
     QVector<quint32> scriptIds;
