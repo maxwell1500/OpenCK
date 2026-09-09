@@ -19,6 +19,7 @@ struct GlobalVariable
         Constant = 0x40
     };
 
+    quint32 formId = 0;
     QString editorId;
     Variant value;
     QVector<RawSubRecord> rawSubRecords;

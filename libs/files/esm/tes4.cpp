@@ -76,7 +76,7 @@ void Header::load(ESMReader& esm)
         if (subName == NAME('GRUP'))
         {
             esm.seekTo(filePosBefore);
-            LOG_WARNING(QString("Header::load: top-level GRUP at 0x%1 before declared TES4 end (recLeft=%2); treating TES4 as ended here")
+            LOG_DEBUG(QString("Header::load: top-level GRUP at 0x%1 before declared TES4 end (recLeft=%2); treating TES4 as ended here")
                 .arg(filePosBefore).arg(esm.recLeft()));
             break;
         }

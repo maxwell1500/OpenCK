@@ -717,6 +717,7 @@ void TestLoaderSinglePass::testSyntheticMultiTypeRoundTrip()
 
         {
             NpcRecord npc;
+            npc.initComponents();
             npc.editorId = QStringLiteral("SynthNPC");
             npc.formId = 0x801;
             npc.fullName = QStringLiteral("Synthetic NPC");
@@ -1156,6 +1157,9 @@ void TestLoaderSinglePass::testGrupSizeConsistent()
 
 void TestLoaderSinglePass::testDiscoverFormIdSubrecordLayouts()
 {
+    if (!qEnvironmentVariableIsSet("OPENCK_RUN_LONG_TESTS"))
+        QSKIP("Diagnostic: requires OPENCK_RUN_LONG_TESTS=1");
+
     const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
     const QString esmPath = dir + "/Starfield.esm";
     if (!QFileInfo::exists(esmPath))

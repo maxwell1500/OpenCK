@@ -6,6 +6,7 @@
 void GlobalVariable::load(ESMReader& esm, bool)
 {
     constant = esm.readHeader().flags.test(GlobalVariable::Constant);
+    formId = esm.currentFormId();
 
     // Skyrim GLOB is EDID+FNAM(type char)+FLTV(value). Starfield GLOBs carry
     // a different subrecord set, so walk generically: pick up the subrecords
@@ -71,6 +72,7 @@ void GlobalVariable::save(ESMWriter& esm) const
 
 void GlobalVariable::blank()
 {
+    formId = 0;
     editorId = "";
     value.setType(VariantType::Var_None);
     constant = false;
