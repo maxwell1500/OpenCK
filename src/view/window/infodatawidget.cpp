@@ -201,7 +201,7 @@ void InfoDataWidget::populateConditions()
 
         auto* fnCombo = new QComboBox(m_condTable);
         fnCombo->addItems(conditionFunctions());
-        int fnIdx = conditionFunctions().indexOf(c.function);
+        int fnIdx = conditionFunctions().indexOf(QString::number(c.functionId, 16));
         if (fnIdx >= 0) fnCombo->setCurrentIndex(fnIdx);
         m_condTable->setCellWidget(i, 0, fnCombo);
         connect(fnCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
@@ -209,19 +209,19 @@ void InfoDataWidget::populateConditions()
 
         auto* opCombo = new QComboBox(m_condTable);
         opCombo->addItems(comparisonOperators());
-        int opIdx = comparisonOperators().indexOf(c.comparison);
+        int opIdx = comparisonOperators().indexOf(CtdaCondition::comparisonName(c.comparison));
         if (opIdx >= 0) opCombo->setCurrentIndex(opIdx);
         m_condTable->setCellWidget(i, 1, opCombo);
         connect(opCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
             [this, i]() { onConditionChanged(); });
 
-        auto* valItem = new QTableWidgetItem(c.value.toString());
+        auto* valItem = new QTableWidgetItem(QString::number(c.param1));
         m_condTable->setItem(i, 2, valItem);
 
         auto* logicCombo = new QComboBox(m_condTable);
         logicCombo->addItem(QStringLiteral("AND"));
         logicCombo->addItem(QStringLiteral("OR"));
-        logicCombo->setCurrentIndex(c.useAND ? 0 : 1);
+        logicCombo->setCurrentIndex(c.useOr() ? 1 : 0);
         m_condTable->setCellWidget(i, 3, logicCombo);
         connect(logicCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
             [this, i]() { onConditionChanged(); });
@@ -238,28 +238,33 @@ void InfoDataWidget::syncConditionsToRecord()
     rec->conditions.clear();
     for (int i = 0; i < m_condTable->rowCount(); ++i)
     {
-        DialogueCondition c;
+        CtdaCondition c;
 
         if (auto* fn = qobject_cast<QComboBox*>(m_condTable->cellWidget(i, 0)))
-            c.function = fn->currentText();
+            c.functionId = fn->currentText().toUInt(nullptr, 16);
         if (auto* op = qobject_cast<QComboBox*>(m_condTable->cellWidget(i, 1)))
-            c.comparison = op->currentText();
+        {
+            const QString opText = op->currentText();
+            if (opText.contains("Equal", Qt::CaseInsensitive) && opText.contains("Not", Qt::CaseInsensitive))
+                c.comparison = CtdaCondition::Comparison::NotEqualTo;
+            else if (opText.contains("Greater") && opText.contains("Equal"))
+                c.comparison = CtdaCondition::Comparison::GreaterThanOrEqualTo;
+            else if (opText.contains("Greater"))
+                c.comparison = CtdaCondition::Comparison::GreaterThan;
+            else if (opText.contains("Less") && opText.contains("Equal"))
+                c.comparison = CtdaCondition::Comparison::LessThanOrEqualTo;
+            else if (opText.contains("Less"))
+                c.comparison = CtdaCondition::Comparison::LessThan;
+            else
+                c.comparison = CtdaCondition::Comparison::EqualTo;
+        }
         if (auto* valItem = m_condTable->item(i, 2))
         {
             QString v = valItem->text().trimmed();
-            bool ok = false;
-            int asInt = v.toInt(&ok);
-            if (ok) c.value = asInt;
-            else
-            {
-                bool fok = false;
-                double asFloat = v.toDouble(&fok);
-                if (fok) c.value = asFloat;
-                else     c.value = v;
-            }
+            c.param1 = v.toUInt(nullptr, 0);
         }
         if (auto* logic = qobject_cast<QComboBox*>(m_condTable->cellWidget(i, 3)))
-            c.useAND = (logic->currentIndex() == 0);
+            c.setUseOr(logic->currentIndex() == 1);
 
         rec->conditions.append(c);
     }

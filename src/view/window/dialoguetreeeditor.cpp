@@ -225,8 +225,10 @@ void DialogueTreeEditor::showInfoDetails(const InfoRecord* info)
         text += QStringLiteral("<ul>");
         for (const auto& c : info->conditions)
             text += QString("<li>%1 %2 %3 <i>(%4)</i></li>")
-                .arg(c.function, c.comparison, c.value.toString(),
-                     c.useAND ? QStringLiteral("AND") : QStringLiteral("OR"));
+                .arg(CtdaCondition::comparisonName(c.comparison),
+                     QString::number(c.functionId, 16),
+                     QString::number(c.param1),
+                     c.useOr() ? QStringLiteral("OR") : QStringLiteral("AND"));
         text += QStringLiteral("</ul>");
     }
     text += QString("<p><b>Scripts:</b> %1</p>").arg(info->scriptIds.size());
