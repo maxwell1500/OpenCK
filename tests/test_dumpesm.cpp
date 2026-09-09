@@ -139,7 +139,7 @@ int main(int argc, char** argv)
     QCoreApplication app(argc, argv);
     QString path = (argc > 3)
         ? QString::fromLocal8Bit(argv[3])
-        : "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
+        : qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
     NAME want = 0;
     if (argc > 1) {
         QByteArray tag = argv[1];

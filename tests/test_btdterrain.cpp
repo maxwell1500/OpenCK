@@ -26,7 +26,7 @@ void TestBtdTerrain::initTestCase()
 void TestBtdTerrain::testReadRealBtd()
 {
     const QString archive = QStringLiteral(
-        "C:/XboxGames/Starfield/Content/Data/Starfield - Terrain01.ba2");
+        qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield - Terrain01.ba2");
     QVERIFY2(QFileInfo::exists(archive), "Starfield Terrain01.ba2 not found");
 
     Ba2Archive ba2;

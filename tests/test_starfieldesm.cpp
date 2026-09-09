@@ -26,7 +26,7 @@ void TestStarfieldESM::initTestCase()
 
 void TestStarfieldESM::testLoadStarfieldHeader()
 {
-    QString filePath = "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
+    QString filePath = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
     QVERIFY(QFile::exists(filePath));
     qint64 fileSize = QFileInfo(filePath).size();
     qDebug() << "Starfield.esm size:" << fileSize << "bytes";
@@ -51,7 +51,7 @@ void TestStarfieldESM::testLoadStarfieldHeader()
 
 void TestStarfieldESM::testIterateFirstRecords()
 {
-    QString filePath = "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
+    QString filePath = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
     ESMReader reader(filePath);
     try {
         reader.open();

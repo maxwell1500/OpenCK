@@ -447,7 +447,7 @@ void TestLoaderSinglePass::testObjectWindowDeferredCategoryFetch()
 // Starfield data dir is absent.
 void TestLoaderSinglePass::testRealSeydaNeenDocument()
 {
-    const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    const QString dir = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
     const QString plugin = realPlugin();
     if (!QFileInfo::exists(dir + '/' + plugin))
         QSKIP(qPrintable(QStringLiteral("Starfield data dir or %1 not found").arg(plugin)));
@@ -592,7 +592,7 @@ void TestLoaderSinglePass::testRealSeydaNeenDocument()
 // GRUPs, cell-children GRUPs) that reloads to the same record counts.
 void TestLoaderSinglePass::testSaveRoundTripGRUP()
 {
-    const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    const QString dir = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
     const QString plugin = realPlugin();
     if (!QFileInfo::exists(dir + '/' + plugin))
         QSKIP(qPrintable(QStringLiteral("Starfield data dir or %1 not found").arg(plugin)));
@@ -821,7 +821,7 @@ void TestLoaderSinglePass::testSyntheticMultiTypeRoundTrip()
 // subrecords (name + payload) against the source file.
 void TestLoaderSinglePass::testSaveRoundTripSubrecordIdentical()
 {
-    const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    const QString dir = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
     const QString plugin = realPlugin();
     if (!QFileInfo::exists(dir + '/' + plugin))
         QSKIP(qPrintable(QStringLiteral("Starfield data dir or %1 not found").arg(plugin)));
@@ -942,7 +942,7 @@ void TestLoaderSinglePass::testMasterRecordSaveStateMachine()
 // warnings (the ~8 residual INFO/PACK/NPC misalignments must go to zero).
 void TestLoaderSinglePass::testMaterializationMatrixZeroWarnings()
 {
-    const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    const QString dir = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
     // The edited plugin is selectable so a corrupt file on disk (SeydaNeen.esp
     // turned out to be damaged) does not poison the zero-warnings gate.
     const QString plugin = qEnvironmentVariable("OPENCK_TEST_PLUGIN",
@@ -1028,7 +1028,7 @@ void TestLoaderSinglePass::testMaterializationMatrixZeroWarnings()
 // infosUnderDial(), and at least one topic must have responses.
 void TestLoaderSinglePass::testDialInfoParentWalking()
 {
-    const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    const QString dir = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
     const QString plugin = realPlugin();
     if (!QFileInfo::exists(dir + '/' + plugin))
         QSKIP(qPrintable(QStringLiteral("Starfield data dir or %1 not found").arg(plugin)));
@@ -1160,7 +1160,7 @@ void TestLoaderSinglePass::testDiscoverFormIdSubrecordLayouts()
     if (!qEnvironmentVariableIsSet("OPENCK_RUN_LONG_TESTS"))
         QSKIP("Diagnostic: requires OPENCK_RUN_LONG_TESTS=1");
 
-    const QString dir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    const QString dir = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
     const QString esmPath = dir + "/Starfield.esm";
     if (!QFileInfo::exists(esmPath))
         QSKIP("Starfield.esm not found");

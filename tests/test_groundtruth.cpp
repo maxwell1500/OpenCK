@@ -89,7 +89,7 @@ private slots:
     {
         try
         {
-            mFilePath = "C:/XboxGames/Starfield/Content/Data/Starfield.esm";
+            mFilePath = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
             QVERIFY2(QFile::exists(mFilePath), "Starfield.esm not found");
             ESMReader reader(mFilePath);
             reader.open();

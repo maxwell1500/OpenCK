@@ -68,7 +68,7 @@ int main(int argc, char** argv)
     QCoreApplication app(argc, argv);
     QTextStream out(stdout);
     QString dir = argc > 1 ? QString::fromLocal8Bit(argv[1])
-        : QStringLiteral("C:/XboxGames/Starfield/Content/Data/Starfield - Meshes01.ba2");
+        : qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield - Meshes01.ba2";
     probe(dir, out);
     out.flush();
     return 0;
