@@ -73,9 +73,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
    - `NpcRecord`: compressed NPCs ending in a non-subrecord binary blob
      (four NUL bytes where a name would sit) are captured verbatim
      (`name=0` raw) instead of abandoning hundreds of tail bytes.
-   Warning floor is now ~302: 180× "top-level GRUP before declared TES4 end"
-   (one root cause — the TES4 header declares more than the file provides;
-   Header::load already recovers, one fix silences all 180), 40× compressed
+    Warning floor is now ~122: 40× compressed
    records whose loaders still exit early inside the decompressed buffer
    (`restoreStreamFromCompression`), ~30 unknown/garbage record names that
    look like downstream artifacts of those two, plus a handful of `_CPN`
@@ -119,6 +117,9 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     **Status 2026-09-08:** `testSyntheticMultiTypeRoundTrip` added — writes a
     plugin with NPC_/GLOB/STAT/WRLD records, loads, saves untouched, and
     asserts subrecord-identical output. Always runs (no real-data dependency).
+    Fixed: `GlobalVariable` and `LocationRefType` lacked a `formId` field,
+    causing them to be displaced to the fallback group with formId=0 on save
+    (breaking ordered replay). Both now carry `formId` set from the reader.
     Remaining: full Starfield.esm-scale round-trip (3.8M records) is a CI/
     nightly job, not a unit test. The ~36 `Variant::load` GMST/GLOB LOG_ERRORs
     (errors, not warnings — outside both gates) remain.
@@ -157,12 +158,10 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     **Status 2026-09-08:** `DialRecord::load()` now parses INAM into
     `responseIds` (was falling through to `rawSubRecords`). `save()`
     re-emits INAM from `responseIds` when `hasInam` is set. Round-trip
-    verified by `testSyntheticMultiTypeRoundTrip` (DIAL with 2 response
-    IDs round-trips identically). Remaining: `DialogueTreeEditor`
-    should use `responseIds` (now populated) to show INFO children;
-    `DialogueEditorWidget::populateTree()` should use
-    `infosUnderDial()`; `addInfo` should update `responseIds` and
-    `m_infoParentDial`.
+    verified by `testSyntheticMultiTypeRoundTrip`. `DialogueTreeEditor`
+    and `DialogueEditorWidget::populateTree()` both iterate
+    `dial.responseIds` to show INFO children; `addInfo` updates
+    `responseIds` and `m_infoParentDial`. **Resolved.**
 
  5. **Master-record state machine on save.** Verify that a materialized
     (deferred) master record saved without edits is not emitted as an override,
