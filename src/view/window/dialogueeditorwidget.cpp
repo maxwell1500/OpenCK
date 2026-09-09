@@ -231,7 +231,7 @@ void DialogueEditorWidget::onAddInfo()
     populateTree();
 
     LOG_INFO(QString("Added new info '%1' (0x%2) under DIAL '%3'")
-        .arg(editorId).arg(newFormId, 8, 16, Qt::CaseLower, QChar('0')).arg(currentDialId));
+        .arg(editorId).arg(QString::number(newFormId, 16)).arg(currentDialId));
 }
 
 void DialogueEditorWidget::onRemoveInfo()
