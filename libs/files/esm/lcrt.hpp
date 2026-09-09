@@ -12,6 +12,7 @@ class ESMWriter;
 
 struct LocationRefType
 {
+    quint32 formId = 0;
     QString editorId;
     Color color;
     QVector<RawSubRecord> rawSubRecords;

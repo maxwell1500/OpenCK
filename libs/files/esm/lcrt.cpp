@@ -6,6 +6,7 @@
 void LocationRefType::load(ESMReader& esm, bool)
 {
     esm.readHeader();
+    formId = esm.currentFormId();
     // Subrecord order varies across games; walk generically instead of
     // demanding EDID-then-CNAM (readSubData throws on any other name).
     while (esm.isRecLeft())
@@ -46,6 +47,7 @@ void LocationRefType::save(ESMWriter& esm) const
 
 void LocationRefType::blank()
 {
+    formId = 0;
     editorId = "";
     color = 0;
 }
