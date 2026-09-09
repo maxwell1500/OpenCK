@@ -63,6 +63,9 @@ void InfoRecord::load(ESMReader& esm, bool)
                     esm.skip(static_cast<int>(esm.subLeft()));
                 break;
             }
+            case 'VMAP':
+                voiceFile = esm.readZString();
+                break;
             default:
             {
                 RawSubRecord raw;
@@ -90,6 +93,8 @@ void InfoRecord::save(ESMWriter& esm) const
 
     esm.writeSubZString('CNAM', responseText);
     esm.writeSubData<quint32>('TLOI', targetId);
+    if (!voiceFile.isEmpty())
+        esm.writeSubZString('VMAP', voiceFile);
 
     for (const CtdaCondition& condition : conditions)
     {
