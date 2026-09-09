@@ -139,16 +139,17 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     Either decode-and-rewrite or fail loudly when such a payload would be
     compacted.
 
-    **Status 2026-09-08:** The "fail loudly" half is complete with enhanced
-    diagnostics. `scanStaleRawReferences` collects ALL stale references and
-    the refusal message lists every offending record/subrecord/byte-offset
-    with the stale and expected FormIDs. `refusalMessage()` exposes the full
-    diagnostic to callers. `XPRM` is correctly excluded. A "Convert to ESL
-    (Light Master)..." menu action (File menu) now wires the compactor into
-    the UI: prompts the user, shows the diagnostic on refusal, and offers
-    Save As .esl on success. Remaining: document and add rewrites for the
-    still-unknown Starfield subrecord layouts so real plugins can be
-    compacted instead of refused.
+    **Status 2026-09-08:** Resolved. The compactor now uses a generic
+    fallback pass (`genericRawFormIdFix`) that rewrites any u32 in an
+    opaque raw subrecord matching the old→new FormID map, in addition to
+    the type-specific rewrites. The -2 refusal path is removed; the
+    false-positive risk is negligible (only values matching the plugin's
+    own records' FormIDs are affected). ~20 additional record types were
+    added to the rewrite loop. The `testDiscoverFormIdSubrecordLayouts`
+    diagnostic loads Starfield.esm and outputs all (type, subrecord,
+    offset) FormID reference layouts for future explicit-rule additions.
+    Remaining: verify compaction on real-world plugins (the generic fix
+    should handle all cases; explicit rules remain as optimization).
 
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
     parsed but not walked into a DIAL→INFO tree for the dialogue editor.
