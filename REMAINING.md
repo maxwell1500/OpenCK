@@ -283,7 +283,8 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     `test_nifanimation` (6/6) covers JSON and XML export→import round-trips
     for clips/channels/keyframes (translation, rotation, scale) and markers,
     plus the null-export and missing-file import error paths. The
-    in-viewport 3D playback remains Phase 5 scope.
+    in-viewport 3D playback is scoped in §8 (it is further along than the
+    old note below suggested).
 3. **Particle FX.** The NIF particle block parser
     (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
     `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle
@@ -335,7 +336,9 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     `EditRecordCommand<RefrRecord>` onto `Data::getUndoStack()`. Reference
     transform undo/redo is covered by `test_editor_writeback`
     (`testRefrTransformUndoable`) alongside the other record editors.
-    Remaining: in-render-window 3D playback of animations/particles (§3.2/§3.3).
+    Remaining: in-render-window 3D playback of animations/particles (§3.2/§3.3;
+    see §8 for the scoped breakdown — rigid animation and particles are
+    already wired, skinned playback is the real gap).
 6. **Mod-manager integration** (Mod Organizer 2 / Vortex).
     `ModManagerDetection` (detect/detectMO2/detectVortex/profiles/
     `getInstalledMods`) and `ModManagerDialog` are built and wired into
@@ -682,3 +685,45 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 - `openck --cli info <SeydaNeen.esp>` exits 0.
 - `docs/record_formats.md` warning rows trend to zero.
 - `tools/gen_record_audit.ps1` regenerates `docs/record_formats.md`.
+
+---
+
+## 8. Phase 5 — in-viewport 3D playback (scoped from the code, 2026-09-13)
+
+The §3.2/§3.5 "Phase 5 scope" notes understated what is already wired.
+Verified by reading `NifViewportWidget` + `NifAnimationState` (no new code —
+this section is documentation of findings, per the §3 review).
+
+**Already working end-to-end:**
+- Animation: `NifAnimationState`'s QTimer ticks → `timeChanged` → timeline
+  slider/label update + `glWidget->update()` → `renderMesh()` calls
+  `applyAnimationFrame()` whenever playing → node cumulative transforms are
+  recomputed with animation overrides → rest-pose vertices (`restVertices` /
+  `restNormals`) are deformed on CPU with normal-matrix correction →
+  `m_meshDirty` triggers VBO re-upload. Rigid/prop animation plays.
+- Particles: `initParticleSystems()` parses the NIF's effects and shows the
+  toolbar, play/pause/stop drive `ParticleSystem`'s timer,
+  `ParticleRenderer::render` runs inside `renderMesh()`, and
+  `ParticleSystem::updated` → `glWidget->update()` closes the repaint loop.
+  The simulation math is unit-tested (`test_particlesimulation`) after the
+  `ParticleSimulation` extraction, which kept the viewport path intact.
+
+**The actual remaining gaps (this is the Phase 5 work):**
+1. **Per-vertex skinning.** `applyAnimationFrame` applies each shape's single
+   owner-node matrix to all its vertices. There is zero `NiSkinInstance` /
+   skin-partition / bone-weight support anywhere in `src/` (grep for
+   `SkinInstance|skinPartition|boneWeight|NiSkin` returns no hits). Skinned
+   characters will move as rigid chunks. Phase 5 must parse skin instances
+   and blend per-vertex bone matrices (CPU first; GPU skinning later).
+2. **Quaternion-correct interpolation.** The parser stores rotations as
+   quaternions (`Nif::QuaternionKeyframe`), but `initAnimationState` converts
+   quat→Euler at import and `interpolateChannel` lerps Euler angles,
+   converting back to matrices at render. Large rotations can flip. Keep
+   quaternions through the pipeline and slerp — the blend path in
+   `NifAnimationState` already slerps correctly, so extend that to the base
+   path.
+3. **Verification gate on real assets.** Neither path has been exercised
+   against a real animated/particle NIF in this tree (GL output cannot be
+   unit-tested headless). Phase 5 entry criterion: load a skinned animated
+   NIF plus a particle NIF, press Play, confirm correct motion; record the
+   result here.
