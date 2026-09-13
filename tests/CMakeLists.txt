@@ -653,6 +653,16 @@ target_link_libraries(test_obscriptbinder PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_obscriptbinder PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_obscriptbinder)
 
+add_executable(test_obscriptcompiler test_obscriptcompiler.cpp)
+target_link_libraries(test_obscriptcompiler PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_obscriptcompiler PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_obscriptcompiler)
+
+add_executable(test_obscripttypechecker test_obscripttypechecker.cpp)
+target_link_libraries(test_obscripttypechecker PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_obscripttypechecker PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_obscripttypechecker)
+
 # Game-family detection + per-game record dispatch
 add_executable(test_gameformat test_gameformat.cpp)
 target_link_libraries(test_gameformat PRIVATE openck_esm Qt6::Test)

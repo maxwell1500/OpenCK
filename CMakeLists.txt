@@ -143,6 +143,8 @@ libs/files/esm/npcrecord.cpp
     libs/files/esm/obscriptlexer.cpp
     libs/files/esm/obscriptparser.cpp
     libs/files/esm/obscriptbinder.cpp
+    libs/files/esm/obscriptcompiler.cpp
+    libs/files/esm/obscripttypechecker.cpp
     libs/files/esm/gameformat.cpp
     libs/files/esm/scrollrecord.cpp
     libs/files/esm/shaderparticlerecord.cpp

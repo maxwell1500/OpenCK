@@ -4,6 +4,7 @@
 
 #include "../../../libs/files/esm/obscriptbinder.hpp"
 #include "../../../libs/files/esm/obscriptparser.hpp"
+#include "../../../libs/files/esm/obscripttypechecker.hpp"
 #include "../../../libs/files/log/logger.hpp"
 
 #include <QCompleter>
@@ -98,15 +99,41 @@ QString ScriptEditorDialog::scriptText() const
 void ScriptEditorDialog::checkSyntax()
 {
     const ObScript::ParseResult result = ObScript::parse(m_edit->toPlainText());
-    if (result.ok)
-    {
-        m_completer->setModel(new QStringListModel(ObScript::completionEntries(result), this));
-        m_status->setText(tr("Syntax OK"));
-        m_status->setStyleSheet(QStringLiteral("color: #2e7d32;"));
-    }
-    else
+    if (!result.ok)
     {
         m_status->setText(tr("Line %1: %2").arg(result.errorLine).arg(result.error));
         m_status->setStyleSheet(QStringLiteral("color: #c62828;"));
+        return;
+    }
+
+    m_completer->setModel(new QStringListModel(ObScript::completionEntries(result), this));
+
+    const ObScript::TypeCheckResult tc =
+        ObScript::typeCheck(result, ObScript::builtinCatalog());
+
+    QString firstError;
+    QString firstWarning;
+    for (const auto& d : tc.diagnostics)
+    {
+        if (d.severity == ObScript::TypeSeverity::Error && firstError.isEmpty())
+            firstError = tr("Line %1: %2").arg(d.line).arg(d.message);
+        else if (d.severity == ObScript::TypeSeverity::Warning && firstWarning.isEmpty())
+            firstWarning = tr("Line %1: %2").arg(d.line).arg(d.message);
+    }
+
+    if (!firstError.isEmpty())
+    {
+        m_status->setText(firstError);
+        m_status->setStyleSheet(QStringLiteral("color: #c62828;"));
+    }
+    else if (!firstWarning.isEmpty())
+    {
+        m_status->setText(firstWarning);
+        m_status->setStyleSheet(QStringLiteral("color: #f57f17;"));
+    }
+    else
+    {
+        m_status->setText(tr("Syntax and types OK"));
+        m_status->setStyleSheet(QStringLiteral("color: #2e7d32;"));
     }
 }
