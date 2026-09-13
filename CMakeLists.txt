@@ -1223,6 +1223,9 @@ if(WIN32)
     if(MSVC)
         add_compile_options(/W4 /permissive- /EHa /FS)
         add_compile_options(/wd4100)
+        # C4714 fires on Qt-internal __forceinline helpers (QStringLiteral
+        # expansions) at /W4; not actionable in our code.
+        add_compile_options(/wd4714)
     endif()
     add_definitions(-DUNICODE -D_UNICODE)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

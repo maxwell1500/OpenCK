@@ -563,6 +563,20 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     **Status 2026-09-08:** `editor.cpp` now checks `OPENCK_DATA_DIR` env var
     (takes priority over config file, before auto-detection). All real-data
     tests now read the env var with fallback to the hardcoded path.
+
+    **Status 2026-09-13 (skip hardening):** 12 existence gates across 9
+    real-data tests (`test_bsaarchive` x4, `test_xwmadecoder`,
+    `test_starfieldesm` x2, `test_groundtruth`, `test_subrecord_roundtrip`,
+    `test_worldspacerecord`, `test_pndrecord`, `test_btdterrain`,
+    `test_hknpphysicssystem`) were converted from hard `QVERIFY` to `QSKIP`,
+    so a data-less machine skips instead of failing — verified by running
+    all 9 with a bogus `OPENCK_DATA_DIR` (exit 0, skips recorded) and again
+    with real data (exit 0, passes). The `if (EXISTS hardcoded-path)` CMake
+    guards for pndrecord/worldspacerecord/bsaarchive were replaced with
+    unconditional registration since the tests now skip at runtime and honor
+    the env var. Self-created-output checks (pluginio, loader save paths,
+    nifanimation temps, ba2/bsa write round-trips) intentionally stay
+    `QVERIFY`.
 2. **Materialization matrix test** — index count vs. loaded count vs. warning
    count for every type from a full master load; assert warnings == 0 or an
    explicitly shrinking allowlist.
@@ -605,7 +619,21 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 
     **Status 2026-09-13:** Implemented as `tools/gate.ps1` (lint → build
     `all_tests` failing on any MSVC warning outside `external/` → full
-    `ctest --output-on-failure`). Leak coverage comes from the in-suite
+    `ctest --output-on-failure`). Verified with a from-scratch Release
+    rebuild into a separate build dir: the first clean build exposed 25,782
+    warning lines, all fixed or justified —
+    C4373 (~4.3k template-amplified diagnostics) fixed properly by dropping
+    top-level `const` from three `Collection<T>` override declarations
+    (`getId`/`replace`/`getRecord`) to match `BaseCollection` and the
+    out-of-line definitions; C4714 (Qt-internal `__forceinline` noise)
+    disabled project-wide with a comment, following the existing `/wd4100`
+    precedent; 8 real diagnostics fixed (merged `#include` lines, unused
+    locals, `int`→`quint32` casts, a shadowed `found`, `%d`→`%lld` for
+    `qsizetype` printf args, `getenv`→`qEnvironmentVariable`). Rebuild is
+    zero-warning; full `ctest` is 124/124. The same run caught a stale
+    `all_tests` DEPENDS list (8 newer tests missing, 2 removed tests still
+    listed) — now verified identical to the built set, which is also what
+    CI's build step compiles. Leak coverage comes from the in-suite
     `HeapValidate`/`_CrtCheckMemory` instrumentation in the matrix test;
     coverage reporting needs OpenCppCoverage (not installed here) and stays
     manual.

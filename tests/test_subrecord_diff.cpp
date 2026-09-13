@@ -55,10 +55,10 @@ int main(int argc, char** argv)
         ++mismatch;
         if (mismatch <= 50)
         {
-            printf("MISMATCH #%d idx %d: %s 0x%08X subs %d -> subs %d (flags 0x%X->0x%X, size %u->%u)\n",
+            printf("MISMATCH #%d idx %d: %s 0x%08X subs %lld -> subs %lld (flags 0x%X->0x%X, size %u->%u)\n",
                 mismatch, i,
                 snapshotName(ra.type).toUtf8().constData(), ra.formId,
-                ra.subs.size(), rb.subs.size(),
+                static_cast<long long>(ra.subs.size()), static_cast<long long>(rb.subs.size()),
                 ra.flags, rb.flags, ra.size, rb.size);
 
             const int s = qMin(ra.subs.size(), rb.subs.size());
@@ -67,31 +67,32 @@ int main(int argc, char** argv)
                 if (ra.subs[j].name != rb.subs[j].name
                     || ra.subs[j].payload != rb.subs[j].payload)
                 {
-                    printf("  sub %d: %s len %d -> %s len %d\n",
+                    printf("  sub %d: %s len %lld -> %s len %lld\n",
                         j,
                         snapshotName(ra.subs[j].name).toUtf8().constData(),
-                        ra.subs[j].payload.size(),
+                        static_cast<long long>(ra.subs[j].payload.size()),
                         snapshotName(rb.subs[j].name).toUtf8().constData(),
-                        rb.subs[j].payload.size());
+                        static_cast<long long>(rb.subs[j].payload.size()));
                 }
             }
             for (int j = s; j < ra.subs.size(); ++j)
-                printf("  extra source sub %d: %s len %d\n", j,
+                printf("  extra source sub %d: %s len %lld\n", j,
                     snapshotName(ra.subs[j].name).toUtf8().constData(),
-                    ra.subs[j].payload.size());
+                    static_cast<long long>(ra.subs[j].payload.size()));
             for (int j = s; j < rb.subs.size(); ++j)
-                printf("  extra saved sub %d: %s len %d\n", j,
+                printf("  extra saved sub %d: %s len %lld\n", j,
                     snapshotName(rb.subs[j].name).toUtf8().constData(),
-                    rb.subs[j].payload.size());
+                    static_cast<long long>(rb.subs[j].payload.size()));
         }
     }
     if (a.size() != b.size())
     {
-        printf("RECORD COUNT DIFFERS: source %d, saved %d\n", a.size(), b.size());
+        printf("RECORD COUNT DIFFERS: source %lld, saved %lld\n",
+            static_cast<long long>(a.size()), static_cast<long long>(b.size()));
         mismatch += (a.size() != b.size()) ? (b.size() > a.size() ? b.size() - a.size() : a.size() - b.size()) : 0;
     }
 
-    printf("source records %d, saved records %d, mismatched records %d\n",
-        a.size(), b.size(), mismatch);
+    printf("source records %lld, saved records %lld, mismatched records %d\n",
+        static_cast<long long>(a.size()), static_cast<long long>(b.size()), mismatch);
     return mismatch ? 1 : 0;
 }

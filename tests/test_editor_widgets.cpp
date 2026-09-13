@@ -129,7 +129,7 @@ void TestEditorWidgets::testCellDataWidgetValid()
 {
     CellRecord rec;
     rec.cellX = 5;
-    rec.cellY = -3;
+    rec.cellY = static_cast<quint32>(-3);
     rec.owner = 0xAB;
     rec.lockLevel = 25;
     auto w = makeWidget<CellDataWidget, CellRecord>(&rec);

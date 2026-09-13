@@ -31,7 +31,7 @@ void TestBsaArchive::testOpenVoicesArchive()
 {
     const QString path = QStringLiteral(
         "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim - Voices_en0.bsa");
-    QVERIFY2(QFileInfo::exists(path), "Skyrim SE not found");
+    if (!QFileInfo::exists(path)) QSKIP("Skyrim SE not found");
 
     BsaArchive archive;
     QVERIFY(archive.open(path));
@@ -60,7 +60,7 @@ void TestBsaArchive::testOpenMeshesArchive()
 {
     const QString path = QStringLiteral(
         "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim - Meshes0.bsa");
-    QVERIFY2(QFileInfo::exists(path), "Skyrim Meshes0.bsa not found");
+    if (!QFileInfo::exists(path)) QSKIP("Skyrim Meshes0.bsa not found");
 
     BsaArchive archive;
     QVERIFY(archive.open(path));
@@ -85,7 +85,7 @@ void TestBsaArchive::testOpenMorrowindArchive()
 {
     const QString path = QStringLiteral(
         "C:/XboxGames/The Elder Scrolls III- Morrowind (PC)/Content/Morrowind GOTY English/Data Files/Morrowind.bsa");
-    QVERIFY2(QFileInfo::exists(path), "Morrowind not found");
+    if (!QFileInfo::exists(path)) QSKIP("Morrowind not found");
 
     BsaArchive archive;
     QVERIFY(archive.open(path));
@@ -103,7 +103,7 @@ void TestBsaArchive::testExtractFuzRoundTrip()
 {
     const QString path = QStringLiteral(
         "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim - Voices_en0.bsa");
-    QVERIFY2(QFileInfo::exists(path), "Skyrim SE not found");
+    if (!QFileInfo::exists(path)) QSKIP("Skyrim SE not found");
 
     BsaArchive archive;
     QVERIFY(archive.open(path));

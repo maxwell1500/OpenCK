@@ -111,7 +111,6 @@ if (auto* ip = dynamic_cast<IntEditorProperty*>(prop))
         sideLayout->addStretch(1);
         layout->addLayout(sideLayout);
 
-        auto* currentList = static_cast<FormArrayEditorProperty*>(prop);
         QObject::connect(addBtn, &QToolButton::clicked, parent, [list, prop]() {
             // Add a placeholder zero form ID; user can edit text to set.
             // The proper picker is a Tier 3 enhancement.

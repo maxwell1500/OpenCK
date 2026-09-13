@@ -110,7 +110,7 @@ struct EarlyPageHeap
 {
     EarlyPageHeap()
     {
-        if (!getenv("OPENCK_FULL_PAGEHEAP"))
+        if (qEnvironmentVariable("OPENCK_FULL_PAGEHEAP").isNull())
             return;
         ULONG compat = 2;
         ULONG n = GetProcessHeaps(0, nullptr);
@@ -242,7 +242,7 @@ void TestLoaderSinglePass::initTestCase()
     // Enable FULL page heap (guard pages) on the process heap so a *large*
     // buffer overrun raises a catchable ACCESS_VIOLATION at the write site.
     // Gated behind an env var (it is slow and changes heap layout).
-    if (getenv("OPENCK_FULL_PAGEHEAP"))
+    if (!qEnvironmentVariable("OPENCK_FULL_PAGEHEAP").isNull())
     {
         ULONG compat = 2;
         ULONG n = GetProcessHeaps(0, nullptr);
@@ -560,15 +560,15 @@ void TestLoaderSinglePass::testRealSeydaNeenDocument()
         {
             // Every reported cell is a real (non-deleted) cell in the
             // collection.
-            bool found = false;
+            bool cellFound = false;
             const auto& cells = data.getCellCollection();
             for (int ci = 0; ci < cells.size(); ++ci)
             {
                 const auto& cellRec = cells.getRecord(ci);
                 if (cellRec.isDeleted()) continue;
-                if (cellRec.get().formId == c) { found = true; break; }
+                if (cellRec.get().formId == c) { cellFound = true; break; }
             }
-            QVERIFY(found);
+            QVERIFY(cellFound);
         }
     }
     QVERIFY(totalMapped > 0);

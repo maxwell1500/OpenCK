@@ -87,10 +87,10 @@ class TestGroundTruth : public QObject
 private slots:
     void initTestCase()
     {
+        mFilePath = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
+        if (!QFile::exists(mFilePath)) QSKIP("Starfield.esm not found");
         try
         {
-            mFilePath = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
-            QVERIFY2(QFile::exists(mFilePath), "Starfield.esm not found");
             ESMReader reader(mFilePath);
             reader.open();
             scanFile(reader);

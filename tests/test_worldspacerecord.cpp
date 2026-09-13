@@ -58,7 +58,7 @@ void TestWorldspaceRecord::testRoundTripRealRecords()
 {
     const QString filePath = QStringLiteral(
         "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim.esm");
-    QVERIFY2(QFileInfo::exists(filePath), "Skyrim.esm not found");
+    if (!QFileInfo::exists(filePath)) QSKIP("Skyrim.esm not found");
 
     ESMReader reader(filePath);
     reader.open();

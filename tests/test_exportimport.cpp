@@ -263,7 +263,7 @@ void TestExportImport::testJsonRoundTrip_Cell()
     cell.formId = 0x0006DEF0;
     cell.flags = 0;
     cell.cellX = 5;
-    cell.cellY = -3;
+    cell.cellY = static_cast<quint32>(-3);
     cell.owner = 0;
     cell.lockLevel = 100;
     cell.cellName = "Test Cell Name";

@@ -28,7 +28,7 @@ void TestXwmaDecoder::testDecodeSkyrimVoice()
 {
     const QString path = QStringLiteral(
         "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim - Voices_en0.bsa");
-    QVERIFY2(QFileInfo::exists(path), "Skyrim SE not found");
+    if (!QFileInfo::exists(path)) QSKIP("Skyrim SE not found");
 
     BsaArchive archive;
     QVERIFY(archive.open(path));

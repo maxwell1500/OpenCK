@@ -30,7 +30,7 @@ void TestHknpPhysicsSystem::testDecodeRealCollision()
 {
     const QString archive =
         qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield - Meshes01.ba2";
-    QVERIFY2(QFileInfo::exists(archive), "Starfield Meshes01.ba2 not found");
+    if (!QFileInfo::exists(archive)) QSKIP("Starfield Meshes01.ba2 not found");
 
     Ba2Archive ba2;
     QVERIFY(ba2.open(archive));

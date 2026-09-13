@@ -233,28 +233,26 @@ target_include_directories(test_dumpesm PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_dumpesm)
 
 # PNDRecord binary encoder round-trip against the real Starfield.esm.
+# Registered unconditionally: the test QSKIPs when the master is absent and
+# honors OPENCK_DATA_DIR at runtime.
 add_executable(test_pndrecord test_pndrecord.cpp)
 target_link_libraries(test_pndrecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_pndrecord PRIVATE ${TEST_INCLUDE_DIRS})
-if (EXISTS "C:/XboxGames/Starfield/Content/Data/Starfield.esm")
-    openck_add_test(test_pndrecord)
-endif ()
+openck_add_test(test_pndrecord)
 
 # WorldspaceRecord binary encoder round-trip against the real Skyrim.esm.
+# Registered unconditionally: the test QSKIPs when the master is absent.
 add_executable(test_worldspacerecord test_worldspacerecord.cpp)
 target_link_libraries(test_worldspacerecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_worldspacerecord PRIVATE ${TEST_INCLUDE_DIRS})
-if (EXISTS "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim.esm")
-    openck_add_test(test_worldspacerecord)
-endif ()
+openck_add_test(test_worldspacerecord)
 
 # BsaArchive (Skyrim SE .bsa) reader.
+# Registered unconditionally: each case QSKIPs when its archive is absent.
 add_executable(test_bsaarchive test_bsaarchive.cpp)
 target_link_libraries(test_bsaarchive PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_bsaarchive PRIVATE ${TEST_INCLUDE_DIRS})
-if (EXISTS "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/Skyrim - Voices_en0.bsa")
-    openck_add_test(test_bsaarchive)
-endif ()
+openck_add_test(test_bsaarchive)
 
 # AssetResolver: archive-aware asset lookup against the user's install.
 add_executable(test_assetresolver test_assetresolver.cpp)
@@ -849,7 +847,7 @@ target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)
 target_include_directories(make_testplugin PRIVATE ${TEST_INCLUDE_DIRS})
 
 # Convenience target that builds every test executable.
-add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
+add_custom_target(all_tests DEPENDS copy_ads_dll
     test_animationeventvalidator test_archivebrowser test_assetresolver
     test_audiopipelinetools test_autopainter test_ba2dx10 test_ba2write
     test_blenderlauncher test_blendtreemodel test_bnetclient test_brushalphamask
@@ -858,14 +856,16 @@ add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_columnvalidator test_component test_compressedrecord test_conditionrecord
     test_configpaths test_conflict test_creatureattachpoints test_creatureeditor
     test_csvsnippet test_datamodel test_ddsdecoder test_dumpesm test_editor_lifecycle
-    test_editor_widgets test_editorproperty test_editrecordcommand test_efshrecord
-    test_esl test_exportimport test_fbximporter test_fuzparser test_gitrepository
+    test_editor_widgets test_editor_writeback test_editorproperty test_editrecordcommand test_efshrecord
+    test_esl test_exportimport     test_fbximporter test_fuzparser test_gameformat test_gitrepository
     test_gizmomath test_groundtruth test_headerparsing test_hknpphysicssystem test_iconrenderer
     test_imgsrecord test_integration test_loader test_locationrecord test_lodgenerator
     test_mastermanagement test_materialpropertygraph test_materialruletemplate
-    test_meshlodconfig test_meshprobe test_missingrecords test_navmeshtoolkit
-    test_navmrecord test_nifintegration test_nifpyfilewrapper test_nodegraph
-    test_obscript test_obscriptbinder test_obscriptparser
+    test_meshlodconfig test_meshprobe test_missingrecords test_modmanager
+    test_multigame test_navmeshtoolkit
+    test_navmrecord test_nifanimation test_nifintegration test_nifpyfilewrapper test_nodegraph
+    test_obscript test_obscriptbinder test_obscriptcompiler test_obscriptparser
+    test_obscripttypechecker
     test_objectwindow test_objectwindowfilter test_opallist test_packagerecord
     test_papyruscompiler test_papyruslanguageserver test_papyrusproject
     test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
@@ -880,5 +880,5 @@ add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_subrecord_diff
     test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
-    test_tes3 test_thememanager test_tier3_components test_undostack test_warningsdock
+    test_tes3 test_tes3roundtrip test_thememanager test_tier3_components test_undostack test_warningsdock
     test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)

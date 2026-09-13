@@ -119,7 +119,7 @@ private slots:
     void initTestCase()
     {
         mFilePath = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
-        QVERIFY2(QFile::exists(mFilePath), "Starfield.esm not found");
+        if (!QFile::exists(mFilePath)) QSKIP("Starfield.esm not found");
     }
 
     void testRoundTripFirstGrupRecords()
@@ -161,8 +161,6 @@ private slots:
 
         while (file.pos() < grupEnd && records.size() < maxRecords)
         {
-            qint64 recStart = file.pos();
-
             // Read record name (4 bytes)
             char recNameBytes[4];
             if (file.read(recNameBytes, 4) != 4) break;

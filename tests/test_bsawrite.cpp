@@ -3,7 +3,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
-#include <QStringList>#include <algorithm>
+#include <QStringList>
+#include <algorithm>
 
 #include "ba2/bsaarchive.hpp"
 #include "logger.hpp"

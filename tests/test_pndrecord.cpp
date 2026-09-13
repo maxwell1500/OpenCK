@@ -55,7 +55,7 @@ static bool parseNext(ESMReader& reader, PndRecord& rec, int* recordsScanned)
 void TestPndRecord::testRoundTripRealRecords()
 {
     const QString filePath = qEnvironmentVariable("OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data")) + "/Starfield.esm";
-    QVERIFY2(QFileInfo::exists(filePath), "Starfield.esm not found - set OPENCK_TEST_STARFIELD_ESM");
+    if (!QFileInfo::exists(filePath)) QSKIP("Starfield.esm not found - set OPENCK_TEST_STARFIELD_ESM");
 
     ESMReader reader(filePath);
     reader.open();

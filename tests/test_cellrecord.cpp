@@ -31,7 +31,7 @@ void TestCellRecord::testXclwRoundTrip()
     rec.formId = 0x2000A;
     rec.flags = 1;
     rec.cellX = 5;
-    rec.cellY = -3;
+    rec.cellY = static_cast<quint32>(-3);
     rec.owner = 0x1234;
     rec.lockLevel = 0;
     rec.cellName = QStringLiteral("Water Cell");

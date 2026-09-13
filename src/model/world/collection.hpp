@@ -84,7 +84,7 @@ public:
     void add(const ESXRecord& record);
 
     virtual int size() const;
-    virtual QString getId(const int index) const;
+    virtual QString getId(int index) const;
     virtual int getIndex(const QString& id) const;
     virtual int getColumns() const;
     virtual QVariant getData(int index, int column) const;
@@ -98,10 +98,10 @@ public:
     virtual bool touchRecord(const QString& id);
     virtual int searchId(const QString& id) const;
     virtual QVector<QString> getIds(bool listDeleted = true) const;
-    virtual void replace(const int index, const BaseRecord& record);
+    virtual void replace(int index, const BaseRecord& record);
     virtual void insertRecord(const BaseRecord& record, int index, CkId::Type = CkId::Type_None);
     virtual void appendRecord(const BaseRecord& record, CkId::Type = CkId::Type_None);
-    virtual const Record<ESXRecord>& getRecord(const int index) const;
+    virtual const Record<ESXRecord>& getRecord(int index) const;
     virtual const Record<ESXRecord>& getRecord(const QString& id) const;
     Record<ESXRecord>& getRecord(const int index);
     Record<ESXRecord>& getRecord(const QString& id);
