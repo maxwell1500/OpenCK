@@ -692,6 +692,7 @@ set(MODEL_SOURCES
     src/model/tools/opallist.cpp
     src/model/tools/particleslodpresets.cpp
     src/model/tools/particlebundle.cpp
+    src/model/tools/particlesimulation.cpp
     src/model/tools/scenephasemodel.cpp
     src/model/tools/materialruletemplate.cpp
     src/model/tools/materialpropertygraph.cpp

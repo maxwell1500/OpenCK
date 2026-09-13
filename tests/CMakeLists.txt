@@ -790,6 +790,12 @@ target_link_libraries(test_particlebundle PRIVATE openck_model test_stubs Qt6::T
 target_include_directories(test_particlebundle PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_particlebundle)
 
+# Headless particle simulation core
+add_executable(test_particlesimulation test_particlesimulation.cpp)
+target_link_libraries(test_particlesimulation PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_particlesimulation PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_particlesimulation)
+
 # Headless CLI (export/info commands)
 add_executable(test_cli test_cli.cpp)
 target_link_libraries(test_cli PRIVATE openck_esm test_stubs Qt6::Test)
@@ -852,7 +858,8 @@ add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_objectwindow test_objectwindowfilter test_opallist test_packagerecord
     test_papyruscompiler test_papyruslanguageserver test_papyrusproject
     test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
-    test_particleprojectilebindings test_particleslodpresets test_perforcerepository
+    test_particleprojectilebindings test_particleslodpresets test_particlesimulation
+    test_perforcerepository
     test_planetdefinition test_plugincompactor test_pluginio test_pndrecord
     test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline

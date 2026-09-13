@@ -292,6 +292,23 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     bindings).
 
     **Remaining:** live in-viewport particle simulation / preview.
+
+    **Status 2026-09-13:** In-viewport preview is wired and the simulation
+    core is now headlessly tested.
+    - `ParticleSystem` (the Qt/GL wrapper in `src/view/window/`) owns a
+      `QTimer` and is driven by `NifViewportWidget`'s particle toolbar
+      (play/pause/stop); `loadNif` calls `initParticleSystems()`, which parses
+      the NIF's particle effects and shows the toolbar, and `renderMesh()`
+      draws the live particles through `ParticleRenderer`.
+    - The simulation math was extracted into a GUI-free
+      `ParticleSimulation` (`src/model/tools/particlesimulation.*`): emission
+      rate, lifetime jitter, spread/velocity bias, gravity, colour/size curves
+      and a max-particle cap, using a reproducible LCG so results are
+      deterministic. `ParticleSystem` now delegates to it and mirrors the
+      particles for the renderer.
+    - `test_particlesimulation` (9/9) covers emission, the max-particle cap,
+      lifetime expiry, gravity, colour/size-over-lifetime, velocity bias,
+      seed determinism, and reset.
 4. **NavMesh reachability.** NavMesh generation works but uses centroid-based
     cell assignment; a reachability flood-fill pass is a documented residual.
 
