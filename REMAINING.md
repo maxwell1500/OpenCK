@@ -278,6 +278,12 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     indicator but does not render the animated model into the render
     window — Phase 5 scope) and automated tests for the NIF animation
     import/write-back pipeline.
+
+    **Status 2026-09-13:** Automated tests added.
+    `test_nifanimation` (6/6) covers JSON and XML export→import round-trips
+    for clips/channels/keyframes (translation, rotation, scale) and markers,
+    plus the null-export and missing-file import error paths. The
+    in-viewport 3D playback remains Phase 5 scope.
 3. **Particle FX.** The NIF particle block parser
     (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
     `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle
@@ -364,6 +370,22 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     check.
     Remaining: compile-to-bytecode and type checking against a game-specific
     native function/property catalog.
+
+    **Status 2026-09-13:** Both remaining pieces are done.
+    - Compile-to-bytecode: `ObScript::BytecodeProgram` +
+      `obscriptbytecode.hpp` define a stack-based opcode set (control flow,
+      arithmetic, comparison, bitwise, logical, stack, variables, calls) and
+      `obscriptcompiler.hpp/.cpp` emits it from the AST with jump patching,
+      a symbol table for variables, and expression compilation.
+    - Type checking: `obscripttypechecker.hpp/.cpp` checks a program against
+      a `NativeCatalog` of game functions/properties (`builtinCatalog()`
+      provides the common Bethesda natives). It reports wrong argument
+      count/type, calling a property as a function (errors), and unknown
+      functions (warning).
+    - `ScriptEditorDialog` now shows the first type error (red) or warning
+      (amber) after a successful parse, or "Syntax and types OK" (green).
+    - Tests: `test_obscriptcompiler` (8/8) and `test_obscripttypechecker`
+      (8/8).
 8. **Starfield-specific feature slots** (long-term, not started):
    spaceship editor, galaxy view, worldspace/planet-generation editors
    (PNDT planets, OPAL placement), reflection probes, crowd-region authoring,
@@ -462,6 +484,21 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      Remaining (TES3 Phase 2b): component-backed editors for the Morrowind
      record types (the generic record edits losslessly but exposes raw
      bytes only), and the game-specific editors (§3.8).
+
+     **Status 2026-09-13 (TES3 component-backed editing — Phase 2b):**
+     - `Tes3Record` gains `parseComponents()`, called after `load()`, which
+       extracts display/edit components from the raw subrecords: `TESFullName`
+       (FULL), `TESModel` (MODL/MNAM), `TESTexture` (ICON/ICO2), and the new
+       `Tes3Data_Component` (`tes3_components.hpp`) which captures the DATA
+       subrecord bytes and exposes them as a hex-edit property. The save path
+       still replays the original raw subrecords, so untouched records remain
+       **byte-identical** (the 79,837,557-byte round-trip test still passes).
+     - `Tes3Record` added to the `FOR_EACH_COMPONENT_RECORD_TYPE` resolver
+       macro, so the Object Window's generic `editSelected` path opens
+       Morrowind records through `QtFormDialog` like any other record type.
+     Remaining (TES3 Phase 2c): type-specific DATA parsing (the current DATA
+     editor is generic hex), edit-through-component write-back wired into the
+     UndoStack, and specialised editors for Morrowind record families.
 
 ---
 
