@@ -158,22 +158,12 @@ void QuestStageEditor::loadFromQuest()
             mStageTexts.append(mQuest->stageDescriptions[i]);
         else
             mStageTexts.append(QString());
-        mStageFlags.append(0);
+        mStageFlags.append(i < mQuest->stageFlags.size() ? mQuest->stageFlags[i] : 0);
     }
 
     for (const auto& raw : mQuest->rawSubRecords)
     {
-        if (raw.name == 'SFLG')
-        {
-            QDataStream stream(raw.data);
-            stream.setByteOrder(QDataStream::LittleEndian);
-            quint32 count = 0;
-            stream >> count;
-            mStageFlags.resize(count);
-            for (quint32 j = 0; j < count; ++j)
-                stream >> mStageFlags[j];
-        }
-        else if (raw.name == 'REXP')
+        if (raw.name == 'REXP')
         {
             QDataStream stream(raw.data);
             stream.setByteOrder(QDataStream::LittleEndian);
@@ -275,6 +265,13 @@ void QuestStageEditor::saveToQuest()
 
     mQuest->stageIds = mStageIndices;
     mQuest->stageDescriptions = mStageTexts;
+    {
+        QVector<quint8> stageFlags;
+        stageFlags.reserve(mStageFlags.size());
+        for (quint32 f : mStageFlags)
+            stageFlags.append(static_cast<quint8>(f));
+        mQuest->stageFlags = stageFlags;
+    }
 
     mXpReward = mXpSpin->value();
     mGoldReward = mGoldSpin->value();
@@ -307,21 +304,10 @@ void QuestStageEditor::saveToQuest()
         }
     };
 
-    removeRaw('SFLG');
     removeRaw('REXP');
     removeRaw('RGOL');
     removeRaw('RITM');
     removeRaw('RSPL');
-
-    {
-        QByteArray data;
-        QDataStream stream(&data, QIODevice::WriteOnly);
-        stream.setByteOrder(QDataStream::LittleEndian);
-        stream << (quint32)mStageFlags.size();
-        for (quint32 f : mStageFlags)
-            stream << f;
-        mQuest->rawSubRecords.append({'SFLG', data});
-    }
 
     {
         QByteArray data;

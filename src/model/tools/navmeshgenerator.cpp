@@ -1,4 +1,5 @@
 #include "navmeshgenerator.hpp"
+#include "navmeshtoolkit.hpp"
 #include "nifparser.hpp"
 
 #include <cmath>
@@ -104,8 +105,10 @@ NavMeshGenerator::NavMesh NavMeshGenerator::generateFromVertices(
     }
 
     QVector<QPair<int,int>> cells;
-    triangles = voxelFilter(triangles, cells);
+    int componentCount = 0;
+    triangles = voxelFilter(triangles, cells, &componentCount);
     mesh.cells = cells;
+    mesh.componentCount = componentCount;
 
     for (int i = 0; i < triangles.size(); ++i) {
         for (int j = i + 1; j < triangles.size(); ++j) {
@@ -133,9 +136,11 @@ NavMeshGenerator::NavMesh NavMeshGenerator::generateFromVertices(
 
 QVector<NavMeshGenerator::NavTriangle> NavMeshGenerator::voxelFilter(
     const QVector<NavTriangle>& triangles,
-    QVector<QPair<int,int>>& walkableCells)
+    QVector<QPair<int,int>>& walkableCells,
+    int* componentCount)
 {
     walkableCells.clear();
+    if (componentCount) *componentCount = 0;
     if (triangles.isEmpty()) return {};
 
     const float cellSize = agentRadius * 2.0f;
@@ -219,6 +224,16 @@ QVector<NavMeshGenerator::NavTriangle> NavMeshGenerator::voxelFilter(
         }
     }
 
+    QVector<bool> walkable(gridW * gridH, false);
+    for (int i = 0; i < gridW * gridH; ++i)
+        walkable[i] = hasFloor[i] && !blocked[i];
+
+    QVector<int> reachable =
+        NavMeshTools::largestReachableComponent(gridW, gridH, walkable, componentCount);
+    QVector<bool> inReachable(gridW * gridH, false);
+    for (int idx : reachable)
+        inReachable[idx] = true;
+
     QVector<NavTriangle> result;
     for (const auto& tri : triangles) {
         if (!isWalkable(tri)) continue;
@@ -226,13 +241,14 @@ QVector<NavMeshGenerator::NavTriangle> NavMeshGenerator::voxelFilter(
         const int idx = cellIndex(c.x(), c.z());
         if (idx < 0) continue;
         if (!hasFloor[idx] || blocked[idx]) continue;
+        if (!inReachable[idx]) continue;
         result.append(tri);
     }
 
     for (int gz = 0; gz < gridH; ++gz) {
         for (int gx = 0; gx < gridW; ++gx) {
             const int idx = gz * gridW + gx;
-            if (hasFloor[idx] && !blocked[idx])
+            if (hasFloor[idx] && !blocked[idx] && inReachable[idx])
                 walkableCells.append(qMakePair(gx + gridMinX, gz + gridMinZ));
         }
     }

@@ -5,8 +5,10 @@
 #include "metadata.hpp"
 #include "../../../libs/files/filepaths.hpp"
 #include "../../../libs/files/esm/esmreader.hpp"
+#include "../../../libs/files/esm/gameformat.hpp"
 #include "../../../libs/files/esm/gmst.hpp"
 #include "../../../libs/files/esm/tes4.hpp"
+#include "../../../libs/files/esm/Tes3record.hpp"
 #include "../../../libs/files/esm/npcrecord.hpp"
 #include "../../../libs/files/esm/weaprecord.hpp"
 #include "../../../libs/files/esm/armorrecord.hpp"
@@ -272,6 +274,17 @@ public:
     // by-value overload here, and binding that temporary to a returned
     // reference left every caller holding a dangling reference.
     Header getReaderHeader() const { return reader ? reader->getHeader() : m_fallbackHeader; }
+
+    /// \brief Game family detected for the last preloaded file
+    /// (basename + master list + HEDR flags).
+    GameFormat::Game currentGame() const { return m_currentGame; }
+
+    /// \brief True if this record type is a known, game-specific record of
+    /// the detected game (recognized even when not yet implemented).
+    bool isGameSpecificRecord(NAME type) const
+    {
+        return GameFormat::gameSpecificRecords(m_currentGame).contains(type);
+    }
 
     /// \brief Continue loading records from preloaded files
     /// \param messages Reference to messages container for progress reporting
@@ -1526,6 +1539,31 @@ public:
     /// \return Pointer to the collection, or nullptr if not found
     BaseCollection* getCollectionByType(CkId::Type type);
 
+    /// \brief Get (creating on first use) the generic TES3 collection for an
+    /// on-disk Morrowind record code (e.g. NAME('GMST')). Morrowind records
+    /// carry no form id, so the collection keys on the editor id.
+    IdCollection<Tes3Record>* tes3CollectionFor(NAME code);
+
+    /// \brief Monotonic synthetic form id for TES3 records.
+    quint32 nextTes3FormId() { return m_nextTes3FormId++; }
+
+    /// \brief Map an on-disk Morrowind record code to a CkId::Type.
+    static CkId::Type tes3TypeForName(NAME code);
+
+    /// \brief Map a CkId::Type to its on-disk record code (0 if unknown).
+    static NAME recordNameForType(CkId::Type type)
+    {
+        return typeNameFor(static_cast<int>(type));
+    }
+
+    /// \brief All TES3 type codes currently in use.
+    QVector<NAME> tes3CollectionCodes() const;
+
+    /// \brief Write every saveable TES3 record to \p writer. Morrowind files
+    /// have no GRUPs, so the plugin's load order is replayed flat and any
+    /// records added after load are appended.
+    void saveTes3Records(ESMWriter& writer);
+
     /// \brief Get all collections as a vector
     /// \return Vector of all record collection pointers
     QVector<IRecordCollection*> allCollections();
@@ -1774,6 +1812,12 @@ private:
     QVector<MasterIndexEntry> m_masterIndex;
     QStringList m_deferredMasterFiles;
     QString m_lastPreloadPath;
+    GameFormat::Game m_currentGame = GameFormat::Game::Unknown;
+
+    // Generic Morrowind (TES3) record storage, keyed by on-disk record code.
+    // Lazily created on first load/materialization.
+    QHash<NAME, IdCollection<Tes3Record>*> m_tes3Collections;
+    quint32 m_nextTes3FormId = 0xF0000000;
 
     // Time-sliced materialization state (see beginTypeMaterialization /
     // materializeNextBatch). All access stays on the main thread.

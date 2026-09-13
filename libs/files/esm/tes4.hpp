@@ -41,9 +41,10 @@ struct Header
     void blank();
     void load(ESMReader& esm);
     void save(ESMWriter& esm);
+    void loadTes3(ESMReader& esm);
 
     // Header information
-    RecHeader recHeader;    
+    RecHeader recHeader;
     Flags flags;
 
     // HEDR subrecord
@@ -57,6 +58,13 @@ struct Header
     QVector<FormID> overrides;   // ONAM, optional
     quint32 internalVersion;     // INTV, required
     quint32 incc;                // INCC, unknown (introduced in V1.6)
+
+    // TES3 (Morrowind) header fields; zero/empty for TES4 files.
+    quint32 formatVersion = 0;   // FORM, 0 = old format
+    quint32 tes3FileType = 0;    // HEDR file type (1 = master, 2 = plugin)
+    QByteArray tes3Gmdt;         // GMDT raw data (player health/time/cell)
+    QByteArray tes3Scrd;         // SCRD raw data
+    QByteArray tes3Scrs;         // SCRS raw data
 };
 
 #endif // TES4_H

@@ -56,6 +56,14 @@ struct CtdaCondition
     static QString comparisonName(Comparison comparison);
     static QString runOnName(RunOn runOn);
 
+    // Human-readable label for a condition function index. Returns the name
+    // for well-known TES4 functions and "Function <hex>" for anything else, so
+    // an unknown index is never silently rewritten. The returned label is
+    // stable: functionName(functionId) round-trips back to functionId through
+    // functionIdForName.
+    static QString functionName(quint32 functionId);
+    static bool functionIdForName(const QString& name, quint32* functionId);
+
     // Raw payload captured on unpack(). pack() re-emits these bytes exactly so
     // real files round-trip losslessly; the typed fields below are only used to
     // rebuild the payload for conditions created/edited from scratch.

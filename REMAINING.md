@@ -73,13 +73,13 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
    - `NpcRecord`: compressed NPCs ending in a non-subrecord binary blob
      (four NUL bytes where a name would sit) are captured verbatim
      (`name=0` raw) instead of abandoning hundreds of tail bytes.
-    Warning floor is now ~122: 40× compressed
-   records whose loaders still exit early inside the decompressed buffer
-   (`restoreStreamFromCompression`), ~30 unknown/garbage record names that
-   look like downstream artifacts of those two, plus a handful of `_CPN`
-    stragglers. Fixed 2026-09-07: `Variant::load(Format_GMST)` now drains
-    the DATA payload losslessly for unknown EDID prefixes instead of
-    throwing; zero errors remain.
+     Warning floor is now 0: `testMaterializationMatrixZeroWarnings` passes
+    with 3,829,768 records / 180 types / zero warnings. The 40×
+    compressed-record misalignments and ~30 unknown/garbage-name artifacts
+    that previously remained were eliminated by the drain/guard fixes
+    above. Fixed 2026-09-07: `Variant::load(Format_GMST)` now drains
+     the DATA payload losslessly for unknown EDID prefixes instead of
+     throwing; zero errors remain.
 
  2. **Untouched-plugin round-trip must be payload-identical.** Build a
     subrecord-diff tool (per-record list of subrecord name+payload) and run it
@@ -120,9 +120,18 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     Fixed: `GlobalVariable` and `LocationRefType` lacked a `formId` field,
     causing them to be displaced to the fallback group with formId=0 on save
     (breaking ordered replay). Both now carry `formId` set from the reader.
-    Remaining: full Starfield.esm-scale round-trip (3.8M records) is a CI/
-    nightly job, not a unit test. The ~36 `Variant::load` GMST/GLOB LOG_ERRORs
-    (errors, not warnings — outside both gates) remain.
+     Remaining: full Starfield.esm-scale round-trip (3.8M records) is a CI/
+     nightly job, not a unit test.
+
+     **Status 2026-09-09:** The ~36 `Variant::load` GMST/GLOB LOG_ERRORs are
+     gone. Verified by re-running `testMaterializationMatrixZeroWarnings`
+     (full Starfield.esm + Magnus.esm + Vvardenfell.esp, 3,829,768 records
+     materialized across 180 types) and capturing stderr: **zero `[ERROR]`,
+     zero `[WARNING]`, zero "Error loading", zero "Invalid format"** lines.
+     The fixes were the generic-walk `GlobalVariable::load` (no throw on
+     unexpected subrecords) and `Variant::load(Format_GMST)` draining unknown
+     EDID prefixes to `rawData` instead of throwing. Load-side is clean at
+     full scale; only the save+diff at 3.8M scale is left to CI/nightly.
 
     **Status 2026-09-04:** `LocationRecord::locationName` is persisted now.
     `FULL` was consumed as an opaque raw (the shared
@@ -172,10 +181,17 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     master record materializes as `State_Base`, is NOT emitted on untouched
     save, promotes to `State_Modified` on edit, and IS emitted as an override.
 
-6. **ObjectPalette save/load asymmetry.** "Save Placement" never writes a file
-   (it only appends in-memory) while "Load Placement" reads a binary file.
-   Make save write the same format Load reads, and rename the extension away
-   from `.json` since it is binary (`QDataStream`, little-endian).
+ 6. **ObjectPalette save/load asymmetry.** "Save Placement" never writes a file
+    (it only appends in-memory) while "Load Placement" reads a binary file.
+    Make save write the same format Load reads, and rename the extension away
+    from `.json` since it is binary (`QDataStream`, little-endian).
+
+    **Status 2026-09-09:** Resolved. `ObjectPalette::onSavePlacementClicked`
+    now writes a binary little-endian `QDataStream` file (count, then per
+    placement: name, x, y, z, rotX, rotY, rotZ, scale, active) under a
+    `.placement` extension — exactly the layout `onLoadPlacementClicked`
+    reads back (which re-resolves the base formId from the name via
+    `resolveFormIdFromName`).
 
 7. **Field range validation on editors.** Editors still accept out-of-range
    values that can corrupt ESM files (the long-running X-02 item). `ColumnValidator`
@@ -207,9 +223,18 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
    route them through the UndoStack like the Object Window's Game Setting add
    (done).
 
-   **Status 2026-09-07:** `watereditor.cpp` already uses `EditRecordCommand`
-   for GLOB/GMST edits and `removeRecordWithUndo` for deletes. No remaining
-   raw mutations.
+    **Status 2026-09-07:** `watereditor.cpp` already uses `EditRecordCommand`
+    for GLOB/GMST edits and `removeRecordWithUndo` for deletes. No remaining
+    raw mutations.
+
+    **Status 2026-09-09:** `weatherlighteditor.cpp` "Add Setting" was a
+    disabled no-op stub. It now builds a new `GameSetting` via
+    `createNewRecord(CkId::Type_Gmst, id)` + `initializeSettingValue` (infers
+    bool/int/float/string from the entered value), wraps it in
+    `Record<GameSetting>(State_ModifiedOnly, nullptr, &gs)`, and pushes an
+    `AddRecordCommand` (with a `coll.appendRecord` fallback). The button is
+    re-enabled. `openck` links clean (0 errors); `test_editor_writeback`
+    9/9 pass.
  3. **Editor write-back smoke tests.** Automated test per editor: open a fixture
     record, perform a canonical edit, assert the UndoStack gained a command and
     the record changed.
@@ -224,39 +249,219 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 
 ## 3. Editor / feature gaps
 
-1. **Dialogue editor.** Conditional response editing (quest-stage conditions,
-    variable checks), voice-file association (`.wav` links), and quest-graph
-    stage editing (flags/indices/objectives) are not implemented.
+1. **Dialogue editor.** Conditional response editing, voice-file
+    association (`.wav` links), and quest-graph stage editing
+    (flags/indices/objectives).
 
-    **Status 2026-09-08:** INFO records now parse CTDA into
-    `QVector<CtdaCondition>` (was opaque raw) and re-emit on save. VMAP
-    (voice file) is parsed and saved. The condition table in
-    `InfoDataWidget` and `DialogueTreeEditor` display CtdaCondition
-    fields. Remaining: quest-graph stage editing (QUST INDX/QSDT/QASD
-    groups) and the condition function dropdown needs a proper function
-    ID → name lookup table.
-2. **Animation timeline.** `NifKeyframeData`/`NiTransformData` block parsing,
-   a timeline widget, keyframe undo commands, NIF write-back, and in-viewport
-   preview (Phase5 scope) are not built; the timeline editor for SCEN is
-   pending.
-3. **Particle FX.** The NIF particle block parser (`NiParticleSystem`,
-   `NiPSys*`, `BSLightingShaderProperty`) is missing; the particle effects
-   parser is a stub; there is no viewport particle simulation or particle
-   editor.
+    **Done 2026-09-09:** INFO records parse CTDA into
+    `QVector<CtdaCondition>` (was opaque raw) and re-emit on save; VMAP
+    voice files parse/save. The condition function dropdown is now
+    data-driven: `CtdaCondition::functionName(id)` /
+    `functionIdForName(name)` give a stable ID↔name mapping — known
+    indices render by name, unknown indices render as `Function <hex>`
+    and round-trip exactly — so a condition's function index no longer
+    collapses to 0 on save. `InfoDataWidget` stores/parses the function
+    id via that mapping (raw hex is also accepted). Quest stages now edit
+    the standard per-stage `QSDT` flags (`QuestRecord::stageFlags`, one
+    byte per stage) instead of a non-standard `SFLG` blob;
+    `QuestStageEditor` reads/writes `stageFlags` and no longer emits
+    `SFLG`. `test_conditionrecord` 9/9 pass (incl.
+    `testFunctionNameRoundTrip`); `openck` builds clean.
+2. **Animation timeline.** `NifKeyframeData`/`NifTransformData` block
+    parsing (`nifrecord.cpp`), the `TimelineWidget`, keyframe undo
+    commands (move/add/remove via `CommandUndoAdapter`), atomic NIF
+    write-back (`NifAnimationWriter::writeKeyframesToNif`), and the SCEN
+    phase timeline (`SceneTimelineWidget`) are all built;
+    `AnimationEditor` wires the timeline to undo and Play/Stop.
+
+    **Remaining:** in-viewport 3D playback (Play advances the timeline
+    indicator but does not render the animated model into the render
+    window — Phase 5 scope) and automated tests for the NIF animation
+    import/write-back pipeline.
+3. **Particle FX.** The NIF particle block parser
+    (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
+    `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle
+    editors exist (`ParticleEffectsEditor`, `ParticleRenderer`,
+    `ParticleSystem`, `ParticleBundle`, LOD presets, projectile
+    bindings).
+
+    **Remaining:** live in-viewport particle simulation / preview.
 4. **NavMesh reachability.** NavMesh generation works but uses centroid-based
-   cell assignment; a reachability flood-fill pass is a documented residual.
-5. **In-viewport object manipulation** (move/rotate/scale placed references in
-   the render window) is not built.
-6. **Mod-manager integration** (Mod Organizer 2 / Vortex) UI is unwired.
-7. **OBScript editor** — long-term, not started.
+    cell assignment; a reachability flood-fill pass is a documented residual.
+
+    **Status 2026-09-09:** Added `NavMeshTools::largestReachableComponent` — a
+    4-connected flood-fill over the row-major walkable cell grid that returns
+    the largest connected component and (optionally) the total component
+    count. `NavMeshGenerator::voxelFilter` now builds the walkable grid, runs
+    the flood-fill, and prunes triangles/cells whose centroid cell is not in
+    the largest reachable component, so disconnected floating islands are
+    dropped. `NavMesh.componentCount` exposes the pre-prune component count.
+    3 new tests added (`testLargestReachableComponent`,
+    `testLargestReachableComponentSingle`, `testVoxelFilterDropsDisconnectedIsland`);
+    `test_navmeshtoolkit` 21/21 pass.
+5. **In-viewport object manipulation** (move/rotate/scale placed references
+    in the render window). `NifViewportWidget` implements this: an
+    `EditMode` (Select/Move/Rotate/Scale) with gizmos (`m_translateGizmoVBO` /
+    `m_rotateGizmoVBO` / `m_scaleGizmoVBO`), grid/angle snapping,
+    `refTransformPreview`/`refTransformCommitted` signals, and
+    `setCellReferences`/`setSelectedRefIndex` for placed references.
+
+    **Done:** `MainWindow` connects `refTransformCommitted` to an undoable
+    write-back that snapshots the `RefrRecord`, applies the transform via the
+    shared `RefrRecord::applyTransform`, and pushes an
+    `EditRecordCommand<RefrRecord>` onto `Data::getUndoStack()`. Reference
+    transform undo/redo is covered by `test_editor_writeback`
+    (`testRefrTransformUndoable`) alongside the other record editors.
+    Remaining: in-render-window 3D playback of animations/particles (§3.2/§3.3).
+6. **Mod-manager integration** (Mod Organizer 2 / Vortex).
+    `ModManagerDetection` (detect/detectMO2/detectVortex/profiles/
+    `getInstalledMods`) and `ModManagerDialog` are built and wired into
+    `MainWindow::on_actionModManager_triggered`. The INI/JSON parsing is
+    factored into testable `parseMo2Ini` / `parseVortexField` helpers;
+    `test_modmanager` covers profile, gamePath, modsDirectory, selectedProfile
+    and Vortex field extraction (6/6 pass).
+7. **OBScript editor** — lexer + parser core done: `ObScript::Lexer`
+   (`libs/files/esm/obscriptlexer.hpp/.cpp`) tokenizes reserved words,
+   identifiers, int/float literals, strings, operators, newlines and `;`
+   comments; `ObScript::Parser` (`libs/files/esm/obscriptparser.hpp/.cpp`)
+   builds an AST via recursive descent: expressions with full operator
+   precedence (`|| && == != < > <= >= + - * / %`, unary `- ! ~`, calls,
+   field access, indexing, parenthesised grouping, literals) and the common
+   statements (`function`/`endfunction`, `if`/`elseif`/`else`/`endif`,
+   `while`/`endwhile`, `for … to …`/`endfor`, `return`, `let`/`set` and bare
+   assignment, expression statements, and the optional `begin … end`/
+   `endscript` wrapper). The parser reports the first syntax error with its
+   line. `test_obscript` (8/8) covers the lexer; `test_obscriptparser` (15/15)
+   covers functions, if/elseif/else, loops, precedence, calls/postfix,
+   assignment/`let`, the `begin` wrapper, unary/logical operators and four
+   error cases. The AST stores children in `std::vector` (Qt's `QVector`
+   copies on reallocation and so cannot hold `unique_ptr`).
+   The editor UI is in place: `ObScriptHighlighter`
+   (`src/view/window/obscripthighlighter.hpp/.cpp`) classifies each source
+   line into spans (control-flow / type / keyword / string / comment / number /
+   operator) via the pure, testable `classifyObScriptLine`, and
+   `ScriptEditorDialog` (`src/view/window/scripteditordialog.hpp/.cpp`) edits a
+   script's SCTX source with that highlighter plus a live syntax-check status
+   line (from `ObScript::parse`). `ObjectWindowDialog::editSelected` now has a
+   `CkId::Type_Scpt_` case that opens it and writes the edited text back to
+   `ScriptRecord::scriptText` (marking the record modified).
+   `test_scripteditor` (11/11) covers span classification (incl. comments
+   inside strings and escaped quotes) and the dialog's valid/invalid syntax
+   status.
+    The semantic binder is in place: `ObScript::bindProgram`
+    (`libs/files/esm/obscriptbinder.hpp/.cpp`) builds a symbol table
+    (functions, parameters, locals, globals), reports duplicate declarations
+    as errors (duplicate function, parameter, or local), and collects
+    references that do not resolve locally into `referencedExternals`
+    (typically the game's native functions/properties); an optional
+    `knownExternals` set suppresses entries a caller already knows.
+    `ObScript::completionEntries` returns a sorted word list of keywords,
+    declared symbols, and unresolved references. `test_obscriptbinder`
+    (11/11) covers the binder and the completion word list.
+    Autocomplete is wired in: `ScriptEditorDialog` attaches a `QCompleter`
+    (via a `QStringListModel`) to the editor through an event filter and
+    triggers it on Ctrl+Space; the word list refreshes with each syntax
+    check.
+    Remaining: compile-to-bytecode and type checking against a game-specific
+    native function/property catalog.
 8. **Starfield-specific feature slots** (long-term, not started):
    spaceship editor, galaxy view, worldspace/planet-generation editors
    (PNDT planets, OPAL placement), reflection probes, crowd-region authoring,
    morph/face-gen editor, RoboVoicer (TTS pipeline), Houdini integration.
-9. **Multi-game record dispatch** — game-specific record formats and editors
-   for Morrowind / Oblivion / Skyrim / FO4 / Starfield behind one dispatch.
-   Morrowind save-format conversions are partly handled; a full per-game
-   layout pass is the largest remaining effort.
+ 9. **Multi-game record dispatch** — foundation verified against real
+    non-Starfield masters:
+    `GameFormat` (`libs/files/esm/gameformat.hpp/.cpp`) detects the game
+    family from master basenames + the LightMaster flag (`detectGame`), now
+    also from the opened file's own basename (real files are named after the
+    game, not "Skyrim.esm"/"Starfield.esm"), and exposes a per-game record
+    registry (`gameSpecificRecords` / `supportsRecord`), now filled for
+    Oblivion (PGRD/SPGD/LSPM), Skyrim (MATT/CLMT/LAIF/GRPA/GRPL/SNIP),
+    FO4 (ASRC/LTEX) and Starfield. `test_gameformat` covers detection (all
+    5 games) and every per-game registry (11/11). `test_multigame` parses real masters end-to-end through the
+    existing `ESMReader`/`Header`: **FO4 `Fallout4.esm` (1.74M records) and
+    Starfield `Starfield-Core.esm` (3.83M records) each read 400 records with
+    0 errors and correct `detectGame`, and the base `.esm` masters correctly
+    report no MAST entries** — proving the unified TES4 reader generalizes
+    beyond Skyrim.
+     **Morrowind (TES3) is a genuine separate format:** its first record is
+     `'TES3'` and stores `HEDR` *inline* (version/numRecords/nextObjectID as
+     raw fields, not a subrecord) followed by per-month `GMST`/`NAME`/`STRV`
+     calendar subrecords — the TES4 reader's `header.load()` desynced on the
+     inline bytes and yielded 0 records.
+
+     **Status 2026-09-12 (TES3 reader core — Phase 1):** the reader now
+     accepts `'TES3'` masters end-to-end at the structural level:
+     - `ESMReader::open` recognizes the `'TES3'` magic (`m_tes3` flag);
+       TES3 record header is 16 bytes (name+size+unknown+flags, no formId),
+       subrecord header is 8 bytes (name+uint32 size, no XXXX/compression).
+       `readHeader`/`readNSubHeader`/`readSubHeader`/`skipGrupHeader`/
+       `buildRecordIndex` all branch on `m_tes3`.
+     - `Header::loadTes3` parses the inline `HEDR` subrecord (version float,
+       file-type uint32, fixed 32-byte author, fixed 256-byte description,
+       record count) plus `MAST`/`DATA`/`GMDT`/`SCRD`/`SCRS`. New
+       `ESMReader::readFixedString(int)` reads a fixed-width string field
+       inside a subrecord (TES3's HEDR author/description are flat fields,
+       *not* subrecords — `readZString` over-consumed them).
+     - `Data::continueLoading` takes a TES3 branch: read header, dispatch
+       through the existing switch, drain remaining subrecords losslessly —
+       no desync, no per-type loader required for a clean walk yet.
+     - Verified against the real `Morrowind.esm` (79,837,557 bytes):
+       **48,295 records walked end-to-end with zero desync** (`test_tes3`
+       6/6: HEDR v1.2/type-1/48,295; full walk; record index first entry
+       GMST@324; GMST NAME+STRV fully drained). `test_multigame::testMorrowind`
+       is upgraded from detection-only to a full 400-record smoke walk.
+     - TES3 GMST `STRV` holds a *variable-length string* for string globals
+       (e.g. `sMonthMorningstar` → "Morning Star"), a 4-byte float for
+       numeric ones — the size field disambiguates.
+     - Morrowind record registry added to `gameformat` (BODY/BSGN/CLOT/
+       CREA/LEVC/LEVI/LOCK/PGRD/PROB/REPA/REGN/SNDG/SSCR — the types
+       actually present in Morrowind.esm, per the walk histogram);
+       `test_gameformat` 12/12.
+    `detectGame` is now wired into the loader: `Data::preload` detects the
+    game from the file's own basename, the MAST list and the HEDR flags and
+    stores it (`Data::currentGame()`); `Data::isGameSpecificRecord(NAME)`
+    answers whether a record code belongs to the detected game's registry,
+    and the unknown-record warning names the detected game.
+    `test_editor_writeback::testCurrentGameDetection` preloads the real
+    `Starfield.esm` through `Data` (indexing 3.8M records in ~1 s) and
+    asserts the detection (11/11 overall).
+     Remaining (TES3 Phase 2): per-type record loaders for the Morrowind
+     record types in the walk histogram (INFO/DIAL/CELL/STAT/NPC_ bodies etc.
+     — ~40 types, mirroring the OpenMW `esm3/load*.cpp` layouts), a TES3
+     save/round-trip path with subrecord-diff gating, and the
+     game-specific editors (§3.8). The structural core (header, subrecords,
+     index, lossless drain) is done and verified.
+
+     **Status 2026-09-12 (TES3 generic record + save — Phase 2a):** the
+     entire Morrowind format now loads and saves through one generic record,
+     no per-type loader required:
+     - `Tes3Record` (`libs/files/esm/Tes3record.hpp/.cpp`) preserves the
+       16-byte header (type/size/unknown/flags), the first `NAME` subrecord
+       (raw payload kept verbatim; editorId decoded as Latin-1 so non-UTF-8
+       bytes like `0x92` survive), and every other subrecord positionally in
+       load order. `save()` replays them in order, adding a `NAME` only when
+       one exists.
+     - `ESMWriter` gained a TES3 mode (`setTes3`): 16-byte record headers,
+       8-byte subrecord headers with uint32 sizes, NUL-less zstrings, no XXXX,
+       and a 320-byte HEDR record-count patch offset. `Header::save` writes
+       the inline TES3 `HEDR` (version/type/fixed 32-byte author/fixed
+       256-byte description/count) plus `MAST`/`GMDT`/`SCRD`/`SCRS`.
+     - `Data` stores Morrowind records in `QHash<NAME, IdCollection<Tes3Record>*>`
+       keyed by record code (`tes3CollectionFor`), assigns synthetic form ids
+       (unique even for `NAME`-less LAND/PGRD), registers Qt models lazily,
+       and `allCollectionsWithTypes`/`getCollectionByType` branch on
+       `GameFormat::Game::Morrowind`.
+     - `Data::saveTes3Records` replays `pluginOrder` flat (no GRUPs) and
+       writes each record directly so the record header flags survive;
+       `Document::save` takes a TES3 branch.
+     - 9 new `CkId::Type`s: BODY/LEVC/LEVI/LOCK/PGRD/PROB/REPA/SNDG/SKIL.
+     - `test_tes3roundtrip` (new, gated on the real Morrowind.esm): full
+       48,295-record load with **exact per-type counts** (GMST 1449, NPC_ 2675,
+       STAT 2788, DIAL 2358, CELL 2538, LAND 1390, PGRD 1194, BODY 1125, …)
+       and a **byte-identical** save of the whole 79,837,557-byte master.
+     Remaining (TES3 Phase 2b): component-backed editors for the Morrowind
+     record types (the generic record edits losslessly but exposes raw
+     bytes only), and the game-specific editors (§3.8).
 
 ---
 

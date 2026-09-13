@@ -13,6 +13,7 @@ private slots:
     void testNames();
     void testListRoundTrip();
     void testOrJoinFlag();
+    void testFunctionNameRoundTrip();
 };
 
 void TestCtdaConditions::testPackUnpackBase()
@@ -121,6 +122,37 @@ void TestCtdaConditions::testOrJoinFlag()
     QVERIFY((condition.flags & 0x01) != 0);
     condition.setUseOr(false);
     QVERIFY(!condition.useOr());
+}
+
+void TestCtdaConditions::testFunctionNameRoundTrip()
+{
+    // A known index renders its name and maps straight back.
+    QCOMPARE(CtdaCondition::functionName(0x0), QStringLiteral("GetKeywordCount"));
+    quint32 id = 0;
+    QVERIFY(CtdaCondition::functionIdForName(QStringLiteral("GetKeywordCount"), &id));
+    QCOMPARE(id, static_cast<quint32>(0));
+
+    // An unknown index gets a stable "Function <hex>" label that maps back.
+    const quint32 unknown = 0x1A2B;
+    const QString label = CtdaCondition::functionName(unknown);
+    QCOMPARE(label, QStringLiteral("Function 1a2b"));
+    QVERIFY(CtdaCondition::functionIdForName(label, &id));
+    QCOMPARE(id, unknown);
+
+    // Raw hex (with and without the 0x prefix) also resolves.
+    QVERIFY(CtdaCondition::functionIdForName(QStringLiteral("1a2b"), &id));
+    QCOMPARE(id, unknown);
+    QVERIFY(CtdaCondition::functionIdForName(QStringLiteral("0x1A2B"), &id));
+    QCOMPARE(id, unknown);
+
+    // Round-trip holds for a spread of ids (known and unknown).
+    const quint32 samples[] = { 0x0, 0x1, 0x1A, 0x40, 0xFFFF, 0x12345678 };
+    for (quint32 s : samples)
+    {
+        const QString n = CtdaCondition::functionName(s);
+        QVERIFY(CtdaCondition::functionIdForName(n, &id));
+        QCOMPARE(id, s);
+    }
 }
 
 QTEST_MAIN(TestCtdaConditions)

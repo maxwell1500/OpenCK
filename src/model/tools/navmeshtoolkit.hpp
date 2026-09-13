@@ -143,6 +143,17 @@ QVector<CoverData> computeCoverData(const QVector<QVector3D>& vertices,
                                     float radius = 512.0f,
                                     float minCoverDepth = 128.0f);
 
+// ─── Reachability ──────────────────────────────────────────────────────────
+//
+// 4-connected flood-fill over a row-major walkable grid (row = z, column = x,
+// index = row * width + column). Returns the cell indices belonging to the
+// largest connected component; when two components tie, the one containing
+// the lowest index wins. If componentCount is non-null it receives the total
+// number of connected components found. Empty result when no cell is walkable.
+QVector<int> largestReachableComponent(int width, int height,
+                                       const QVector<bool>& walkable,
+                                       int* componentCount = nullptr);
+
 } // namespace NavMeshTools
 
 #endif // NAVMESHTOOLKIT_HPP

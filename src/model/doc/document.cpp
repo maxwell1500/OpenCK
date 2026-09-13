@@ -104,7 +104,24 @@ void Document::save(const QString& savePath)
     }
     LOG_INFO(QString("Writing header with %1 master files").arg(readerHeader.masters.size()));
 
+    if (data->currentGame() == GameFormat::Game::Morrowind)
+    {
+        writer.setTes3(true);
+        writer.setTes3FileType(readerHeader.tes3FileType);
+        writer.setFormatVersion(readerHeader.formatVersion);
+        writer.setTes3Gmdt(readerHeader.tes3Gmdt);
+        writer.setTes3Scrd(readerHeader.tes3Scrd);
+        writer.setTes3Scrs(readerHeader.tes3Scrs);
+    }
+
     writer.save(saveFile);
+
+    if (data->currentGame() == GameFormat::Game::Morrowind)
+    {
+        data->saveTes3Records(writer);
+        writer.close();
+        return;
+    }
 
     struct RecordTypeTag {
         const IRecordCollection* collection;

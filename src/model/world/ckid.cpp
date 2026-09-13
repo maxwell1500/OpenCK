@@ -11,6 +11,15 @@ struct TypeData
 
 static const TypeData typesIdArg[] =
 {
+    { CkId::Type_Body_, "Body Part" },
+    { CkId::Type_Levc_, "Leveled Creature List" },
+    { CkId::Type_Levi_, "Leveled Item List" },
+    { CkId::Type_Lock_, "Lockpick" },
+    { CkId::Type_Pgrd_, "Path Grid" },
+    { CkId::Type_Prob_, "Probe" },
+    { CkId::Type_Repa_, "Repair Tool" },
+    { CkId::Type_Sndg_, "Sound Generator" },
+    { CkId::Type_Skil_, "Skill" },
     { CkId::Type_Gmst, "Game Setting"},
     { CkId::Type_Npc_, "Actor" },
     { CkId::Type_Weap_, "Weapon" },
@@ -690,8 +699,11 @@ CkId::Type CkId::stringToType(const QString& typeName)
             { Type_Flst_, "FLST" }, { Type_Furn_, "FURN" }, { Type_Grass_, "GRAS" },
             { Type_Hair_, "HAIR" }, { Type_Idle_, "IDLE" }, { Type_Idlm_, "IDLM" },
             { Type_Imgs_, "IMGS" }, { Type_Keym_, "KEYM" }, { Type_Kywd_, "KYWD" },
-            { Type_Ligh_, "LIGH" }, { Type_Lscr_, "LSCR" }, { Type_Lvlc_, "LVLC" },
+            { Type_Ligh_, "LIGH" }, { Type_Lscr_, "LSCR" },             { Type_Lvlc_, "LVLC" },
             { Type_Lvli_, "LVLI" }, { Type_Lvsp_, "LVSP" }, { Type_Mesg_, "MESG" },
+            { Type_Body_, "BODY" }, { Type_Levc_, "LEVC" }, { Type_Levi_, "LEVI" },
+            { Type_Lock_, "LOCK" }, { Type_Pgrd_, "PGRD" }, { Type_Prob_, "PROB" },
+            { Type_Repa_, "REPA" }, { Type_Sndg_, "SNDG" }, { Type_Skil_, "SKIL" },
             { Type_Mstt_, "MSTT" }, { Type_Navm_, "NAVM" }, { Type_Note_, "NOTE" },
             { Type_Otft_, "OTFT" }, { Type_Proj_, "PROJ" }, { Type_Regn_, "REGN" },
             { Type_Road_, "ROAD" }, { Type_Scpt_, "SCPT" }, { Type_Scrl_, "SCRL" },

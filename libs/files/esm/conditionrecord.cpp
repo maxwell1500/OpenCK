@@ -42,6 +42,63 @@ QString CtdaCondition::runOnName(RunOn runOn)
     return QStringLiteral("Subject");
 }
 
+namespace
+{
+// Best-effort name table for TES4 condition function indices. Entries are
+// added as authoritative names are confirmed; any index absent here renders
+// as "Function <hex>" and still round-trips exactly via functionIdForName.
+const QVector<QPair<quint32,QString>>& functionNameTable()
+{
+    static const QVector<QPair<quint32,QString>> table = {
+        { 0x0, QStringLiteral("GetKeywordCount") },
+    };
+    return table;
+}
+}
+
+QString CtdaCondition::functionName(quint32 functionId)
+{
+    for (const auto& e : functionNameTable())
+        if (e.first == functionId)
+            return e.second;
+    return QStringLiteral("Function %1").arg(functionId, 0, 16);
+}
+
+bool CtdaCondition::functionIdForName(const QString& name, quint32* functionId)
+{
+    for (const auto& e : functionNameTable())
+        if (e.second == name)
+        {
+            *functionId = e.first;
+            return true;
+        }
+    const QString prefix = QStringLiteral("Function ");
+    if (name.startsWith(prefix))
+    {
+        bool ok = false;
+        const quint32 id = name.mid(prefix.size()).toUInt(&ok, 16);
+        if (ok)
+        {
+            *functionId = id;
+            return true;
+        }
+    }
+    // Accept a raw hexadecimal id (with optional 0x prefix) typed by hand.
+    {
+        QString hex = name.trimmed();
+        if (hex.startsWith(QLatin1String("0x"), Qt::CaseInsensitive))
+            hex = hex.mid(2);
+        bool ok = false;
+        const quint32 id = hex.toUInt(&ok, 16);
+        if (ok && !hex.isEmpty())
+        {
+            *functionId = id;
+            return true;
+        }
+    }
+    return false;
+}
+
 QByteArray CtdaCondition::pack() const
 {
     if (!raw.isEmpty())

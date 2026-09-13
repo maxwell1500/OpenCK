@@ -392,6 +392,11 @@ target_link_libraries(test_editor_widgets PRIVATE openck_view openck_model test_
 target_include_directories(test_editor_widgets PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_editor_widgets)
 
+add_executable(test_scripteditor test_scripteditor.cpp)
+target_link_libraries(test_scripteditor PRIVATE openck_view openck_esm Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_scripteditor PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_scripteditor)
+
 # CREA editor widget + QtFormDialogManager factory tests
 add_executable(test_creatureeditor test_creatureeditor.cpp)
 target_link_libraries(test_creatureeditor PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
@@ -626,6 +631,54 @@ target_link_libraries(test_conditionrecord PRIVATE openck_esm test_stubs Qt6::Te
 target_include_directories(test_conditionrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_conditionrecord)
 
+# Mod-manager detection (MO2 INI / Vortex JSON parsing)
+add_executable(test_modmanager test_modmanager.cpp)
+target_link_libraries(test_modmanager PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_modmanager PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_modmanager)
+
+# OBScript lexer
+add_executable(test_obscript test_obscript.cpp)
+target_link_libraries(test_obscript PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_obscript PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_obscript)
+
+add_executable(test_obscriptparser test_obscriptparser.cpp)
+target_link_libraries(test_obscriptparser PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_obscriptparser PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_obscriptparser)
+
+add_executable(test_obscriptbinder test_obscriptbinder.cpp)
+target_link_libraries(test_obscriptbinder PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_obscriptbinder PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_obscriptbinder)
+
+# Game-family detection + per-game record dispatch
+add_executable(test_gameformat test_gameformat.cpp)
+target_link_libraries(test_gameformat PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_gameformat PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_gameformat)
+
+# Real multi-game ESM parsing (Starfield / FO4 / Morrowind masters)
+add_executable(test_multigame test_multigame.cpp)
+target_link_libraries(test_multigame PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_multigame PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_multigame)
+
+# TES3 (Morrowind) reader ground-truth tests against the real Morrowind.esm
+# (16-byte record headers, 4-byte subrecord sizes, fixed-size strings).
+add_executable(test_tes3 test_tes3.cpp)
+target_link_libraries(test_tes3 PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_tes3 PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_tes3)
+
+# TES3 (Morrowind) generic record load/save round-trip against the real
+# Morrowind.esm (byte-identical) plus per-type record counts.
+add_executable(test_tes3roundtrip test_tes3roundtrip.cpp)
+target_link_libraries(test_tes3roundtrip PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_tes3roundtrip PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_tes3roundtrip)
+
 # PACK record with typed CTDA conditions
 add_executable(test_packagerecord test_packagerecord.cpp)
 target_link_libraries(test_packagerecord PRIVATE openck_esm test_stubs Qt6::Test)
@@ -780,6 +833,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_mastermanagement test_materialpropertygraph test_materialruletemplate
     test_meshlodconfig test_meshprobe test_missingrecords test_navmeshtoolkit
     test_navmrecord test_nifintegration test_nifpyfilewrapper test_nodegraph
+    test_obscript test_obscriptbinder test_obscriptparser
     test_objectwindow test_objectwindowfilter test_opallist test_packagerecord
     test_papyruscompiler test_papyruslanguageserver test_papyrusproject
     test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
@@ -787,10 +841,10 @@ add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_planetdefinition test_plugincompactor test_pluginio test_pndrecord
     test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
-    test_scenrecord test_scriptflagfile test_searchalgorithm test_shortcutmanager
+    test_scenrecord test_scripteditor test_scriptflagfile test_searchalgorithm test_shortcutmanager
     test_specialized_widgets test_spellchecker test_starfieldesm test_subrecord_roundtrip
     test_subrecord_diff
     test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
-    test_thememanager test_tier3_components test_undostack test_warningsdock
+    test_tes3 test_thememanager test_tier3_components test_undostack test_warningsdock
     test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)

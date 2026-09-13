@@ -48,9 +48,28 @@ public:
     quint16 readSubHeader();
     QString readZString();
     QString readSubZString(NAME name);
+    // Reads exactly `size` bytes of the current subrecord — a fixed-width
+    // string field inside a subrecord (e.g. TES3 HEDR's 32-byte author and
+    // 256-byte description) — and trims the trailing padding.
+    QString readFixedString(int size)
+    {
+        QByteArray data(size, '\0');
+        readRaw(data.data(), size);
+        esm.forward(size);
+        QString str = QString::fromUtf8(data.constData(), size);
+        while (str.endsWith(QChar(0)))
+            str.chop(1);
+        return str;
+    }
 
     quint32 currentFormId() const { return mCurrentFormId; }
+    // TES3 records carry no form id in the header; the caller assigns a
+    // synthetic one after load so pluginOrder and save can key on it.
+    void setCurrentFormId(quint32 id) { mCurrentFormId = id; }
     quint32 currentHeaderFlags() const { return mCurrentHeaderFlags; }
+    // True when the opened file is a TES3 (Morrowind) plugin: 16-byte
+    // record headers and 4-byte subrecord sizes, no compression.
+    bool tes3() const { return m_tes3; }
     void setCurrentRecordName(NAME n) { mCurrentRecordName = n; }
     NAME currentRecordName() const { return mCurrentRecordName; }
 
@@ -146,6 +165,7 @@ private:
     void restoreStreamFromCompression();
 
     ESMFile esm;
+    bool m_tes3 = false;
     quint32 mCurrentFormId = 0;
     quint32 mCurrentHeaderFlags = 0;
     NAME mCurrentRecordName = 0;

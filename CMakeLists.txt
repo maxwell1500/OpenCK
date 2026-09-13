@@ -62,6 +62,7 @@ include(cmake/bundle_niftools.cmake)
 set(ESM_SOURCES
     libs/files/esm/esmreader.cpp
     libs/files/esm/esmwriter.cpp
+    libs/files/esm/Tes3record.cpp
     libs/files/esm/glob.cpp
     libs/files/esm/gmst.cpp
     libs/files/esm/lcrt.cpp
@@ -139,6 +140,10 @@ libs/files/esm/npcrecord.cpp
     libs/files/esm/regionrecord.cpp
     libs/files/esm/roadrecord.cpp
     libs/files/esm/scriptrecord.cpp
+    libs/files/esm/obscriptlexer.cpp
+    libs/files/esm/obscriptparser.cpp
+    libs/files/esm/obscriptbinder.cpp
+    libs/files/esm/gameformat.cpp
     libs/files/esm/scrollrecord.cpp
     libs/files/esm/shaderparticlerecord.cpp
     libs/files/esm/slgmrecord.cpp
@@ -1009,6 +1014,8 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/windowlayout.cpp
     src/view/window/scripteditorwidget.cpp
 src/view/window/scriptmanagerdialog.cpp
+    src/view/window/scripteditordialog.cpp
+    src/view/window/obscripthighlighter.cpp
     src/view/window/dialogueeditorwidget.cpp
     src/view/window/formideditorwidget.cpp
     src/view/window/assetbrowserwidget.cpp
@@ -1122,6 +1129,8 @@ set(VIEW_HEADERS
     src/view/window/qtformdialogmanager.hpp
     src/view/window/windowlayout.hpp
     src/view/window/scripteditorwidget.hpp
+    src/view/window/scripteditordialog.hpp
+    src/view/window/obscripthighlighter.hpp
     src/view/window/dialogueeditorwidget.hpp
     src/view/window/formideditorwidget.hpp
     src/view/window/assetbrowserwidget.hpp

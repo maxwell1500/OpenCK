@@ -511,4 +511,62 @@ QVector<CoverData> computeCoverData(const QVector<QVector3D>& vertices,
     return covers;
 }
 
+QVector<int> largestReachableComponent(int width, int height,
+                                       const QVector<bool>& walkable,
+                                       int* componentCount)
+{
+    QVector<int> best;
+    int count = 0;
+
+    if (width <= 0 || height <= 0 ||
+        walkable.size() != width * height)
+        return best;
+
+    QVector<char> visited(width * height, 0);
+
+    for (int start = 0; start < width * height; ++start)
+    {
+        if (!walkable[start] || visited[start]) continue;
+
+        ++count;
+
+        QVector<int> component;
+        component.reserve(64);
+        QVector<int> stack;
+        stack.append(start);
+        visited[start] = 1;
+
+        while (!stack.isEmpty())
+        {
+            const int cur = stack.last();
+            stack.removeLast();
+            component.append(cur);
+
+            const int cx = cur % width;
+            const int cz = cur / width;
+            const int nb[4][2] = {
+                { cx + 1, cz }, { cx - 1, cz },
+                { cx, cz + 1 }, { cx, cz - 1 }
+            };
+
+            for (const auto& d : nb)
+            {
+                const int nx = d[0];
+                const int nz = d[1];
+                if (nx < 0 || nx >= width || nz < 0 || nz >= height) continue;
+                const int ni = nz * width + nx;
+                if (visited[ni] || !walkable[ni]) continue;
+                visited[ni] = 1;
+                stack.append(ni);
+            }
+        }
+
+        if (component.size() > best.size())
+            best = component;
+    }
+
+    if (componentCount) *componentCount = count;
+    return best;
+}
+
 } // namespace NavMeshTools

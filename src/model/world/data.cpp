@@ -14,6 +14,7 @@
 
 #include <QAbstractItemModel>
 #include <QElapsedTimer>
+#include <QFileInfo>
 #include <QMessageBox>
 
 #include <stdexcept>
@@ -1233,6 +1234,149 @@ Data::~Data()
         delete stack;
     }
     delete mUndoStack;
+
+    qDeleteAll(m_tes3Collections);
+    m_tes3Collections.clear();
+}
+
+CkId::Type Data::tes3TypeForName(NAME code)
+{
+    switch (code)
+    {
+    case 'GMST': return CkId::Type_Gmst;
+    case 'NPC_': return CkId::Type_Npc_;
+    case 'WEAP': return CkId::Type_Weap_;
+    case 'ARMO': return CkId::Type_Armor_;
+    case 'SPEL': return CkId::Type_Spel_;
+    case 'MGEF': return CkId::Type_Magic_;
+    case 'DIAL': return CkId::Type_Dial_;
+    case 'INFO': return CkId::Type_Info_;
+    case 'GLOB': return CkId::Type_Glob_;
+    case 'ALCH': return CkId::Type_Alch_;
+    case 'INGR': return CkId::Type_Ingr_;
+    case 'CONT': return CkId::Type_Cont_;
+    case 'ENCH': return CkId::Type_Ench_;
+    case 'BOOK': return CkId::Type_Book_;
+    case 'MISC': return CkId::Type_Misc_;
+    case 'ACTI': return CkId::Type_Acti_;
+    case 'STAT': return CkId::Type_Stat_;
+    case 'RACE': return CkId::Type_Race_;
+    case 'CLAS': return CkId::Type_Class_;
+    case 'FACT': return CkId::Type_Fact_;
+    case 'CELL': return CkId::Type_Cel_;
+    case 'LAND': return CkId::Type_Land_;
+    case 'SOUN': return CkId::Type_Soun_;
+    case 'LTEX': return CkId::Type_Ltex_;
+    case 'APPA': return CkId::Type_Appa_;
+    case 'BSGN': return CkId::Type_Bsgn_;
+    case 'CLOT': return CkId::Type_Clot_;
+    case 'CREA': return CkId::Type_Crea_;
+    case 'DOOR': return CkId::Type_Door_;
+    case 'LIGH': return CkId::Type_Ligh_;
+    case 'REGN': return CkId::Type_Regn_;
+    case 'SCPT': return CkId::Type_Scpt_;
+    case 'BODY': return CkId::Type_Body_;
+    case 'LEVC': return CkId::Type_Levc_;
+    case 'LEVI': return CkId::Type_Levi_;
+    case 'LOCK': return CkId::Type_Lock_;
+    case 'PGRD': return CkId::Type_Pgrd_;
+    case 'PROB': return CkId::Type_Prob_;
+    case 'REPA': return CkId::Type_Repa_;
+    case 'SNDG': return CkId::Type_Sndg_;
+    case 'SKIL': return CkId::Type_Skil_;
+    default: return CkId::Type_None;
+    }
+}
+
+IdCollection<Tes3Record>* Data::tes3CollectionFor(NAME code)
+{
+    auto it = m_tes3Collections.find(code);
+    if (it != m_tes3Collections.end())
+        return it.value();
+
+    auto* collection = new IdCollection<Tes3Record>();
+    collection->addColumn(new StringIdColumn<Tes3Record>());
+    collection->addColumn(new RecordStateColumn<Tes3Record>());
+    collection->addColumn(new StringColumn<Tes3Record>("Name", &Tes3Record::editorId));
+
+    const CkId::Type type = tes3TypeForName(code);
+    if (type != CkId::Type_None)
+        addModel(new IdTable(collection), type);
+
+    m_tes3Collections.insert(code, collection);
+    return collection;
+}
+
+QVector<NAME> Data::tes3CollectionCodes() const
+{
+    QVector<NAME> codes;
+    const auto keys = m_tes3Collections.keys();
+    codes.reserve(keys.size());
+    for (NAME code : keys)
+        codes.append(code);
+    std::sort(codes.begin(), codes.end());
+    return codes;
+}
+
+void Data::saveTes3Records(ESMWriter& writer)
+{
+    const auto saveKey = [](NAME tag, quint32 formId) -> quint64 {
+        return (static_cast<quint64>(static_cast<quint32>(tag)) << 32) | formId;
+    };
+    QSet<quint64> written;
+
+    // The generic TES3 record header is name/size/unknown/flags; the flags
+    // live on the record (unlike TES4), so write the record directly instead
+    // of going through saveRecordAt (which leaves them at 0).
+    const auto writeOne = [&writer](IdCollection<Tes3Record>* coll, int i, NAME code) {
+        const auto& rec = coll->getRecord(i);
+        RecHeader header;
+        header.flags.val = rec.get().flags;
+        writer.startRecord(code, header);
+        rec.get().save(writer);
+        writer.endRecord();
+    };
+
+    // Morrowind files have no GRUPs; replay the load order flat so an
+    // untouched round-trip preserves the source layout.
+    for (const auto& ref : m_pluginOrder)
+    {
+        IdCollection<Tes3Record>* coll = m_tes3Collections.value(ref.type, nullptr);
+        if (!coll)
+            continue;
+        if (written.contains(saveKey(ref.type, ref.formId)))
+            continue;
+        for (int i = 0; i < coll->size(); ++i)
+        {
+            if (coll->getFormId(i) != ref.formId)
+                continue;
+            if (coll->isRecordSaveable(i))
+                writeOne(coll, i, ref.type);
+            written.insert(saveKey(ref.type, ref.formId));
+            break;
+        }
+    }
+
+    // Records added after load (e.g. Record -> New) are not in pluginOrder;
+    // emit any saveable record not already written.
+    for (NAME code : tes3CollectionCodes())
+    {
+        IdCollection<Tes3Record>* coll = m_tes3Collections.value(code, nullptr);
+        if (!coll)
+            continue;
+        for (int i = 0; i < coll->size(); ++i)
+        {
+            if (!coll->isRecordSaveable(i))
+                continue;
+            if (coll->getFormId(i) == 0)
+                coll->getRecord(i).get().formId = m_nextTes3FormId++;
+            const quint64 key = saveKey(code, coll->getFormId(i));
+            if (written.contains(key))
+                continue;
+            writeOne(coll, i, code);
+            written.insert(key);
+        }
+    }
 }
 
 int Data::preload(const QString& filename, bool base_)
@@ -1261,6 +1405,19 @@ int Data::preload(const QString& filename, bool base_)
     reader->open();
     base = base_;
     m_lastPreloadPath = fullPath;
+
+    {
+        QStringList masterNames;
+        const Header& header = reader->getHeader();
+        for (const MasterData& master : header.masters)
+        {
+            masterNames.append(master.name.trimmed());
+        }
+        m_currentGame = GameFormat::detectGame(QFileInfo(fullPath).fileName(),
+                                               masterNames, header.flags.val);
+        LOG_INFO(QString("Data::preload: detected game '%1' for %2")
+            .arg(GameFormat::gameName(m_currentGame)).arg(filename));
+    }
 
     if (!base)
     {
@@ -1326,6 +1483,25 @@ bool Data::continueLoading(Messages& messages)
                 .arg(QChar(static_cast<char>((name >> 8) & 0xFF)))
                 .arg(QChar(static_cast<char>(name & 0xFF))));
 
+            if (m_currentGame == GameFormat::Game::Morrowind)
+            {
+                if (name == 0)
+                {
+                    return true;
+                }
+                // Every Morrowind record type round-trips through one generic
+                // collection: 16-byte headers and 8-byte subrecord headers are
+                // uniform, so the loader preserves subrecord order and payload.
+                IdCollection<Tes3Record>* collection = tes3CollectionFor(name);
+                const int index = collection->load(*reader, base);
+                Tes3Record& record = collection->getRecord(index).get();
+                record.code = name;
+                if (record.formId == 0)
+                    record.formId = m_nextTes3FormId++;
+                reader->setCurrentFormId(record.formId);
+            }
+            else
+            {
             switch (name)
             {
             case 'GRUP': reader->skipGrupHeader();              break;
@@ -1575,9 +1751,13 @@ bool Data::continueLoading(Messages& messages)
                 }
                 char buf[5] = {};
                 memcpy(buf, &name, 4);
-                LOG_WARNING(QString("Unknown record: %1 (0x%2)").arg(buf).arg(name, 8, 16, QChar('0')));
+                LOG_WARNING(QString("Unknown record: %1 (0x%2) in %3")
+                    .arg(buf)
+                    .arg(name, 8, 16, QChar('0'))
+                    .arg(GameFormat::gameName(m_currentGame)));
                 reader->skipRecord();
                 break;
+            }
             }
             }
 
@@ -1812,6 +1992,15 @@ NAME Data::typeNameFor(int typeId)
     case CkId::Type_Wths_: return NAME('WTHS');
     case CkId::Type_Wwed_: return NAME('WWED');
     case CkId::Type_Zoom_: return NAME('ZOOM');
+    case CkId::Type_Body_: return NAME('BODY');
+    case CkId::Type_Levc_: return NAME('LEVC');
+    case CkId::Type_Levi_: return NAME('LEVI');
+    case CkId::Type_Lock_: return NAME('LOCK');
+    case CkId::Type_Pgrd_: return NAME('PGRD');
+    case CkId::Type_Prob_: return NAME('PROB');
+    case CkId::Type_Repa_: return NAME('REPA');
+    case CkId::Type_Sndg_: return NAME('SNDG');
+    case CkId::Type_Skil_: return NAME('SKIL');
     default: return 0;
     }
 }
@@ -2128,6 +2317,13 @@ const IdCollection<RefrRecord>& Data::getRefrCollection() const
 
 const BaseCollection* Data::getCollectionByType(CkId::Type type) const
 {
+    if (m_currentGame == GameFormat::Game::Morrowind)
+    {
+        const NAME code = recordNameForType(type);
+        if (code != 0)
+            return m_tes3Collections.value(code, nullptr);
+        return nullptr;
+    }
     switch (type)
     {
     case CkId::Type_Gmst:    return &gameSettings;
@@ -2337,6 +2533,13 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
 
 BaseCollection* Data::getCollectionByType(CkId::Type type)
 {
+    if (m_currentGame == GameFormat::Game::Morrowind)
+    {
+        const NAME code = recordNameForType(type);
+        if (code != 0)
+            return m_tes3Collections.value(code, nullptr);
+        return nullptr;
+    }
     switch (type)
     {
     case CkId::Type_Gmst:    return &gameSettings;
@@ -2946,6 +3149,23 @@ QVector<IRecordCollection*> Data::allCollections()
 
 QVector<Data::TypedCollection> Data::allCollectionsWithTypes()
 {
+    if (m_currentGame == GameFormat::Game::Morrowind)
+    {
+        QVector<TypedCollection> out;
+        for (NAME code : tes3CollectionCodes())
+        {
+            const CkId::Type type = tes3TypeForName(code);
+            if (type == CkId::Type_None)
+            {
+                char buf[5] = {};
+                memcpy(buf, &code, 4);
+                LOG_WARNING(QString("Data::allCollectionsWithTypes: no CkId mapping for %1").arg(buf));
+                continue;
+            }
+            out.append({ m_tes3Collections.value(code), type });
+        }
+        return out;
+    }
     return {
         {&gameSettings,      CkId::Type_Gmst},
         {&npcCollection,     CkId::Type_Npc_},

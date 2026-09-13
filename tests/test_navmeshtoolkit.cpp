@@ -27,6 +27,9 @@ private slots:
     void testVoxelFilterBlockedHeadroom();
     void testVoxelFilterDegenerate();
     void testComputeCoverData();
+    void testLargestReachableComponent();
+    void testLargestReachableComponentSingle();
+    void testVoxelFilterDropsDisconnectedIsland();
 };
 
 void TestNavMeshToolkit::testAdjacencySquare()
@@ -509,6 +512,74 @@ void TestNavMeshToolkit::testComputeCoverData()
     QVERIFY(covers[0].flags & Cover_Low_N);
     // Vertex 3 (same base height) also has low cover from the wall.
     QVERIFY(covers[3].flags & Cover_Low_N);
+}
+
+void TestNavMeshToolkit::testLargestReachableComponent()
+{
+    // 4x1 row: cells 0,1 adjacent; cell 2 blocked; cell 3 isolated.
+    QVector<bool> walkable = { true, true, false, true };
+    int components = -1;
+    QVector<int> best = largestReachableComponent(4, 1, walkable, &components);
+
+    QCOMPARE(best.size(), 2);
+    QVERIFY(best.contains(0));
+    QVERIFY(best.contains(1));
+    QVERIFY(!best.contains(3));
+    QCOMPARE(components, 2);
+}
+
+void TestNavMeshToolkit::testLargestReachableComponentSingle()
+{
+    // Full 3x3 walkable grid is one component of nine.
+    QVector<bool> full(9, true);
+    int components = -1;
+    QVector<int> best = largestReachableComponent(3, 3, full, &components);
+    QCOMPARE(best.size(), 9);
+    QCOMPARE(components, 1);
+
+    // An all-blocked grid has no component and returns empty.
+    QVector<bool> empty(6, false);
+    components = -1;
+    best = largestReachableComponent(3, 2, empty, &components);
+    QVERIFY(best.isEmpty());
+    QCOMPARE(components, 0);
+}
+
+void TestNavMeshToolkit::testVoxelFilterDropsDisconnectedIsland()
+{
+    // Two disconnected flat floors separated by a 3-cell gap. The larger
+    // island (2 cells) is the largest reachable component and is kept; the
+    // single-cell island (at grid x=4) is dropped by the flood-fill prune.
+    NavMeshGenerator generator;
+    const float cs = 72.0f;
+
+    QVector<QVector3D> verts;
+    QVector<unsigned int> indices;
+
+    // Island A: 2 cells wide (x 0..144), z 0..72 -> cells (0,0) and (1,0).
+    verts << QVector3D(0, 0, 0)
+          << QVector3D(144, 0, 0)
+          << QVector3D(144, 0, cs)
+          << QVector3D(0, 0, cs);
+    indices << 0 << 2 << 1
+            << 0 << 3 << 2;
+
+    // Island B: 1 cell wide (x 288..360), z 0..72 -> cell (4,0).
+    verts << QVector3D(288, 0, 0)
+          << QVector3D(360, 0, 0)
+          << QVector3D(360, 0, cs)
+          << QVector3D(288, 0, cs);
+    indices << 4 << 6 << 5
+            << 4 << 7 << 6;
+
+    const NavMeshGenerator::NavMesh mesh = generator.generateFromVertices(verts, indices);
+
+    QCOMPARE(mesh.componentCount, 2);
+    QCOMPARE(mesh.triangles.size(), 2);
+    QCOMPARE(mesh.cells.size(), 2);
+    QVERIFY(mesh.cells.contains(qMakePair(0, 0)));
+    QVERIFY(mesh.cells.contains(qMakePair(1, 0)));
+    QVERIFY(!mesh.cells.contains(qMakePair(4, 0)));
 }
 
 QTEST_MAIN(TestNavMeshToolkit)

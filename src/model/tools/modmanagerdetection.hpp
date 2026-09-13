@@ -15,6 +15,8 @@ public:
         QString installPath;
         QString version;
         QString gamePath;
+        QString modsDirectory;
+        QString selectedProfile;
         QStringList profiles;
         bool isRunning = false;
     };
@@ -27,6 +29,10 @@ public:
     static QString getMO2Profile();
     static QString getVortexProfile();
     static QStringList getInstalledMods(ModManager manager);
+
+    // Pure, file-based parsers (testable without a live install).
+    static bool parseMo2Ini(const QString& iniPath, ModManagerInfo& out);
+    static QString parseVortexField(const QString& jsonContent, const QString& key);
 };
 
 #endif // MODMANAGERDETECTION_HPP

@@ -47,9 +47,17 @@ void ESMReader::open()
     m_mappedSize = esm.file.size();
     m_mapped = esm.file.map(0, m_mappedSize);
 
-    if (readName() != 'TES4')
+    // TES4 masters (Oblivion/Skyrim/FO4/Starfield) start with a 'TES4'
+    // record; TES3 (Morrowind) plugins start with 'TES3', whose record
+    // bodies use a 16-byte header and 4-byte subrecord sizes.
+    const NAME magic = readName();
+    if (magic == NAME('TES3'))
     {
-        notifyFailure("not a valid Skyrim file!");
+        m_tes3 = true;
+    }
+    else if (magic != NAME('TES4'))
+    {
+        notifyFailure("not a valid ESM file!");
     }
 
     header.load(*this);
@@ -124,17 +132,30 @@ void ESMReader::buildRecordIndex(QVector<RecordIndexEntry>& out)
             break;
         if (name == NAME('GRUP'))
         {
-            // GRUP header is 24 bytes; the records inside it are scanned on
-            // the next iterations, so the group's own size is irrelevant.
-            m_pos = pos + 24;
+            // GRUP header is 24 bytes (TES4) or 16 bytes (TES3); the records
+            // inside it are scanned on the next iterations, so the group's
+            // own size is irrelevant.
+            m_pos = pos + (m_tes3 ? 16 : 24);
             continue;
         }
         quint32 size = 0;
         quint32 id = 0;
-        if (!peekBytesAt(pos + 4, &size, 4) || !peekBytesAt(pos + 12, &id, 4))
+        if (!peekBytesAt(pos + 4, &size, 4))
             break;
+        if (m_tes3)
+        {
+            // TES3 has no numeric formId in the header; the third uint32 is
+            // the record flags and the old-format ID is a NAME string.
+            id = 0;
+            m_pos = pos + 16 + size;
+        }
+        else
+        {
+            if (!peekBytesAt(pos + 12, &id, 4))
+                break;
+            m_pos = pos + 24 + size;
+        }
         out.push_back({ name, id, pos });
-        m_pos = pos + 24 + size;
         if (m_pos > m_mappedSize)
             m_pos = m_mappedSize;
     }
@@ -173,6 +194,13 @@ void ESMReader::skipGrupHeader()
 {
     quint32 grupSize = readType<quint32>(true);    // size
     mGrupEnd = m_pos + grupSize;
+    if (m_tes3)
+    {
+        // TES3 group header: 4 name + 4 size + 4 unknown + 4 flags.
+        readType<quint32>(true);    // unknown
+        readType<quint32>(true);    // flags
+        return;
+    }
     readType<quint32>(true);    // label
     readType<quint32>(true);    // group type
     readType<quint8>(true);        // vc day
@@ -194,6 +222,23 @@ RecHeader ESMReader::readHeader()
     }
 
     RecHeader header;
+    if (m_tes3)
+    {
+        // TES3 record header: 4 name + 4 size + 4 unknown + 4 flags = 16
+        // bytes. The size excludes the header (as in TES4). Old-format
+        // object IDs are strings in the NAME subrecord, not in the header;
+        // the third uint32 is the record flags (deleted/persistent/...).
+        header.size = readType<quint32>(true);
+        esm.recLeft = header.size;
+        esm.subLeft = 0;
+        readType<quint32>(true);
+        header.flags.val = readType<quint32>(true);
+        mCurrentHeaderFlags = header.flags.val;
+        header.id = 0;
+        mCurrentFormId = 0;
+        return header;
+    }
+
     header.size = readType<quint32>(true);
     esm.recLeft = header.size;
     esm.subLeft = 0;
@@ -329,7 +374,7 @@ NAME ESMReader::readNSubHeader()
         skip(static_cast<int>(esm.subLeft));
     }
 
-    if (esm.recLeft < 6)
+    if (esm.recLeft < (m_tes3 ? 8 : 6))
     {
         if (esm.recLeft > 0)
         {
@@ -339,13 +384,15 @@ NAME ESMReader::readNSubHeader()
     }
 
     NAME name{ readName() };
-    quint32 sz = readType<quint16>();
+    // TES3 subrecord headers are 8 bytes with a 4-byte size; TES4's are
+    // 6 bytes with a 2-byte size.
+    quint32 sz = m_tes3 ? readType<quint32>() : readType<quint16>();
 
-    // XXXX is the extended-size prefix for subrecords larger than 64 KiB:
-    // its 4-byte payload is the real size of the NEXT subrecord, whose own
-    // size field is 0. Without this, the following data is misread as
-    // subrecord headers and the whole record desyncs.
-    if (name == NAME('XXXX') && sz == 4 && esm.recLeft >= 10)
+    // XXXX is the extended-size prefix for subrecords larger than 64 KiB
+    // (TES4 only): its 4-byte payload is the real size of the NEXT
+    // subrecord, whose own size field is 0. Without this, the following
+    // data is misread as subrecord headers and the whole record desyncs.
+    if (!m_tes3 && name == NAME('XXXX') && sz == 4 && esm.recLeft >= 10)
     {
         const quint32 extendedSize = readType<quint32>();
         name = readName();
@@ -367,6 +414,13 @@ NAME ESMReader::readNSubHeader()
 
 quint16 ESMReader::readSubHeader()
 {
+    if (m_tes3)
+    {
+        // TES3 subrecord size is 4 bytes; the quint16 return value is only
+        // used by callers that re-read the header, so report the clamped size.
+        esm.subLeft = readType<quint32>();
+        return static_cast<quint16>(qMin<qint64>(esm.subLeft, 65535));
+    }
     quint16 sz = readType<quint16>();
     esm.subLeft = sz;
 

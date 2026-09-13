@@ -58,7 +58,7 @@ void ESMWriter::save(QFile& file)
 
     RecHeader tes4Header;
     tes4Header.flags.val = mFileFlags;
-    startRecord('TES4', tes4Header);
+    startRecord(m_tes3 ? NAME('TES3') : NAME('TES4'), tes4Header);
     header.save(*this);
     endRecord();
 }
@@ -66,6 +66,17 @@ void ESMWriter::save(QFile& file)
 void ESMWriter::startRecord(NAME name, RecHeader header)
 {
     recordsWritten++;
+    if (m_tes3)
+    {
+        // TES3 record header: name(4) + size(4) + unknown(4) + flags(4).
+        writeType<NAME>(swapName(name));
+        recSizePos = stream.device()->pos();
+        writeType<quint32>(0);
+        writeType<quint32>(0);
+        writeType<quint32>(header.flags.val);
+        recPos = stream.device()->pos();
+        return;
+    }
     recSizePos = stream.device()->pos() + static_cast<qint64>(sizeof(NAME));
     header.save(*this, swapName(name));
     recPos = stream.device()->pos();
@@ -83,7 +94,10 @@ void ESMWriter::startSubRecord(NAME name)
 {
     writeType<NAME>(swapName(name));
     subSizePos = stream.device()->pos();
-    writeType<quint16>(0);
+    if (m_tes3)
+        writeType<quint32>(0);
+    else
+        writeType<quint16>(0);
     subPos = stream.device()->pos();
 }
 
@@ -91,7 +105,10 @@ void ESMWriter::endSubRecord()
 {
     qint64 currentPos{ stream.device()->pos() };
     stream.device()->seek(subSizePos);
-    writeType<quint16>(static_cast<quint16>(currentPos - subPos));
+    if (m_tes3)
+        writeType<quint32>(static_cast<quint32>(currentPos - subPos));
+    else
+        writeType<quint16>(static_cast<quint16>(currentPos - subPos));
     stream.device()->seek(currentPos);
 }
 
@@ -132,6 +149,14 @@ void ESMWriter::endGrup()
 
 void ESMWriter::writeZString(const QString& str)
 {
+    if (m_tes3)
+    {
+        // TES3 strings carry no trailing NUL; the subrecord size is the
+        // exact byte count.
+        QByteArray bytes{ str.toUtf8() };
+        stream.writeRawData(bytes.data(), bytes.size());
+        return;
+    }
     qint32 size = static_cast<qint32>(str.size()) + 1;
     buf.resize(size);
     buf.fill('\0', size);
@@ -150,7 +175,7 @@ void ESMWriter::writeSubZString(NAME name, const QString &str)
 void ESMWriter::writeRawSubRecord(const RawSubRecord& raw)
 {
     const qint32 size = static_cast<qint32>(raw.data.size());
-    if (size > 0xFFFF)
+    if (!m_tes3 && size > 0xFFFF)
     {
         // Extended-size subrecord: XXXX prefix carries the real size, then
         // the subrecord header with a 0 size field.
@@ -171,7 +196,7 @@ void ESMWriter::writeRawSubRecord(const RawSubRecord& raw)
 
 void ESMWriter::close()
 {
-    // Do not include TES4 record in numRecords
-    stream.device()->seek(numRecordsPos);
+    // Do not include the header record in numRecords.
+    stream.device()->seek(m_tes3 ? tes3NumRecordsPos : numRecordsPos);
     writeType<quint32>(static_cast<quint32>(recordsWritten - 1));
 }

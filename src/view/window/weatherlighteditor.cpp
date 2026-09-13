@@ -5,7 +5,9 @@
 #include "../../model/world/collection_impl.hpp"
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/addrecordcommand.hpp"
 #include "../../model/tools/undostack.hpp"
+#include "../../model/world/idtable.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/gmst.hpp"
@@ -49,6 +51,29 @@ void applySettingValue(GameSetting& setting, const QString& newValue)
     default:
         break;
     }
+}
+
+void initializeSettingValue(GameSetting& setting, const QString& raw)
+{
+    const QString v = raw.trimmed();
+    bool ok = false;
+    if (v.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0 ||
+        v.compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0)
+    {
+        setting.value.setBool(v.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0);
+        return;
+    }
+    if (!v.contains(QLatin1Char('.')) && v.toLongLong(&ok) && ok)
+    {
+        setting.value.setInt(static_cast<quint32>(v.toLongLong()));
+        return;
+    }
+    if (v.toFloat(&ok) && ok)
+    {
+        setting.value.setFloat(v.toFloat());
+        return;
+    }
+    setting.value.setString(v);
 }
 
 } // namespace
@@ -123,8 +148,6 @@ void WeatherLightEditor::setupUI()
 
     auto* buttonBar = new QHBoxLayout();
     mAddSettingButton = new QPushButton("Add Setting");
-    mAddSettingButton->setEnabled(false);
-    mAddSettingButton->setToolTip("Adding game settings is not yet supported.");
     buttonBar->addWidget(mAddSettingButton);
 
     mEditButton = new QPushButton("Edit");
@@ -268,15 +291,52 @@ void WeatherLightEditor::onAddSetting()
     QString name = QInputDialog::getText(this, "Add Setting",
         "Enter setting name (e.g., fWeatherDistance):", QLineEdit::Normal, "", &ok);
 
-    if (!ok || name.isEmpty()) return;
+    if (!ok || name.trimmed().isEmpty()) return;
+
+    const QString finalId = name.trimmed();
 
     QString value = QInputDialog::getText(this, "Set Value",
         "Enter initial value:", QLineEdit::Normal, "0.0", &ok);
 
     if (!ok) return;
 
-    LOG_INFO(QString("Added setting '%1' with value '%2'").arg(name).arg(value));
-    mStatusLabel->setText(QString("Added setting '%1'").arg(name));
+    auto& coll = mData->getGameSettings();
+    if (coll.searchId(finalId) >= 0)
+    {
+        QMessageBox::warning(this, "Add Setting",
+            QString("A game setting named '%1' already exists.").arg(finalId));
+        return;
+    }
+
+    GameSetting gs;
+    gs.blank();
+    gs.editorId = finalId;
+    try
+    {
+        gs.formId = mData->createNewRecord(CkId::Type_Gmst, finalId);
+    }
+    catch (const std::exception&)
+    {
+        gs.formId = 0;
+    }
+    initializeSettingValue(gs, value);
+
+    const int indexInColl = coll.getAppendIndex(finalId, CkId::Type_Gmst);
+    Record<GameSetting> rec(State_ModifiedOnly, nullptr, &gs);
+    IdTable* table = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Gmst));
+    if (mData->getUndoStack() && table)
+    {
+        mData->getUndoStack()->push(
+            new AddRecordCommand(table, &coll, indexInColl, rec,
+                QStringLiteral("Add Game Setting: %1").arg(finalId)));
+    }
+    else
+    {
+        coll.appendRecord(rec, CkId::Type_Gmst);
+    }
+
+    LOG_INFO(QString("Added setting '%1' with value '%2'").arg(finalId).arg(value));
+    mStatusLabel->setText(QString("Added setting '%1'").arg(finalId));
     refreshTree();
 }
 

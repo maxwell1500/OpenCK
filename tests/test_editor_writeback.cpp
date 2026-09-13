@@ -1,4 +1,6 @@
 #include <QtTest>
+#include <QFile>
+#include <QFileInfo>
 
 #include "model/world/data.hpp"
 #include "model/world/collection.hpp"
@@ -10,6 +12,9 @@
 #include "libs/files/esm/worldspacerecord.hpp"
 #include "libs/files/esm/npcrecord.hpp"
 #include "libs/files/esm/Packagerecord.hpp"
+#include "libs/files/esm/refrecord.hpp"
+#include "libs/files/esm/common.hpp"
+#include "libs/files/esm/gameformat.hpp"
 #include "libs/files/filepaths.hpp"
 #include "logger.hpp"
 
@@ -25,6 +30,8 @@ private slots:
     void testWorldspaceEditorUndoable();
     void testNpcEditorUndoable();
     void testPackEditorUndoable();
+    void testRefrTransformUndoable();
+    void testCurrentGameDetection();
     void testNoChangeDoesNotPush();
 };
 
@@ -216,6 +223,74 @@ void TestEditorWriteback::testPackEditorUndoable()
 
     stack->undo();
     QCOMPARE(col.getRecord(0).get().editorId, QString("smoke_pack"));
+}
+
+void TestEditorWriteback::testRefrTransformUndoable()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& col = data.getRefrCollection();
+    auto* stack = data.getUndoStack();
+
+    RefrRecord rec;
+    rec.editorId = "smoke_refr";
+    rec.formId = 0x00000806;
+    rec.baseId = 0x00000007;
+    rec.applyTransform(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    col.add(rec);
+
+    // Mirrors the viewport drag-end commit path.
+    RefrRecord original = col.getRecord(0).get();
+    RefrRecord edited = original;
+    edited.applyTransform(10.0f, 20.0f, 30.0f, 0.5f, 0.25f, 1.5f, 2.0f);
+
+    EditRecordCommand<RefrRecord> probe(&col, 0, original, edited);
+    QVERIFY(probe.hasChanged());
+    stack->push(new EditRecordCommand<RefrRecord>(&col, 0, original, edited,
+                                                  "Transform Reference"));
+
+    QCOMPARE(stack->undoCount(), 1);
+    QCOMPARE(col.getRecord(0).get().posX, 10.0f);
+    QCOMPARE(col.getRecord(0).get().posY, 20.0f);
+    QCOMPARE(col.getRecord(0).get().posZ, 30.0f);
+    QCOMPARE(col.getRecord(0).get().rotX, 0.5f);
+    QCOMPARE(col.getRecord(0).get().rotZ, 1.5f);
+    QCOMPARE(col.getRecord(0).get().scale, 2.0f);
+
+    stack->undo();
+    QCOMPARE(col.getRecord(0).get().posX, 0.0f);
+    QCOMPARE(col.getRecord(0).get().scale, 1.0f);
+
+    stack->redo();
+    QCOMPARE(col.getRecord(0).get().posX, 10.0f);
+    QCOMPARE(col.getRecord(0).get().scale, 2.0f);
+
+    // A transform that changes nothing must not register as a change.
+    RefrRecord same = original;
+    same.applyTransform(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+    EditRecordCommand<RefrRecord> noChange(&col, 0, original, same);
+    QVERIFY(!noChange.hasChanged());
+}
+
+void TestEditorWriteback::testCurrentGameDetection()
+{
+    const QString starfield = qEnvironmentVariable(
+        "OPENCK_TEST_STARFIELD_ESM",
+        QStringLiteral("C:/XboxGames/Starfield/Content/Data/Starfield.esm"));
+    if (!QFile::exists(starfield))
+    {
+        QSKIP("Starfield.esm fixture not available (set OPENCK_TEST_STARFIELD_ESM)");
+    }
+
+    FilePaths paths(QCoreApplication::applicationName());
+    paths.dataDir = QDir(QFileInfo(starfield).absolutePath());
+    Data data(QStringList(), paths);
+
+    const int count = data.preload(QFileInfo(starfield).fileName(), true);
+    QVERIFY2(count > 0, "preload found no records");
+    QCOMPARE(data.currentGame(), GameFormat::Game::Starfield);
+    QVERIFY(data.isGameSpecificRecord(NAME('SHOU')));
+    QVERIFY(!data.isGameSpecificRecord(NAME('PGRD')));
 }
 
 void TestEditorWriteback::testNoChangeDoesNotPush()

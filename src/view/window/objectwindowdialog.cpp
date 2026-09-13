@@ -1,5 +1,7 @@
 #include "objectwindowdialog.hpp"
 
+#include "scripteditordialog.hpp"
+
 #include "../../model/window/objectwindow.hpp"
 #include "../../model/tools/objectwindowfilter.hpp"
 #include "../../model/world/data.hpp"
@@ -631,6 +633,22 @@ void ObjectWindowDialog::editSelected()
 
     switch (type)
     {
+    case CkId::Type_Scpt_:
+    {
+        auto& collection = mData->getScptCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            ScriptRecord& rec = record.get();
+            ScriptEditorDialog dlg(rec.editorId, rec.scriptText, this);
+            if (dlg.exec() == QDialog::Accepted)
+            {
+                rec.scriptText = dlg.scriptText();
+                record.setModified(rec);
+            }
+        }
+        break;
+    }
     case CkId::Type_Npc_:
     {
         auto& collection = mData->getNpcCollection();

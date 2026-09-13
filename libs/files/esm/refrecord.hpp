@@ -30,6 +30,20 @@ struct RefrRecord
     void save(ESMWriter& esm) const;
     void blank();
     void initComponents();
+
+    // Applies a viewport transform (position/rotation in radians/scale) to the
+    // reference. Shared by the viewport commit path and its tests.
+    void applyTransform(float px, float py, float pz,
+                        float rx, float ry, float rz, float scaleValue)
+    {
+        posX = px;
+        posY = py;
+        posZ = pz;
+        rotX = rx;
+        rotY = ry;
+        rotZ = rz;
+        scale = scaleValue;
+    }
 };
 
 inline bool operator==(const RefrRecord& l, const RefrRecord& r)

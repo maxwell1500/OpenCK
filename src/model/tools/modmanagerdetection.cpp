@@ -99,52 +99,7 @@ ModManagerDetection::ModManagerInfo ModManagerDetection::detectMO2()
     }
 
     QString iniPath = info.installPath + "/ModOrganizer.ini";
-    QFile iniFile(iniPath);
-    if (iniFile.exists() && iniFile.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        QTextStream stream(&iniFile);
-        QString currentSection;
-        bool inProfiles = false;
-
-        while (!stream.atEnd())
-        {
-            QString line = stream.readLine().trimmed();
-
-            if (line.startsWith("[") && line.endsWith("]"))
-            {
-                currentSection = line.mid(1, line.length() - 2);
-                inProfiles = (currentSection == "Profiles");
-                continue;
-            }
-
-            if (line.isEmpty() || line.startsWith(";") || line.startsWith("#"))
-            {
-                continue;
-            }
-
-            if (inProfiles)
-            {
-                if (line.contains("="))
-                {
-                    QString key = line.section("=", 0, 0).trimmed();
-                    QString value = line.section("=", 1).trimmed();
-                    if (key == "profileName" && !value.isEmpty())
-                    {
-                        info.profiles.append(value);
-                    }
-                }
-            }
-            else
-            {
-                if (line.startsWith("gamePath=", Qt::CaseInsensitive))
-                {
-                    info.gamePath = line.section("=", 1).trimmed();
-                    info.gamePath = QDir::toNativeSeparators(info.gamePath);
-                }
-            }
-        }
-        iniFile.close();
-    }
+    parseMo2Ini(iniPath, info);
 
     info.isRunning = isMO2Running();
     return info;
@@ -218,20 +173,7 @@ ModManagerDetection::ModManagerInfo ModManagerDetection::detectVortex()
     {
         QByteArray data = configFile.readAll();
         configFile.close();
-
-        QString content = QString::fromUtf8(data);
-
-        int gamePathIdx = content.indexOf("\"gamePath\"");
-        if (gamePathIdx >= 0)
-        {
-            int colonIdx = content.indexOf(":", gamePathIdx);
-            int quoteStart = content.indexOf("\"", colonIdx + 1);
-            int quoteEnd = content.indexOf("\"", quoteStart + 1);
-            if (quoteStart >= 0 && quoteEnd >= 0)
-            {
-                info.gamePath = content.mid(quoteStart + 1, quoteEnd - quoteStart - 1);
-            }
-        }
+        info.gamePath = parseVortexField(QString::fromUtf8(data), QStringLiteral("gamePath"));
     }
 
     info.isRunning = isVortexRunning();
@@ -263,36 +205,7 @@ QString ModManagerDetection::getMO2Profile()
     {
         return QString();
     }
-
-    QString iniPath = info.installPath + "/ModOrganizer.ini";
-    QFile iniFile(iniPath);
-    if (!iniFile.exists() || !iniFile.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        return QString();
-    }
-
-    QTextStream stream(&iniFile);
-    bool inProfiles = false;
-    QString currentProfile;
-
-    while (!stream.atEnd())
-    {
-        QString line = stream.readLine().trimmed();
-
-        if (line.startsWith("[") && line.endsWith("]"))
-        {
-            QString section = line.mid(1, line.length() - 2);
-            inProfiles = (section == "Profiles");
-            continue;
-        }
-
-        if (inProfiles && line.startsWith("selectedProfile=", Qt::CaseInsensitive))
-        {
-            currentProfile = line.section("=", 1).trimmed();
-        }
-    }
-    iniFile.close();
-    return currentProfile;
+    return info.selectedProfile;
 }
 
 QString ModManagerDetection::getVortexProfile()
@@ -317,20 +230,7 @@ QString ModManagerDetection::getVortexProfile()
     QByteArray data = configFile.readAll();
     configFile.close();
 
-    QString content = QString::fromUtf8(data);
-    int profileIdx = content.indexOf("\"activeProfile\"");
-    if (profileIdx >= 0)
-    {
-        int colonIdx = content.indexOf(":", profileIdx);
-        int quoteStart = content.indexOf("\"", colonIdx + 1);
-        int quoteEnd = content.indexOf("\"", quoteStart + 1);
-        if (quoteStart >= 0 && quoteEnd >= 0)
-        {
-            return content.mid(quoteStart + 1, quoteEnd - quoteStart - 1);
-        }
-    }
-
-    return QString();
+    return parseVortexField(QString::fromUtf8(data), QStringLiteral("activeProfile"));
 }
 
 QStringList ModManagerDetection::getInstalledMods(ModManager manager)
@@ -345,29 +245,9 @@ QStringList ModManagerDetection::getInstalledMods(ModManager manager)
             return mods;
         }
 
-        QString iniPath = info.installPath + "/ModOrganizer.ini";
-        QFile iniFile(iniPath);
-        QString modsPath;
-
-        if (iniFile.exists() && iniFile.open(QIODevice::ReadOnly | QIODevice::Text))
-        {
-            QTextStream stream(&iniFile);
-            while (!stream.atEnd())
-            {
-                QString line = stream.readLine().trimmed();
-                if (line.startsWith("modsDirectory=", Qt::CaseInsensitive))
-                {
-                    modsPath = line.section("=", 1).trimmed();
-                    break;
-                }
-            }
-            iniFile.close();
-        }
-
-        if (modsPath.isEmpty())
-        {
-            modsPath = info.installPath + "/mods";
-        }
+        QString modsPath = info.modsDirectory.isEmpty()
+            ? info.installPath + "/mods"
+            : info.modsDirectory;
 
         QDir modsDir(modsPath);
         if (modsDir.exists())
@@ -404,4 +284,72 @@ QStringList ModManagerDetection::getInstalledMods(ModManager manager)
     }
 
     return mods;
+}
+
+bool ModManagerDetection::parseMo2Ini(const QString& iniPath, ModManagerInfo& out)
+{
+    QFile iniFile(iniPath);
+    if (!iniFile.exists() || !iniFile.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        return false;
+    }
+
+    QTextStream stream(&iniFile);
+    bool inProfiles = false;
+    while (!stream.atEnd())
+    {
+        QString line = stream.readLine().trimmed();
+        if (line.startsWith("[") && line.endsWith("]"))
+        {
+            inProfiles = (line.mid(1, line.length() - 2) == "Profiles");
+            continue;
+        }
+        if (line.isEmpty() || line.startsWith(";") || line.startsWith("#"))
+        {
+            continue;
+        }
+        if (!line.contains("="))
+        {
+            continue;
+        }
+        const QString key = line.section("=", 0, 0).trimmed();
+        const QString value = line.section("=", 1).trimmed();
+        if (inProfiles)
+        {
+            if (key == "profileName" && !value.isEmpty())
+            {
+                out.profiles.append(value);
+            }
+            else if (key == "selectedProfile" && !value.isEmpty())
+            {
+                out.selectedProfile = value;
+            }
+        }
+        else
+        {
+            if (key.compare("gamePath", Qt::CaseInsensitive) == 0)
+            {
+                out.gamePath = QDir::toNativeSeparators(value);
+            }
+            else if (key.compare("modsDirectory", Qt::CaseInsensitive) == 0)
+            {
+                out.modsDirectory = QDir::toNativeSeparators(value);
+            }
+        }
+    }
+    iniFile.close();
+    return true;
+}
+
+QString ModManagerDetection::parseVortexField(const QString& jsonContent, const QString& key)
+{
+    const int idx = jsonContent.indexOf("\"" + key + "\"");
+    if (idx < 0) return QString();
+    const int colonIdx = jsonContent.indexOf(":", idx);
+    if (colonIdx < 0) return QString();
+    const int quoteStart = jsonContent.indexOf("\"", colonIdx + 1);
+    if (quoteStart < 0) return QString();
+    const int quoteEnd = jsonContent.indexOf("\"", quoteStart + 1);
+    if (quoteEnd < 0) return QString();
+    return jsonContent.mid(quoteStart + 1, quoteEnd - quoteStart - 1);
 }

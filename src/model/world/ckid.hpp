@@ -222,6 +222,17 @@ public:
     Type_Wwed_,
     Type_Zoom_,
 
+    // Morrowind (TES3) record types not otherwise present.
+    Type_Body_,
+    Type_Levc_,
+    Type_Levi_,
+    Type_Lock_,
+    Type_Pgrd_,
+    Type_Prob_,
+    Type_Repa_,
+    Type_Sndg_,
+    Type_Skil_,
+
     NumTypes
 };
 

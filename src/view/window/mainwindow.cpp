@@ -298,9 +298,8 @@ void MainWindow::setData(Data* data)
                 if (dataIndex >= coll.size()) return;
                 RefrRecord original = coll.getRecord(dataIndex).get();
                 RefrRecord edited = original;
-                edited.posX = pos.x(); edited.posY = pos.y(); edited.posZ = pos.z();
-                edited.rotX = rot.x(); edited.rotY = rot.y(); edited.rotZ = rot.z();
-                edited.scale = scale;
+                edited.applyTransform(pos.x(), pos.y(), pos.z(),
+                                      rot.x(), rot.y(), rot.z(), scale);
                 auto* cmd = new EditRecordCommand<RefrRecord>(
                     &coll, dataIndex, original, edited,
                     QStringLiteral("Transform Reference 0x%1").arg(edited.formId, 8, 16, QChar('0')));

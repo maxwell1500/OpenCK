@@ -6,6 +6,8 @@
 
 #include <QDebug>
 
+#include <cstring>
+
 const float DEFAULT_VERSION = 0.94f;
 
 Header::Header()
@@ -28,10 +30,22 @@ void Header::blank()
 
     // INCC
     incc = 0;
+
+    // TES3
+    formatVersion = 0;
+    tes3FileType = 0;
+    tes3Gmdt.clear();
+    tes3Scrd.clear();
+    tes3Scrs.clear();
 }
 
 void Header::load(ESMReader& esm)
 {
+    if (esm.tes3())
+    {
+        loadTes3(esm);
+        return;
+    }
     LOG_DEBUG(QString("Header::load: entered, filePos=%1").arg(esm.filePos()));
     recHeader = esm.readHeader();
     flags.val = recHeader.flags.val;
@@ -175,8 +189,149 @@ void Header::load(ESMReader& esm)
     }
 }
 
+void Header::loadTes3(ESMReader& esm)
+{
+    LOG_DEBUG(QString("Header::loadTes3: entered, filePos=%1").arg(esm.filePos()));
+    recHeader = esm.readHeader();
+    flags.val = recHeader.flags.val;
+
+    formatVersion = 0;
+    tes3FileType = 0;
+    version = 0;
+    numRecords = 0;
+    nextObjectID = 0;
+    author.clear();
+    description.clear();
+    masters.clear();
+    overrides.clear();
+    internalVersion = 0;
+    incc = 0;
+    tes3Scrd.clear();
+    tes3Scrs.clear();
+    tes3Gmdt.clear();
+
+    while (esm.isRecLeft())
+    {
+        if (esm.recLeft() < 0)
+        {
+            LOG_WARNING(QString("Header::loadTes3: recLeft went negative (%1), breaking").arg(esm.recLeft()));
+            break;
+        }
+        NAME subName = esm.readNSubHeader();
+        if (subName == 0)
+        {
+            break;
+        }
+        switch (subName)
+        {
+        case 'FORM':
+        {
+            formatVersion = esm.readType<quint32>();
+            break;
+        }
+        case 'HEDR':
+        {
+            // HEDR is one 300-byte subrecord: version, file type, then the
+            // fixed-width 32-byte author and 256-byte description fields,
+            // then the record count.
+            version = esm.readType<float>();
+            tes3FileType = esm.readType<quint32>();
+            author = esm.readFixedString(32);
+            description = esm.readFixedString(256);
+            numRecords = esm.readType<qint32>();
+            break;
+        }
+        case 'MAST':
+        {
+            MasterData m;
+            m.name = esm.readZString();
+            if (esm.isNextName(NAME('DATA')))
+            {
+                esm.readNSubHeader();
+                m.size = esm.readType<quint32>();
+            }
+            masters.push_back(m);
+            break;
+        }
+        case 'GMDT':
+        {
+            esm.readRawSubData(tes3Gmdt);
+            break;
+        }
+        case 'SCRD':
+        {
+            esm.readRawSubData(tes3Scrd);
+            break;
+        }
+        case 'SCRS':
+        {
+            esm.readRawSubData(tes3Scrs);
+            break;
+        }
+        default:
+        {
+            esm.skip(static_cast<int>(esm.subLeft()));
+            break;
+        }
+        }
+    }
+
+    LOG_DEBUG(QString("Header::loadTes3: version=%1 records=%2 masters=%3")
+        .arg(version).arg(numRecords).arg(masters.size()));
+}
+
 void Header::save(ESMWriter& esm)
 {
+    if (esm.tes3())
+    {
+        if (formatVersion != 0)
+        {
+            esm.writeSubData<quint32>('FORM', formatVersion);
+        }
+
+        esm.startSubRecord('HEDR');
+        esm.writeType<float>(version);
+        esm.writeType<quint32>(tes3FileType);
+        {
+            QByteArray authorBytes(32, '\0');
+            const QByteArray a = author.toUtf8();
+            memcpy(authorBytes.data(), a.constData(), static_cast<size_t>(qMin(a.size(), 32)));
+            esm.writeRawData(authorBytes.constData(), 32);
+            QByteArray descBytes(256, '\0');
+            const QByteArray d = description.toUtf8();
+            memcpy(descBytes.data(), d.constData(), static_cast<size_t>(qMin(d.size(), 256)));
+            esm.writeRawData(descBytes.constData(), 256);
+        }
+        esm.writeType<qint32>(numRecords);
+        esm.endSubRecord();
+
+        for (const MasterData& master : masters)
+        {
+            esm.writeSubZString('MAST', master.name);
+            esm.writeSubData<quint32>('DATA', static_cast<quint32>(master.size));
+        }
+
+        if (!tes3Gmdt.isEmpty())
+        {
+            esm.startSubRecord('GMDT');
+            esm.writeRawData(tes3Gmdt.constData(), tes3Gmdt.size());
+            esm.endSubRecord();
+        }
+        if (!tes3Scrd.isEmpty())
+        {
+            esm.startSubRecord('SCRD');
+            esm.writeRawData(tes3Scrd.constData(), tes3Scrd.size());
+            esm.endSubRecord();
+        }
+        if (!tes3Scrs.isEmpty())
+        {
+            esm.startSubRecord('SCRS');
+            esm.writeRawData(tes3Scrs.constData(), tes3Scrs.size());
+            esm.endSubRecord();
+        }
+        return;
+    }
+
     esm.startSubRecord('HEDR');
     esm.writeType<float>(version);
     esm.writeType<qint32>(numRecords);

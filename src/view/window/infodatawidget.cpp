@@ -36,21 +36,15 @@ namespace openck {
 
 namespace {
 
-const QStringList& conditionFunctions()
+// Editable combo for a condition function. The displayed text is a
+// CtdaCondition::functionName label; the authoritative value is recovered via
+// CtdaCondition::functionIdForName, so an arbitrary function index round-trips
+// exactly instead of collapsing to 0.
+QComboBox* makeFunctionCombo(QWidget* parent)
 {
-    static const QStringList f = {
-        QStringLiteral("GetIsAliasRef"),
-        QStringLiteral("GetStage"),
-        QStringLiteral("GetQuestDone"),
-        QStringLiteral("GetIsClass"),
-        QStringLiteral("GetIsRace"),
-        QStringLiteral("GetLevel"),
-        QStringLiteral("GetSex"),
-        QStringLiteral("GetIsDead"),
-        QStringLiteral("GetGlobalValue"),
-        QStringLiteral("GetScriptVariable")
-    };
-    return f;
+    auto* combo = new QComboBox(parent);
+    combo->setEditable(true);
+    return combo;
 }
 
 const QStringList& comparisonOperators()
@@ -199,12 +193,10 @@ void InfoDataWidget::populateConditions()
 
         m_condTable->insertRow(i);
 
-        auto* fnCombo = new QComboBox(m_condTable);
-        fnCombo->addItems(conditionFunctions());
-        int fnIdx = conditionFunctions().indexOf(QString::number(c.functionId, 16));
-        if (fnIdx >= 0) fnCombo->setCurrentIndex(fnIdx);
+        auto* fnCombo = makeFunctionCombo(m_condTable);
+        fnCombo->setEditText(CtdaCondition::functionName(c.functionId));
         m_condTable->setCellWidget(i, 0, fnCombo);
-        connect(fnCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
+        connect(fnCombo->lineEdit(), &QLineEdit::textChanged, this,
             [this, i]() { onConditionChanged(); });
 
         auto* opCombo = new QComboBox(m_condTable);
@@ -241,7 +233,12 @@ void InfoDataWidget::syncConditionsToRecord()
         CtdaCondition c;
 
         if (auto* fn = qobject_cast<QComboBox*>(m_condTable->cellWidget(i, 0)))
-            c.functionId = fn->currentText().toUInt(nullptr, 16);
+        {
+            quint32 fid = 0;
+            if (!CtdaCondition::functionIdForName(fn->currentText(), &fid))
+                fid = 0;
+            c.functionId = fid;
+        }
         if (auto* op = qobject_cast<QComboBox*>(m_condTable->cellWidget(i, 1)))
         {
             const QString opText = op->currentText();
@@ -281,10 +278,10 @@ void InfoDataWidget::onAddCondition()
     m_condTable->blockSignals(true);
     m_condTable->insertRow(row);
 
-    auto* fnCombo = new QComboBox(m_condTable);
-    fnCombo->addItems(conditionFunctions());
+    auto* fnCombo = makeFunctionCombo(m_condTable);
+    fnCombo->setEditText(CtdaCondition::functionName(0));
     m_condTable->setCellWidget(row, 0, fnCombo);
-    connect(fnCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
+    connect(fnCombo->lineEdit(), &QLineEdit::textChanged, this,
         [this]() { onConditionChanged(); });
 
     auto* opCombo = new QComboBox(m_condTable);
