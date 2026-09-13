@@ -22,6 +22,14 @@ struct OpalList
     // cannot be read.
     static bool loadFile(const QString& path, OpalList& out);
 
+    // Serializes the header + rows back to CSV text. Fields containing a
+    // comma or quote are double-quoted (embedded quotes doubled).
+    QString toCsv() const;
+
+    // Writes toCsv() to the given path. Returns false if it cannot be
+    // written.
+    bool saveFile(const QString& path) const;
+
     // Column value lookup helper: returns the value of the named column in
     // row i, or an empty string if absent.
     QString value(int row, const QString& columnName) const;

@@ -15,6 +15,7 @@ private slots:
     void testCommentsAndPadding();
     void testLoadFile();
     void testValueLookup();
+    void testCsvRoundTrip();
 };
 
 void TestOpalList::initTestCase()
@@ -88,6 +89,35 @@ void TestOpalList::testValueLookup()
     QCOMPARE(list.value(0, QStringLiteral("Chance")), QStringLiteral("50"));
     QCOMPARE(list.value(0, QStringLiteral("Missing")), QString());
     QCOMPARE(list.value(5, QStringLiteral("FormID")), QString());
+}
+
+void TestOpalList::testCsvRoundTrip()
+{
+    const QString content = QStringLiteral(
+        "Name,Count\n"
+        "\"Chair, Wooden\",5\n"
+        "Table,2\n");
+    const OpalList original = OpalList::parse(content);
+
+    const QString csv = original.toCsv();
+    QVERIFY(csv.contains(QStringLiteral("\"Chair, Wooden\"")));
+
+    const OpalList reparsed = OpalList::parse(csv);
+    QCOMPARE(reparsed.headers, original.headers);
+    QCOMPARE(reparsed.rowCount(), original.rowCount());
+    QCOMPARE(reparsed.rows[0][0], QStringLiteral("Chair, Wooden"));
+    QCOMPARE(reparsed.rows[1][0], QStringLiteral("Table"));
+
+    QTemporaryFile out;
+    QVERIFY(out.open());
+    const QString path = out.fileName();
+    out.close();
+    QVERIFY(original.saveFile(path));
+
+    OpalList loaded;
+    QVERIFY(OpalList::loadFile(path, loaded));
+    QCOMPARE(loaded.rowCount(), original.rowCount());
+    QCOMPARE(loaded.rows[0][1], QStringLiteral("5"));
 }
 
 QTEST_MAIN(TestOpalList)

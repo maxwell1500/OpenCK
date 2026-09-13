@@ -1005,6 +1005,8 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/animationeditor.cpp
     src/view/window/timeline.cpp
     src/view/window/particleeffectseffecteditor.cpp
+    src/view/window/planeteditordialog.cpp
+    src/view/window/opalplacementdialog.cpp
     src/view/window/colorgradientwidget.cpp
     src/view/window/sizecurvewidget.cpp
     src/view/window/particlesystem.cpp
@@ -1121,6 +1123,8 @@ set(VIEW_HEADERS
     src/view/window/animationeditor.hpp
     src/view/window/timeline.hpp
     src/view/window/particleeffectseffecteditor.hpp
+    src/view/window/planeteditordialog.hpp
+    src/view/window/opalplacementdialog.hpp
     src/view/window/colorgradientwidget.hpp
     src/view/window/sizecurvewidget.hpp
     src/view/window/particlesystem.hpp

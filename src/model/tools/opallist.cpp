@@ -113,3 +113,51 @@ QString OpalList::value(int row, const QString& columnName) const
         return QString();
     return rows[row][col];
 }
+
+namespace {
+
+QString escapeCsvField(const QString& field)
+{
+    if (field.contains(',') || field.contains('"') || field.contains('\n'))
+    {
+        QString escaped = field;
+        escaped.replace('"', QStringLiteral("\"\""));
+        return QStringLiteral("\"") + escaped + QStringLiteral("\"");
+    }
+    return field;
+}
+
+} // namespace
+
+QString OpalList::toCsv() const
+{
+    QStringList lines;
+
+    QStringList headerFields;
+    for (const QString& h : headers)
+        headerFields.append(escapeCsvField(h));
+    lines.append(headerFields.join(','));
+
+    for (const QVector<QString>& row : rows)
+    {
+        QStringList fields;
+        for (const QString& f : row)
+            fields.append(escapeCsvField(f));
+        lines.append(fields.join(','));
+    }
+
+    return lines.join('\n') + '\n';
+}
+
+bool OpalList::saveFile(const QString& path) const
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        LOG_WARNING(QString("OpalList::saveFile: cannot write %1").arg(path));
+        return false;
+    }
+    file.write(toCsv().toUtf8());
+    file.close();
+    return true;
+}

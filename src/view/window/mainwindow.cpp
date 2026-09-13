@@ -46,6 +46,8 @@
 #include "archivebrowserdialog.hpp"
 #include "animationeditor.hpp"
 #include "particleeffectseffecteditor.hpp"
+#include "planeteditordialog.hpp"
+#include "opalplacementdialog.hpp"
 #include "papyrusdebugger.hpp"
 #include "papyruscompiler.hpp"
 #include "../../../libs/files/ba2/ba2archive.hpp"
@@ -490,6 +492,22 @@ void MainWindow::setupEditMenu()
     QAction* batchExportAction = new QAction(tr("Batch Export..."), this);
     connect(batchExportAction, &QAction::triggered, this, &MainWindow::on_actionBatchExport_triggered);
     ui->menuTools->addAction(batchExportAction);
+
+    // Starfield planet (PNDT) editor
+    QAction* planetEditorAction = new QAction(tr("Planet Editor..."), this);
+    connect(planetEditorAction, &QAction::triggered, this, [this]() {
+        PlanetEditorDialog dialog(this);
+        dialog.exec();
+    });
+    ui->menuTools->addAction(planetEditorAction);
+
+    // Starfield OPAL procedural-placement list editor
+    QAction* opalEditorAction = new QAction(tr("OPAL Placement Editor..."), this);
+    connect(opalEditorAction, &QAction::triggered, this, [this]() {
+        OpalPlacementDialog dialog(this);
+        dialog.exec();
+    });
+    ui->menuTools->addAction(opalEditorAction);
 
     // Add Batch Tools actions to Tools menu
     QAction* batchRenameAction = new QAction(tr("Batch Rename Records..."), this);

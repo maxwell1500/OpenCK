@@ -407,6 +407,24 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
    spaceship editor, galaxy view, worldspace/planet-generation editors
    (PNDT planets, OPAL placement), reflection probes, crowd-region authoring,
    morph/face-gen editor, RoboVoicer (TTS pipeline), Houdini integration.
+
+   **Status 2026-09-13 (worldspace/planet-generation editors):** the
+   PNDT-planet and OPAL-placement editors are done at the model + UI level.
+   - `PlanetDefinition` (already modelled + JSON round-trip) now has a
+     `PlanetEditorDialog` exposing editor id, star system, day length,
+     gravity/temperature, a biome table (name/colour/coverage), a checkable
+     trait list (from `commonTraits()` plus customs) and a resource table,
+     with Load/Save JSON.
+   - `OpalList` gained `toCsv()` / `saveFile()` (CSV-quoted round-trip) and a
+     `OpalPlacementDialog` that displays the header/rows in an editable table
+     with add/remove row and Load/Save `.opl`.
+   - Both dialogs are wired into the Tools menu
+     ("Planet Editor...", "OPAL Placement Editor...").
+   - `test_opallist` extended with a CSV round-trip case (8/8). The planet
+     model is covered by `test_planetdefinition`.
+   Remaining (§3.8): spaceship editor, galaxy view, reflection probes,
+   crowd-region authoring, morph/face-gen editor, RoboVoicer and Houdini
+   integration.
  9. **Multi-game record dispatch** — foundation verified against real
     non-Starfield masters:
     `GameFormat` (`libs/files/esm/gameformat.hpp/.cpp`) detects the game
