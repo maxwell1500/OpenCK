@@ -21,13 +21,73 @@ quint32 nextSyntheticTes3FormId()
 }
 }
 
-void Tes3Record::initComponents()
+void Tes3Record::parseComponents()
 {
     components.clear();
     components.add<tescomponents::TESFullName_Component>();
     components.add<tescomponents::TESModel_Component>();
     components.add<tescomponents::TESTexture_Component>();
     components.add<tescomponents::Tes3Data_Component>();
+
+    // Parse subrecords into components for display/editing
+    for (const auto& raw : rawSubRecords)
+    {
+        if (raw.name == NAME('NAME'))
+            continue; // editor id is handled separately
+
+        auto* full = static_cast<tescomponents::TESFullName_Component*>(
+            components.findByName(QStringLiteral("TESFullName")));
+        if (raw.name == NAME('FULL') && full)
+        {
+            QString s = QString::fromUtf8(raw.data.constData(), raw.data.size());
+            while (s.endsWith('\0'))
+                s.chop(1);
+            full->fullName = s;
+            continue;
+        }
+
+        auto* model = static_cast<tescomponents::TESModel_Component*>(
+            components.findByName(QStringLiteral("TESModel")));
+        if (raw.name == NAME('MODL') && model)
+        {
+            model->modelPath = QString::fromUtf8(raw.data.constData(), raw.data.size());
+            while (model->modelPath.endsWith('\0'))
+                model->modelPath.chop(1);
+            continue;
+        }
+        if (raw.name == NAME('MNAM') && model)
+        {
+            model->lodModelPath = QString::fromUtf8(raw.data.constData(), raw.data.size());
+            while (model->lodModelPath.endsWith('\0'))
+                model->lodModelPath.chop(1);
+            continue;
+        }
+
+        auto* tex = static_cast<tescomponents::TESTexture_Component*>(
+            components.findByName(QStringLiteral("TESTexture")));
+        if (raw.name == NAME('ICON') && tex)
+        {
+            tex->iconPath = QString::fromUtf8(raw.data.constData(), raw.data.size());
+            while (tex->iconPath.endsWith('\0'))
+                tex->iconPath.chop(1);
+            continue;
+        }
+        if (raw.name == NAME('ICO2') && tex)
+        {
+            tex->smallIconPath = QString::fromUtf8(raw.data.constData(), raw.data.size());
+            while (tex->smallIconPath.endsWith('\0'))
+                tex->smallIconPath.chop(1);
+            continue;
+        }
+
+        auto* data = static_cast<tescomponents::Tes3Data_Component*>(
+            components.findByName(QStringLiteral("Tes3Data")));
+        if (raw.name == NAME('DATA') && data)
+        {
+            data->data = raw.data;
+            continue;
+        }
+    }
 }
 
 void Tes3Record::load(ESMReader& esm, bool)
@@ -42,7 +102,6 @@ void Tes3Record::load(ESMReader& esm, bool)
     loadOrder.clear();
     nameIndex = -1;
     nameRaw.clear();
-    initComponents();
 
     while (esm.isRecLeft())
     {
@@ -52,7 +111,6 @@ void Tes3Record::load(ESMReader& esm, bool)
         if (sub == 0)
             break;
         loadOrder.append(sub);
-
         if (sub == NAME('NAME') && nameIndex < 0)
         {
             nameIndex = loadOrder.size() - 1;
@@ -63,181 +121,55 @@ void Tes3Record::load(ESMReader& esm, bool)
             editorId = QString::fromLatin1(trimmed);
             continue;
         }
-
-        // Try to dispatch to a component
-        bool handled = false;
-        for (auto& c : components.all())
-        {
-            if (c->canHandle(sub))
-            {
-                c->handleSubrecord(sub, esm);
-                handled = true;
-                break;
-            }
-        }
-        if (handled)
-            continue;
-
-        // Fallback: store as raw for lossless round-trip
         RawSubRecord raw;
         raw.name = sub;
         esm.readRawSubData(raw.data);
         rawSubRecords.push_back(raw);
     }
+
+    parseComponents();
 }
 
 void Tes3Record::save(ESMWriter& esm) const
 {
-    // Index raw subrecords by name for save-time lookup
     QHash<NAME, QVector<int>> rawByName;
     for (int i = 0; i < rawSubRecords.size(); ++i)
         rawByName[rawSubRecords[i].name].append(i);
     QHash<NAME, int> rawCursor;
 
-    // Track which subrecords we've written to avoid duplicates
-    bool wroteName = false;
-    bool wroteFull = false;
-    bool wroteModl = false;
-    bool wroteMnam = false;
-    bool wroteIcon = false;
-    bool wroteIco2 = false;
-    bool wroteData = false;
-
-    // Get component pointers
-    auto* full = static_cast<tescomponents::TESFullName_Component*>(
-        const_cast<Tes3Record*>(this)->components.findByName(QStringLiteral("TESFullName")));
-    auto* model = static_cast<tescomponents::TESModel_Component*>(
-        const_cast<Tes3Record*>(this)->components.findByName(QStringLiteral("TESModel")));
-    auto* tex = static_cast<tescomponents::TESTexture_Component*>(
-        const_cast<Tes3Record*>(this)->components.findByName(QStringLiteral("TESTexture")));
-    auto* data = static_cast<tescomponents::Tes3Data_Component*>(
-        const_cast<Tes3Record*>(this)->components.findByName(QStringLiteral("Tes3Data")));
-
-    // Walk the load order and write each subrecord in its original position
     for (int i = 0; i < loadOrder.size(); ++i)
     {
         const NAME sub = loadOrder[i];
-
-        if (sub == NAME('NAME'))
+        if (i == nameIndex)
         {
-            if (!wroteName)
+            const QByteArray payload = editorId.toLatin1();
+            const bool unchanged = nameRaw.size() >= payload.size()
+                && nameRaw.startsWith(payload)
+                && std::all_of(nameRaw.constBegin() + payload.size(), nameRaw.constEnd(),
+                               [](char c) { return c == '\0'; });
+            esm.startSubRecord(NAME('NAME'));
+            if (unchanged)
             {
-                const QByteArray payload = editorId.toLatin1();
-                const bool unchanged = nameRaw.size() >= payload.size()
-                    && nameRaw.startsWith(payload)
-                    && std::all_of(nameRaw.constBegin() + payload.size(), nameRaw.constEnd(),
-                                   [](char c) { return c == '\0'; });
-                esm.startSubRecord(NAME('NAME'));
-                if (unchanged)
-                {
-                    esm.writeRawData(nameRaw.constData(), nameRaw.size());
-                }
-                else
-                {
-                    esm.writeRawData(payload.constData(), payload.size());
-                    const char nul = '\0';
-                    esm.writeRawData(&nul, 1);
-                }
-                esm.endSubRecord();
-                wroteName = true;
+                esm.writeRawData(nameRaw.constData(), nameRaw.size());
             }
+            else
+            {
+                esm.writeRawData(payload.constData(), payload.size());
+                const char nul = '\0';
+                esm.writeRawData(&nul, 1);
+            }
+            esm.endSubRecord();
             continue;
         }
-
-        // Dispatch to component save
-        if (sub == NAME('FULL'))
-        {
-            if (!wroteFull && full && !full->fullName.isEmpty())
-            {
-                esm.startSubRecord(NAME('FULL'));
-                esm.writeZString(full->fullName);
-                esm.endSubRecord();
-            }
-            wroteFull = true;
-            continue;
-        }
-
-        if (sub == NAME('MODL'))
-        {
-            if (!wroteModl && model && !model->modelPath.isEmpty())
-            {
-                esm.writeSubZString(NAME('MODL'), model->modelPath);
-            }
-            wroteModl = true;
-            continue;
-        }
-
-        if (sub == NAME('MNAM'))
-        {
-            if (!wroteMnam && model && !model->lodModelPath.isEmpty())
-            {
-                esm.writeSubZString(NAME('MNAM'), model->lodModelPath);
-            }
-            wroteMnam = true;
-            continue;
-        }
-
-        if (sub == NAME('ICON'))
-        {
-            if (!wroteIcon && tex && !tex->iconPath.isEmpty())
-            {
-                esm.writeSubZString(NAME('ICON'), tex->iconPath);
-            }
-            wroteIcon = true;
-            continue;
-        }
-
-        if (sub == NAME('ICO2'))
-        {
-            if (!wroteIco2 && tex && !tex->smallIconPath.isEmpty())
-            {
-                esm.writeSubZString(NAME('ICO2'), tex->smallIconPath);
-            }
-            wroteIco2 = true;
-            continue;
-        }
-
-        if (sub == NAME('DATA'))
-        {
-            if (!wroteData && data)
-            {
-                data->save(esm);
-            }
-            wroteData = true;
-            continue;
-        }
-
-        // Fallback: write raw subrecord
         const QVector<int>& idx = rawByName[sub];
-        if (!idx.isEmpty())
-        {
-            int& cur = rawCursor[sub];
-            if (cur < idx.size())
-                esm.writeRawSubRecord(rawSubRecords[idx[cur++]]);
-        }
+        int& cur = rawCursor[sub];
+        if (cur < idx.size())
+            esm.writeRawSubRecord(rawSubRecords[idx[cur++]]);
     }
 
-    // Append any component subrecords that weren't in the load order
-    if (!wroteName && !editorId.isEmpty())
+    if (nameIndex < 0 && !editorId.isEmpty())
         esm.writeSubZString(NAME('NAME'), editorId);
-    if (!wroteFull && full && !full->fullName.isEmpty())
-    {
-        esm.startSubRecord(NAME('FULL'));
-        esm.writeZString(full->fullName);
-        esm.endSubRecord();
-    }
-    if (!wroteModl && model && !model->modelPath.isEmpty())
-        esm.writeSubZString(NAME('MODL'), model->modelPath);
-    if (!wroteMnam && model && !model->lodModelPath.isEmpty())
-        esm.writeSubZString(NAME('MNAM'), model->lodModelPath);
-    if (!wroteIcon && tex && !tex->iconPath.isEmpty())
-        esm.writeSubZString(NAME('ICON'), tex->iconPath);
-    if (!wroteIco2 && tex && !tex->smallIconPath.isEmpty())
-        esm.writeSubZString(NAME('ICO2'), tex->smallIconPath);
-    if (!wroteData && data)
-        data->save(esm);
 
-    // Append any remaining raw subrecords
     for (auto it = rawByName.constBegin(); it != rawByName.constEnd(); ++it)
     {
         const QVector<int>& idx = it.value();
@@ -258,5 +190,5 @@ void Tes3Record::blank()
     nameRaw.clear();
     rawSubRecords.clear();
     loadOrder.clear();
-    initComponents();
+    components.clear();
 }

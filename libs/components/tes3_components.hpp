@@ -9,7 +9,6 @@
 
 #include <QString>
 #include <QByteArray>
-#include <QVector>
 
 #include <memory>
 #include <vector>
@@ -19,9 +18,9 @@ class ESMWriter;
 
 namespace tescomponents {
 
-/// Generic binary DATA subrecord handler for TES3 records. Exposes the raw
-/// bytes as a hex string for inspection and editing. Type-specific parsing
-/// of DATA payloads is deferred to a later phase.
+/// Generic binary DATA subrecord handler for TES3 records. Captures the raw
+/// bytes of the DATA subrecord and exposes it as hex for inspection/editing.
+/// Type-specific parsing of DATA payloads is deferred to a later phase.
 class Tes3Data_Component : public Component
 {
 public:
@@ -44,9 +43,8 @@ public:
         if (subrecordName != NAME('DATA'))
             return;
         nameSpelling = NAME('DATA');
-        const qint64 left = esm.bytesLeftInRecord();
-        data = QByteArray(left, 0);
-        esm.readBytes(data.data(), left);
+        data.clear();
+        esm.readRawSubData(data);
     }
 
     void save(ESMWriter& esm) const override
@@ -60,13 +58,18 @@ public:
 
     QString toHex() const
     {
-        return data.toHex(' ').toUpper();
+        return QString(data.toHex().data()).toUpper();
     }
 
     bool fromHex(const QString& hex)
     {
-        data = QByteArray::fromHex(hex.remove(' ').toUtf8());
-        return !hex.isEmpty();
+        QString cleaned = hex;
+        cleaned.remove(' ');
+        QByteArray bytes = QByteArray::fromHex(cleaned.toUtf8());
+        if (bytes.isEmpty() && !hex.isEmpty())
+            return false;
+        data = bytes;
+        return true;
     }
 
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
@@ -105,83 +108,6 @@ public:
 private:
     QString m_hexDisplay;
     friend class EditorProperty;
-};
-
-/// TES3 flags component — handles the DATA subrecord for records where
-/// the first field is a flags word. Stores as a bitmask property.
-class Tes3Flags_Component : public Component
-{
-public:
-    void load(ESMReader& esm) override {}
-
-    quint32 flags = 0;
-    NAME nameSpelling = NAME('DATA');
-    bool hasData = false;
-
-    QString name() const override { return QStringLiteral("Flags"); }
-    QString className() const override { return QStringLiteral("Tes3Flags"); }
-    static QString staticClassName() { return QStringLiteral("Tes3Flags"); }
-
-    bool canHandle(quint32 subrecordName) const override
-    {
-        return subrecordName == NAME('DATA');
-    }
-
-    void handleSubrecord(quint32 subrecordName, ESMReader& esm) override
-    {
-        if (subrecordName != NAME('DATA'))
-            return;
-        nameSpelling = NAME('DATA');
-        hasData = true;
-        flags = esm.readType<quint32>();
-        // Drain any remaining bytes in the DATA subrecord
-        const qint64 left = esm.bytesLeftInRecord();
-        if (left > 0)
-        {
-            QByteArray drain(left, 0);
-            esm.readBytes(drain.data(), left);
-        }
-    }
-
-    void save(ESMWriter& esm) const override
-    {
-        if (!hasData)
-            return;
-        esm.writeSubData<quint32>(nameSpelling, flags);
-    }
-
-    std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
-    {
-        std::vector<std::unique_ptr<EditorProperty>> out;
-        out.push_back(std::make_unique<UIntEditorProperty>(
-            QStringLiteral("Flags"), &flags));
-        return out;
-    }
-
-    std::unique_ptr<Component> clone() const override
-    {
-        auto c = std::make_unique<Tes3Flags_Component>();
-        c->flags = flags;
-        c->hasData = hasData;
-        return c;
-    }
-
-    void copyFrom(const Component* other) override
-    {
-        if (!other || other->className() != className()) return;
-        const auto* o = static_cast<const Tes3Flags_Component*>(other);
-        flags = o->flags;
-        hasData = o->hasData;
-    }
-
-    bool isEqualTo(const Component* other) const override
-    {
-        if (!other || other->className() != className()) return false;
-        const auto* o = static_cast<const Tes3Flags_Component*>(other);
-        return flags == o->flags;
-    }
-
-    void mergeWith(const Component* other) override { copyFrom(other); }
 };
 
 } // namespace tescomponents

@@ -13,10 +13,6 @@ class ESMWriter;
 // can round-trip through this without a bespoke loader. The first NAME
 // subrecord is the editor id; everything else is preserved positionally in
 // rawSubRecords keyed by loadOrder.
-//
-// Components (Phase 2b) handle common subrecords (FULL, MODL, ICON, DATA)
-// while unknown or type-specific subrecords remain as raw bytes for lossless
-// round-trip.
 struct Tes3Record {
     openck::FormComponents components;
     NAME code = 0;              // on-disk record type
@@ -31,7 +27,7 @@ struct Tes3Record {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
-    void initComponents();
+    void parseComponents();
 };
 
 inline bool operator==(const Tes3Record& l, const Tes3Record& r)

@@ -128,6 +128,7 @@
 #include "../../../libs/files/esm/spellrecord.hpp"
 #include "../../../libs/files/esm/staticcollectionrecord.hpp"
 #include "../../../libs/files/esm/statrecord.hpp"
+#include "../../../libs/files/esm/Tes3record.hpp"
 #include "../../../libs/files/esm/termrecord.hpp"
 #include "../../../libs/files/esm/texturesetrecord.hpp"
 #include "../../../libs/files/esm/treerecord.hpp"
@@ -419,6 +420,7 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     MACRO(WkmfRecord) \
     MACRO(WthsRecord) \
     MACRO(WwedRecord) \
+    MACRO(Tes3Record) \
     MACRO(ZoomRecord)
 } // namespace
 
