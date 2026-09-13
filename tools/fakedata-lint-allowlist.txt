@@ -1,0 +1,11 @@
+# Fake-data lint allowlist (format: path-substring || pattern-substring || reason).
+# A hit is excused when the file's repo-relative path contains the first part
+# AND the offending line matches the second part (regex). Keep entries minimal
+# and justified: every line here is tech debt against §4.4.
+
+src/view/window/papyrusdebugger.cpp || XboxGames || Script-dir fallback when no config exists
+src/view/window/papyrusdebugger.cpp || steamapps/common/Starfield || Steam-install fallback for the script dir
+src/model/tools/modmanagerdetection.cpp || Program Files || Reads %ProgramFiles% env with a default value
+src/model/tools/blenderlauncher.cpp || Program Files || Blender install candidate paths
+src/model/tools/blenderlauncher.hpp || Program Files || Doc comment showing the default install path
+src/model/tools/lootwrapper.cpp || Program Files || LOOT/Steam install detection

@@ -228,7 +228,9 @@ endif ()
 add_executable(test_dumpesm test_dumpesm.cpp)
 target_link_libraries(test_dumpesm PRIVATE openck_esm Qt6::Core)
 target_include_directories(test_dumpesm PRIVATE ${TEST_INCLUDE_DIRS})
-# Diagnostic (non-QTest) tool: not registered with CTest.
+# Diagnostic (non-QTest) tool: with no arguments it prints usage and exits 0,
+# so it is safe to register (a real dump needs an explicit record tag).
+openck_add_test(test_dumpesm)
 
 # PNDRecord binary encoder round-trip against the real Starfield.esm.
 add_executable(test_pndrecord test_pndrecord.cpp)
@@ -264,12 +266,15 @@ openck_add_test(test_assetresolver)
 add_executable(test_scanbtd test_scanbtd.cpp)
 target_link_libraries(test_scanbtd PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_scanbtd PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — needs a game data dir with archives.
+# Always exits 0 (reports "no such dir" when the data dir is absent).
+openck_add_test(test_scanbtd)
 
 # Diagnostic: probe a Starfield mesh BA2 for hknp markers (test_meshprobe [ba2]).
 add_executable(test_meshprobe test_meshprobe.cpp)
 target_link_libraries(test_meshprobe PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_meshprobe PRIVATE ${TEST_INCLUDE_DIRS})
+# Always exits 0 (reports "open failed" when the archive is absent).
+openck_add_test(test_meshprobe)
 
 # Diagnostic: subrecord-level diff of a source plugin against its untouched
 # round-trip save (test_subrecord_diff <source> <saved>). Exit 0 = identical.

@@ -566,16 +566,56 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 2. **Materialization matrix test** — index count vs. loaded count vs. warning
    count for every type from a full master load; assert warnings == 0 or an
    explicitly shrinking allowlist.
+
+    **Status 2026-09-13:** Verified in place.
+    `test_loader::testMaterializationMatrixZeroWarnings` loads Starfield.esm
+    + Magnus.esm + Vvardenfell.esp, materializes every type present in the
+    master index (per-type counts via `ensureTypeLoaded`, heap-validated per
+    type with `HeapValidate` + `_CrtCheckMemory`), and asserts the reader
+    warning list is empty afterwards. Passes in the suite (3.8M records).
 3. **Per-type round-trip subrecord-diff tests** (the tool from §1.2) as part of
    the suite.
+
+    **Status 2026-09-13:** Covered.
+    `testSaveRoundTripSubrecordIdentical` (Vvardenfell.esp, 1374/1374 records,
+    0 mismatches), `testSyntheticMultiTypeRoundTrip` (synthetic NPC_/GLOB/
+    STAT/WRLD), and `test_tes3roundtrip` (full 48,295-record Morrowind.esm,
+    byte-identical) are all registered QTest cases and green.
 4. **Fake-data lint** — CI grep that fails on hardcoded game-content strings in
    `src/` so sample data comes from fixtures.
+
+    **Status 2026-09-13:** Implemented.
+    `tools/fakedata-lint.ps1` scans `src/**/*.cpp|hpp` for the regexes in
+    `tools/fakedata-lint-patterns.txt` (placeholder text, hardcoded
+    game-install roots, content proper nouns, sample-content markers) with
+    per-hit excuses in `tools/fakedata-lint-allowlist.txt` (path + pattern +
+    reason; currently 6 entries for legitimate tool-detection fallbacks).
+    Verified both directions (clean on the 510-file baseline; fails on a
+    planted violation, then removed). Wired into CI as the first step of
+    `windows-build.yml`.
 5. **API doc comments** (Doxygen) on the main public interfaces (`Data`,
    `NifPyFileWrapper`, `BlenderLauncher`, `ShortcutManager`).
+
+    **Status 2026-09-13:** Verified present.
+    `Data` (~995 doc lines), `BlenderLauncher`, `ShortcutManager` and
+    `NifPyFileWrapper` (class + every public method/struct with
+    `///`/`/** */` comments, params and returns) are all documented.
 6. **Final build gate** — zero-warning clean build, all tests, memory-leak
    check, coverage target.
+
+    **Status 2026-09-13:** Implemented as `tools/gate.ps1` (lint → build
+    `all_tests` failing on any MSVC warning outside `external/` → full
+    `ctest --output-on-failure`). Leak coverage comes from the in-suite
+    `HeapValidate`/`_CrtCheckMemory` instrumentation in the matrix test;
+    coverage reporting needs OpenCppCoverage (not installed here) and stays
+    manual.
 7. **CTest registration** for the 3 remaining non-QTest binaries
    (`dumpesm`, `scanbtd`, `meshprobe`).
+
+    **Status 2026-09-13:** Done.
+    All three exit 0 with no arguments (usage / "no such dir" / "open
+    failed"), so they are registered via `openck_add_test` with no fixture
+    dependency. `ctest -N` lists 124 tests; the full run is 100% green.
 
 ---
 

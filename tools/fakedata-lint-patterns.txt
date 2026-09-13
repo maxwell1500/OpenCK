@@ -1,0 +1,33 @@
+# Fake-data lint patterns (one .NET regex per line; '#' starts a comment).
+# tools/fakedata-lint.ps1 fails CI when any pattern matches under src/ unless
+# the hit is covered by tools/fakedata-lint-allowlist.txt. The goal (§4.4):
+# sample game content must come from fixtures, never from literals in src/.
+
+# Placeholder text must not ship.
+(?i)lorem ipsum
+
+# Hardcoded game-install roots (path management belongs in filepaths/config).
+C:/XboxGames
+C:\\XboxGames
+steamapps/common/(Starfield|Skyrim|Morrowind|Fallout\s*4|Oblivion)
+
+# Game-content proper nouns that belong in fixtures, not in src/ literals.
+# (The Dragonborn pattern excludes the "Dragonborn.esm" master filename.)
+(?i)\bSeyda Neen\b
+(?i)\bBalmora\b
+(?i)\bDovahkiin\b
+\bDragonborn\b(?!\.esm)
+(?i)\bWhiterun\b
+(?i)\bDiamond City\b
+(?i)\bAkila City\b
+(?i)\bNerevar\b
+(?i)\bVivec\b
+(?i)\bDagoth\b
+(?i)\bSheogorath\b
+(?i)\bMehrunes Dagon\b
+
+# Obvious sample-content markers.
+TestNPC
+FakeSword
+DummyQuest
+SampleDialogue
