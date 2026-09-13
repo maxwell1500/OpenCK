@@ -663,6 +663,11 @@ target_link_libraries(test_obscripttypechecker PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_obscripttypechecker PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_obscripttypechecker)
 
+add_executable(test_nifanimation test_nifanimation.cpp)
+target_link_libraries(test_nifanimation PRIVATE openck_files Qt6::Test)
+target_include_directories(test_nifanimation PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_nifanimation)
+
 # Game-family detection + per-game record dispatch
 add_executable(test_gameformat test_gameformat.cpp)
 target_link_libraries(test_gameformat PRIVATE openck_esm Qt6::Test)
