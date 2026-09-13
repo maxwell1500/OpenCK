@@ -796,6 +796,12 @@ target_link_libraries(test_particlesimulation PRIVATE openck_model test_stubs Qt
 target_include_directories(test_particlesimulation PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_particlesimulation)
 
+# Starfield-specific feature-slot models (REMAINING.md 3.8)
+add_executable(test_starfieldtools test_starfieldtools.cpp)
+target_link_libraries(test_starfieldtools PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_starfieldtools PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_starfieldtools)
+
 # Headless CLI (export/info commands)
 add_executable(test_cli test_cli.cpp)
 target_link_libraries(test_cli PRIVATE openck_esm test_stubs Qt6::Test)
@@ -864,7 +870,8 @@ add_custom_target(all_tests DEPENDS copy_ads_dll test_bitwise test_framing
     test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
     test_scenrecord test_scripteditor test_scriptflagfile test_searchalgorithm test_shortcutmanager
-    test_specialized_widgets test_spellchecker test_starfieldesm test_subrecord_roundtrip
+    test_specialized_widgets test_spellchecker test_starfieldesm test_starfieldtools
+    test_subrecord_roundtrip
     test_subrecord_diff
     test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer

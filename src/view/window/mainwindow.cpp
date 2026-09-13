@@ -48,6 +48,7 @@
 #include "particleeffectseffecteditor.hpp"
 #include "planeteditordialog.hpp"
 #include "opalplacementdialog.hpp"
+#include "starfieldtoolsdialog.hpp"
 #include "papyrusdebugger.hpp"
 #include "papyruscompiler.hpp"
 #include "../../../libs/files/ba2/ba2archive.hpp"
@@ -508,6 +509,15 @@ void MainWindow::setupEditMenu()
         dialog.exec();
     });
     ui->menuTools->addAction(opalEditorAction);
+
+    // Starfield feature-slot editors (spaceship, galaxy, probes, crowd,
+    // morph, RoboVoicer, Houdini)
+    QAction* starfieldToolsAction = new QAction(tr("Starfield Tools..."), this);
+    connect(starfieldToolsAction, &QAction::triggered, this, [this]() {
+        StarfieldToolsDialog dialog(this);
+        dialog.exec();
+    });
+    ui->menuTools->addAction(starfieldToolsAction);
 
     // Add Batch Tools actions to Tools menu
     QAction* batchRenameAction = new QAction(tr("Batch Rename Records..."), this);

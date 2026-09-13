@@ -422,9 +422,23 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      ("Planet Editor...", "OPAL Placement Editor...").
    - `test_opallist` extended with a CSV round-trip case (8/8). The planet
      model is covered by `test_planetdefinition`.
-   Remaining (§3.8): spaceship editor, galaxy view, reflection probes,
-   crowd-region authoring, morph/face-gen editor, RoboVoicer and Houdini
-   integration.
+   - `StarfieldToolsDialog` (all remaining slots, wired to the Tools menu):
+     Spaceship editor (identity, reactor/grav/shield/engine, cargo/crew,
+     mass/hull, module table), Galaxy map with a painted star-system view
+     (`GalaxyViewWidget`: fit-to-view circles, click-to-select) plus system
+     list and planet table, Reflection Probe editor (position, radius,
+     resolution, projection, brightness, shape), Crowd Region editor
+     (behavior, volume, density, member weights), Morph/Face editor (race,
+     clamped value sliders as a channel table seeded from commonChannels),
+     RoboVoicer (voice-line plan table + run that reports what a real
+     `IVoiceSynthesizer` backend would synthesize), and a Houdini bridge tab
+     that previews the generated interactive/batch command.
+   - `test_starfieldtools` (11/11): JSON round-trips for all five models,
+     the voice runner (success / null-engine / unavailable-engine), and the
+     Houdini command builder.
+   Remaining (§3.8): binary record encoders for these models (to add once a
+   real shipped record is available to validate against), in-engine playback
+   for the voice lines, and actual native Houdini-side scripts.
  9. **Multi-game record dispatch** — foundation verified against real
     non-Starfield masters:
     `GameFormat` (`libs/files/esm/gameformat.hpp/.cpp`) detects the game

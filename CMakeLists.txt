@@ -693,6 +693,10 @@ set(MODEL_SOURCES
     src/model/tools/particleslodpresets.cpp
     src/model/tools/particlebundle.cpp
     src/model/tools/particlesimulation.cpp
+    src/model/tools/starfielddefinitions.cpp
+    src/model/tools/galaxymap.cpp
+    src/model/tools/robovoicer.cpp
+    src/model/tools/houdinibridge.cpp
     src/model/tools/scenephasemodel.cpp
     src/model/tools/materialruletemplate.cpp
     src/model/tools/materialpropertygraph.cpp
@@ -1007,6 +1011,9 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/particleeffectseffecteditor.cpp
     src/view/window/planeteditordialog.cpp
     src/view/window/opalplacementdialog.cpp
+    src/view/window/galaxyviewwidget.cpp
+    src/view/window/starfieldtoolsdialog.cpp
+    src/view/window/starfieldtoolsdialog_ctor.cpp
     src/view/window/colorgradientwidget.cpp
     src/view/window/sizecurvewidget.cpp
     src/view/window/particlesystem.cpp
@@ -1125,6 +1132,8 @@ set(VIEW_HEADERS
     src/view/window/particleeffectseffecteditor.hpp
     src/view/window/planeteditordialog.hpp
     src/view/window/opalplacementdialog.hpp
+    src/view/window/galaxyviewwidget.hpp
+    src/view/window/starfieldtoolsdialog.hpp
     src/view/window/colorgradientwidget.hpp
     src/view/window/sizecurvewidget.hpp
     src/view/window/particlesystem.hpp
