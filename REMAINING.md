@@ -633,10 +633,21 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     zero-warning; full `ctest` is 124/124. The same run caught a stale
     `all_tests` DEPENDS list (8 newer tests missing, 2 removed tests still
     listed) — now verified identical to the built set, which is also what
-    CI's build step compiles. Leak coverage comes from the in-suite
+    CI's build step compiles.     Leak coverage comes from the in-suite
     `HeapValidate`/`_CrtCheckMemory` instrumentation in the matrix test;
-    coverage reporting needs OpenCppCoverage (not installed here) and stays
-    manual.
+    coverage reporting was investigated 2026-09-14 and is
+    environment-blocked on this machine: VS Community 17.x ships no
+    collection tools (only BuildTools' analysis-only `CodeCoverage.exe`;
+    no `vsinstr`/`VSPerfCmd` anywhere on disk), OpenCppCoverage publishes
+    no portable build and its installer requires admin (hung on UAC, killed;
+    no choco/winget to install without elevation), and `dotnet-coverage`
+    (installed to the user profile for the test) attaches via the CLR
+    profiling API, so it reports "Profiler was not initialized" for
+    pure-native executables even with PDBs present. Verified along the way:
+    a `RelWithDebInfo` configure produces PDBs fine (the default Release
+    build emits none — any coverage run must use a debug-info config).
+    Unblocking coverage needs an elevated OpenCppCoverage install or VS
+    Enterprise; until then it stays a manual/nightly step.
 7. **CTest registration** for the 3 remaining non-QTest binaries
    (`dumpesm`, `scanbtd`, `meshprobe`).
 
