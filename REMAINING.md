@@ -697,14 +697,26 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     this machine. Qt5 deps not relevant (project is Qt6-only).
 6. 7 remaining `const_cast` call sites in `src/` — add proper mutable getters.
 
-   **Status 2026-09-07:** Fixed 4 of 7 sites:
-   - `landscapeeditor.cpp`: 2 sites — removed unnecessary casts (mutable
-     getters already exist for `getLandCollection()`/`getCellCollection()`).
-   - `objectwindowdialog.cpp`: 2 sites — changed `const auto&` to `auto&`
-     for `getRefrCollection()`, removed casts.
-   - Remaining 3: `nodegraphwidget.cpp` (intentional — graph API only
-     exposes const nodes), `data.cpp` x2 (standard
-     const-delegates-to-non-const pattern). All safe, no fix needed.
+    **Status 2026-09-07:** Fixed 4 of 7 sites:
+    - `landscapeeditor.cpp`: 2 sites — removed unnecessary casts (mutable
+      getters already exist for `getLandCollection()`/`getCellCollection()`).
+    - `objectwindowdialog.cpp`: 2 sites — changed `const auto&` to `auto&`
+      for `getRefrCollection()`, removed casts.
+    - Remaining 3: `nodegraphwidget.cpp` (intentional — graph API only
+      exposes const nodes), `data.cpp` x2 (standard
+      const-delegates-to-non-const pattern). All safe, no fix needed.
+
+    **Status 2026-09-13 (re-audit):** a 4th site had appeared since the
+    audit — `mainwindow.cpp` (`const_cast<FilePaths&>(mData->getPaths())`
+    in the Convert-to-ESL flow). Fixed properly per the item: added a
+    non-const `Data::getPaths()` overload and dropped the cast. Verified
+    the other §5 claims still hold (`mNextLocalId` persists/resets;
+    `strokeDirtyRect` partial updates; logger mutex + pre-init buffer with
+    no message-handler install; install targets + Qt GLOB; stat/glob
+    editors validate-before-mutate; no real TODO/FIXME — the hits are
+    `toDouble` and the `XXXX` subrecord name; no `.bak` files, only
+    vendored Blender binaries under `external/`). Full build + 124/124
+    green.
  7. Dead-code sweep: unused stubs, duplicate enums, `Q_UNUSED` params, commented
     blocks, `catch(...)` sites.
 

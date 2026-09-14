@@ -2786,7 +2786,7 @@ void MainWindow::on_actionConvertToESL_triggered()
         QString(), "Light Master (*.esl)");
     if (savePath.isEmpty()) return;
 
-    const_cast<FilePaths&>(mData->getPaths()).dataDir.setPath(QFileInfo(savePath).absolutePath());
+    mData->getPaths().dataDir.setPath(QFileInfo(savePath).absolutePath());
     emit actionSaveAs_triggered();
 
     QMessageBox::information(this, "Convert to ESL",

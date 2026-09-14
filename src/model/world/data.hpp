@@ -260,6 +260,9 @@ public:
     /// \brief Get the file paths configuration
     const FilePaths& getPaths() const { return paths; }
 
+    /// \brief Mutable access to the file paths configuration
+    FilePaths& getPaths() { return paths; }
+
     /// \brief Preload a file's header and metadata
     /// \param filename Path to ESM/ESP file
     /// \param base True if this is a master file, false if plugin
