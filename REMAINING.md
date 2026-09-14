@@ -634,20 +634,17 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     `all_tests` DEPENDS list (8 newer tests missing, 2 removed tests still
     listed) — now verified identical to the built set, which is also what
     CI's build step compiles.     Leak coverage comes from the in-suite
-    `HeapValidate`/`_CrtCheckMemory` instrumentation in the matrix test;
-    coverage reporting was investigated 2026-09-14 and is
-    environment-blocked on this machine: VS Community 17.x ships no
-    collection tools (only BuildTools' analysis-only `CodeCoverage.exe`;
-    no `vsinstr`/`VSPerfCmd` anywhere on disk), OpenCppCoverage publishes
-    no portable build and its installer requires admin (hung on UAC, killed;
-    no choco/winget to install without elevation), and `dotnet-coverage`
-    (installed to the user profile for the test) attaches via the CLR
-    profiling API, so it reports "Profiler was not initialized" for
-    pure-native executables even with PDBs present. Verified along the way:
-    a `RelWithDebInfo` configure produces PDBs fine (the default Release
-    build emits none — any coverage run must use a debug-info config).
-    Unblocking coverage needs an elevated OpenCppCoverage install or VS
-    Enterprise; until then it stays a manual/nightly step.
+    `HeapValidate`/`_CrtCheckMemory` instrumentation in the matrix test.
+    Coverage is verified working via `tools/coverage.ps1`: it builds the
+    requested tests in a `RelWithDebInfo` directory (PDBs are required —
+    the default Release build emits none), runs each under OpenCppCoverage,
+    and prints per-test line rates from the Cobertura XML (verified:
+    `test_opallist` 94.6%, `test_particlesimulation` 93.3%, including the
+    script's auto-build path). OpenCppCoverage needs a one-time elevated
+    install; `dotnet-coverage` cannot substitute (it attaches via the CLR
+    profiling API, which never initializes in pure-native processes).
+    Full-suite coverage is slow (instrumentation overhead on the real-data
+    tests) — treat it as a nightly job, use `-Tests` for slices.
 7. **CTest registration** for the 3 remaining non-QTest binaries
    (`dumpesm`, `scanbtd`, `meshprobe`).
 
