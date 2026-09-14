@@ -52,4 +52,27 @@ struct VoiceRunReport
 /// marked done. A null synthesizer marks every pending line failed.
 VoiceRunReport runVoicePlan(VoiceLinePlan& plan, IVoiceSynthesizer* synth);
 
+#ifdef _WIN32
+// SapiVoiceSynthesizer (REMAINING.md §3.8) — the in-engine speech backend for
+// Windows: renders lines through the built-in speech engine
+// (System.Speech over SAPI: David/Zira/Haruka Desktop ship with Windows)
+// straight to WAV files, which VoicePreview::playVoiceAudio can play back.
+// It drives the engine in a short-lived powershell helper process so the
+// build needs no SAPI SDK/ATL linkage beyond QtCore's QProcess. Each call
+// costs roughly a second of interpreter startup; unavailable when no voice
+// tokens are installed (e.g. Server Core) — callers fall back to the
+// null-engine report path via isAvailable().
+class SapiVoiceSynthesizer : public IVoiceSynthesizer
+{
+public:
+    QString name() const override;
+    bool isAvailable() const override;
+    bool synthesize(const QString& text, const QString& voiceId,
+                    const QString& outputPath) override;
+
+    // Display names of the installed SAPI voices (empty when none).
+    static QStringList availableVoices();
+};
+#endif
+
 #endif // ROBOVOICER_HPP

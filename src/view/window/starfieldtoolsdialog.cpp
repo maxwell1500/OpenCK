@@ -1,10 +1,13 @@
 #include "starfieldtoolsdialog.hpp"
 
 #include "galaxyviewwidget.hpp"
+#include "voicepreview.hpp"
 
 #include "../../libs/files/log/logger.hpp"
 
+#include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 #include <QPushButton>
@@ -626,19 +629,55 @@ void StarfieldToolsDialog::runVoicePlan()
 {
     syncVoiceFromWidgets();
 
-    // The dialog runs without an external speech engine attached; the runner
-    // reports the pending lines as failed so the author sees exactly what
-    // would be synthesized once a real IVoiceSynthesizer is plugged in.
-    const VoiceRunReport report = ::runVoicePlan(m_voicePlan, nullptr);
+#ifdef _WIN32
+    SapiVoiceSynthesizer sapi;
+    IVoiceSynthesizer* synth = sapi.isAvailable() ? &sapi : nullptr;
+    const QString engineName = synth ? sapi.name()
+                                     : tr("none (no SAPI voices installed)");
+#else
+    IVoiceSynthesizer* synth = nullptr;
+    const QString engineName = tr("none (SAPI is Windows-only)");
+#endif
+
+    const VoiceRunReport report = ::runVoicePlan(m_voicePlan, synth);
     syncVoiceToWidgets();
 
     QMessageBox::information(this, tr("RoboVoicer"),
-        tr("Plan run with no speech engine attached.\n"
-           "Completed: %1\nFailed (pending): %2\n\n"
-           "Plug in an IVoiceSynthesizer backend to synthesize the %3 pending line(s).")
+        tr("Plan run with speech engine: %1.\n"
+           "Completed: %2\nFailed (pending): %3")
+            .arg(engineName)
             .arg(report.completed)
-            .arg(report.failed)
-            .arg(m_voicePlan.pendingCount()));
+            .arg(report.failed));
+
+    if (report.completed <= 0)
+        return;
+
+    // Offer in-engine playback of the first completed line's WAV.
+    QString previewPath;
+    for (const VoiceLine& line : m_voicePlan.lines)
+    {
+        if (line.done && QFileInfo::exists(line.outputPath))
+        {
+            previewPath = line.outputPath;
+            break;
+        }
+    }
+    if (previewPath.isEmpty())
+        return;
+    if (QMessageBox::question(this, tr("RoboVoicer"),
+            tr("Play back the first completed line?\n%1").arg(previewPath))
+        != QMessageBox::Yes)
+        return;
+
+    QFile wav(previewPath);
+    if (!wav.open(QIODevice::ReadOnly))
+        return;
+    const QByteArray audio = wav.readAll();
+    if (!VoicePreview::playVoiceAudio(audio, QString(), this))
+    {
+        QMessageBox::warning(this, tr("RoboVoicer"),
+            tr("Could not play back %1.").arg(previewPath));
+    }
 }
 
 // ===========================================================================

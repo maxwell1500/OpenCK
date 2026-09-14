@@ -1,4 +1,7 @@
 #include <QtTest>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 
 #include "../../src/model/tools/starfielddefinitions.hpp"
@@ -20,6 +23,10 @@ private slots:
     void testVoicePlanRunSuccess();
     void testVoicePlanRunFailure();
     void testHoudiniBridgeCommands();
+    // Windows-only SAPI backend (bodies skip elsewhere; the declarations stay
+    // unconditional because moc does not evaluate _WIN32).
+    void testSapiAvailable();
+    void testSapiSynthesizeToWav();
 };
 
 void TestStarfieldTools::testSpaceshipJsonRoundTrip()
@@ -285,6 +292,61 @@ void TestStarfieldTools::testHoudiniBridgeCommands()
 
     QCOMPARE(HoudiniBridge::defaultBatchExecutable(),
              QStringLiteral("hython.exe"));
+}
+
+void TestStarfieldTools::testSapiAvailable()
+{
+#ifdef _WIN32
+    SapiVoiceSynthesizer sapi;
+    QCOMPARE(sapi.name(), QStringLiteral("SAPI"));
+    if (!sapi.isAvailable())
+        QSKIP("No SAPI voices installed on this machine");
+    QVERIFY(!SapiVoiceSynthesizer::availableVoices().isEmpty());
+#else
+    QSKIP("SAPI backend is Windows-only");
+#endif
+}
+
+void TestStarfieldTools::testSapiSynthesizeToWav()
+{
+#ifdef _WIN32
+    SapiVoiceSynthesizer sapi;
+    if (!sapi.isAvailable())
+        QSKIP("No SAPI voices installed on this machine");
+
+    const QString outPath = QDir::tempPath()
+        + QStringLiteral("/openck_sapi_test.wav");
+    QFile::remove(outPath);
+
+    // Empty text or empty path must fail without touching the filesystem.
+    QVERIFY(!sapi.synthesize(QString(), QString(), outPath));
+    QVERIFY(!sapi.synthesize(QStringLiteral("Hello."), QString(), QString()));
+    QVERIFY(!QFileInfo::exists(outPath));
+
+    QVERIFY(sapi.synthesize(QStringLiteral("Welcome aboard."), QString(), outPath));
+    QFile wav(outPath);
+    QVERIFY(wav.open(QIODevice::ReadOnly));
+    const QByteArray bytes = wav.readAll();
+    QVERIFY(bytes.size() > 44);
+    QCOMPARE(bytes.left(4), QByteArray("RIFF", 4));
+    wav.close();
+    QFile::remove(outPath);
+
+    // End-to-end through the plan runner: the line is marked done.
+    VoiceLinePlan plan;
+    VoiceLine line;
+    line.lineId = QStringLiteral("SAPI_001");
+    line.text = QStringLiteral("Hello.");
+    line.outputPath = QDir::tempPath() + QStringLiteral("/openck_sapi_plan.wav");
+    plan.lines.append(line);
+    const VoiceRunReport report = runVoicePlan(plan, &sapi);
+    QCOMPARE(report.completed, 1);
+    QCOMPARE(plan.pendingCount(), 0);
+    QVERIFY(QFileInfo::exists(line.outputPath));
+    QFile::remove(line.outputPath);
+#else
+    QSKIP("SAPI backend is Windows-only");
+#endif
 }
 
 QTEST_MAIN(TestStarfieldTools)

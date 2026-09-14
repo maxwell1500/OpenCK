@@ -604,6 +604,12 @@ target_link_libraries(test_planetdefinition PRIVATE openck_model test_stubs Qt6:
 target_include_directories(test_planetdefinition PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_planetdefinition)
 
+# PlanetDefinition <-> PndRecord binary codec (validated vs real Starfield.esm)
+add_executable(test_planetcodec test_planetcodec.cpp)
+target_link_libraries(test_planetcodec PRIVATE openck_model openck_esm test_stubs Qt6::Test)
+target_include_directories(test_planetcodec PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_planetcodec)
+
 # Starfield creature (CCT) attach-point model
 add_executable(test_creatureattachpoints test_creatureattachpoints.cpp)
 target_link_libraries(test_creatureattachpoints PRIVATE openck_model test_stubs Qt6::Test)
@@ -877,7 +883,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
     test_particleprojectilebindings test_particleslodpresets test_particlesimulation
     test_perforcerepository
-    test_planetdefinition test_plugincompactor test_pluginio test_pndrecord
+    test_planetdefinition test_planetcodec test_plugincompactor test_pluginio test_pndrecord
     test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
     test_scenrecord test_scripteditor test_scriptflagfile test_searchalgorithm test_shortcutmanager
