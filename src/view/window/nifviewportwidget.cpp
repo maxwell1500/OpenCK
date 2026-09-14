@@ -15,6 +15,7 @@
 #include <QFont>
 
 #include "../../libs/files/nif/nifparser.hpp"
+#include "../../libs/files/nif/nifskinning.hpp"
 #include "../../libs/files/nif/ddsdecoder.hpp"
 #include "../../libs/files/nifanim/nifanimation.hpp"
 #include "../../libs/files/nif/particle/particleeffects.hpp"
@@ -28,6 +29,7 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLContext>
 #include <QMatrix4x4>
+#include <QQuaternion>
 #include <QVector3D>
 #include <QVector2D>
 #include <QToolBar>
@@ -741,6 +743,10 @@ void NifViewportWidget::clear()
     shapeEmissionColors.clear();
     shapeBounds.clear();
     shapeNames.clear();
+    shapeVertexRanges.clear();
+    shapeSources.clear();
+    shapeSkinBones.clear();
+    shapeSkinWeights.clear();
     navmeshTriangles.clear();
     pathWaypoints.clear();
     cellReferences.clear();
@@ -946,6 +952,10 @@ void NifViewportWidget::buildMesh()
     shapeBounds.clear();
     shapeNames.clear();
     shapeOwnerNode.clear();
+    shapeVertexRanges.clear();
+    shapeSources.clear();
+    shapeSkinBones.clear();
+    shapeSkinWeights.clear();
     clearTextures();
     texturesBuilt = false;
 
@@ -957,6 +967,59 @@ void NifViewportWidget::buildMesh()
 
     QMatrix4x4 identity;
     buildMeshFromNode(root, identity);
+
+    // Capture skin bind poses at rest pose (§8.1). nodeCumulativeTransforms
+    // currently holds the rest-pose walk, so each bone's bind inverse is its
+    // rest world transform inverted. Bones missing from the table (or with a
+    // singular rest matrix) disqualify the shape's skinning: it renders rigid.
+    for (int s = 0; s < shapeSources.size(); ++s) {
+        Nif::Node* srcNode = shapeSources[s].first;
+        const int si = shapeSources[s].second;
+        if (!srcNode || si < 0 || si >= srcNode->shapes.size())
+            continue;
+        const Nif::TriShape& src = srcNode->shapes[si];
+        if (!src.isSkinned())
+            continue;
+        QVector<ShapeSkinBone> bones;
+        bool bonesOk = !src.skinBones.isEmpty();
+        for (const auto& sb : src.skinBones) {
+            if (!sb.boneNode || !nodeCumulativeTransforms.contains(sb.boneNode)) {
+                bonesOk = false;
+                break;
+            }
+            bool invertible = false;
+            const QMatrix4x4 inv =
+                nodeCumulativeTransforms[sb.boneNode].inverted(&invertible);
+            if (!invertible) {
+                bonesOk = false;
+                break;
+            }
+            ShapeSkinBone bone;
+            bone.bone = sb.boneNode;
+            bone.bindInverse = inv;
+            bones.append(bone);
+        }
+        if (!bonesOk)
+            continue;
+        QVector<ShapeSkinWeight> weights;
+        for (const auto& sw : src.skinWeights) {
+            if (sw.bone >= static_cast<quint32>(bones.size()))
+                continue;
+            if (sw.vertex >= static_cast<quint32>(src.vertices.size()))
+                continue;
+            if (sw.weight <= 0.0f)
+                continue;
+            ShapeSkinWeight w;
+            w.localVertex = static_cast<int>(sw.vertex);
+            w.bone = static_cast<int>(sw.bone);
+            w.weight = sw.weight;
+            weights.append(w);
+        }
+        if (weights.isEmpty())
+            continue;
+        shapeSkinBones[s] = bones;
+        shapeSkinWeights[s] = weights;
+    }
 
     meshBuilt = !vertices.isEmpty();
     restVertices = vertices;
@@ -995,7 +1058,8 @@ void NifViewportWidget::buildMeshFromNode(Nif::Node* node, const QMatrix4x4& par
     QMatrix4x4 cumulativeTransform = parentTransform * localTransform;
     nodeCumulativeTransforms[node] = cumulativeTransform;
 
-    for (auto& shape : node->shapes) {
+    for (int si = 0; si < node->shapes.size(); ++si) {
+        auto& shape = node->shapes[si];
         const int indexStart = indices.size();
         const unsigned int vertexOffset = vertices.size();
 
@@ -1035,6 +1099,11 @@ void NifViewportWidget::buildMeshFromNode(Nif::Node* node, const QMatrix4x4& par
         const int indexEnd = indices.size();
         shapeIndexRanges.append({indexStart, indexEnd});
         shapeOwnerNode.append(node);
+        shapeVertexRanges.append({static_cast<int>(vertexOffset),
+                                  static_cast<int>(shape.vertices.size())});
+        shapeSources.append({node, si});
+        shapeSkinBones.append(QVector<ShapeSkinBone>());
+        shapeSkinWeights.append(QVector<ShapeSkinWeight>());
         shapeNames.append(shape.name);
         shapeBaseColors.append(QColor::fromRgbF(
             qBound(0.0f, shape.baseColor.r, 1.0f),
@@ -2686,6 +2755,9 @@ void NifViewportWidget::initAnimationState()
                     kf.rx = std::atan2(2.0f * (qw * qx + qy * qz), 1.0f - 2.0f * (qx * qx + qy * qy));
                     kf.ry = std::asin(qMax(-1.0f, qMin(1.0f, 2.0f * (qw * qy - qz * qx))));
                     kf.rz = std::atan2(2.0f * (qw * qz + qx * qy), 1.0f - 2.0f * (qy * qy + qz * qz));
+                    // Keep the source quaternion so the player slerps (§8.2).
+                    kf.qw = qw; kf.qx = qx; kf.qy = qy; kf.qz = qz;
+                    kf.hasQuat = true;
                     channel.keyframes.append(kf);
                     if (kf.time > channel.duration) channel.duration = kf.time;
                 }
@@ -2776,9 +2848,14 @@ void NifViewportWidget::applyAnimationFrame()
             const TransformKeyframe& f = frameMap[node->name];
             QMatrix4x4 animLocal;
             animLocal.translate(f.tx, f.ty, f.tz);
-            animLocal.rotate(f.rz * 180.0f / 3.14159265f, 0.0f, 0.0f, 1.0f);
-            animLocal.rotate(f.ry * 180.0f / 3.14159265f, 0.0f, 1.0f, 0.0f);
-            animLocal.rotate(f.rx * 180.0f / 3.14159265f, 1.0f, 0.0f, 0.0f);
+            if (f.hasQuat) {
+                // Quaternion-correct rotation (§8.2): no Euler round-trip.
+                animLocal.rotate(QQuaternion(f.qw, f.qx, f.qy, f.qz));
+            } else {
+                animLocal.rotate(f.rz * 180.0f / 3.14159265f, 0.0f, 0.0f, 1.0f);
+                animLocal.rotate(f.ry * 180.0f / 3.14159265f, 0.0f, 1.0f, 0.0f);
+                animLocal.rotate(f.rx * 180.0f / 3.14159265f, 1.0f, 0.0f, 0.0f);
+            }
             animLocal.scale(f.sx, f.sy, f.sz);
             localTransform = animLocal;
         }
@@ -2793,13 +2870,21 @@ void NifViewportWidget::applyAnimationFrame()
 
     computeAnimTransforms(nifParser->getRoot(), QMatrix4x4());
 
-    // Transform rest-pose vertices by animated cumulative transforms
+    // Transform rest-pose vertices by animated cumulative transforms.
+    // Skinned shapes blend per-vertex bone palettes instead (§8.1).
     QVector<bool> normalTransformed(normals.size(), false);
     for (int s = 0; s < shapeIndexRanges.size(); ++s) {
         if (s >= shapeOwnerNode.size()) continue;
         Nif::Node* ownerNode = shapeOwnerNode[s];
         if (!ownerNode || !nodeCumulativeTransforms.contains(ownerNode)) continue;
         const QMatrix4x4& animXform = nodeCumulativeTransforms[ownerNode];
+
+        if (s < shapeSkinWeights.size() && !shapeSkinWeights[s].isEmpty()
+            && s < shapeSkinBones.size() && !shapeSkinBones[s].isEmpty()
+            && s < shapeVertexRanges.size()) {
+            applySkinnedShape(s, animXform, normalTransformed);
+            continue;
+        }
 
         const int start = shapeIndexRanges[s].first;
         const int count = shapeIndexRanges[s].second - shapeIndexRanges[s].first;
@@ -2827,6 +2912,86 @@ void NifViewportWidget::applyAnimationFrame()
         }
     }
     m_meshDirty = true;
+}
+
+void NifViewportWidget::applySkinnedShape(int s, const QMatrix4x4& ownerXform,
+                                          QVector<bool>& normalTransformed)
+{
+    static_assert(sizeof(QVector3D) == 3 * sizeof(float),
+                  "QVector3D must stay tightly packed for the skinning core");
+
+    const int vOffset = shapeVertexRanges[s].first;
+    const int vCount = shapeVertexRanges[s].second;
+    const QVector<ShapeSkinBone>& bones = shapeSkinBones[s];
+    const QVector<ShapeSkinWeight>& weights = shapeSkinWeights[s];
+    if (vCount <= 0 || vOffset < 0 || vOffset + vCount > restVertices.size()
+        || vOffset + vCount > restNormals.size())
+        return;
+
+    // Row-major palettes for the shared CPU blend core (QMatrix4x4 stores
+    // column-major, so transpose while copying). Palette = animated bone
+    // world * rest-world inverse; a missing animated transform degrades to
+    // identity, keeping the rest offset.
+    QVector<float> palettes(static_cast<int>(bones.size()) * 16, 0.0f);
+    QVector<float> normalPalettes(static_cast<int>(bones.size()) * 9, 0.0f);
+    for (int b = 0; b < bones.size(); ++b) {
+        QMatrix4x4 palette;
+        if (bones[b].bone && nodeCumulativeTransforms.contains(bones[b].bone))
+            palette = nodeCumulativeTransforms[bones[b].bone] * bones[b].bindInverse;
+        const float* colMajor = palette.constData();
+        float* rowMajor = palettes.data() + b * 16;
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j)
+                rowMajor[i * 4 + j] = colMajor[j * 4 + i];
+        const QMatrix3x3 normalMat = palette.normalMatrix();
+        const float* ncolMajor = normalMat.constData();
+        float* nrowMajor = normalPalettes.data() + b * 9;
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                nrowMajor[i * 3 + j] = ncolMajor[j * 3 + i];
+    }
+
+    QVector<Nif::SkinVertexWeight> influences;
+    influences.reserve(weights.size());
+    for (const auto& w : weights) {
+        if (w.localVertex < 0 || w.bone < 0 || w.weight <= 0.0f)
+            continue;
+        Nif::SkinVertexWeight inf;
+        inf.vertex = static_cast<quint32>(w.localVertex);
+        inf.bone = static_cast<quint32>(w.bone);
+        inf.weight = w.weight;
+        influences.append(inf);
+    }
+
+    // Blend in shape-local space through the shared core, then apply the
+    // owner transform on top — identical to the rigid path.
+    QVector<QVector3D> localPos(vCount);
+    QVector<QVector3D> localNrm(vCount);
+    Nif::blendSkinnedLocal(
+        reinterpret_cast<const float*>(restVertices.constData() + vOffset),
+        reinterpret_cast<const float*>(restNormals.constData() + vOffset),
+        vCount,
+        reinterpret_cast<const float(*)[16]>(palettes.constData()),
+        reinterpret_cast<const float(*)[9]>(normalPalettes.constData()),
+        bones.size(), influences.constData(), influences.size(),
+        reinterpret_cast<float*>(localPos.data()),
+        reinterpret_cast<float*>(localNrm.data()));
+
+    const QMatrix3x3 ownerNormal = ownerXform.normalMatrix();
+    for (int lv = 0; lv < vCount; ++lv) {
+        const int vi = vOffset + lv;
+        if (vi < 0 || vi >= vertices.size()) continue;
+        vertices[vi] = ownerXform * localPos[lv];
+        if (vi < normals.size() && !normalTransformed[vi]) {
+            normalTransformed[vi] = true;
+            const QVector3D& n = localNrm[lv];
+            normals[vi] = QVector3D(
+                ownerNormal(0, 0) * n.x() + ownerNormal(0, 1) * n.y() + ownerNormal(0, 2) * n.z(),
+                ownerNormal(1, 0) * n.x() + ownerNormal(1, 1) * n.y() + ownerNormal(1, 2) * n.z(),
+                ownerNormal(2, 0) * n.x() + ownerNormal(2, 1) * n.y() + ownerNormal(2, 2) * n.z()
+            ).normalized();
+        }
+    }
 }
 
 void NifViewportWidget::setupParticleToolbar()

@@ -45,6 +45,14 @@ bool NifAnimationExporter::exportToJson(const NifAnimation* animation, const QSt
                 kfObj["rx"] = static_cast<double>(kf.rx);
                 kfObj["ry"] = static_cast<double>(kf.ry);
                 kfObj["rz"] = static_cast<double>(kf.rz);
+                if (kf.hasQuat) {
+                    // Quaternion fidelity (§8.2): persisted when present so
+                    // the clip round-trips without Euler degradation.
+                    kfObj["qw"] = static_cast<double>(kf.qw);
+                    kfObj["qx"] = static_cast<double>(kf.qx);
+                    kfObj["qy"] = static_cast<double>(kf.qy);
+                    kfObj["qz"] = static_cast<double>(kf.qz);
+                }
                 kfObj["sx"] = static_cast<double>(kf.sx);
                 kfObj["sy"] = static_cast<double>(kf.sy);
                 kfObj["sz"] = static_cast<double>(kf.sz);
@@ -126,6 +134,12 @@ bool NifAnimationExporter::exportToXml(const NifAnimation* animation, const QStr
                 xml.writeAttribute("rx", QString::number(static_cast<double>(kf.rx)));
                 xml.writeAttribute("ry", QString::number(static_cast<double>(kf.ry)));
                 xml.writeAttribute("rz", QString::number(static_cast<double>(kf.rz)));
+                if (kf.hasQuat) {
+                    xml.writeAttribute("qw", QString::number(static_cast<double>(kf.qw)));
+                    xml.writeAttribute("qx", QString::number(static_cast<double>(kf.qx)));
+                    xml.writeAttribute("qy", QString::number(static_cast<double>(kf.qy)));
+                    xml.writeAttribute("qz", QString::number(static_cast<double>(kf.qz)));
+                }
                 xml.writeAttribute("sx", QString::number(static_cast<double>(kf.sx)));
                 xml.writeAttribute("sy", QString::number(static_cast<double>(kf.sy)));
                 xml.writeAttribute("sz", QString::number(static_cast<double>(kf.sz)));

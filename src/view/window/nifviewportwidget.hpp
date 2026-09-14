@@ -237,6 +237,16 @@ private:
     QMap<Nif::Node*, QMatrix4x4> nodeCumulativeTransforms;
     QVector<Nif::Node*> shapeOwnerNode;
 
+    // Per-vertex skinning state (REMAINING.md §8.1), parallel to
+    // shapeIndexRanges. shapeSources points back into the parser model so
+    // bind poses can be captured after the rest-pose walk completes.
+    struct ShapeSkinBone { Nif::Node* bone = nullptr; QMatrix4x4 bindInverse; };
+    struct ShapeSkinWeight { int localVertex = 0; int bone = 0; float weight = 0.0f; };
+    QVector<QPair<int, int>> shapeVertexRanges;   // (vertexOffset, vertexCount)
+    QVector<QPair<Nif::Node*, int>> shapeSources; // (owner node, shape index)
+    QVector<QVector<ShapeSkinBone>> shapeSkinBones;
+    QVector<QVector<ShapeSkinWeight>> shapeSkinWeights;
+
     QComboBox* m_shapePickerCombo = nullptr;
     QComboBox* m_cameraPresetCombo = nullptr;
     QLabel* m_pivotInfoLabel = nullptr;
@@ -269,6 +279,8 @@ private:
     void initAnimationState();
     void initParticleSystems();
     void applyAnimationFrame();
+    void applySkinnedShape(int shapeIdx, const QMatrix4x4& ownerXform,
+                           QVector<bool>& normalTransformed);
     void populateShapePicker();
     void rebuildPivot();
     void updatePivotInfo();

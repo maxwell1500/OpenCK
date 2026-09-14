@@ -367,10 +367,12 @@ static QMap<quint32, NifObject*> parseAllBlocks(QIODevice& device, quint32 versi
         if (className == "NiAVObject" || className == "NifNode") {
             // NiNode is the actual class, NiAVObject is base - treat as NifNode
             obj = new NifNode();
+        } else if (className.startsWith("NiTriShapeData") || className.startsWith("NiBasedGeomData")) {
+            // Data blocks before shapes: "NiTriShapeData" also starts with
+            // "NiTriShape" and must not dispatch as a shape.
+            obj = new NifTriShapeData();
         } else if (className.startsWith("NiTriShape")) {
             obj = new NifTriShape();
-        } else if (className.startsWith("NiTriShapeData") || className.startsWith("NiBasedGeomData")) {
-            obj = new NifTriShapeData();
         } else if (className.startsWith("NiTexture")) {
             obj = new NifTexture();
         } else if (className.startsWith("NiMaterial")) {
@@ -391,6 +393,10 @@ static QMap<quint32, NifObject*> parseAllBlocks(QIODevice& device, quint32 versi
             obj = new NifKeyframeData();
         } else if (className.startsWith("NiTransformData")) {
             obj = new NifTransformData();
+        } else if (className == "NiSkinInstance" || className == "BSDismemberSkinInstance") {
+            obj = new NifSkinInstance();
+        } else if (className == "NiSkinData") {
+            obj = new NifSkinData();
         } else if (className == "NiLODNode" || className == "BSLODNode") {
             obj = new NifLODNode();
         } else if (className == "NiBillboardNode") {
@@ -424,7 +430,17 @@ static QMap<quint32, NifObject*> parseAllBlocks(QIODevice& device, quint32 versi
         obj->className = className;
 
         // Parse the block (reads type-specific data from device)
+        const qint64 posBeforeParse = device.pos();
         obj->parse(device, version, fileHeader);
+        if (device.pos() <= posBeforeParse) {
+            // A block that consumes no bytes would spin this loop forever.
+            // That happens on non-dialect input (e.g. Gamebryo binaries fed
+            // by mistake: the header seek lands mid-file and an unknown
+            // block parses to zero bytes), so stop cleanly instead of
+            // hanging the caller.
+            delete obj;
+            break;
+        }
 
         blockMap[dataRef] = obj;
     }
@@ -465,6 +481,9 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
 {
     // Map from NIF block ref to our Node* for animation linking
     QMap<quint32, Node*> refToNode;
+    // Map from NiTriShape block ref to (our parent node, shape index) so the
+    // skin-link pass below can attach NiSkinInstance data (§8.1)
+    QMap<quint32, QPair<Node*, int>> skinShapeTargets;
 
     // Walk all AVObjects to find NiTriShape nodes
     QStack<std::pair<NifAVObject*, Node*>> stack;
@@ -611,6 +630,8 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
                 }
 
                 parentNode->shapes.append(shape);
+                skinShapeTargets[triShape->dataRef] =
+                    qMakePair(parentNode, parentNode->shapes.size() - 1);
             }
         }
 
@@ -782,6 +803,82 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
 
         targetNode->animations.append(anim);
         targetNode->hasAnimation = true;
+    }
+
+    // Link NiSkinInstance blocks to their shapes (per-vertex skinning, §8.1).
+    // Shapes without a skin instance keep rigid owner-node deformation.
+    for (auto it = blocks.constBegin(); it != blocks.constEnd(); ++it) {
+        auto skinInst = dynamic_cast<NifSkinInstance*>(it.value());
+        if (!skinInst)
+            continue;
+        if (!skinShapeTargets.contains(skinInst->refTargetShape)) {
+            LOG_WARNING(QString("NiSkinInstance block %1 targets unknown shape block %2")
+                            .arg(it.key()).arg(skinInst->refTargetShape));
+            continue;
+        }
+        const QPair<Node*, int> target = skinShapeTargets.value(skinInst->refTargetShape);
+        Node* shapeNode = target.first;
+        const int shapeIdx = target.second;
+        if (!shapeNode || shapeIdx < 0 || shapeIdx >= shapeNode->shapes.size())
+            continue;
+        TriShape& shape = shapeNode->shapes[shapeIdx];
+
+        auto skinDataObj = blocks.value(skinInst->refSkinData);
+        auto skinData = dynamic_cast<NifSkinData*>(skinDataObj);
+        if (!skinData) {
+            LOG_WARNING(QString("NiSkinInstance block %1 references missing NiSkinData %2")
+                            .arg(it.key()).arg(skinInst->refSkinData));
+            continue;
+        }
+        if (skinInst->bones.size() != skinData->bones.size()) {
+            LOG_WARNING(QString("NiSkinInstance block %1 bone count %2 != NiSkinData %3 bone count %4")
+                            .arg(it.key()).arg(skinInst->bones.size())
+                            .arg(skinInst->refSkinData).arg(skinData->bones.size()));
+            continue;
+        }
+
+        QVector<SkinBone> linkedBones;
+        bool bonesOk = true;
+        for (quint32 boneRef : skinInst->bones) {
+            Node* boneNode = refToNode.value(boneRef);
+            if (!boneNode) {
+                LOG_WARNING(QString("NiSkinInstance block %1 references unknown bone block %2")
+                                .arg(it.key()).arg(boneRef));
+                bonesOk = false;
+                break;
+            }
+            SkinBone bone;
+            bone.boneName = boneNode->name;
+            bone.boneNode = boneNode;
+            linkedBones.append(bone);
+        }
+        if (!bonesOk || linkedBones.isEmpty())
+            continue;
+
+        QVector<SkinVertexWeight> linkedWeights;
+        for (int b = 0; b < skinData->bones.size(); ++b) {
+            for (const auto& inf : skinData->bones[b].weights) {
+                if (inf.vertex >= static_cast<quint32>(shape.vertices.size())) {
+                    LOG_WARNING(QString("NiSkinInstance block %1 weight on out-of-range vertex %2")
+                                    .arg(it.key()).arg(inf.vertex));
+                    continue;
+                }
+                if (inf.weight <= 0.0f)
+                    continue;
+                SkinVertexWeight w;
+                w.vertex = inf.vertex;
+                w.bone = static_cast<quint32>(b);
+                w.weight = inf.weight;
+                linkedWeights.append(w);
+            }
+        }
+        if (linkedWeights.isEmpty())
+            continue;
+
+        shape.skinBones = linkedBones;
+        shape.skinWeights = linkedWeights;
+        LOG_INFO(QString("Linked skinning to shape '%1': %2 bones, %3 weights")
+                     .arg(shape.name).arg(shape.skinBones.size()).arg(shape.skinWeights.size()));
     }
 }
 

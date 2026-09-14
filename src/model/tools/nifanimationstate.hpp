@@ -24,11 +24,42 @@ inline void quatToEuler(float qw, float qx, float qy, float qz, float& rx, float
     rz = std::atan2(2.0f * (qw * qz + qx * qy), 1.0f - 2.0f * (qy * qy + qz * qz));
 }
 
+// Spherical linear interpolation between two unit quaternions (REMAINING.md
+// §8.2). Handles the antipodal case (dot < 0) by negating one endpoint and
+// degrades to lerp for near-identical inputs.
+inline void slerpQuat(float qw1, float qx1, float qy1, float qz1,
+                      float qw2, float qx2, float qy2, float qz2, float t,
+                      float& rqw, float& rqx, float& rqy, float& rqz) {
+    float dot = qw1 * qw2 + qx1 * qx2 + qy1 * qy2 + qz1 * qz2;
+    if (dot < 0.0f) {
+        qw2 = -qw2; qx2 = -qx2; qy2 = -qy2; qz2 = -qz2;
+        dot = -dot;
+    }
+    float angle = std::acos(qMin(1.0f, dot));
+    float sinA = std::sin(angle);
+    float wa, wb;
+    if (sinA > 1e-6f) {
+        wa = std::sin((1.0f - t) * angle) / sinA;
+        wb = std::sin(t * angle) / sinA;
+    } else {
+        wa = 1.0f - t;
+        wb = t;
+    }
+    rqw = wa * qw1 + wb * qw2;
+    rqx = wa * qx1 + wb * qx2;
+    rqy = wa * qy1 + wb * qy2;
+    rqz = wa * qz1 + wb * qz2;
+}
+
 struct TransformKeyframe {
     QString nodeName;
     float tx = 0.0f, ty = 0.0f, tz = 0.0f;
     float rx = 0.0f, ry = 0.0f, rz = 0.0f;
     float sx = 1.0f, sy = 1.0f, sz = 1.0f;
+    // Slerped rotation when the source channel carries quaternions; the Euler
+    // angles are then derived from it so legacy consumers keep working.
+    float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
+    bool hasQuat = false;
 };
 
 class NifAnimationState : public QObject {
@@ -191,19 +222,21 @@ public:
                         frame.sz = frame.sz * (1 - w) + blendFrame.sz * w;
                         float qw1, qx1, qy1, qz1;
                         float qw2, qx2, qy2, qz2;
-                        eulerToQuat(frame.rx, frame.ry, frame.rz, qw1, qx1, qy1, qz1);
-                        eulerToQuat(blendFrame.rx, blendFrame.ry, blendFrame.rz, qw2, qx2, qy2, qz2);
-                        float dot = qw1*qw2 + qx1*qx2 + qy1*qy2 + qz1*qz2;
-                        if (dot < 0.0f) { qw2 = -qw2; qx2 = -qx2; qy2 = -qy2; qz2 = -qz2; dot = -dot; }
-                        float angle = std::acos(qMin(1.0f, dot));
-                        float sinA = std::sin(angle);
-                        float wa, wb;
-                        if (sinA > 1e-6f) { wa = std::sin((1 - w) * angle) / sinA; wb = std::sin(w * angle) / sinA; }
-                        else { wa = 1.0f - w; wb = w; }
-                        float rqw = wa*qw1 + wb*qw2;
-                        float rqx = wa*qx1 + wb*qx2;
-                        float rqy = wa*qy1 + wb*qy2;
-                        float rqz = wa*qz1 + wb*qz2;
+                        if (frame.hasQuat && blendFrame.hasQuat) {
+                            qw1 = frame.qw; qx1 = frame.qx;
+                            qy1 = frame.qy; qz1 = frame.qz;
+                            qw2 = blendFrame.qw; qx2 = blendFrame.qx;
+                            qy2 = blendFrame.qy; qz2 = blendFrame.qz;
+                        } else {
+                            eulerToQuat(frame.rx, frame.ry, frame.rz, qw1, qx1, qy1, qz1);
+                            eulerToQuat(blendFrame.rx, blendFrame.ry, blendFrame.rz, qw2, qx2, qy2, qz2);
+                        }
+                        float rqw, rqx, rqy, rqz;
+                        slerpQuat(qw1, qx1, qy1, qz1, qw2, qx2, qy2, qz2, w,
+                                  rqw, rqx, rqy, rqz);
+                        frame.qw = rqw; frame.qx = rqx;
+                        frame.qy = rqy; frame.qz = rqz;
+                        frame.hasQuat = frame.hasQuat && blendFrame.hasQuat;
                         quatToEuler(rqw, rqx, rqy, rqz, frame.rx, frame.ry, frame.rz);
                         break;
                     }
@@ -270,43 +303,19 @@ private:
             return frame;
 
         if (channel.keyframes.size() == 1) {
-            frame.tx = channel.keyframes[0].tx;
-            frame.ty = channel.keyframes[0].ty;
-            frame.tz = channel.keyframes[0].tz;
-            frame.rx = channel.keyframes[0].rx;
-            frame.ry = channel.keyframes[0].ry;
-            frame.rz = channel.keyframes[0].rz;
-            frame.sx = channel.keyframes[0].sx;
-            frame.sy = channel.keyframes[0].sy;
-            frame.sz = channel.keyframes[0].sz;
+            copyKeyframe(channel.keyframes[0], frame);
             return frame;
         }
 
         const auto& kfs = channel.keyframes;
 
         if (time <= kfs.first().time) {
-            frame.tx = kfs.first().tx;
-            frame.ty = kfs.first().ty;
-            frame.tz = kfs.first().tz;
-            frame.rx = kfs.first().rx;
-            frame.ry = kfs.first().ry;
-            frame.rz = kfs.first().rz;
-            frame.sx = kfs.first().sx;
-            frame.sy = kfs.first().sy;
-            frame.sz = kfs.first().sz;
+            copyKeyframe(kfs.first(), frame);
             return frame;
         }
 
         if (time >= kfs.last().time) {
-            frame.tx = kfs.last().tx;
-            frame.ty = kfs.last().ty;
-            frame.tz = kfs.last().tz;
-            frame.rx = kfs.last().rx;
-            frame.ry = kfs.last().ry;
-            frame.rz = kfs.last().rz;
-            frame.sx = kfs.last().sx;
-            frame.sy = kfs.last().sy;
-            frame.sz = kfs.last().sz;
+            copyKeyframe(kfs.last(), frame);
             return frame;
         }
 
@@ -317,17 +326,48 @@ private:
                 frame.tx = kfs[i].tx + (kfs[i + 1].tx - kfs[i].tx) * alpha;
                 frame.ty = kfs[i].ty + (kfs[i + 1].ty - kfs[i].ty) * alpha;
                 frame.tz = kfs[i].tz + (kfs[i + 1].tz - kfs[i].tz) * alpha;
-                frame.rx = kfs[i].rx + (kfs[i + 1].rx - kfs[i].rx) * alpha;
-                frame.ry = kfs[i].ry + (kfs[i + 1].ry - kfs[i].ry) * alpha;
-                frame.rz = kfs[i].rz + (kfs[i + 1].rz - kfs[i].rz) * alpha;
                 frame.sx = kfs[i].sx + (kfs[i + 1].sx - kfs[i].sx) * alpha;
                 frame.sy = kfs[i].sy + (kfs[i + 1].sy - kfs[i].sy) * alpha;
                 frame.sz = kfs[i].sz + (kfs[i + 1].sz - kfs[i].sz) * alpha;
+                if (kfs[i].hasQuat && kfs[i + 1].hasQuat) {
+                    // Quaternion-correct path (§8.2): slerp the rotations and
+                    // derive Euler angles from the result so legacy consumers
+                    // see flip-free angles.
+                    slerpQuat(kfs[i].qw, kfs[i].qx, kfs[i].qy, kfs[i].qz,
+                              kfs[i + 1].qw, kfs[i + 1].qx,
+                              kfs[i + 1].qy, kfs[i + 1].qz, alpha,
+                              frame.qw, frame.qx, frame.qy, frame.qz);
+                    frame.hasQuat = true;
+                    quatToEuler(frame.qw, frame.qx, frame.qy, frame.qz,
+                                frame.rx, frame.ry, frame.rz);
+                } else {
+                    frame.rx = kfs[i].rx + (kfs[i + 1].rx - kfs[i].rx) * alpha;
+                    frame.ry = kfs[i].ry + (kfs[i + 1].ry - kfs[i].ry) * alpha;
+                    frame.rz = kfs[i].rz + (kfs[i + 1].rz - kfs[i].rz) * alpha;
+                    frame.hasQuat = false;
+                }
                 break;
             }
         }
 
         return frame;
+    }
+
+    static void copyKeyframe(const AnimKeyframe& kf, TransformKeyframe& frame) {
+        frame.tx = kf.tx;
+        frame.ty = kf.ty;
+        frame.tz = kf.tz;
+        frame.rx = kf.rx;
+        frame.ry = kf.ry;
+        frame.rz = kf.rz;
+        frame.sx = kf.sx;
+        frame.sy = kf.sy;
+        frame.sz = kf.sz;
+        frame.qw = kf.qw;
+        frame.qx = kf.qx;
+        frame.qy = kf.qy;
+        frame.qz = kf.qz;
+        frame.hasQuat = kf.hasQuat;
     }
 
     QTimer* m_timer;

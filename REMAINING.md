@@ -439,9 +439,38 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
    - `test_starfieldtools` (11/11): JSON round-trips for all five models,
      the voice runner (success / null-engine / unavailable-engine), and the
      Houdini command builder.
-   Remaining (§3.8): binary record encoders for these models (to add once a
-   real shipped record is available to validate against), in-engine playback
-   for the voice lines, and actual native Houdini-side scripts.
+    Remaining (§3.8): binary record encoders for these models (to add once a
+    real shipped record is available to validate against), in-engine playback
+    for the voice lines, and actual native Houdini-side scripts.
+
+    **Status 2026-09-14 (leftovers closed where validatable):**
+    - Binary encoders: `PlanetCodec::toRecord/fromRecord`
+      (`src/model/tools/planetcodec.*`) maps PlanetDefinition onto the real
+      PNDT layout — EDID/ANAM exactly, TEMP via the numeric temperature
+      string (display labels keep the base record's measured TEMP), DENS/
+      PHLA/RSCS seeded from the record under edit or the observed shipped
+      defaults for new planets (1.0/1.0/0, the placeholder-orbital values),
+      raw subrecords preserved verbatim. Surveyed the first 25 real PNDT
+      (Mars -5 °C, Jemison 21 °C, Vectera -214 °C, …; values documented in
+      the header). `test_planetcodec` 6/6, incl. 10 real PNDT through the
+      model and back losslessly (typed + raw + order). The other models
+      (Spaceship/Probe/Crowd/Morph/Galaxy/Opal/Voice) have NO on-disk
+      record: no matching type exists in the ESM layer or shipped files, so
+      their encoders stay blocked on a shipped layout per the item's own
+      condition — JSON remains their persistence.
+    - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
+      the in-box Windows speech engine (System.Speech over SAPI in a helper
+      process — no ATL/SDK linkage; ~1 s per call), `runVoicePlan` uses it
+      whenever voices are installed (David/Zira/Haruka verified here), and
+      the dialog offers playback of the first completed line through the
+      existing `VoicePreview::playVoiceAudio` path. `test_starfieldtools`
+      13/13 (2 new SAPI slots, skipping cleanly on voiceless machines).
+    - Houdini scripts: `tools/houdini/export_ship.py` (ship geometry to FBX
+      via a filmboxfbx ROP, `--node`/`--hip`) and `import_opal.py` (OPAL CSV
+      rows to null locators with spare parameters, x/y/z honored when
+      present) — the batch counterparts to the bridge's command builder.
+      `py_compile` clean; both exit 2 with a clear message outside Houdini
+      (no Houdini installed here to run them under).
  9. **Multi-game record dispatch** — foundation verified against real
     non-Starfield masters:
     `GameFormat` (`libs/files/esm/gameformat.hpp/.cpp`) detects the game
@@ -816,21 +845,39 @@ this section is documentation of findings, per the §3 review).
   `ParticleSimulation` extraction, which kept the viewport path intact.
 
 **The actual remaining gaps (this is the Phase 5 work):**
-1. **Per-vertex skinning.** `applyAnimationFrame` applies each shape's single
-   owner-node matrix to all its vertices. There is zero `NiSkinInstance` /
-   skin-partition / bone-weight support anywhere in `src/` (grep for
-   `SkinInstance|skinPartition|boneWeight|NiSkin` returns no hits). Skinned
-   characters will move as rigid chunks. Phase 5 must parse skin instances
-   and blend per-vertex bone matrices (CPU first; GPU skinning later).
-2. **Quaternion-correct interpolation.** The parser stores rotations as
-   quaternions (`Nif::QuaternionKeyframe`), but `initAnimationState` converts
-   quat→Euler at import and `interpolateChannel` lerps Euler angles,
-   converting back to matrices at render. Large rotations can flip. Keep
-   quaternions through the pipeline and slerp — the blend path in
-   `NifAnimationState` already slerps correctly, so extend that to the base
-   path.
-3. **Verification gate on real assets.** Neither path has been exercised
-   against a real animated/particle NIF in this tree (GL output cannot be
-   unit-tested headless). Phase 5 entry criterion: load a skinned animated
-   NIF plus a particle NIF, press Play, confirm correct motion; record the
-   result here.
+1. **Per-vertex skinning — DONE 2026-09-14 (CPU).** `NifSkinInstance` /
+   `NifSkinData` dialect blocks (`libs/files/esm/nifrecord.*`) parse and
+   round-trip; `extractGeometry` links instances to shapes (bone refs
+   resolved to scene nodes, out-of-range data warned and skipped);
+   `applyAnimationFrame` blends skinned shapes through a shared GUI-free
+   core (`libs/files/nif/nifskinning.*`: `v' = OwnerWorld * Σ w·(BoneWorld·
+   BindInverse)·v`, per-vertex weight normalization, unweighted fallback to
+   rigid) — single-bone weight-1.0 reproduces the rigid path exactly.
+   `test_nifskinning` 15/15 (blend math, block codec, synthetic file load→
+   link, playback composition, real-file canary). The work also fixed two
+   latent loader bugs the tests exposed: `NiTriShapeData` misdispatched as
+   `NiTriShape` (prefix match order), and a zero-progress infinite loop in
+   `parseAllBlocks` on non-dialect input (now breaks cleanly). GPU skinning
+   stays future work.
+2. **Quaternion-correct interpolation — DONE 2026-09-14.** `AnimKeyframe`
+   / `TransformKeyframe` carry `qw..qz` + `hasQuat` alongside the Euler
+   angles; `interpolateChannel` slerps when both endpoints have quats
+   (Euler derived from the result for legacy consumers) and keeps Euler
+   lerp otherwise; the viewport imports quats from keyframe controllers
+   and renders rotation straight from quat matrices; the blend path uses
+   stored quats; JSON/XML persist quats when present (old files keep the
+   Euler path). `test_nifanimation` 11/11, incl. the 350°→−5° short-path
+   proof (Euler lerp would sit at 175°).
+3. **Verification gate on real assets — PARTIAL 2026-09-14.** Headless half
+   is green: `testPlaybackComposition` runs state→palette→blend on a
+   slerped frame and checks the world position, and `testRealNifSurvey`
+   attempts the first 8 shipped 20.2.0.7 NIFs and asserts the honest
+   current boundary (0 load — the dialect header reader rejects Gamebryo
+   binaries, loudly, with no hang). What remains is a real Gamebryo block
+   reader (header string table, block-type index, real NiSkinInstance /
+   NiSkinData / NiSkinPartition layouts — the dialect shares names only)
+   plus the manual Play-confirm on a skinned animated mesh and a particle
+   mesh, which needs a display. Entry criterion restated: land the reader
+   (the survey canary fails the moment one does), then load a skinned
+   animated NIF plus a particle NIF, press Play, confirm correct motion,
+   and record the result here.

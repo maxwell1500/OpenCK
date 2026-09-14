@@ -246,6 +246,38 @@ public:
     void write(QIODevice& device, quint32 version) const override;
 };
 
+// Per-vertex skinning blocks (REMAINING.md §8.1). Dialect-native layout
+// (NOT the Gamebryo binary encoding): the instance names the skinned shape
+// block plus the bone node blocks and the data block; the data block stores
+// one bind-pose matrix and a sparse weight list per bone. NiSkinPartition
+// data is intentionally not stored — the CPU blend reads SkinData only.
+class NifSkinInstance : public NifObject {
+public:
+    quint32 refTargetShape = 0;   // dataRef of the skinned NiTriShape block
+    quint32 refSkeletonRoot = 0;  // dataRef of the skeleton root NiNode (0 = none)
+    QList<quint32> bones;         // dataRefs of the bone NiNode blocks
+    quint32 refSkinData = 0;      // dataRef of the NiSkinData block
+
+    void parse(QIODevice& device, quint32 version, const QByteArray& fileHeader) override;
+    void write(QIODevice& device, quint32 version) const override;
+};
+
+class NifSkinData : public NifObject {
+public:
+    struct BoneWeights {
+        float bindPose[16];  // row-major rest world matrix of the bone
+        struct Influence {
+            quint32 vertex = 0;  // shape-local vertex index
+            float weight = 0.0f;
+        };
+        QList<Influence> weights;
+    };
+    QList<BoneWeights> bones;
+
+    void parse(QIODevice& device, quint32 version, const QByteArray& fileHeader) override;
+    void write(QIODevice& device, quint32 version) const override;
+};
+
 struct ParticleSystemSettings {
     quint32 numParticles = 0;
     float numVisibleParticles = 0.0f;

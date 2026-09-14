@@ -9,6 +9,13 @@ struct AnimKeyframe {
     float tx = 0.0f, ty = 0.0f, tz = 0.0f;
     float rx = 0.0f, ry = 0.0f, rz = 0.0f;
     float sx = 1.0f, sy = 1.0f, sz = 1.0f;
+    // Quaternion rotation carried alongside the Euler angles (REMAINING.md
+    // §8.2). Set by importers that read quaternions natively (the NIF
+    // viewport path); JSON/XML/binary importers leave hasQuat false and the
+    // player falls back to Euler lerp. Exporters persist the quaternion when
+    // present so a clip round-trips without Euler degradation.
+    float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
+    bool hasQuat = false;
 };
 
 struct AnimChannel {

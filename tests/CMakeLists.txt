@@ -616,6 +616,12 @@ target_link_libraries(test_creatureattachpoints PRIVATE openck_model test_stubs 
 target_include_directories(test_creatureattachpoints PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_creatureattachpoints)
 
+# NIF per-vertex skinning: blend core, skin block codec, synthetic load link
+add_executable(test_nifskinning test_nifskinning.cpp)
+target_link_libraries(test_nifskinning PRIVATE openck_model openck_files openck_esm test_stubs Qt6::Test)
+target_include_directories(test_nifskinning PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_nifskinning)
+
 # BTD land-texture files (per-quad texture indices)
 add_executable(test_btdfile test_btdfile.cpp)
 target_link_libraries(test_btdfile PRIVATE openck_model test_stubs Qt6::Test)
@@ -673,7 +679,7 @@ target_include_directories(test_obscripttypechecker PRIVATE ${TEST_INCLUDE_DIRS}
 openck_add_test(test_obscripttypechecker)
 
 add_executable(test_nifanimation test_nifanimation.cpp)
-target_link_libraries(test_nifanimation PRIVATE openck_files Qt6::Test)
+target_link_libraries(test_nifanimation PRIVATE openck_files openck_model test_stubs Qt6::Test)
 target_include_directories(test_nifanimation PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_nifanimation)
 
@@ -875,7 +881,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_mastermanagement test_materialpropertygraph test_materialruletemplate
     test_meshlodconfig test_meshprobe test_missingrecords test_modmanager
     test_multigame test_navmeshtoolkit
-    test_navmrecord test_nifanimation test_nifintegration test_nifpyfilewrapper test_nodegraph
+    test_navmrecord test_nifanimation test_nifintegration test_nifpyfilewrapper test_nifskinning test_nodegraph
     test_obscript test_obscriptbinder test_obscriptcompiler test_obscriptparser
     test_obscripttypechecker
     test_objectwindow test_objectwindowfilter test_opallist test_packagerecord

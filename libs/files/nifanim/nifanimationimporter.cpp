@@ -67,6 +67,14 @@ NifAnimation* NifAnimationImporter::importFromJson(const QString& filePath)
                 kf.rx = static_cast<float>(kfObj["rx"].toDouble());
                 kf.ry = static_cast<float>(kfObj["ry"].toDouble());
                 kf.rz = static_cast<float>(kfObj["rz"].toDouble());
+                if (kfObj.contains("qw") && kfObj.contains("qx")
+                    && kfObj.contains("qy") && kfObj.contains("qz")) {
+                    kf.qw = static_cast<float>(kfObj["qw"].toDouble(1.0));
+                    kf.qx = static_cast<float>(kfObj["qx"].toDouble(0.0));
+                    kf.qy = static_cast<float>(kfObj["qy"].toDouble(0.0));
+                    kf.qz = static_cast<float>(kfObj["qz"].toDouble(0.0));
+                    kf.hasQuat = true;
+                }
                 kf.sx = static_cast<float>(kfObj["sx"].toDouble(1.0));
                 kf.sy = static_cast<float>(kfObj["sy"].toDouble(1.0));
                 kf.sz = static_cast<float>(kfObj["sz"].toDouble(1.0));
@@ -144,6 +152,16 @@ NifAnimation* NifAnimationImporter::importFromXml(const QString& filePath)
                 kf.rx = xml.attributes().value("rx").toFloat();
                 kf.ry = xml.attributes().value("ry").toFloat();
                 kf.rz = xml.attributes().value("rz").toFloat();
+                if (xml.attributes().hasAttribute("qw")
+                    && xml.attributes().hasAttribute("qx")
+                    && xml.attributes().hasAttribute("qy")
+                    && xml.attributes().hasAttribute("qz")) {
+                    kf.qw = xml.attributes().value("qw").toFloat();
+                    kf.qx = xml.attributes().value("qx").toFloat();
+                    kf.qy = xml.attributes().value("qy").toFloat();
+                    kf.qz = xml.attributes().value("qz").toFloat();
+                    kf.hasQuat = true;
+                }
                 if (xml.attributes().hasAttribute("sx"))
                     kf.sx = xml.attributes().value("sx").toFloat();
                 if (xml.attributes().hasAttribute("sy"))

@@ -64,6 +64,30 @@ struct CollisionShape {
     float radius = 1.0f;
 };
 
+// --- Per-vertex skinning data (REMAINING.md §8.1) ---
+//
+// A skinned shape carries, per bone, the scene node that drives it and, per
+// vertex, a sparse (bone, weight) list. The blend runs in shape-local space
+// and the owning node's world transform applies on top — identical to the
+// rigid path with a single weight-1.0 bone at rest:
+//     v' = OwnerWorld * Σ_b w(v,b) * (BoneWorld_b * BindInverse_b) * v
+// BindInverse_b is the bone's rest world transform inverted; the viewport
+// captures it from its own rest-pose table at load, so the blocks below only
+// need to name the bones and weights.
+
+struct Node;  // defined below; bones resolve to scene nodes at link time
+
+struct SkinVertexWeight {
+    quint32 vertex = 0;   // shape-local vertex index
+    quint32 bone = 0;     // index into the shape's skinBones
+    float weight = 0.0f;
+};
+
+struct SkinBone {
+    QString boneName;
+    Node* boneNode = nullptr;  // resolved scene node, null until linked
+};
+
 struct TriShape {
     QString name;
     QVector<Vector3> vertices;
@@ -71,6 +95,11 @@ struct TriShape {
     QVector<Vector3> normals;
     QVector<Color4> colors;
     QVector<unsigned int> indices;
+
+    QVector<SkinBone> skinBones;
+    QVector<SkinVertexWeight> skinWeights;
+
+    bool isSkinned() const { return !skinBones.isEmpty() && !skinWeights.isEmpty(); }
 
     // Material / texture
     Color4 baseColor = {1.0f, 1.0f, 1.0f, 1.0f};

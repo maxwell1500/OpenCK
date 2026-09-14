@@ -875,6 +875,76 @@ void NifTransformData::write(QIODevice& device, quint32 version) const
     }
 }
 
+void NifSkinInstance::parse(QIODevice& device, quint32 version, const QByteArray& fileHeader)
+{
+    NifObject::parse(device, version, fileHeader);
+
+    refTargetShape = readRef(device);
+    refSkeletonRoot = readRef(device);
+
+    quint32 numBones = 0;
+    device.read(reinterpret_cast<char*>(&numBones), sizeof(numBones));
+    bones.clear();
+    for (quint32 i = 0; i < numBones; ++i)
+        bones.append(readRef(device));
+
+    refSkinData = readRef(device);
+}
+
+void NifSkinInstance::write(QIODevice& device, quint32 version) const
+{
+    NifObject::write(device, version);
+
+    writeRef(device, refTargetShape);
+    writeRef(device, refSkeletonRoot);
+
+    const quint32 numBones = static_cast<quint32>(bones.size());
+    device.write(reinterpret_cast<const char*>(&numBones), sizeof(numBones));
+    for (quint32 ref : bones)
+        writeRef(device, ref);
+
+    writeRef(device, refSkinData);
+}
+
+void NifSkinData::parse(QIODevice& device, quint32 version, const QByteArray& fileHeader)
+{
+    NifObject::parse(device, version, fileHeader);
+
+    quint32 numBones = 0;
+    device.read(reinterpret_cast<char*>(&numBones), sizeof(numBones));
+    bones.clear();
+    for (quint32 b = 0; b < numBones; ++b) {
+        BoneWeights bw;
+        device.read(reinterpret_cast<char*>(bw.bindPose), sizeof(bw.bindPose));
+        quint32 numWeights = 0;
+        device.read(reinterpret_cast<char*>(&numWeights), sizeof(numWeights));
+        for (quint32 w = 0; w < numWeights; ++w) {
+            BoneWeights::Influence inf;
+            device.read(reinterpret_cast<char*>(&inf.vertex), sizeof(inf.vertex));
+            device.read(reinterpret_cast<char*>(&inf.weight), sizeof(inf.weight));
+            bw.weights.append(inf);
+        }
+        bones.append(bw);
+    }
+}
+
+void NifSkinData::write(QIODevice& device, quint32 version) const
+{
+    NifObject::write(device, version);
+
+    const quint32 numBones = static_cast<quint32>(bones.size());
+    device.write(reinterpret_cast<const char*>(&numBones), sizeof(numBones));
+    for (const auto& bw : bones) {
+        device.write(reinterpret_cast<const char*>(bw.bindPose), sizeof(bw.bindPose));
+        const quint32 numWeights = static_cast<quint32>(bw.weights.size());
+        device.write(reinterpret_cast<const char*>(&numWeights), sizeof(numWeights));
+        for (const auto& inf : bw.weights) {
+            device.write(reinterpret_cast<const char*>(&inf.vertex), sizeof(inf.vertex));
+            device.write(reinterpret_cast<const char*>(&inf.weight), sizeof(inf.weight));
+        }
+    }
+}
+
 void NifParticleSystem::parse(QIODevice& device, quint32 version, const QByteArray& fileHeader)
 {
     NifObject::parse(device, version, fileHeader);

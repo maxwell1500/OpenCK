@@ -575,6 +575,7 @@ set(FILES_SOURCES
     libs/files/data/zipwriter.cpp
     libs/files/data/csvsnippet.cpp
     libs/files/nif/nifparser.cpp
+    libs/files/nif/nifskinning.cpp
     libs/files/nif/ddsencoder.cpp
     libs/files/nif/ddsdecoder.cpp
     libs/files/nif/tgaencoder.cpp
@@ -604,6 +605,7 @@ set(FILES_HEADERS
     libs/files/data/csvsnippet.hpp
     libs/files/log/logger.hpp
     libs/files/nif/nifparser.hpp
+    libs/files/nif/nifskinning.hpp
     libs/files/nif/ddsencoder.hpp
     libs/files/nif/ddsdecoder.hpp
     libs/files/nif/tgaencoder.hpp
