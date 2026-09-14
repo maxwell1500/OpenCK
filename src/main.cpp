@@ -2,6 +2,7 @@
 #include "logger.hpp"
 #include "filepaths.hpp"
 #include "cli.hpp"
+#include "crashhandler.hpp"
 #include "view/window/thememanager.hpp"
 
 #include <QApplication>
@@ -26,6 +27,8 @@ int main(int argc, char *argv[])
     OpenCK::Logging::Logger::instance().setMinLevel(OpenCK::Logging::LogLevel::Debug);
     OpenCK::Logging::Logger::instance().log(OpenCK::Logging::LogLevel::Info, "=== OpenCK Starting ===");
     OpenCK::Logging::Logger::instance().log(OpenCK::Logging::LogLevel::Info, QString("Log file: %1").arg(logFile));
+
+    OpenCK::installCrashHandlers();
 
     // Headless command-line mode: no GUI is created, so use a QCoreApplication.
     QStringList rawArgs;

@@ -569,6 +569,7 @@ add_subdirectory(external/ads)
 # ─── Library: openck_files ─────────────────────────────────────────────────
 # NIF/BA2 parsing, data export/import, logging
 set(FILES_SOURCES
+    src/crashhandler.cpp
     libs/files/data/dataexporter2.cpp
     libs/files/data/dataimporter2.cpp
     libs/files/data/zipwriter.cpp
@@ -596,6 +597,7 @@ set(FILES_SOURCES
 )
 
 set(FILES_HEADERS
+    src/crashhandler.hpp
     libs/files/data/dataexporter.hpp
     libs/files/data/dataimporter.hpp
     libs/files/data/zipwriter.hpp

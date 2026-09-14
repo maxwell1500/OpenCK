@@ -718,13 +718,32 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     vendored Blender binaries under `external/`). Full build + 124/124
     green.
  7. Dead-code sweep: unused stubs, duplicate enums, `Q_UNUSED` params, commented
-    blocks, `catch(...)` sites.
+     blocks, `catch(...)` sites.
 
-    **Status 2026-09-08:** Audited. No commented-out blocks, no TODO/FIXME
-    markers, no truly dead functions. All 55 `Q_UNUSED` sites are in Qt
-    virtual overrides (parameter required by signature — correct pattern).
-    Both `catch(...)` blocks are top-level safety nets in `main.cpp` and
-    `crashhandler.cpp` (legitimate). Nothing to remove.
+     **Status 2026-09-08:** Audited. No commented-out blocks, no TODO/FIXME
+     markers, no truly dead functions. All 55 `Q_UNUSED` sites are in Qt
+     virtual overrides (parameter required by signature — correct pattern).
+     Both `catch(...)` blocks are top-level safety nets in `main.cpp` and
+     `crashhandler.cpp` (legitimate). Nothing to remove.
+
+     **Status 2026-09-13 (file-level re-audit):** the 09-08 audit covered
+     functions, not files — 12 source files were uncompiled AND unreferenced
+     (verified: absent from every CMakeLists, no `#include`, no symbol use,
+     no `.ui`/docs references) and are now deleted: `genericrecordeditor.*`
+     (save path never validated, nothing opens it), `globeditor.*`
+     (superseded by `globvar_editor` + the water-editor GLOB flow),
+     `npcvalidator.cpp`/`questvalidator.cpp`/`weaponvalidator.cpp` (hazardous
+     out-of-line duplicates of the header-inline implementations — compiling
+     them would break the link; headers stay), `nifviewport.*` (first-gen
+     viewport superseded by `NifViewportWidget`), `worldviewwidget.*`
+     (~42 KB, unreferenced), `mainwindow_construction.cpp` (10-line orphaned
+     constructor fragment). The `catch(...)` claim needed one correction:
+     `crashhandler.cpp` was never compiled and `installCrashHandlers()` never
+     called, so the documented crash reporter was dormant — it is now wired
+     up (`openck_files` target, called from `main()` after logger init) with
+     two latent bugs fixed (missing `<csignal>`, duplicate
+     `EXCEPTION_ACCESS_VIOLATION` case) and covered by `test_crashhandler`
+     (5/5: install, stack trace, crash bundle). Full build + 125/125 green.
  8. Stale `.bak` files and `external/vorbis` build outputs clutter the tree —
     add a cleanup rule + gitignore.
 

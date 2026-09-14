@@ -10,6 +10,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <csignal>
 #include <exception>
 #include <new>
 
@@ -154,8 +155,7 @@ LONG WINAPI exceptionHandler(EXCEPTION_POINTERS* ex)
             case EXCEPTION_INT_DIVIDE_BY_ZERO:     kind = "INT_DIVIDE_BY_ZERO";     break;
             case EXCEPTION_STACK_OVERFLOW:         kind = "STACK_OVERFLOW";         break;
             case EXCEPTION_PRIV_INSTRUCTION:       kind = "PRIV_INSTRUCTION";       break;
-            case EXCEPTION_GUARD_PAGE:             kind = "GUARD_PAGE";             break;
-            case 0xC0000005:                       kind = "ACCESS_VIOLATION";       break;
+            case EXCEPTION_GUARD_PAGE:        kind = "GUARD_PAGE";         break;
             default: break;
         }
         LOG_FATAL(QString("Win32 exception %1 (0x%2) at address 0x%3")

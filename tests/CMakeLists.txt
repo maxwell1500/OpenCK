@@ -721,6 +721,12 @@ target_link_libraries(test_referencebatchactions PRIVATE openck_model test_stubs
 target_include_directories(test_referencebatchactions PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_referencebatchactions)
 
+# Crash handler install + stack-trace/bundle smoke (no crash induced)
+add_executable(test_crashhandler test_crashhandler.cpp)
+target_link_libraries(test_crashhandler PRIVATE openck_files test_stubs Qt6::Test)
+target_include_directories(test_crashhandler PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_crashhandler)
+
 # CSV Snippets template engine (.Import= directives + field accessors)
 add_executable(test_csvsnippet test_csvsnippet.cpp)
 target_link_libraries(test_csvsnippet PRIVATE openck_files test_stubs Qt6::Test)
@@ -855,7 +861,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_cellrecord test_cellviewcanvas test_cli test_collisionshapegenerator
     test_columnvalidator test_component test_compressedrecord test_conditionrecord
     test_configpaths test_conflict test_creatureattachpoints test_creatureeditor
-    test_csvsnippet test_datamodel test_ddsdecoder test_dumpesm test_editor_lifecycle
+    test_crashhandler test_csvsnippet test_datamodel test_ddsdecoder test_dumpesm test_editor_lifecycle
     test_editor_widgets test_editor_writeback test_editorproperty test_editrecordcommand test_efshrecord
     test_esl test_exportimport     test_fbximporter test_fuzparser test_gameformat test_gitrepository
     test_gizmomath test_groundtruth test_headerparsing test_hknpphysicssystem test_iconrenderer
