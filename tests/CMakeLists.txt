@@ -240,6 +240,12 @@ target_link_libraries(test_pndrecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_pndrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_pndrecord)
 
+# MRPH (Morphable Object) binary encoder round-trip against real Starfield.esm
+add_executable(test_morphrecord test_morphrecord.cpp)
+target_link_libraries(test_morphrecord PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_morphrecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_morphrecord)
+
 # WorldspaceRecord binary encoder round-trip against the real Skyrim.esm.
 # Registered unconditionally: the test QSKIPs when the master is absent.
 add_executable(test_worldspacerecord test_worldspacerecord.cpp)
@@ -889,7 +895,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
     test_particleprojectilebindings test_particleslodpresets test_particlesimulation
     test_perforcerepository
-    test_planetdefinition test_planetcodec test_plugincompactor test_pluginio test_pndrecord
+    test_planetdefinition test_planetcodec test_plugincompactor test_pluginio test_pndrecord test_morphrecord
     test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
     test_scenrecord test_scripteditor test_scriptflagfile test_searchalgorithm test_shortcutmanager

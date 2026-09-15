@@ -11,6 +11,10 @@ struct MrhpRecord {
     openck::FormComponents components;
     QString editorId;
     quint32 formId = 0;
+    // Typed fields (surveyed from Starfield.esm: 998 records, 4 subrecord types)
+    QString morphPath;        // TCMP — folder containing morph.dat
+    quint32 mobcFlags = 0xFF; // MOBC — always 0xFF000000 in surveyed data
+    QString templatePath;     // TMPP — optional template morph folder
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
@@ -21,6 +25,8 @@ struct MrhpRecord {
 inline bool operator==(const MrhpRecord& l, const MrhpRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
+        && l.morphPath == r.morphPath && l.mobcFlags == r.mobcFlags
+        && l.templatePath == r.templatePath
         && l.rawSubRecords == r.rawSubRecords;
 }
 

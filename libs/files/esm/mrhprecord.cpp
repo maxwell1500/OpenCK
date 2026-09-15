@@ -30,6 +30,9 @@ void MrhpRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
+            case 'TCMP': morphPath = esm.readZString(); break;
+            case 'MOBC': mobcFlags = esm.readType<quint32>(); break;
+            case 'TMPP': templatePath = esm.readZString(); break;
             default:
             {
                 RawSubRecord raw;
@@ -45,6 +48,11 @@ void MrhpRecord::load(ESMReader& esm, bool)
 void MrhpRecord::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
+    if (!morphPath.isEmpty())
+        esm.writeSubZString('TCMP', morphPath);
+    esm.writeSubData<quint32>('MOBC', mobcFlags);
+    if (!templatePath.isEmpty())
+        esm.writeSubZString('TMPP', templatePath);
 
     for (const auto& raw : rawSubRecords)
     {
@@ -56,6 +64,9 @@ void MrhpRecord::blank()
 {
     editorId.clear();
     formId = 0;
+    morphPath.clear();
+    mobcFlags = 0xFF;
+    templatePath.clear();
     rawSubRecords.clear();
     initComponents();
 }

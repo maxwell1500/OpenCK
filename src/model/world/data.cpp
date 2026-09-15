@@ -953,6 +953,9 @@ Data::Data(const QStringList& files, const FilePaths& paths)
     mrhpCollection.addColumn(new StringIdColumn<MrhpRecord>());
     mrhpCollection.addColumn(new RecordStateColumn<MrhpRecord>());
     mrhpCollection.addColumn(new StringColumn<MrhpRecord>("Name", &MrhpRecord::editorId));
+    mrhpCollection.addColumn(new StringColumn<MrhpRecord>("Morph Path", &MrhpRecord::morphPath));
+    mrhpCollection.addColumn(new IntColumn<MrhpRecord>("MOBC", &MrhpRecord::mobcFlags));
+    mrhpCollection.addColumn(new StringColumn<MrhpRecord>("Template", &MrhpRecord::templatePath));
     addModel(new IdTable(&mrhpCollection), CkId::Type_Mrhp_);
     // MTPT - Mount Point
     mtptCollection.addColumn(new StringIdColumn<MtptRecord>());
@@ -2355,6 +2358,7 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_WRLD_:    return &worldspaceCollection;
     case CkId::Type_LOCT_:    return &locationCollection;
     case CkId::Type_Plnt_:    return &planetCollection;
+    case CkId::Type_Mrhp_:    return &mrhpCollection;
     case CkId::Type_Refr_:    return &refrCollection;
     case CkId::Type_Material_: return &materialCollection;
     case CkId::Type_Land_:     return &landCollection;
@@ -2481,7 +2485,6 @@ const BaseCollection* Data::getCollectionByType(CkId::Type type) const
     case CkId::Type_Lvlp_:    return &lvlpCollection;
     case CkId::Type_Lvsc_:    return &lvscCollection;
     case CkId::Type_Maam_:    return &maamCollection;
-    case CkId::Type_Mrhp_:    return &mrhpCollection;
     case CkId::Type_Mtpt_:    return &mtptCollection;
     case CkId::Type_Navi_:    return &naviCollection;
     case CkId::Type_Nocm_:    return &nocmCollection;
@@ -2571,6 +2574,7 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_WRLD_:    return &worldspaceCollection;
     case CkId::Type_LOCT_:    return &locationCollection;
     case CkId::Type_Plnt_:    return &planetCollection;
+    case CkId::Type_Mrhp_:    return &mrhpCollection;
     case CkId::Type_Refr_:    return &refrCollection;
     case CkId::Type_Material_: return &materialCollection;
     case CkId::Type_Land_:     return &landCollection;
@@ -2697,7 +2701,6 @@ BaseCollection* Data::getCollectionByType(CkId::Type type)
     case CkId::Type_Lvlp_:    return &lvlpCollection;
     case CkId::Type_Lvsc_:    return &lvscCollection;
     case CkId::Type_Maam_:    return &maamCollection;
-    case CkId::Type_Mrhp_:    return &mrhpCollection;
     case CkId::Type_Mtpt_:    return &mtptCollection;
     case CkId::Type_Navi_:    return &naviCollection;
     case CkId::Type_Nocm_:    return &nocmCollection;

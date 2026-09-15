@@ -444,20 +444,24 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     for the voice lines, and actual native Houdini-side scripts.
 
     **Status 2026-09-14 (leftovers closed where validatable):**
-    - Binary encoders: `PlanetCodec::toRecord/fromRecord`
-      (`src/model/tools/planetcodec.*`) maps PlanetDefinition onto the real
-      PNDT layout — EDID/ANAM exactly, TEMP via the numeric temperature
-      string (display labels keep the base record's measured TEMP), DENS/
-      PHLA/RSCS seeded from the record under edit or the observed shipped
-      defaults for new planets (1.0/1.0/0, the placeholder-orbital values),
-      raw subrecords preserved verbatim. Surveyed the first 25 real PNDT
-      (Mars -5 °C, Jemison 21 °C, Vectera -214 °C, …; values documented in
-      the header). `test_planetcodec` 6/6, incl. 10 real PNDT through the
-      model and back losslessly (typed + raw + order). The other models
-      (Spaceship/Probe/Crowd/Morph/Galaxy/Opal/Voice) have NO on-disk
-      record: no matching type exists in the ESM layer or shipped files, so
-      their encoders stay blocked on a shipped layout per the item's own
-      condition — JSON remains their persistence.
+    - Binary encoders:
+      - **PNDT (Planets):** `PlanetCodec::toRecord/fromRecord`
+        (`src/model/tools/planetcodec.*`) maps PlanetDefinition onto the real
+        PNDT layout — EDID/ANAM exactly, TEMP via the numeric temperature
+        string, DENS/PHLA/RSCS seeded from the record under edit or shipped
+        defaults. `test_planetcodec` 6/6, incl. 10 real PNDT losslessly.
+      - **MRPH (Morphable Objects):** `MrhpRecord` now parses TCMP (morph
+        path), MOBC (flags), TMPP (template path) as typed fields alongside
+        EDID, with raw subrecords preserved. Surveyed 998 records (998 MOBC,
+        976 TCMP, 191 TMPP). `test_morphrecord` 3/3 — 20 real records round-
+        tripped byte-exact (17 with TCMP, 7 with TMPP, 0 failures).
+      - **Ships:** composite COBJ→FLST→GBFM chain (no single SHIP record
+        type). The COBJ FLST entries link to GBFM records built from BFCB
+        component wrappers (property sheets, form links, keywords, names).
+        Encoder blocked on the BFCB component codec (partially decoded by
+        xEdit, reflection-based data streams still opaque).
+      - **Galaxy/Crowd/Opal:** no ESM record type exists. JSON-only.
+    - Voice/Houdini: done (see above).
     - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
       the in-box Windows speech engine (System.Speech over SAPI in a helper
       process — no ATL/SDK linkage; ~1 s per call), `runVoicePlan` uses it
