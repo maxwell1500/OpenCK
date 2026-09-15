@@ -24,10 +24,13 @@ under the hood and how OpenCK's architecture maps to it.
 
 Build: `cmake -S . -B build -DCMAKE_PREFIX_PATH=C:/Qt/6.5.3/msvc2019_64 && cmake --build build --config Debug --target openck`
 
-Test: every `test_*.exe` in `build/bin/Debug/` exits 0. PowerShell
+Test: every `test_*.exe` in `build/bin/Debug/` exits 0. Test exes and
+`ctest` REQUIRE `C:/Qt/6.5.3/msvc2019_64/bin` on `PATH` first — without it
+every test fails to start with `Qt6Test.dll was not found`. PowerShell
 loop:
 
 ```powershell
+$env:PATH = "C:\Qt\6.5.3\msvc2019_64\bin;" + $env:PATH
 $tests = Get-ChildItem build\bin\Debug\test_*.exe | ForEach-Object { $_.FullName }
 $pass = 0
 foreach ($t in $tests) { & $t 2>&1 | Out-Null; if ($LASTEXITCODE -eq 0) { $pass++ } }
