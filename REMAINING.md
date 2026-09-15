@@ -502,15 +502,32 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
         round-trip), the dialog now shows name/transform/FormID, and
         `test_opallist` 7/7 — including a byte-exact round-trip of all ten
         shipped files.
-      - **Galaxy/Crowd:** crowd-region data lives in the
-        `BGSCrowdComponent_Component` GBFM component (now decoded, above), so
-        the CrowdRegion model can be backed by a real record when a matching
-        GBFM is chosen. The galaxy map still has no ESM record type (174
-        signatures scanned) — it is an editor layout over planet/star data.
-      - **ReflectionProbes:** also a GBFM component
-        (`ReflectionProbes_Component`), but its payload is a `wbReflection`
-        data stream that neither OpenCK nor xEdit decodes; the model stays
-        JSON-only until that stream is documented.
+      - **Galaxy — DONE 2026-09-14.** The galaxy map *is* an ESM record after
+        all: `STDT` (Star), 123 in Starfield.esm. The earlier note missed it.
+        `StdtRecord` (`libs/files/esm/stdtrecord.*`) stores subrecords raw and
+        round-trips byte-exactly, with typed accessors for the galaxy fields:
+        `ANAM` name, `BNAM` system parsec location (3 floats — the map
+        position), `DNAM` system id, `ENAM` colour, `SNAM`/`PNAM` links. The
+        star catalogue data (catalogue id, spectral class, magnitude, mass,
+        habitable zones, HIP, radius, temperature) lives in the
+        `BGSStarDataComponent_Component` base-form component, parsed from its
+        `DATA` layout per xEdit. `test_starrecord` 5/5: 30 stars with all
+        fields, 123 scanned / 122 distinct system ids, byte-exact round-trip,
+        and REFL schema decode.
+      - **Crowd — DONE (component):** `BGSCrowdComponent_Component` (density,
+        population count, per-population name/scale) is decoded on GBFM.
+      - **ReflectionProbes — PARTIAL, and blocked on shipped data.** Two
+        findings: (1) `ReflectionProbes_Component` is defined by xEdit but
+        does **not** occur anywhere in Starfield.esm — there is no shipped
+        instance to validate against. (2) Its payload is a "reflection" data
+        stream; that format is *not* raw noise — every stream starts with a
+        `BETH` magic and carries an embedded type/field schema. `parseReflectionStream`
+        (`libs/files/esm/reflectstream.*`) now extracts the root type name and
+        field names (e.g. `BSGalaxy::BGSSunPresetForm` with `SunColor`,
+        `SunIlluminance`, …) while preserving exact bytes. Field *values* still
+        need the per-type layouts that neither OpenCK nor xEdit has, and with
+        no shipped `ReflectionProbes_Component` instance there is nothing to
+        validate a decode against — so the model stays JSON-only.
     - Voice/Houdini: done (see above).
     - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
       the in-box Windows speech engine (System.Speech over SAPI in a helper

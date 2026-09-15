@@ -2,6 +2,8 @@
 #define GbfmRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "baseformcomponents.hpp"
+#include "reflectstream.hpp"
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QStringList>
@@ -9,25 +11,10 @@
 class ESMReader;
 class ESMWriter;
 
-// A parsed BFCB component: the marker's component-type name (the BFCB
-// payload, a NUL-terminated string such as "TESFullName_Component") plus the
-// subrecords that follow it until the next BFCB/BFCE. This is a *derived
-// view*: storage stays in GbfmRecord::rawSubRecords in on-disk order, so the
-// record still round-trips byte-for-byte; the view exists so callers can read
-// the typed fields (full name, keywords, form links) without decoding the
-// whole component catalogue.
-struct GbfmComponent
-{
-    QString typeName;
-    QVector<RawSubRecord> subrecords;
-
-    bool hasSubrecord(NAME name) const;
-    const RawSubRecord* findSubrecord(NAME name) const;
-    // First little-endian uint32 of the named subrecord, or 0 when absent.
-    quint32 firstU32(NAME name) const;
-    // Every little-endian uint32 in the named subrecord (e.g. KWDA/FLFM lists).
-    QVector<quint32> u32List(NAME name) const;
-};
+// GBFM (Generic Base Form) — Starfield's component-carrier record. It holds a
+// sequence of BFCB components (see baseformcomponents.hpp); GbfmComponent is
+// the shared BaseFormComponent type under its historical name.
+using GbfmComponent = BaseFormComponent;
 
 // Blueprint_Component (BUO4): one ship-module placement. The on-disk stride is
 // 36 bytes: Base Item (GBFM formId), Construction Object (COBJ or 0),
@@ -65,9 +52,8 @@ struct GbfmRecord {
     void initComponents();
 
     // --- Derived BFCB component view (Starfield §3.8 ship composite) ---
-    // Splits rawSubRecords at BFCB markers. Subrecords before the first BFCB
-    // (EDID/OBND/ODTY/OPDS) and after a BFCE are reported through
-    // leadingSubrecords()/trailingSubrecords() rather than as components.
+    // Splits rawSubRecords at BFCB/BFCE. Subrecords before the first BFCB and
+    // after a BFCE are reported through the leading/trailing out-params.
     QVector<GbfmComponent> parseComponents() const;
     void splitComponents(QVector<GbfmComponent>& outPieces,
                          QVector<RawSubRecord>& outLeading,
@@ -91,9 +77,9 @@ struct GbfmRecord {
     QVector<quint32> linkedKeywordIds() const;
 
     // --- Blueprint_Component (ship composition) ---
-    // Blueprint_Component::BUO4. Returns an empty list when absent; a length
-    // that is not a multiple of ShipBlueprintItem::kStride means the layout
-    // assumption is wrong, in which case the trailing bytes are skipped.
+    // Blueprint_Component::BUO4. Empty when absent; a length that is not a
+    // multiple of ShipBlueprintItem::kStride means the layout assumption is
+    // wrong, in which case the trailing bytes are skipped.
     QVector<ShipBlueprintItem> blueprintItems() const;
 
     // --- BGSCrowdComponent_Component ---
@@ -101,8 +87,13 @@ struct GbfmRecord {
     int crowdPopulationCount() const;    // CDNS
     QVector<CrowdPopulation> crowdPopulations() const;   // STRV + FLTV pairs
 
-    // --- On-disk order helpers (BFCB is preserved as a raw subrecord; the
-    // editor view above is derived, not stored) ---
+    // --- ReflectionProbes_Component ---
+    // The component's REFL reflection stream, parsed for its embedded schema
+    // (root type + field names). valid == false when the component is absent;
+    // note the component is defined by xEdit but not instantiated in the
+    // shipped Starfield.esm.
+    ReflectionStream reflectionStream() const;
+
     int rawSubrecordIndex(NAME name) const;
 };
 

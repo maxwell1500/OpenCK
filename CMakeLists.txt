@@ -213,6 +213,8 @@ libs/files/esm/npcrecord.cpp
     libs/files/esm/fstsrecord.cpp
     libs/files/esm/fxpdrecord.cpp
     libs/files/esm/gbfmrecord.cpp
+    libs/files/esm/baseformcomponents.cpp
+    libs/files/esm/reflectstream.cpp
     libs/files/esm/gbftrecord.cpp
     libs/files/esm/gcvrrecord.cpp
     libs/files/esm/imadrecord.cpp
@@ -433,6 +435,8 @@ set(ESM_HEADERS
     libs/files/esm/fstsrecord.hpp
     libs/files/esm/fxpdrecord.hpp
     libs/files/esm/gbfmrecord.hpp
+    libs/files/esm/baseformcomponents.hpp
+    libs/files/esm/reflectstream.hpp
     libs/files/esm/gbftrecord.hpp
     libs/files/esm/gcvrrecord.hpp
     libs/files/esm/imadrecord.hpp

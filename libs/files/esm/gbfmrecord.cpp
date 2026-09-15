@@ -3,81 +3,22 @@
 #include "esmwriter.hpp"
 #include "../../components/tier1_components.hpp"
 
-#include <cstring>
-
-namespace {
-
-quint32 leU32(const QByteArray& data, int offset)
+QVector<GbfmComponent> GbfmRecord::parseComponents() const
 {
-    if (offset < 0 || offset + 4 > data.size())
-        return 0;
-    const uchar* p = reinterpret_cast<const uchar*>(data.constData()) + offset;
-    return static_cast<quint32>(p[0])
-        | (static_cast<quint32>(p[1]) << 8)
-        | (static_cast<quint32>(p[2]) << 16)
-        | (static_cast<quint32>(p[3]) << 24);
+    return splitBaseFormComponents(rawSubRecords);
 }
 
-QString trimmedZString(const QString& s)
+void GbfmRecord::splitComponents(QVector<GbfmComponent>& outPieces,
+                                 QVector<RawSubRecord>& outLeading,
+                                 QVector<RawSubRecord>& outTrailing) const
 {
-    QString t = s;
-    while (!t.isEmpty() && t.at(t.size() - 1) < QChar(0x20))
-        t.chop(1);
-    return t;
+    outPieces = splitBaseFormComponents(rawSubRecords, &outLeading, &outTrailing);
 }
 
-float leF32(const QByteArray& data, int offset)
+const GbfmComponent* GbfmRecord::findComponent(const QVector<GbfmComponent>& comps,
+                                               const QString& typeName)
 {
-    const quint32 bits = leU32(data, offset);
-    float f = 0.0f;
-    static_assert(sizeof(float) == 4, "float must be 32-bit");
-    std::memcpy(&f, &bits, sizeof(f));
-    return f;
-}
-
-const GbfmComponent* componentByName(const QVector<GbfmComponent>& comps,
-                                     const QString& typeName)
-{
-    for (const GbfmComponent& c : comps)
-        if (c.typeName == typeName)
-            return &c;
-    return nullptr;
-}
-
-} // namespace
-
-bool GbfmComponent::hasSubrecord(NAME name) const
-{
-    return findSubrecord(name) != nullptr;
-}
-
-const RawSubRecord* GbfmComponent::findSubrecord(NAME name) const
-{
-    for (const RawSubRecord& r : subrecords)
-        if (r.name == name)
-            return &r;
-    return nullptr;
-}
-
-quint32 GbfmComponent::firstU32(NAME name) const
-{
-    const RawSubRecord* r = findSubrecord(name);
-    return r ? leU32(r->data, 0) : 0;
-}
-
-QVector<quint32> GbfmComponent::u32List(NAME name) const
-{
-    // Collect across every occurrence: KWDA is one subrecord holding N ids,
-    // while FLKW/FLFM appear once per entry. Both flatten to the same list.
-    QVector<quint32> out;
-    for (const RawSubRecord& r : subrecords)
-    {
-        if (r.name != name)
-            continue;
-        for (int off = 0; off + 4 <= r.data.size(); off += 4)
-            out.append(leU32(r.data, off));
-    }
-    return out;
+    return findBaseFormComponent(comps, typeName);
 }
 
 void GbfmRecord::initComponents()
@@ -137,79 +78,10 @@ void GbfmRecord::blank()
     initComponents();
 }
 
-void GbfmRecord::splitComponents(QVector<GbfmComponent>& outPieces,
-                                 QVector<RawSubRecord>& outLeading,
-                                 QVector<RawSubRecord>& outTrailing) const
-{
-    outPieces.clear();
-    outLeading.clear();
-    outTrailing.clear();
-
-    // BFCB opens a component; BFCE (when present) closes it; a new BFCB also
-    // implicitly closes the open one. Everything before the first BFCB and
-    // after the last close is reported as leading/trailing.
-    GbfmComponent current;
-    bool inComponent = false;
-
-    for (const RawSubRecord& raw : rawSubRecords)
-    {
-        if (raw.name == NAME('BFCB'))
-        {
-            if (inComponent)
-                outPieces.append(current);
-            current = GbfmComponent();
-            current.typeName = trimmedZString(QString::fromLatin1(raw.data));
-            inComponent = true;
-        }
-        else if (raw.name == NAME('BFCE'))
-        {
-            if (inComponent)
-            {
-                outPieces.append(current);
-                current = GbfmComponent();
-                inComponent = false;
-            }
-        }
-        else if (inComponent)
-        {
-            current.subrecords.append(raw);
-        }
-        else if (outPieces.isEmpty())
-        {
-            outLeading.append(raw);
-        }
-        else
-        {
-            outTrailing.append(raw);
-        }
-    }
-
-    if (inComponent)
-        outPieces.append(current);
-}
-
-QVector<GbfmComponent> GbfmRecord::parseComponents() const
-{
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
-    return pieces;
-}
-
-const GbfmComponent* GbfmRecord::findComponent(const QVector<GbfmComponent>& comps,
-                                               const QString& typeName)
-{
-    return componentByName(comps, typeName);
-}
-
 QStringList GbfmRecord::componentTypeNames() const
 {
     QStringList names;
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     names.reserve(pieces.size());
     for (const GbfmComponent& c : pieces)
         names.append(c.typeName);
@@ -218,50 +90,35 @@ QStringList GbfmRecord::componentTypeNames() const
 
 quint32 GbfmRecord::fullNameStringId() const
 {
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces, QStringLiteral("TESFullName_Component"));
     return c ? c->firstU32(NAME('FULL')) : 0;
 }
 
 QVector<quint32> GbfmRecord::keywordFormIds() const
 {
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces, QStringLiteral("BGSKeywordForm_Component"));
     return c ? c->u32List(NAME('KWDA')) : QVector<quint32>();
 }
 
 int GbfmRecord::itemCount() const
 {
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces, QStringLiteral("BGSFormLinkData_Component"));
     return c ? static_cast<int>(c->firstU32(NAME('ITMC'))) : 0;
 }
 
 QVector<quint32> GbfmRecord::linkedFormIds() const
 {
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces, QStringLiteral("BGSFormLinkData_Component"));
     return c ? c->u32List(NAME('FLFM')) : QVector<quint32>();
 }
 
 QVector<quint32> GbfmRecord::linkedKeywordIds() const
 {
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces, QStringLiteral("BGSFormLinkData_Component"));
     return c ? c->u32List(NAME('FLKW')) : QVector<quint32>();
 }
@@ -278,11 +135,7 @@ QVector<ShipBlueprintItem> GbfmRecord::blueprintItems() const
 {
     QVector<ShipBlueprintItem> items;
 
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
-
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces, QStringLiteral("Blueprint_Component"));
     if (!c)
         return items;
@@ -296,15 +149,15 @@ QVector<ShipBlueprintItem> GbfmRecord::blueprintItems() const
         {
             const int base = i * ShipBlueprintItem::kStride;
             ShipBlueprintItem item;
-            item.baseItemFormId = leU32(raw.data, base + 0);
-            item.constructionFormId = leU32(raw.data, base + 4);
-            item.posX = leF32(raw.data, base + 8);
-            item.posY = leF32(raw.data, base + 12);
-            item.posZ = leF32(raw.data, base + 16);
-            item.rotX = leF32(raw.data, base + 20);
-            item.rotY = leF32(raw.data, base + 24);
-            item.rotZ = leF32(raw.data, base + 28);
-            item.partId = leU32(raw.data, base + 32);
+            item.baseItemFormId = baseFormU32(raw.data, base + 0);
+            item.constructionFormId = baseFormU32(raw.data, base + 4);
+            item.posX = baseFormF32(raw.data, base + 8);
+            item.posY = baseFormF32(raw.data, base + 12);
+            item.posZ = baseFormF32(raw.data, base + 16);
+            item.rotX = baseFormF32(raw.data, base + 20);
+            item.rotY = baseFormF32(raw.data, base + 24);
+            item.rotZ = baseFormF32(raw.data, base + 28);
+            item.partId = baseFormU32(raw.data, base + 32);
             items.append(item);
         }
     }
@@ -313,24 +166,15 @@ QVector<ShipBlueprintItem> GbfmRecord::blueprintItems() const
 
 float GbfmRecord::crowdDensity() const
 {
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces,
         QStringLiteral("BGSCrowdComponent_Component"));
-    if (!c)
-        return 0.0f;
-    const RawSubRecord* r = c->findSubrecord(NAME('CDND'));
-    return r ? leF32(r->data, 0) : 0.0f;
+    return c ? c->firstFloat(NAME('CDND')) : 0.0f;
 }
 
 int GbfmRecord::crowdPopulationCount() const
 {
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces,
         QStringLiteral("BGSCrowdComponent_Component"));
     return c ? static_cast<int>(c->firstU32(NAME('CDNS'))) : 0;
@@ -340,11 +184,7 @@ QVector<CrowdPopulation> GbfmRecord::crowdPopulations() const
 {
     QVector<CrowdPopulation> populations;
 
-    QVector<GbfmComponent> pieces;
-    QVector<RawSubRecord> leading;
-    QVector<RawSubRecord> trailing;
-    splitComponents(pieces, leading, trailing);
-
+    const QVector<GbfmComponent> pieces = parseComponents();
     const GbfmComponent* c = findComponent(pieces,
         QStringLiteral("BGSCrowdComponent_Component"));
     if (!c)
@@ -360,12 +200,15 @@ QVector<CrowdPopulation> GbfmRecord::crowdPopulations() const
             if (pending)
                 populations.append(current);
             current = CrowdPopulation();
-            current.name = trimmedZString(QString::fromLatin1(raw.data));
+            current.name = QString::fromLatin1(raw.data);
+            while (!current.name.isEmpty()
+                   && current.name.at(current.name.size() - 1) < QChar(0x20))
+                current.name.chop(1);
             pending = true;
         }
         else if (raw.name == NAME('FLTV') && pending)
         {
-            current.scale = leF32(raw.data, 0);
+            current.scale = baseFormF32(raw.data, 0);
             populations.append(current);
             current = CrowdPopulation();
             pending = false;
@@ -375,4 +218,15 @@ QVector<CrowdPopulation> GbfmRecord::crowdPopulations() const
         populations.append(current);
 
     return populations;
+}
+
+ReflectionStream GbfmRecord::reflectionStream() const
+{
+    const QVector<GbfmComponent> pieces = parseComponents();
+    const GbfmComponent* c = findComponent(pieces,
+        QStringLiteral("ReflectionProbes_Component"));
+    if (!c)
+        return ReflectionStream();
+    const RawSubRecord* r = c->findSubrecord(NAME('REFL'));
+    return r ? parseReflectionStream(r->data) : ReflectionStream();
 }
