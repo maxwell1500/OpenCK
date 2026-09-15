@@ -742,6 +742,7 @@ set(MODEL_SOURCES
     src/model/tools/fbximporter.cpp
     src/model/tools/planetdefinition.cpp
     src/model/tools/planetcodec.cpp
+    src/model/tools/shippartcodec.cpp
     src/model/tools/creatureattachpoints.cpp
     src/model/tools/btdfile.cpp
     src/model/tools/btdterrain.cpp

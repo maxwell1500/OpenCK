@@ -19,3 +19,18 @@ void CobjRecord::save(ESMWriter& esm) const {
     for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
 void CobjRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); }
+
+quint32 CobjRecord::createdObjectId() const
+{
+    for (const RawSubRecord& raw : rawSubRecords)
+    {
+        if (raw.name != NAME('CNAM') || raw.data.size() < 4)
+            continue;
+        const uchar* p = reinterpret_cast<const uchar*>(raw.data.constData());
+        return static_cast<quint32>(p[0])
+            | (static_cast<quint32>(p[1]) << 8)
+            | (static_cast<quint32>(p[2]) << 16)
+            | (static_cast<quint32>(p[3]) << 24);
+    }
+    return 0;
+}

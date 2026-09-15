@@ -17,6 +17,10 @@ struct CobjRecord {
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
+
+    // CNAM — the created-object FormID (a GBFM for ship parts). Starfield
+    // stores it as a raw subrecord; this reads the first little-endian u32.
+    quint32 createdObjectId() const;
 };
 
 inline bool operator==(const CobjRecord& l, const CobjRecord& r)

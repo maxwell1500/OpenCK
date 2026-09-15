@@ -246,6 +246,12 @@ target_link_libraries(test_morphrecord PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_morphrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_morphrecord)
 
+# Starfield ship composite: GBFM BFCB components + COBJ->FLST->GBFM resolver
+add_executable(test_shipcomposite test_shipcomposite.cpp)
+target_link_libraries(test_shipcomposite PRIVATE openck_model openck_esm test_stubs Qt6::Test)
+target_include_directories(test_shipcomposite PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_shipcomposite)
+
 # WorldspaceRecord binary encoder round-trip against the real Skyrim.esm.
 # Registered unconditionally: the test QSKIPs when the master is absent.
 add_executable(test_worldspacerecord test_worldspacerecord.cpp)
@@ -895,7 +901,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
     test_particleprojectilebindings test_particleslodpresets test_particlesimulation
     test_perforcerepository
-    test_planetdefinition test_planetcodec test_plugincompactor test_pluginio test_pndrecord test_morphrecord
+    test_planetdefinition test_planetcodec test_plugincompactor test_pluginio test_pndrecord test_morphrecord test_shipcomposite
     test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
     test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
     test_scenrecord test_scripteditor test_scriptflagfile test_searchalgorithm test_shortcutmanager

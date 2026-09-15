@@ -455,12 +455,33 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
         EDID, with raw subrecords preserved. Surveyed 998 records (998 MOBC,
         976 TCMP, 191 TMPP). `test_morphrecord` 3/3 — 20 real records round-
         tripped byte-exact (17 with TCMP, 7 with TMPP, 0 failures).
-      - **Ships:** composite COBJ→FLST→GBFM chain (no single SHIP record
-        type). The COBJ FLST entries link to GBFM records built from BFCB
-        component wrappers (property sheets, form links, keywords, names).
-        Encoder blocked on the BFCB component codec (partially decoded by
-        xEdit, reflection-based data streams still opaque).
-      - **Galaxy/Crowd/Opal:** no ESM record type exists. JSON-only.
+      - **Ships:** composite COBJ→FLST→GBFM chain (no single SHIP record).
+        Done this round:
+        - `GbfmRecord` now parses the BFCB component architecture into a
+          derived view (`GbfmComponent`: type name + its subrecords) while
+          preserving `rawSubRecords` byte-exactly. Typed accessors extract
+          `TESFullName_Component::FULL`, `BGSKeywordForm_Component::KWDA`
+          (`u32List` flattens both the one-subrecord/many-value KWDA shape and
+          the one-value-per-occurrence FLKW/FLFM shape), and
+          `BGSFormLinkData_Component` ITMC/FLFM/FLKW.
+        - `ShipPartCodec` (`src/model/tools/shippartcodec.*`) maps a GBFM to a
+          `ShipPartDefinition` and writes it back; every opaque component
+          (Blueprint_Component's BUO4, the NVNM navmesh blob, …) rides along
+          untouched, so an untouched apply is byte-exact.
+        - `ShipCompositeResolver` walks COBJ → CNAM → FLST → LNAM → GBFM and
+          produces `ShipComposite` (recipe, form list, variant form ids +
+          resolved editor ids), with a case-insensitive id lookup helper (the
+          collections' own `searchId` is case-sensitive while the game is not).
+        - `test_shipcomposite` 6/6 against real Starfield.esm: component
+          parsing, 15 GBFM byte-exact round-trips, 15 no-op applies, and a real
+          chain (`co_SMS_FuelTank_Dogstar_M50_Ulysses` →
+          `SMSSet_FuelTank_Dogstar_M50` → 2 variant GBFMs).
+        Not done: the opaque components (Blueprint/BUO4, NVNM) remain un-
+        decoded, so the editor exposes identity/keywords/form-links rather
+        than every component field; xEdit itself blocks copying records with
+        these data streams.
+      - **Galaxy/Crowd/Opal:** no ESM record type exists (174 signatures
+        scanned). JSON-only.
     - Voice/Houdini: done (see above).
     - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
       the in-box Windows speech engine (System.Speech over SAPI in a helper
