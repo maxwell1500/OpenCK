@@ -9,7 +9,15 @@ void GameSetting::load(ESMReader& esm, bool)
     formId = esm.currentFormId();
     editorId = esm.readSubZString('EDID');
 
-    value.load(esm, Variant::Format_GMST, editorId);
+    if (esm.isNextName(NAME('DATA')))
+    {
+        value.load(esm, Variant::Format_GMST, editorId);
+        hasData = true;
+    }
+    else
+    {
+        value.setType(VariantType::Var_None);
+    }
 
     // Starfield TSMG records carry extra subrecords after the value (14
     // bytes observed). Drain them losslessly so the record ends exactly
@@ -30,9 +38,12 @@ void GameSetting::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
 
-    esm.startSubRecord('DATA');
-    value.write(esm, Variant::Format_GMST);
-    esm.endSubRecord();
+    if (hasData || value.getType() != VariantType::Var_None)
+    {
+        esm.startSubRecord('DATA');
+        value.write(esm, Variant::Format_GMST);
+        esm.endSubRecord();
+    }
 
     for (const auto& raw : rawSubRecords)
         esm.writeRawSubRecord(raw);
@@ -41,6 +52,7 @@ void GameSetting::save(ESMWriter& esm) const
 void GameSetting::blank()
 {
     editorId = "";
+    hasData = false;
     value.setType(VariantType::Var_None);
 }
 

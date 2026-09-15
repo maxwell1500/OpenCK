@@ -8,6 +8,8 @@
 #include "../../libs/files/esm/dialrecord.hpp"
 #include "../../libs/files/esm/inforecord.hpp"
 #include "../../model/tools/columnvalidator.hpp"
+#include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/undostack.hpp"
 
 #include "logger.hpp"
 
@@ -222,12 +224,22 @@ void DialogueEditorWidget::onAddInfo()
     auto& infoCollection = mData->getInfoCollection();
     infoCollection.add(newInfo);
 
-    DialRecord& dial = dialCollection.getRecord(dialIdx).get();
-    dial.responseIds.append(newFormId);
-    dial.hasInam = true;
-    dialCollection.getRecord(dialIdx).setModified(dial);
+    DialRecord originalDial = dialCollection.getRecord(dialIdx).get();
+    DialRecord editedDial = originalDial;
+    editedDial.responseIds.append(newFormId);
+    editedDial.hasInam = true;
+    if (mData->getUndoStack())
+    {
+        EditRecordCommand<DialRecord>* cmd = new EditRecordCommand<DialRecord>(&dialCollection, dialIdx, originalDial, editedDial,
+            "Add Info to DIAL: " + currentDialId);
+        cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
+    }
+    else
+    {
+        dialCollection.getRecord(dialIdx).setModified(editedDial);
+    }
 
-    mData->setInfoParentDial(newFormId, dial.formId);
+    mData->setInfoParentDial(newFormId, editedDial.formId);
     populateTree();
 
     LOG_INFO(QString("Added new info '%1' (0x%2) under DIAL '%3'")

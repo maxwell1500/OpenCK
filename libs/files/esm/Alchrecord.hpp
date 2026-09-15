@@ -17,6 +17,14 @@ struct AlchRecord {
     float weight = 0.0f;
     quint32 value = 0;
     QVector<RawSubRecord> rawSubRecords;
+    // Width preservation: Starfield writes weight-only 4-byte DATA (legacy
+    // records carry weight + value = 8). dataFields counts the u32 slots
+    // present at load; the save re-emits exactly that width so an
+    // unconditional 8-byte write neither over-reads at load nor appends a
+    // spurious subrecord.
+    int dataFields = 2;
+    bool hasData = false;
+    bool hasFlags = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

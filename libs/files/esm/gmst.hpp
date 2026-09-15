@@ -17,6 +17,10 @@ struct GameSetting
     quint32 formId = 0;
     Variant value;
     QVector<RawSubRecord> rawSubRecords;
+    // Set when a DATA value subrecord was present at load. Some shipped
+    // settings carry other subrecords (e.g. XALG) in its place; those must
+    // stay raw and no DATA may be invented on save.
+    bool hasData = false;
 
     void load(ESMReader& esm, bool base = false);
     void save(ESMWriter& esm) const;

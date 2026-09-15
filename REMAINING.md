@@ -133,6 +133,56 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      EDID prefixes to `rawData` instead of throwing. Load-side is clean at
      full scale; only the save+diff at 3.8M scale is left to CI/nightly.
 
+     **Status 2026-09-15 (nightly gate built + save-side fixes):** the
+     deferred CI/nightly job now exists: `tests/test_fullscale_roundtrip.cpp`
+     (standalone CLI — load → save untouched → snapshot-diff, plus
+     `--compact` mode that compacts a copy and verifies reload; deliberately
+     NOT in ctest) driven by `tools/nightly-roundtrip.ps1` (round-trips
+     Starfield.esm, compacts up to 5 real `.esp` copies). Validated:
+     Vvardenfell.esp 1374/1374 identical, Magnus.esm 522/522 identical,
+     `--compact` on a real plugin (73/73 remapped, reload clean). The gate
+     paid for itself immediately — SFBGS00D.esm exposed a save crash and
+     seven round-trip bugs, all fixed:
+     - Save fast-fail (`0xC0000409`) on localised GMSTs: `Variant::write`
+       threw on `Var_LString` (and `Var_None` with empty `rawData`); the
+       uncaught throw aborted the save. `write` now emits the string-table
+       index for LStrings and re-emits drained payloads verbatim.
+     - `RefrRecord` did not replay load order (component block always first):
+       now records `loadOrder` + `hasEdid` and replays positionally via a new
+       `BGSRefData_Component::saveSubrecord` single-sub writer.
+     - `LocationRecord` DATA always wrote 12 bytes (shipped 8-byte variants
+       exist): now preserves `dataFieldCount` + `dataExtra` tail.
+     - `PndRecord` treated every FNAM as the flags u32: only the first is
+       (later 24-byte FNAM structs were truncated and `flags` clobbered by
+       the last occurrence); subsequent FNAMs stay raw with per-name replay.
+     - `StatRecord` appended a 1-byte NUL EDID for EDID-less records.
+     - `AlchRecord` over-read 4-byte DATA as 8 (weight+value), desyncing its
+       stored raws so the save emitted garbage mid-record (this is what
+       killed the snapshot walker at record 2621): DATA is now width-guarded
+       (Starfield ALCH DATA is weight-only, 353/353 surveyed), FNAM/DATA
+       emission gated on presence.
+     - `GlobalVariable` invented FNAM for FNAM-less GLOBs (`hasType` gate);
+       `KeywordRecord`/`FactRecord` invented EDID/FNAM/FULL
+       (`hasEdid`/`hasFlags`/`hasFull` gates); `GameSetting` consumed a
+       non-DATA subrecord (e.g. XALG) as its value and always emitted DATA
+       (`isNextName` check + `hasData` gate).
+     - Rule of thumb established: never emit a subrecord the source lacked
+       unless it carries a user edit.
+     SFBGS00D.esm round-trip still open (434,976/434,990 records; the rest
+     is positional cascade, not payload — type counts match exactly):
+     - 14 records of 3 unhandled types (GPOF 12, GPOG 1, GWED 1) are skipped
+       at load and dropped on save. Needs a generic opaque-record preserve
+       path (store raw bytes keyed by type+formId, re-emit in order).
+     - Non-REFR/ACHR cell children (PGRE nested in CELL groups, etc.) are
+       relocated to top-level groups: `writeCellChildrenGroups` /
+       `markCellChildrenWritten` / the replay skip cover REFR/ACHR only.
+       Needs generic child coverage driven by the parent-cell index.
+     - Unverified payload diffs needing per-formId comparison once the
+       cascade clears: several FACTs, RACE 0x106e2bc (138→126 subs),
+       MGEF 0x101ea08 (4→7 subs).
+     Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
+     in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.
+
     **Status 2026-09-04:** `LocationRecord::locationName` is persisted now.
     `FULL` was consumed as an opaque raw (the shared
     `TESFullName_Component` never handles it — `tesfullname.cpp` holding
@@ -169,8 +219,20 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     re-emits INAM from `responseIds` when `hasInam` is set. Round-trip
     verified by `testSyntheticMultiTypeRoundTrip`. `DialogueTreeEditor`
     and `DialogueEditorWidget::populateTree()` both iterate
-    `dial.responseIds` to show INFO children; `addInfo` updates
-    `responseIds` and `m_infoParentDial`. **Resolved.**
+     `dial.responseIds` to show INFO children; `addInfo` updates
+     `responseIds` and `m_infoParentDial`. **Resolved.**
+
+     Perf follow-up (2026-09-15): `Data::infosUnderDial` scans the whole
+     INFO collection per topic — O(dials × infos), which timed out
+     `testDialInfoParentWalking` at QTest's 5-minute limit on full masters
+     (68k × 126k; responses are sparse early, so even a stop-after-25 cap
+     still timed out). The test now gates on a linear
+     `Data::infosWithParentDialCount()` single pass plus a 5-topic
+     `infosUnderDial` spot-check. The product callers
+     (`DialogueEditorWidget::populateTree`, `DialogueTreeEditor`) have the
+     same complexity and will hang on full-master dialogue trees; they need
+     a reverse parent→children index maintained alongside
+     `m_infoParentDial`.
 
  5. **Master-record state machine on save.** Verify that a materialized
     (deferred) master record saved without edits is not emitted as an override,
@@ -227,23 +289,34 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     for GLOB/GMST edits and `removeRecordWithUndo` for deletes. No remaining
     raw mutations.
 
-    **Status 2026-09-09:** `weatherlighteditor.cpp` "Add Setting" was a
-    disabled no-op stub. It now builds a new `GameSetting` via
-    `createNewRecord(CkId::Type_Gmst, id)` + `initializeSettingValue` (infers
-    bool/int/float/string from the entered value), wraps it in
-    `Record<GameSetting>(State_ModifiedOnly, nullptr, &gs)`, and pushes an
-    `AddRecordCommand` (with a `coll.appendRecord` fallback). The button is
-    re-enabled. `openck` links clean (0 errors); `test_editor_writeback`
-    9/9 pass.
+     **Status 2026-09-09:** `weatherlighteditor.cpp` "Add Setting" was a
+     disabled no-op stub. It now builds a new `GameSetting` via
+     `createNewRecord(CkId::Type_Gmst, id)` + `initializeSettingValue` (infers
+     bool/int/float/string from the entered value), wraps it in
+     `Record<GameSetting>(State_ModifiedOnly, nullptr, &gs)`, and pushes an
+     `AddRecordCommand` (with a `coll.appendRecord` fallback). The button is
+     re-enabled. `openck` links clean (0 errors); `test_editor_writeback`
+     9/9 pass.
  3. **Editor write-back smoke tests.** Automated test per editor: open a fixture
-    record, perform a canonical edit, assert the UndoStack gained a command and
-    the record changed.
+     record, perform a canonical edit, assert the UndoStack gained a command and
+     the record changed.
 
-    **Status 2026-09-08:** `test_editor_writeback` added — 7 test cases covering
-    StatRecord, GlobalVariable, CellRecord, WorldspaceRecord, NpcRecord,
-    PackageRecord, and the no-change case. Each case: add fixture → push
-    `EditRecordCommand` → verify record changed → undo → verify reverted →
-    redo → verify re-applied. All pass.
+     **Status 2026-09-08:** `test_editor_writeback` added — 7 test cases covering
+     StatRecord, GlobalVariable, CellRecord, WorldspaceRecord, NpcRecord,
+     PackageRecord, and the no-change case. Each case: add fixture → push
+     `EditRecordCommand` → verify record changed → undo → verify reverted →
+     redo → verify re-applied. All pass.
+
+     **Status 2026-09-15 (re-audit):** a fresh grep for raw `setModified`
+     across `src/view/window/` found two stragglers the 09-07 audit missed:
+     the Object Window script-text edit and `DialogueEditorWidget::onAddInfo`
+     (DIAL response-id append) both mutated records without an undo command.
+     Both now snapshot original → edit a copy → push `EditRecordCommand`
+     (with a `setModified` fallback only when no UndoStack exists). The two
+     `landscapeeditor.cpp` hits are the canonical pattern (snapshot + push).
+     `test_editor_writeback` extended with `testScriptEditorUndoable` and
+     `testDialAddInfoUndoable`: 13/13 pass. No raw mutations remain outside
+     command application.
 
 ---
 

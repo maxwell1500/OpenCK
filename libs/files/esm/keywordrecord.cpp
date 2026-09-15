@@ -6,7 +6,7 @@ void KeywordRecord::load(ESMReader& esm, bool) {
     while (esm.isRecLeft()) {
         NAME sub = esm.readNSubHeader(); if (sub == 0) break;
         bool handled = false;
-        switch (sub) { case 'EDID': editorId = esm.readZString(); handled = true; break; default: break; }
+        switch (sub) { case 'EDID': editorId = esm.readZString(); hasEdid = true; handled = true; break; default: break; }
         if (handled) continue;
         for (auto& c : components.all()) if (c->canHandle(sub)) { c->handleSubrecord(sub, esm); handled = true; break; }
         if (handled) continue;
@@ -14,8 +14,9 @@ void KeywordRecord::load(ESMReader& esm, bool) {
     }
 }
 void KeywordRecord::save(ESMWriter& esm) const {
-    esm.writeSubZString('EDID', editorId);
+    if (hasEdid || !editorId.isEmpty())
+        esm.writeSubZString('EDID', editorId);
     components.saveAll(esm);
     for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
-void KeywordRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); }
+void KeywordRecord::blank() { editorId = ""; formId = 0; flags = 0; hasEdid = false; rawSubRecords.clear(); components.clear(); }

@@ -232,9 +232,17 @@ void Variant::write(ESMWriter& esm, Format format) const
         {
             esm.writeZString(data.toString().toUtf8());
         }
-        else if (type == Var_None && !rawData.isEmpty())
+        else if (type == Var_LString)
         {
-            esm.writeRawData(rawData.constData(), rawData.size());
+            // Localised 's'-prefix settings store the string-table index.
+            esm.writeType<quint32>(lstring.index);
+        }
+        else if (type == Var_None)
+        {
+            // Unknown-prefix payloads drained at load (possibly empty);
+            // re-emit verbatim so the record round-trips.
+            if (!rawData.isEmpty())
+                esm.writeRawData(rawData.constData(), rawData.size());
         }
         else
         {

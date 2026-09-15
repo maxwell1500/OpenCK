@@ -28,10 +28,15 @@ void AlchRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); hasFlags = true; break;
             case 'DATA': {
-                weight = esm.readType<float>();
-                value = esm.readType<quint32>();
+                // Width-guarded: a short DATA must not over-read into the
+                // following subrecord (that desyncs the stored raws and the
+                // save then emits garbage).
+                dataFields = 0;
+                if (esm.subLeft() >= 4) { weight = esm.readType<float>(); ++dataFields; }
+                if (esm.subLeft() >= 4) { value = esm.readType<quint32>(); ++dataFields; }
+                hasData = true;
                 break;
             }
             default:
@@ -58,12 +63,16 @@ void AlchRecord::save(ESMWriter& esm) const
     if (model) model->modelPath = modelPath;
 
     esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
+    if (hasFlags || flags != 0)
+        esm.writeSubData<quint32>('FNAM', flags);
     components.saveAll(esm);
-    esm.startSubRecord('DATA');
-    esm.writeType<float>(weight);
-    esm.writeType<quint32>(value);
-    esm.endSubRecord();
+    if (hasData || weight != 0.0f || value != 0)
+    {
+        esm.startSubRecord('DATA');
+        if (dataFields > 0) esm.writeType<float>(weight);
+        if (dataFields > 1) esm.writeType<quint32>(value);
+        esm.endSubRecord();
+    }
 
     for (const auto& raw : rawSubRecords)
     {
@@ -80,6 +89,9 @@ void AlchRecord::blank()
     modelPath.clear();
     weight = 0.0f;
     value = 0;
+    dataFields = 2;
+    hasData = false;
+    hasFlags = false;
     rawSubRecords.clear();
     initComponents();
 }

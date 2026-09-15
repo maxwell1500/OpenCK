@@ -14,6 +14,8 @@ struct KeywordRecord {
     quint32 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
     openck::FormComponents components;
+    // Set when EDID was present at load; the save must not invent one.
+    bool hasEdid = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

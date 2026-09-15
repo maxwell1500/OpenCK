@@ -99,11 +99,17 @@ void LocationRecord::load(ESMReader& esm, bool)
         }
         case 'DATA':
         {
-            x = esm.subLeft() >= 4 ? esm.readType<quint32>() : 0;
-            y = esm.subLeft() >= 4 ? esm.readType<quint32>() : 0;
-            z = esm.subLeft() >= 4 ? esm.readType<quint32>() : 0;
+            dataFieldCount = 0;
+            if (esm.subLeft() >= 4) { x = esm.readType<quint32>(); ++dataFieldCount; } else { x = 0; }
+            if (esm.subLeft() >= 4) { y = esm.readType<quint32>(); ++dataFieldCount; } else { y = 0; }
+            if (esm.subLeft() >= 4) { z = esm.readType<quint32>(); ++dataFieldCount; } else { z = 0; }
+            dataExtra.clear();
             if (esm.subLeft() > 0)
-                esm.skip(static_cast<int>(esm.subLeft()));
+            {
+                dataExtra.resize(static_cast<int>(esm.subLeft()));
+                for (int i = 0; i < dataExtra.size(); ++i)
+                    dataExtra[i] = static_cast<char>(esm.readType<quint8>());
+            }
             hasData = true;
             break;
         }
@@ -140,9 +146,11 @@ void LocationRecord::save(ESMWriter& esm) const
     };
     auto writeData = [&]() {
         esm.startSubRecord('DATA');
-        esm.writeType<quint32>(x);
-        esm.writeType<quint32>(y);
-        esm.writeType<quint32>(z);
+        if (dataFieldCount > 0) esm.writeType<quint32>(x);
+        if (dataFieldCount > 1) esm.writeType<quint32>(y);
+        if (dataFieldCount > 2) esm.writeType<quint32>(z);
+        for (char b : dataExtra)
+            esm.writeType<quint8>(static_cast<quint8>(b));
         esm.endSubRecord();
     };
 
@@ -254,5 +262,7 @@ void LocationRecord::blank()
     hasFull = false;
     hasParent = false;
     hasData = false;
+    dataFieldCount = 3;
+    dataExtra.clear();
     initComponents();
 }

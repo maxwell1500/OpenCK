@@ -7,6 +7,7 @@
 
 #include <QString>
 #include <QVector>
+#include <QByteArray>
 
 class ESMReader;
 class ESMWriter;
@@ -31,6 +32,12 @@ struct LocationRecord
     bool hasFull = false;
     bool hasParent = false;
     bool hasData = false;
+    // Width preservation for DATA: how many u32 fields were present at load
+    // (Starfield writes short variants, e.g. 8 bytes = x/y only) plus any
+    // trailing bytes beyond the 3rd field, so an untouched save re-emits
+    // the exact width instead of always writing 12 bytes.
+    int dataFieldCount = 3;
+    QByteArray dataExtra;
 
     // One linked-reference group (Skyrim LCTN): an XNAM subrecord holds the
     // LocationRefType (LCRT) form ID, followed by one LNAM subrecord per

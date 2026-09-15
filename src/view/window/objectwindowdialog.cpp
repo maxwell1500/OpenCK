@@ -641,11 +641,22 @@ void ObjectWindowDialog::editSelected()
         {
             auto& record = collection.getRecord(recordIndex);
             ScriptRecord& rec = record.get();
+            ScriptRecord originalState = rec;
             ScriptEditorDialog dlg(rec.editorId, rec.scriptText, this);
             if (dlg.exec() == QDialog::Accepted)
             {
-                rec.scriptText = dlg.scriptText();
-                record.setModified(rec);
+                ScriptRecord editedState = originalState;
+                editedState.scriptText = dlg.scriptText();
+                if (mData->getUndoStack())
+                {
+                    EditRecordCommand<ScriptRecord>* cmd = new EditRecordCommand<ScriptRecord>(&collection, recordIndex, originalState, editedState,
+                        "Edit Script: " + editedState.editorId);
+                    cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
+                }
+                else
+                {
+                    record.setModified(editedState);
+                }
             }
         }
         break;

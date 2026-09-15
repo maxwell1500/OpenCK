@@ -23,6 +23,9 @@ struct GlobalVariable
     QString editorId;
     Variant value;
     QVector<RawSubRecord> rawSubRecords;
+    // True when an FNAM type subrecord was present at load. Some shipped
+    // GLOBs carry FLTV only; the save must not invent an FNAM for those.
+    bool hasType = true;
 
     void load(ESMReader& esm, bool base = false);
     void save(ESMWriter& esm) const;

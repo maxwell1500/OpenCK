@@ -59,12 +59,21 @@ void GlobalVariable::load(ESMReader& esm, bool)
         value.setShort(static_cast<quint16>(floatValue));
     else
         value.setInt(static_cast<quint32>(floatValue));
+    hasType = haveType;
 }
 
 void GlobalVariable::save(ESMWriter& esm) const
 {
     esm.writeSubZString('EDID', editorId);
-    value.write(esm, Variant::Format_GLOB);
+    if (hasType)
+    {
+        value.write(esm, Variant::Format_GLOB);
+    }
+    else
+    {
+        // FNAM-less record: re-emit the bare FLTV value.
+        esm.writeSubData<float>('FLTV', value.getFloat());
+    }
 
     for (const auto& raw : rawSubRecords)
         esm.writeRawSubRecord(raw);
@@ -76,5 +85,6 @@ void GlobalVariable::blank()
     editorId = "";
     value.setType(VariantType::Var_None);
     constant = false;
+    hasType = true;
     rawSubRecords.clear();
 }

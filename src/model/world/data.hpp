@@ -337,6 +337,11 @@ public:
     /// Empty when the dialogue (or its responses) has not been loaded.
     QVector<quint32> infosUnderDial(quint32 dialFormId);
 
+    /// \brief How many loaded INFO records have a parent DIAL. Linear
+    /// single pass; use this instead of calling infosUnderDial() per topic
+    /// (which is O(dials x infos) and unusable at full-master scale).
+    int infosWithParentDialCount();
+
     // Cell-children tracking for the save path. While the edited file is
     // parsed eagerly, each REFR/ACHR records the CELL it is a child of, so
     // saving can rebuild the cell-children GRUPs instead of emitting a flat

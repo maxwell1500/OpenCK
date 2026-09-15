@@ -4,6 +4,8 @@
 #include "esmwriter.hpp"
 #include "../../components/tier3_components.hpp"
 
+#include <QHash>
+
 void RefrRecord::initComponents()
 {
     components.clear();
@@ -14,10 +16,13 @@ void RefrRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
+    loadOrder.clear();
+    hasEdid = false;
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
         if (sub == 0) break;
+        loadOrder.append(sub);
         bool handled = false;
         for (auto& c : components.all())
         {
@@ -32,7 +37,7 @@ void RefrRecord::load(ESMReader& esm, bool)
 
         switch (sub)
         {
-        case 'EDID': editorId = esm.readZString(); break;
+        case 'EDID': editorId = esm.readZString(); hasEdid = true; break;
         default:
         {
             RawSubRecord raw;
@@ -76,13 +81,98 @@ void RefrRecord::save(ESMWriter& esm) const
 
     // Placed references usually carry no EDID; writing an empty one emits
     // a 1-byte NUL subrecord that breaks payload-identical round-trips.
-    if (!editorId.isEmpty())
-        esm.writeSubZString('EDID', editorId);
-    components.saveAll(esm);
+    // Subrecords replay in load order; values introduced after load (or
+    // absent from it) are appended under the save() conditionals.
+    QHash<NAME, QVector<int>> rawByName;
+    for (int i = 0; i < rawSubRecords.size(); ++i)
+        rawByName[rawSubRecords[i].name].append(i);
+    QHash<NAME, int> rawCursor;
 
-    for (const auto& raw : rawSubRecords)
+    bool wroteEdid = false, wroteName = false, wroteData = false,
+        wroteXscl = false, wroteXown = false, wroteDnam = false,
+        wroteXesp = false, wroteScri = false;
+
+    for (NAME sub : loadOrder)
     {
-        esm.writeRawSubRecord(raw);
+        switch (sub)
+        {
+        case 'EDID':
+            if (!wroteEdid && (hasEdid || !editorId.isEmpty()))
+            {
+                esm.writeSubZString('EDID', editorId);
+                wroteEdid = true;
+            }
+            break;
+        case 'NAME':
+            if (!wroteName && comp && comp->saveSubrecord(esm, sub, true))
+                wroteName = true;
+            break;
+        case 'DATA':
+            if (!wroteData && comp && comp->saveSubrecord(esm, sub, true))
+                wroteData = true;
+            break;
+        case 'XSCL':
+            if (!wroteXscl && comp && comp->saveSubrecord(esm, sub, true))
+                wroteXscl = true;
+            break;
+        case 'XOWN':
+            if (!wroteXown && comp && comp->saveSubrecord(esm, sub, true))
+                wroteXown = true;
+            break;
+        case 'DNAM':
+            if (!wroteDnam && comp && comp->saveSubrecord(esm, sub, true))
+                wroteDnam = true;
+            break;
+        case 'XESP':
+            if (!wroteXesp && comp && comp->saveSubrecord(esm, sub, true))
+                wroteXesp = true;
+            break;
+        case 'SCRI':
+            if (!wroteScri && comp && comp->saveSubrecord(esm, sub, true))
+                wroteScri = true;
+            break;
+        default:
+        {
+            const QVector<int>& idx = rawByName[sub];
+            int& cur = rawCursor[sub];
+            if (cur < idx.size())
+                esm.writeRawSubRecord(rawSubRecords[idx[cur++]]);
+            break;
+        }
+        }
+    }
+
+    if (!wroteEdid && !editorId.isEmpty())
+        esm.writeSubZString('EDID', editorId);
+    if (comp)
+    {
+        if (!wroteName)
+            comp->saveSubrecord(esm, NAME('NAME'), false);
+        if (!wroteData)
+            comp->saveSubrecord(esm, NAME('DATA'), false);
+        if (!wroteXscl)
+            comp->saveSubrecord(esm, NAME('XSCL'), false);
+        if (!wroteXown)
+            comp->saveSubrecord(esm, NAME('XOWN'), false);
+        if (!wroteDnam)
+            comp->saveSubrecord(esm, NAME('DNAM'), false);
+        if (!wroteXesp)
+            comp->saveSubrecord(esm, NAME('XESP'), false);
+        if (!wroteScri)
+            comp->saveSubrecord(esm, NAME('SCRI'), false);
+    }
+
+    // Leftover raws (no load order, e.g. assembled records) keep old order.
+    for (int i = 0; i < rawSubRecords.size(); ++i)
+    {
+        const NAME sub = rawSubRecords[i].name;
+        const QVector<int>& idx = rawByName[sub];
+        int& cur = rawCursor[sub];
+        if (cur < idx.size() && idx[cur] == i)
+        {
+            esm.writeRawSubRecord(rawSubRecords[i]);
+            ++cur;
+        }
     }
 }
 
@@ -103,5 +193,7 @@ void RefrRecord::blank()
     initiallyDisabled = false;
     scriptIds.clear();
     rawSubRecords.clear();
+    loadOrder.clear();
+    hasEdid = false;
     initComponents();
 }

@@ -299,6 +299,12 @@ target_link_libraries(test_subrecord_diff PRIVATE openck_esm Qt6::Core)
 target_include_directories(test_subrecord_diff PRIVATE ${TEST_INCLUDE_DIRS})
 # Not registered with CTest by default — needs a real Starfield install.
 
+# Full-scale untouched round-trip gate (REMAINING.md §1.2). Standalone CLI,
+# driven by tools/nightly-roundtrip.ps1 — far too slow for CTest.
+add_executable(test_fullscale_roundtrip test_fullscale_roundtrip.cpp)
+target_link_libraries(test_fullscale_roundtrip PRIVATE openck_model test_stubs Qt6::Core)
+target_include_directories(test_fullscale_roundtrip PRIVATE ${TEST_INCLUDE_DIRS})
+
 # BTDX v2 GNRL writer round-trip (create -> open/extract).
 add_executable(test_ba2write test_ba2write.cpp)
 target_link_libraries(test_ba2write PRIVATE openck_model test_stubs Qt6::Test)
@@ -914,6 +920,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_specialized_widgets test_spellchecker test_starfieldesm test_starfieldtools
     test_subrecord_roundtrip
     test_subrecord_diff
+    test_fullscale_roundtrip
     test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
     test_tes3 test_tes3roundtrip test_thememanager test_tier3_components test_undostack test_warningsdock

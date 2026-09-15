@@ -146,8 +146,11 @@ void StatRecord::save(ESMWriter& esm) const
         }
     }
 
-    // Values introduced after load (or absent from it) are appended.
-    if (!wroteEdid)
+    // Values introduced after load (or absent from it) are appended. An
+    // EDID is only appended when the record actually has an editor id;
+    // writing an empty one emits a 1-byte NUL subrecord that breaks
+    // payload-identical round-trips (same class as the RefrRecord fix).
+    if (!wroteEdid && !editorId.isEmpty())
         esm.writeSubZString('EDID', editorId);
     if (!wroteFlags && (hasFlags || flags != 0))
         esm.writeSubData<quint32>(flagsSpelling, flags);

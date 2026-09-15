@@ -2056,6 +2056,20 @@ QVector<quint32> Data::infosUnderDial(quint32 dialFormId)
     return out;
 }
 
+int Data::infosWithParentDialCount()
+{
+    int parented = 0;
+    for (int i = 0; i < infoCollection.size(); ++i)
+    {
+        const Record<InfoRecord>& rec = infoCollection.getRecord(i);
+        if (rec.isDeleted())
+            continue;
+        if (m_infoParentDial.value(rec.get().formId, 0) != 0)
+            ++parented;
+    }
+    return parented;
+}
+
 bool Data::beginTypeMaterialization(int typeId)
 {
     const NAME name = typeNameFor(typeId);

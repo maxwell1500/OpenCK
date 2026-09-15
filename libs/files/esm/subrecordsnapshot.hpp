@@ -15,6 +15,7 @@
 #include <QFileInfo>
 #include <QString>
 #include <QVector>
+#include <cstdio>
 
 namespace openck {
 
@@ -73,6 +74,7 @@ inline QVector<RecordSnapshot> collectRecordSnapshots(const QString& path)
     ESMReader reader(path);
     reader.open();
 
+    const bool trace = qgetenv("OPENCK_SNAPSHOT_TRACE") == "1";
     const qint64 fileSize = QFileInfo(path).size();
     while (reader.filePos() < fileSize)
     {
@@ -99,6 +101,11 @@ inline QVector<RecordSnapshot> collectRecordSnapshots(const QString& path)
         snap.type = name;
         snap.formId = header.id;
         snap.flags = header.flags.val;
+        if (trace)
+            fprintf(stderr, "openck-snap: %d %s 0x%x size %u pos %lld\n",
+                out.size(), snapshotName(name).toLatin1().constData(),
+                header.id, header.size,
+                static_cast<long long>(reader.filePos()));
         snap.size = header.size;
         snap.vcDay = header.vcDay;
         snap.vcMonth = header.vcMonth;

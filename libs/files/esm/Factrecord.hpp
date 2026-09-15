@@ -18,6 +18,10 @@ struct FactRecord {
     QVector<QString> ranks;
     QVector<quint32> relations;
     QVector<RawSubRecord> rawSubRecords;
+    // Presence flags so the save never invents subrecords the source
+    // lacked (spurious FNAM/FULL break payload-identical round-trips).
+    bool hasFlags = false;
+    bool hasFull = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

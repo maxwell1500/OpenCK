@@ -445,6 +445,68 @@ public:
         }
     }
 
+    // Writes a single named subrecord from the current values. Used by
+    // RefrRecord::save to replay the load order positionally: with
+    // fromLoad=true the subrecord was present on disk and is emitted from
+    // values unconditionally; with fromLoad=false the save() new-value
+    // conditionals apply. Returns false for unhandled names.
+    bool saveSubrecord(ESMWriter& esm, quint32 subrecordName, bool fromLoad) const
+    {
+        switch (subrecordName)
+        {
+        case NAME('NAME'):
+            esm.writeSubData<quint32>(NAME('NAME'), baseId);
+            return true;
+        case NAME('DATA'):
+            esm.startSubRecord(NAME('DATA'));
+            esm.writeType<float>(posX);
+            esm.writeType<float>(posY);
+            esm.writeType<float>(posZ);
+            esm.writeType<float>(rotX);
+            esm.writeType<float>(rotY);
+            esm.writeType<float>(rotZ);
+            esm.endSubRecord();
+            return true;
+        case NAME('XSCL'):
+            if (fromLoad || scale != 1.0f)
+                esm.writeSubData<float>(NAME('XSCL'), scale);
+            else
+                return false;
+            return true;
+        case NAME('XOWN'):
+            if (fromLoad || owner != 0)
+                esm.writeSubData<quint32>(NAME('XOWN'), owner);
+            else
+                return false;
+            return true;
+        case NAME('DNAM'):
+            if (fromLoad || lockLevel != 0)
+                esm.writeSubData<quint32>(NAME('DNAM'), lockLevel);
+            else
+                return false;
+            return true;
+        case NAME('XESP'):
+            if (fromLoad || initiallyDisabled)
+                esm.writeSubData<quint32>(NAME('XESP'), initiallyDisabled ? 1u : 0u);
+            else
+                return false;
+            return true;
+        case NAME('SCRI'):
+            if (fromLoad || !scriptIds.isEmpty())
+            {
+                esm.startSubRecord(NAME('SCRI'));
+                for (quint32 id : scriptIds)
+                    esm.writeType<quint32>(id);
+                esm.endSubRecord();
+            }
+            else
+                return false;
+            return true;
+        default:
+            return false;
+        }
+    }
+
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
     {
         std::vector<std::unique_ptr<EditorProperty>> out;

@@ -25,6 +25,11 @@ struct RefrRecord
     bool initiallyDisabled;
     QVector<quint32> scriptIds;
     QVector<RawSubRecord> rawSubRecords;
+    // Subrecord names in on-disk order, recorded at load so save() can
+    // replay them positionally (untouched round-trips stay identical).
+    QVector<NAME> loadOrder;
+    // True when an EDID subrecord was present at load (possibly empty).
+    bool hasEdid = false;
 
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

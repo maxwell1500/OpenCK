@@ -11,6 +11,9 @@
 #include <QFile>
 #include <QSet>
 
+#include <cstdio>
+#include <cstring>
+
 Document::Document(const QStringList& contentFiles, const QString& savePath, bool isNew) :
     paths(FilePaths(QCoreApplication::applicationName())),
     contentFiles(contentFiles),
@@ -368,14 +371,36 @@ void Document::save(const QString& savePath)
         const uint32_t achrTag = static_cast<uint32_t>('ACHR');
         const uint32_t cellTag = static_cast<uint32_t>('CELL');
         const auto& cells = data->getCellCollection();
+        // Env-gated save progress for the nightly full-scale gate: prints
+        // every 1000th replayed record so a save-side crash can be localized
+        // to a record type without a debugger attached.
+        const bool saveProgress = qEnvironmentVariableIsSet("OPENCK_SAVE_PROGRESS");
+        qint64 replayCount = 0;
         for (const auto& ref : data->pluginOrder())
         {
+            if (saveProgress && (replayCount++ % 1000) == 0)
+            {
+                char tag[5] = {};
+                memcpy(tag, &ref.type, 4);
+                fprintf(stderr, "openck-save: replay %lld %s 0x%x\n",
+                    static_cast<long long>(replayCount), tag, ref.formId);
+                fflush(stderr);
+            }
             const uint32_t tag = ref.type;
             if (tag == refrTag || tag == achrTag)
                 continue;
             const auto itc = collByTag.find(tag);
             if (itc == collByTag.end())
+            {
+                if (saveProgress)
+                {
+                    char tag[5] = {};
+                    memcpy(tag, &ref.type, 4);
+                    fprintf(stderr, "openck-save: skip untracked %s 0x%x\n", tag, ref.formId);
+                    fflush(stderr);
+                }
                 continue;
+            }
             const int idx = indexByTag[tag].value(ref.formId, -1);
             if (idx < 0)
                 continue;
@@ -399,7 +424,20 @@ void Document::save(const QString& savePath)
             }
             if ((*itc)->isRecordSaveable(idx))
             {
+                if (saveProgress)
+                {
+                    char tag[5] = {};
+                    memcpy(tag, &ref.type, 4);
+                    fprintf(stderr, "openck-save: saveable %s 0x%x idx %d\n",
+                        tag, (*itc)->getFormId(idx), idx);
+                    fflush(stderr);
+                }
                 ensureGrup(tag);
+                if (saveProgress)
+                {
+                    fprintf(stderr, "openck-save: grup ok idx %d\n", idx);
+                    fflush(stderr);
+                }
                 if ((*itc)->saveRecordAt(writer, tag, idx))
                 {
                     written.insert(saveKey(tag, ref.formId));

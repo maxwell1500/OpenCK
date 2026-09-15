@@ -12,6 +12,8 @@
 #include "libs/files/esm/worldspacerecord.hpp"
 #include "libs/files/esm/npcrecord.hpp"
 #include "libs/files/esm/Packagerecord.hpp"
+#include "libs/files/esm/scriptrecord.hpp"
+#include "libs/files/esm/dialrecord.hpp"
 #include "libs/files/esm/refrecord.hpp"
 #include "libs/files/esm/common.hpp"
 #include "libs/files/esm/gameformat.hpp"
@@ -30,6 +32,8 @@ private slots:
     void testWorldspaceEditorUndoable();
     void testNpcEditorUndoable();
     void testPackEditorUndoable();
+void testScriptEditorUndoable();
+void testDialAddInfoUndoable();
     void testRefrTransformUndoable();
     void testCurrentGameDetection();
     void testNoChangeDoesNotPush();
@@ -270,6 +274,73 @@ void TestEditorWriteback::testRefrTransformUndoable()
     same.applyTransform(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
     EditRecordCommand<RefrRecord> noChange(&col, 0, original, same);
     QVERIFY(!noChange.hasChanged());
+}
+
+void TestEditorWriteback::testScriptEditorUndoable()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& col = data.getScptCollection();
+    auto* stack = data.getUndoStack();
+
+    ScriptRecord rec;
+    rec.editorId = "smoke_script";
+    rec.formId = 0x00000807;
+    rec.scriptText = "Begin OnActivate\nEnd";
+    col.add(rec);
+
+    // Mirrors the Object Window script-edit commit path.
+    ScriptRecord original = col.getRecord(0).get();
+    ScriptRecord edited = original;
+    edited.scriptText = "Begin OnActivate\nPlayer.AddItem f 1\nEnd";
+
+    EditRecordCommand<ScriptRecord> probe(&col, 0, original, edited);
+    QVERIFY(probe.hasChanged());
+    stack->push(new EditRecordCommand<ScriptRecord>(&col, 0, original, edited,
+                                                    "Edit Script: smoke_script"));
+
+    QCOMPARE(stack->undoCount(), 1);
+    QVERIFY(col.getRecord(0).get().scriptText.contains("AddItem"));
+
+    stack->undo();
+    QVERIFY(!col.getRecord(0).get().scriptText.contains("AddItem"));
+
+    stack->redo();
+    QVERIFY(col.getRecord(0).get().scriptText.contains("AddItem"));
+}
+
+void TestEditorWriteback::testDialAddInfoUndoable()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& col = data.getDialCollection();
+    auto* stack = data.getUndoStack();
+
+    DialRecord rec;
+    rec.editorId = "smoke_dial";
+    rec.formId = 0x00000808;
+    col.add(rec);
+
+    // Mirrors the DialogueEditorWidget::onAddInfo commit path.
+    DialRecord original = col.getRecord(0).get();
+    DialRecord edited = original;
+    edited.responseIds.append(0x00000809);
+    edited.hasInam = true;
+
+    EditRecordCommand<DialRecord> probe(&col, 0, original, edited);
+    QVERIFY(probe.hasChanged());
+    stack->push(new EditRecordCommand<DialRecord>(&col, 0, original, edited,
+                                                  "Add Info to DIAL: smoke_dial"));
+
+    QCOMPARE(stack->undoCount(), 1);
+    QCOMPARE(col.getRecord(0).get().responseIds.size(), 1);
+    QVERIFY(col.getRecord(0).get().hasInam);
+
+    stack->undo();
+    QVERIFY(col.getRecord(0).get().responseIds.isEmpty());
+
+    stack->redo();
+    QCOMPARE(col.getRecord(0).get().responseIds.size(), 1);
 }
 
 void TestEditorWriteback::testCurrentGameDetection()
