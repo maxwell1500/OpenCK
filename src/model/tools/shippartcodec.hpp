@@ -31,6 +31,11 @@ struct ShipPartDefinition
     QVector<quint32> linkedFormIds;      // BGSFormLinkData_Component::FLFM
     QVector<quint32> linkedKeywordIds;   // BGSFormLinkData_Component::FLKW
     QStringList componentTypes;          // BFCB component type names present
+    // Blueprint_Component::BUO4 — the module placements that make up the
+    // part (base GBFM + COBJ + transform + part id). Empty for non-blueprint
+    // parts; the Blueprint component is opaque to xEdit override-copying but
+    // its BUO4 stride is fully defined.
+    QVector<ShipBlueprintItem> blueprintItems;
 };
 
 namespace ShipPartCodec

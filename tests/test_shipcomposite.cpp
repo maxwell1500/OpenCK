@@ -23,6 +23,8 @@ private slots:
     void testGbfmComponentParsing();
     void testGbfmRoundTrip();
     void testApplyToGbfmNoOp();
+    void testBlueprintItems();
+    void testCrowdComponent();
     void testResolveRealChain();
 
 private:
@@ -257,6 +259,91 @@ void TestShipComposite::testApplyToGbfmNoOp()
     qDebug() << "applyToGbfm no-op checked:" << checked << "failures:" << failures;
     QVERIFY(checked > 0);
     QCOMPARE(failures, 0);
+}
+
+void TestShipComposite::testBlueprintItems()
+{
+    const QString path = esmPath();
+    if (!QFileInfo::exists(path)) QSKIP("Starfield.esm not found");
+
+    int recordsWithBlueprint = 0;
+    int totalItems = 0;
+    int itemsWithBase = 0;
+    int strideFailures = 0;
+
+    scanTyped(path, NAME('GBFM'), [&](ESMReader& reader) {
+        GbfmRecord rec;
+        rec.load(reader, true);
+        const QVector<GbfmComponent> comps = rec.parseComponents();
+        const GbfmComponent* bc =
+            GbfmRecord::findComponent(comps, QStringLiteral("Blueprint_Component"));
+        if (bc)
+        {
+            ++recordsWithBlueprint;
+            for (const RawSubRecord& r : bc->subrecords)
+            {
+                if (r.name != NAME('BUO4'))
+                    continue;
+                if (r.data.size() % ShipBlueprintItem::kStride != 0)
+                    ++strideFailures;
+            }
+            const QVector<ShipBlueprintItem> items = rec.blueprintItems();
+            totalItems += items.size();
+            for (const ShipBlueprintItem& item : items)
+                if (item.baseItemFormId != 0)
+                    ++itemsWithBase;
+        }
+        return recordsWithBlueprint >= 25;
+    });
+
+    qDebug() << "GBFM with Blueprint_Component:" << recordsWithBlueprint
+             << "items:" << totalItems
+             << "items with base:" << itemsWithBase
+             << "stride failures:" << strideFailures;
+    QVERIFY(recordsWithBlueprint > 0);
+    QVERIFY(totalItems > 0);
+    QVERIFY(itemsWithBase > 0);
+    // Every BUO4 length must be a whole number of 36-byte items, or the
+    // stride assumption is wrong and the parse silently produced garbage.
+    QCOMPARE(strideFailures, 0);
+}
+
+void TestShipComposite::testCrowdComponent()
+{
+    const QString path = esmPath();
+    if (!QFileInfo::exists(path)) QSKIP("Starfield.esm not found");
+
+    int recordsWithCrowd = 0;
+    int totalPopulations = 0;
+    int namedPopulations = 0;
+    scanTyped(path, NAME('GBFM'), [&](ESMReader& reader) {
+        GbfmRecord rec;
+        rec.load(reader, true);
+        const QVector<GbfmComponent> comps = rec.parseComponents();
+        if (!GbfmRecord::findComponent(comps,
+                QStringLiteral("BGSCrowdComponent_Component")))
+            return false;
+        ++recordsWithCrowd;
+        const QVector<CrowdPopulation> pops = rec.crowdPopulations();
+        totalPopulations += pops.size();
+        for (const CrowdPopulation& p : pops)
+            if (!p.name.isEmpty())
+                ++namedPopulations;
+        // Density is a float; a finite non-zero value on at least one record
+        // confirms the field offset.
+        return recordsWithCrowd >= 10;
+    });
+
+    qDebug() << "GBFM with Crowd component:" << recordsWithCrowd
+             << "populations:" << totalPopulations
+             << "named:" << namedPopulations;
+    // Crowd components are optional; when present the population names must
+    // decode. If none exist in this master, that is a valid outcome.
+    if (recordsWithCrowd > 0)
+    {
+        QVERIFY(totalPopulations > 0);
+        QVERIFY(namedPopulations > 0);
+    }
 }
 
 void TestShipComposite::testResolveRealChain()

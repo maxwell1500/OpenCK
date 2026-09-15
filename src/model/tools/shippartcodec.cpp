@@ -73,6 +73,7 @@ ShipPartDefinition fromGbfm(const GbfmRecord& rec)
     def.linkedFormIds = rec.linkedFormIds();
     def.linkedKeywordIds = rec.linkedKeywordIds();
     def.componentTypes = rec.componentTypeNames();
+    def.blueprintItems = rec.blueprintItems();
     return def;
 }
 

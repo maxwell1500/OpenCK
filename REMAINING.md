@@ -472,14 +472,25 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
           produces `ShipComposite` (recipe, form list, variant form ids +
           resolved editor ids), with a case-insensitive id lookup helper (the
           collections' own `searchId` is case-sensitive while the game is not).
-        - `test_shipcomposite` 6/6 against real Starfield.esm: component
-          parsing, 15 GBFM byte-exact round-trips, 15 no-op applies, and a real
+        - `test_shipcomposite` 8/8 against real Starfield.esm: component
+          parsing, 15 GBFM byte-exact round-trips, 15 no-op applies, a real
           chain (`co_SMS_FuelTank_Dogstar_M50_Ulysses` →
-          `SMSSet_FuelTank_Dogstar_M50` → 2 variant GBFMs).
-        Not done: the opaque components (Blueprint/BUO4, NVNM) remain un-
-        decoded, so the editor exposes identity/keywords/form-links rather
-        than every component field; xEdit itself blocks copying records with
-        these data streams.
+          `SMSSet_FuelTank_Dogstar_M50` → 2 variant GBFMs), the ship
+          blueprint decode (25 records / 1,267 items / 0 stride failures) and
+          the crowd component decode.
+        - **Component layouts** are now taken from xEdit's published
+          `wbDefinitionsSF1.pas` (MPL) rather than guessed, which unblocked
+          two components the earlier note called opaque:
+          - `Blueprint_Component::BUO4` — the module placements (Base Item
+            GBFM, Construction Object COBJ, Vec3PosRot 3+3 floats, Part ID),
+            a fixed 36-byte stride. This is the actual ship composition.
+          - `BGSCrowdComponent_Component` — CDND density, CDNS population
+            count, and per-population STRV name + FLTV scale.
+        Genuinely opaque: `ReflectionProbes_Component` (REFL),
+        `ParticleSystem_Component` (PTCL) and `HoudiniData_Component` (PCCC)
+        are `wbReflection` data streams — preserved byte-exactly but not
+        semantically decoded (xEdit blocks override-copying them too). NVNM
+        (navmesh) is defined but large; it rides along as a raw subrecord.
       - **OPAL placement lists:** the real binary `.opl` format is now
         decoded and implemented (the earlier CSV/header version was a guess).
         Found via the ten shipped lists under `Content/OPAL/` — all 3,311
@@ -491,8 +502,15 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
         round-trip), the dialog now shows name/transform/FormID, and
         `test_opallist` 7/7 — including a byte-exact round-trip of all ten
         shipped files.
-      - **Galaxy/Crowd:** no ESM record type exists (174 signatures scanned).
-        JSON-only.
+      - **Galaxy/Crowd:** crowd-region data lives in the
+        `BGSCrowdComponent_Component` GBFM component (now decoded, above), so
+        the CrowdRegion model can be backed by a real record when a matching
+        GBFM is chosen. The galaxy map still has no ESM record type (174
+        signatures scanned) — it is an editor layout over planet/star data.
+      - **ReflectionProbes:** also a GBFM component
+        (`ReflectionProbes_Component`), but its payload is a `wbReflection`
+        data stream that neither OpenCK nor xEdit decodes; the model stays
+        JSON-only until that stream is documented.
     - Voice/Houdini: done (see above).
     - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
       the in-box Windows speech engine (System.Speech over SAPI in a helper
