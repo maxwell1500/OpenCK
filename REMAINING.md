@@ -486,11 +486,14 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
             a fixed 36-byte stride. This is the actual ship composition.
           - `BGSCrowdComponent_Component` — CDND density, CDNS population
             count, and per-population STRV name + FLTV scale.
-        Genuinely opaque: `ReflectionProbes_Component` (REFL),
-        `ParticleSystem_Component` (PTCL) and `HoudiniData_Component` (PCCC)
-        are `wbReflection` data streams — preserved byte-exactly but not
-        semantically decoded (xEdit blocks override-copying them too). NVNM
-        (navmesh) is defined but large; it rides along as a raw subrecord.
+        Genuinely opaque: `ParticleSystem_Component` (PTCL) and
+        `HoudiniData_Component` (PCCC) are `wbReflection` data streams —
+        preserved byte-exactly but not semantically decoded (xEdit blocks
+        override-copying them too). (`ReflectionProbes_Component` was in this
+        list until 2026-09-14; it has zero shipped instances and the real
+        probe data is `Volumes_Component::VLMS`, now decoded — see below.)
+        NVNM (navmesh) is defined but large; it rides along as a raw
+        subrecord.
       - **OPAL placement lists:** the real binary `.opl` format is now
         decoded and implemented (the earlier CSV/header version was a guess).
         Found via the ten shipped lists under `Content/OPAL/` — all 3,311
