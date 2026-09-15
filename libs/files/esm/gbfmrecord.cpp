@@ -230,3 +230,23 @@ ReflectionStream GbfmRecord::reflectionStream() const
     const RawSubRecord* r = c->findSubrecord(NAME('REFL'));
     return r ? parseReflectionStream(r->data) : ReflectionStream();
 }
+
+QVector<VolumeEntry> GbfmRecord::volumes() const
+{
+    const QVector<GbfmComponent> pieces = parseComponents();
+    const GbfmComponent* c = findComponent(pieces,
+        QStringLiteral("Volumes_Component"));
+    if (!c)
+        return QVector<VolumeEntry>();
+
+    QVector<VolumeEntry> all;
+    for (const RawSubRecord& raw : c->subrecords)
+    {
+        if (raw.name != NAME('VLMS'))
+            continue;
+        QVector<VolumeEntry> parsed;
+        if (parseVolumePayload(raw.data, parsed))
+            all += parsed;
+    }
+    return all;
+}

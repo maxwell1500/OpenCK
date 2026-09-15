@@ -25,6 +25,7 @@ private slots:
     void testApplyToGbfmNoOp();
     void testBlueprintItems();
     void testCrowdComponent();
+    void testVolumeComponent();
     void testResolveRealChain();
 
 private:
@@ -344,6 +345,74 @@ void TestShipComposite::testCrowdComponent()
         QVERIFY(totalPopulations > 0);
         QVERIFY(namedPopulations > 0);
     }
+}
+
+void TestShipComposite::testVolumeComponent()
+{
+    const QString path = esmPath();
+    if (!QFileInfo::exists(path)) QSKIP("Starfield.esm not found");
+
+    // Volumes_Component::VLMS backs the shipped volume data behind reflection
+    // probes / probe grid volumes. Scan records of any type that carry VLMS
+    // and assert the decode consumes exactly each subrecord.
+    ESMReader reader(path);
+    reader.open();
+
+    int subrecords = 0;
+    int entries = 0;
+    int failures = 0;
+    QMap<quint32, int> typeHistogram;
+
+    const NAME wanted = NAME('VLMS');
+    while (subrecords < 400 && reader.isLeft())
+    {
+        NAME name = 0;
+        try { name = reader.readName(); } catch (...) { break; }
+        if (name == 0) break;
+        if (name == (NAME)'GRUP') { reader.skipGrupHeader(); continue; }
+
+        reader.readHeader();
+        while (reader.isRecLeft())
+        {
+            const NAME sub = reader.readNSubHeader();
+            if (sub == 0) break;
+            QByteArray data;
+            reader.readRawSubData(data);
+            if (sub != wanted)
+                continue;
+
+            QVector<VolumeEntry> parsed;
+            const bool ok = parseVolumePayload(data, parsed);
+            if (!ok)
+            {
+                ++failures;
+                qWarning() << "VLMS decode failed, size" << data.size();
+            }
+            else
+            {
+                for (const VolumeEntry& e : parsed)
+                    typeHistogram[e.type] = typeHistogram.value(e.type) + 1;
+                entries += parsed.size();
+            }
+            ++subrecords;
+            if (subrecords >= 400)
+                break;
+        }
+    }
+
+    qDebug() << "VLMS subrecords:" << subrecords
+             << "entries:" << entries
+             << "failures:" << failures
+             << "types:" << typeHistogram;
+    QVERIFY(subrecords > 0);
+    QVERIFY(entries > 0);
+    QVERIFY(subrecords > 0);
+    QVERIFY(typeHistogram.contains(5));
+    QCOMPARE(failures, 0);
+
+    // Whole-master sweep is done by the Python validation harness; here a 400
+    // subrecord sample is enough to pin the layout in the test suite.
+    Q_UNUSED(entries);
 }
 
 void TestShipComposite::testResolveRealChain()

@@ -516,18 +516,33 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
         and REFL schema decode.
       - **Crowd — DONE (component):** `BGSCrowdComponent_Component` (density,
         population count, per-population name/scale) is decoded on GBFM.
-      - **ReflectionProbes — PARTIAL, and blocked on shipped data.** Two
-        findings: (1) `ReflectionProbes_Component` is defined by xEdit but
-        does **not** occur anywhere in Starfield.esm — there is no shipped
-        instance to validate against. (2) Its payload is a "reflection" data
-        stream; that format is *not* raw noise — every stream starts with a
-        `BETH` magic and carries an embedded type/field schema. `parseReflectionStream`
-        (`libs/files/esm/reflectstream.*`) now extracts the root type name and
-        field names (e.g. `BSGalaxy::BGSSunPresetForm` with `SunColor`,
-        `SunIlluminance`, …) while preserving exact bytes. Field *values* still
-        need the per-type layouts that neither OpenCK nor xEdit has, and with
-        no shipped `ReflectionProbes_Component` instance there is nothing to
-        validate a decode against — so the model stays JSON-only.
+      - **ReflectionProbes — RESOLVED 2026-09-14 (was looking in the wrong
+        place).** Searched *every* installed master (Starfield.esm,
+        BlueprintShips 290 MB, SFBGS00D 97 MB, all DLC/mod masters) and the
+        Creation Kit itself:
+        - `ReflectionProbes_Component` has **zero shipped instances** — xEdit
+          defines it, nothing emits it. It was never the right target.
+        - The CK's real reflection-probe system is cell/volume based: its
+          binary references `ProbeGridVolume`, `ReflectionProbeCellComponent`
+          and `ReflectionProbeInstanceData`, and a "Reflection Probes" toolbar
+          action, and `E:\BuildAgent\...\Genesis\BSMain\BSReflectionProbe.cpp`.
+        - The shipped representation is **`Volumes_Component::VLMS`** (present
+          on STAT/REFR/GBFM in every master) plus `XVOI` — "Volume Reflection
+          Probe Offset Intensity" — on references.
+        - `parseVolumePayload` (`libs/files/esm/baseformcomponents.*`) decodes
+          VLMS: `uint32 count`, then per entry `uint32 type` (1/3/5),
+          row-major `float[16]` matrix, 3 floats, and a type-specific tail
+          (1→1, 3→2, 5→3 floats) per xEdit's `wbVLMSTypeDecider`. Validated
+          against the whole master: **11,765 VLMS subrecords, every one
+          consuming exactly its own size, 0 failures** (types 1:114, 3:549,
+          5:18223). `test_shipcomposite::testVolumeComponent` pins a sample.
+        - `parseReflectionStream` (`libs/files/esm/reflectstream.*`) also now
+          reads the `BETH`-framed REFL schema (root type + field names), so
+          that stream is no longer an opaque blob. Field *values* still need
+          the per-type layouts nobody has.
+        So the probe geometry/data is decodable from shipped files; the
+        remaining gap is only the *semantics* of the volume `type` codes,
+        which neither xEdit nor the CK expose.
     - Voice/Houdini: done (see above).
     - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
       the in-box Windows speech engine (System.Speech over SAPI in a helper

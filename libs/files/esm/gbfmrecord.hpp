@@ -94,6 +94,11 @@ struct GbfmRecord {
     // shipped Starfield.esm.
     ReflectionStream reflectionStream() const;
 
+    // --- Volumes_Component (VLMS) ---
+    // The shipped volume entries (reflection/probe grid volumes, trigger
+    // volumes). Empty when the component is absent or malformed.
+    QVector<VolumeEntry> volumes() const;
+
     int rawSubrecordIndex(NAME name) const;
 };
 

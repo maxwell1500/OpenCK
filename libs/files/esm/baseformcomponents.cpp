@@ -137,3 +137,55 @@ const BaseFormComponent* findBaseFormComponent(
             return &c;
     return nullptr;
 }
+
+bool parseVolumePayload(const QByteArray& data, QVector<VolumeEntry>& out)
+{
+    out.clear();
+    if (data.size() < 4)
+        return false;
+
+    int offset = 0;
+    const quint32 count = baseFormU32(data, offset);
+    offset += 4;
+
+    out.reserve(static_cast<int>(count));
+    for (quint32 i = 0; i < count; ++i)
+    {
+        VolumeEntry entry;
+        entry.type = baseFormU32(data, offset);
+        offset += 4;
+
+        // type + 16 matrix floats + 3 floats, then the type-specific tail.
+        int extraCount = 0;
+        if (entry.type == 1)
+            extraCount = 1;
+        else if (entry.type == 3)
+            extraCount = 2;
+        else if (entry.type == 5)
+            extraCount = 3;
+        const int entrySize = 4 + VolumeEntry::kMatrixFloats * 4 + 3 * 4
+            + extraCount * 4;
+
+        if (offset + entrySize - 4 > data.size())
+            return false;   // truncated: reject rather than emit a partial entry
+
+        for (int f = 0; f < VolumeEntry::kMatrixFloats; ++f)
+        {
+            entry.matrix[f] = baseFormF32(data, offset);
+            offset += 4;
+        }
+        entry.a = baseFormF32(data, offset); offset += 4;
+        entry.b = baseFormF32(data, offset); offset += 4;
+        entry.c = baseFormF32(data, offset); offset += 4;
+        for (int e = 0; e < extraCount; ++e)
+        {
+            entry.extra.append(baseFormF32(data, offset));
+            offset += 4;
+        }
+        out.append(entry);
+    }
+
+    // Every shipped VLMS consumes exactly its subrecord; a leftover tail means
+    // the layout assumption is wrong.
+    return offset == data.size();
+}
