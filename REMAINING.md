@@ -480,8 +480,19 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
         decoded, so the editor exposes identity/keywords/form-links rather
         than every component field; xEdit itself blocks copying records with
         these data streams.
-      - **Galaxy/Crowd/Opal:** no ESM record type exists (174 signatures
-        scanned). JSON-only.
+      - **OPAL placement lists:** the real binary `.opl` format is now
+        decoded and implemented (the earlier CSV/header version was a guess).
+        Found via the ten shipped lists under `Content/OPAL/` — all 3,311
+        entries parse with zero trailing bytes. Layout: `uint32 version` (=3),
+        `uint32 count`, then per entry `uint32 nameLen`, name + NUL, `uint32
+        payloadLen` (0 or 24), payload (24 = 6 floats: pos xyz + rot xyz),
+        `uint64 trailer` (high 32 always 0; low 32 = FormID). `OpalList` was
+        rewritten to this layout (payload kept as raw bytes for exact
+        round-trip), the dialog now shows name/transform/FormID, and
+        `test_opallist` 7/7 — including a byte-exact round-trip of all ten
+        shipped files.
+      - **Galaxy/Crowd:** no ESM record type exists (174 signatures scanned).
+        JSON-only.
     - Voice/Houdini: done (see above).
     - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
       the in-box Windows speech engine (System.Speech over SAPI in a helper

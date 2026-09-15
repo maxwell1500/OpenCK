@@ -1,163 +1,164 @@
 #include "opallist.hpp"
 
+#include <QDataStream>
 #include <QFile>
+
+#include <cstring>
 
 #include "../../files/log/logger.hpp"
 
 namespace {
 
-// Splits a CSV line, respecting double-quoted fields ("" escapes a quote).
-QStringList splitCsvLine(const QString& line)
+// The shipped format is little-endian; read explicit widths rather than
+// relying on QDataStream's float/version defaults.
+quint32 readU32(const QByteArray& data, int& offset)
 {
-    QStringList fields;
-    QString current;
-    bool inQuotes = false;
-    const QChar quote('"');
+    if (offset + 4 > data.size())
+        return 0;
+    const uchar* p = reinterpret_cast<const uchar*>(data.constData()) + offset;
+    offset += 4;
+    return static_cast<quint32>(p[0])
+        | (static_cast<quint32>(p[1]) << 8)
+        | (static_cast<quint32>(p[2]) << 16)
+        | (static_cast<quint32>(p[3]) << 24);
+}
 
-    for (int i = 0; i < line.size(); ++i)
-    {
-        const QChar c = line.at(i);
-        if (inQuotes)
-        {
-            if (c == quote)
-            {
-                if (i + 1 < line.size() && line.at(i + 1) == quote)
-                {
-                    current += quote;
-                    ++i;
-                }
-                else
-                {
-                    inQuotes = false;
-                }
-            }
-            else
-            {
-                current += c;
-            }
-        }
-        else if (c == quote)
-        {
-            inQuotes = true;
-        }
-        else if (c == ',')
-        {
-            fields.append(current.trimmed());
-            current.clear();
-        }
-        else
-        {
-            current += c;
-        }
-    }
-    fields.append(current.trimmed());
-    return fields;
+quint64 readU64(const QByteArray& data, int& offset)
+{
+    const quint32 lo = readU32(data, offset);
+    const quint32 hi = readU32(data, offset);
+    return static_cast<quint64>(lo) | (static_cast<quint64>(hi) << 32);
+}
+
+void writeU32(QByteArray& out, quint32 value)
+{
+    out.append(static_cast<char>(value & 0xFF));
+    out.append(static_cast<char>((value >> 8) & 0xFF));
+    out.append(static_cast<char>((value >> 16) & 0xFF));
+    out.append(static_cast<char>((value >> 24) & 0xFF));
+}
+
+void writeU64(QByteArray& out, quint64 value)
+{
+    writeU32(out, static_cast<quint32>(value & 0xFFFFFFFFu));
+    writeU32(out, static_cast<quint32>(value >> 32));
 }
 
 } // namespace
 
-OpalList OpalList::parse(const QString& content)
+QVector<float> OpalPlacement::transform() const
 {
-    OpalList list;
-    const QStringList lines = content.split('\n');
-
-    bool firstLine = true;
-    for (QString line : lines)
+    QVector<float> values;
+    if (!hasTransform())
+        return values;
+    values.resize(6);
+    for (int i = 0; i < 6; ++i)
     {
-        line = line.trimmed();
-        if (line.isEmpty())
-            continue;
-        if (line.startsWith('#'))
-            continue;
-
-        const QStringList fields = splitCsvLine(line);
-        if (firstLine)
-        {
-            list.headers = fields;
-            firstLine = false;
-            continue;
-        }
-
-        QVector<QString> row = fields.toVector();
-        // Pad short rows to match the header width.
-        while (row.size() < list.headers.size())
-            row.append(QString());
-        list.rows.append(row);
+        const uchar* p = reinterpret_cast<const uchar*>(payload.constData()) + i * 4;
+        const quint32 bits = static_cast<quint32>(p[0])
+            | (static_cast<quint32>(p[1]) << 8)
+            | (static_cast<quint32>(p[2]) << 16)
+            | (static_cast<quint32>(p[3]) << 24);
+        float f = 0.0f;
+        static_assert(sizeof(float) == 4, "float must be 32-bit");
+        std::memcpy(&f, &bits, sizeof(f));
+        values[i] = f;
     }
-    return list;
+    return values;
+}
+
+bool OpalList::parse(const QByteArray& data, OpalList& out)
+{
+    out = OpalList();
+
+    // Header is version + count; an empty or truncated header is not a list.
+    if (data.size() < 8)
+        return false;
+
+    int offset = 0;
+    out.version = readU32(data, offset);
+    const quint32 count = readU32(data, offset);
+
+    out.placements.reserve(static_cast<int>(count));
+    for (quint32 i = 0; i < count; ++i)
+    {
+        OpalPlacement placement;
+        const quint32 nameLen = readU32(data, offset);
+        if (offset + static_cast<int>(nameLen) + 1 > data.size())
+            return false;
+        placement.name = QString::fromLatin1(data.constData() + offset,
+                                             static_cast<int>(nameLen));
+        offset += static_cast<int>(nameLen);
+        offset += 1;   // NUL terminator (always present on shipped data)
+
+        const quint32 payloadLen = readU32(data, offset);
+        if (offset + static_cast<int>(payloadLen) + 8 > data.size())
+            return false;
+        placement.payload = data.mid(offset, static_cast<int>(payloadLen));
+        offset += static_cast<int>(payloadLen);
+
+        placement.trailer = readU64(data, offset);
+        out.placements.append(placement);
+    }
+
+    // Every shipped file consumes exactly its own size; a leftover tail means
+    // the layout assumption is wrong, so reject rather than silently accept.
+    if (offset != data.size())
+        return false;
+
+    return true;
 }
 
 bool OpalList::loadFile(const QString& path, OpalList& out)
 {
     QFile file(path);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    if (!file.open(QIODevice::ReadOnly))
     {
         LOG_WARNING(QString("OpalList::loadFile: cannot open %1").arg(path));
         return false;
     }
-    const QString content = QString::fromUtf8(file.readAll());
+    const QByteArray data = file.readAll();
     file.close();
 
-    out = parse(content);
-    LOG_DEBUG(QString("OpalList: parsed %1 placement rows from %2")
-        .arg(out.rowCount()).arg(path));
+    if (!parse(data, out))
+    {
+        LOG_WARNING(QString("OpalList::loadFile: malformed .opl %1").arg(path));
+        return false;
+    }
+    LOG_DEBUG(QString("OpalList: parsed %1 placements (version %2) from %3")
+        .arg(out.rowCount()).arg(out.version).arg(path));
     return true;
 }
 
-QString OpalList::value(int row, const QString& columnName) const
+QByteArray OpalList::serialize() const
 {
-    if (row < 0 || row >= rows.size())
-        return QString();
-    const int col = headers.indexOf(columnName);
-    if (col < 0 || col >= rows[row].size())
-        return QString();
-    return rows[row][col];
-}
+    QByteArray out;
+    writeU32(out, version);
+    writeU32(out, static_cast<quint32>(placements.size()));
 
-namespace {
-
-QString escapeCsvField(const QString& field)
-{
-    if (field.contains(',') || field.contains('"') || field.contains('\n'))
+    for (const OpalPlacement& placement : placements)
     {
-        QString escaped = field;
-        escaped.replace('"', QStringLiteral("\"\""));
-        return QStringLiteral("\"") + escaped + QStringLiteral("\"");
+        const QByteArray name = placement.name.toLatin1();
+        writeU32(out, static_cast<quint32>(name.size()));
+        out.append(name);
+        out.append('\0');
+        writeU32(out, static_cast<quint32>(placement.payload.size()));
+        out.append(placement.payload);
+        writeU64(out, placement.trailer);
     }
-    return field;
-}
-
-} // namespace
-
-QString OpalList::toCsv() const
-{
-    QStringList lines;
-
-    QStringList headerFields;
-    for (const QString& h : headers)
-        headerFields.append(escapeCsvField(h));
-    lines.append(headerFields.join(','));
-
-    for (const QVector<QString>& row : rows)
-    {
-        QStringList fields;
-        for (const QString& f : row)
-            fields.append(escapeCsvField(f));
-        lines.append(fields.join(','));
-    }
-
-    return lines.join('\n') + '\n';
+    return out;
 }
 
 bool OpalList::saveFile(const QString& path) const
 {
     QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    if (!file.open(QIODevice::WriteOnly))
     {
         LOG_WARNING(QString("OpalList::saveFile: cannot write %1").arg(path));
         return false;
     }
-    file.write(toCsv().toUtf8());
+    const QByteArray data = serialize();
+    const bool ok = file.write(data) == data.size();
     file.close();
-    return true;
+    return ok;
 }

@@ -8,8 +8,8 @@
 class QTableWidget;
 
 // Starfield OPAL procedural-placement list editor (REMAINING.md §3.8). Shows
-// the header/rows of a .opl list in a table, lets the user add/remove rows and
-// edit cells, and loads/saves the file via OpalList.
+// the placements of a binary .opl list in a table (name, transform, FormID),
+// lets the user add/remove rows and edit cells, and loads/saves via OpalList.
 class OpalPlacementDialog : public QDialog
 {
     Q_OBJECT
@@ -24,7 +24,7 @@ private slots:
     void addRow();
     void removeRow();
     void loadFromFile();
-    void saveToFile();
+    void saveFromFile();
 
 private:
     void rebuildTable();
