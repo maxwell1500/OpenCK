@@ -107,6 +107,10 @@ public:
     }
 
     qint64 grupEnd() const { return mGrupEnd; }
+    // Group type of the most recently skipped GRUP header (0 = top-level,
+    // 6 = cell children, 8/9 = persistent/temporary children, ...). Callers
+    // use it to reconstruct the source's grouping without tracking labels.
+    quint32 lastGrupType() const { return mLastGrupType; }
     void skipToGrupEnd();
 
     template<typename T>
@@ -170,6 +174,7 @@ private:
     quint32 mCurrentHeaderFlags = 0;
     NAME mCurrentRecordName = 0;
     qint64 mGrupEnd = 0;
+    quint32 mLastGrupType = 0;
 
     uchar* m_mapped = nullptr;
     qint64 m_mappedSize = 0;

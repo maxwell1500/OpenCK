@@ -26,16 +26,25 @@ struct DialogueCondition {
 struct InfoRecord {
     openck::FormComponents components;
     QString editorId;
-    quint32 formId;
-    quint32 flags;
+    quint32 formId = 0;
+    quint32 flags = 0;
     QString responseText;
     QString voiceFile;
     QVector<quint32> conditionIds;
     QVector<CtdaCondition> conditions;
     QString scriptFragment;
-    quint32 targetId;
+    quint32 targetId = 0;
     QVector<quint32> scriptIds;
     QVector<RawSubRecord> rawSubRecords;
+    // Subrecord names in on-disk order so save can re-emit them positionally
+    // (notably CTDA, which is parsed out of rawSubRecords).
+    QVector<NAME> loadOrder;
+    // Per CTDA occurrence: index into rawSubRecords for an unparsed condition
+    // or -1 when it lives in `conditions` (consumed in order).
+    QVector<int> conditionOrder;
+    bool hasCnam = false;
+    bool hasTloi = false;
+    bool hasVmap = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

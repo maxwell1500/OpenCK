@@ -343,17 +343,32 @@ void Document::save(const QString& savePath)
     // overrides) falls through to the type-grouped pass below.
     // REFR/ACHR are not replayed here: they ride inside their CELL's
     // children group, or the orphan fallback when their CELL is absent.
+    SaveIndex index;
+    for (const auto& entry : saveableCollections)
+    {
+        index.collByTag.insert(entry.tag, entry.collection);
+        QHash<quint32, int>& idx = index.indexByTag[entry.tag];
+        for (int i = 0; i < entry.collection->count(); ++i)
+            idx.insert(entry.collection->getFormId(i), i);
+    }
+    {
+        const auto& opaques = data->opaqueRecords();
+        for (int i = 0; i < opaques.size(); ++i)
+            index.opaqueByKey.insert(saveKey(opaques[i].type, opaques[i].header.id), i);
+    }
+    // REFR/ACHR are not in saveableCollections (they ride inside their CELL's
+    // children group), but the cell-children writer still needs to reach them.
+    const auto addRefCollection = [&](uint32_t tag, const auto& coll) {
+        index.collByTag.insert(tag, &coll);
+        QHash<quint32, int>& idx = index.indexByTag[tag];
+        for (int i = 0; i < coll.count(); ++i)
+            idx.insert(coll.getFormId(i), i);
+    };
+    addRefCollection('REFR', data->getRefrCollection());
+    addRefCollection('ACHR', data->getAchrCollection());
+
     QSet<quint64> written;
     {
-        QHash<uint32_t, const IRecordCollection*> collByTag;
-        QHash<uint32_t, QHash<quint32, int>> indexByTag;
-        for (const auto& entry : saveableCollections)
-        {
-            collByTag.insert(entry.tag, entry.collection);
-            QHash<quint32, int>& idx = indexByTag[entry.tag];
-            for (int i = 0; i < entry.collection->count(); ++i)
-                idx.insert(entry.collection->getFormId(i), i);
-        }
 
         uint32_t openTag = 0;
         bool grupOpen = false;
@@ -389,10 +404,18 @@ void Document::save(const QString& savePath)
             const uint32_t tag = ref.type;
             if (tag == refrTag || tag == achrTag)
                 continue;
-            const auto itc = collByTag.find(tag);
-            if (itc == collByTag.end())
+            const auto itc = index.collByTag.find(tag);
+            if (itc == index.collByTag.end())
             {
-                if (saveProgress)
+                const auto op = index.opaqueByKey.find(saveKey(tag, ref.formId));
+                if (op != index.opaqueByKey.end()
+                    && !written.contains(saveKey(tag, ref.formId)))
+                {
+                    ensureGrup(tag);
+                    writeOpaqueRecord(writer, op.value());
+                    written.insert(saveKey(tag, ref.formId));
+                }
+                else if (saveProgress)
                 {
                     char tag[5] = {};
                     memcpy(tag, &ref.type, 4);
@@ -401,7 +424,7 @@ void Document::save(const QString& savePath)
                 }
                 continue;
             }
-            const int idx = indexByTag[tag].value(ref.formId, -1);
+            const int idx = index.indexByTag[tag].value(ref.formId, -1);
             if (idx < 0)
                 continue;
             if (written.contains(saveKey(tag, ref.formId)))
@@ -418,8 +441,7 @@ void Document::save(const QString& savePath)
                 writeRecordState(writer, static_cast<NAME>('CELL'), rec);
                 written.insert(saveKey(tag, ref.formId));
                 written.insert(saveKey(tag, cells.getFormId(idx)));
-                writeCellChildrenGroups(writer, cells.getFormId(idx));
-                markCellChildrenWritten(cells.getFormId(idx), written);
+                writeCellChildrenGroups(writer, cells.getFormId(idx), index, written);
                 continue;
             }
             if ((*itc)->isRecordSaveable(idx))
@@ -489,8 +511,7 @@ void Document::save(const QString& savePath)
                         continue;
                     writeRecordState(writer, static_cast<NAME>('CELL'), rec);
                     written.insert(saveKey(static_cast<quint32>('CELL'), cells.getFormId(i)));
-                    writeCellChildrenGroups(writer, cells.getFormId(i));
-                    markCellChildrenWritten(cells.getFormId(i), written);
+                    writeCellChildrenGroups(writer, cells.getFormId(i), index, written);
                 }
             }
             else
@@ -551,68 +572,55 @@ void Document::save(const QString& savePath)
     writer.close();
 }
 
-void Document::markCellChildrenWritten(quint32 cellId, QSet<quint64>& written) const
+void Document::writeCellChildrenGroups(ESMWriter& writer, quint32 cellId,
+    const SaveIndex& index, QSet<quint64>& written)
 {
-    // Mirrors writeCellChildrenGroups' selection so the grouped fallback
-    // never re-emits references already saved inside a cell-children group.
-    const auto& refrColl = data->getRefrCollection();
-    for (int r = 0; r < refrColl.size(); ++r)
-    {
-        const auto& rec = refrColl.getRecord(r);
-        if (rec.state != State_Modified && rec.state != State_ModifiedOnly
-            && rec.state != State_Deleted)
-            continue;
-        if (data->parentCellOfRefr(rec.get().formId) == cellId)
-            written.insert(saveKey(static_cast<uint32_t>('REFR'), rec.get().formId));
-    }
-    const auto& achrColl = data->getAchrCollection();
-    for (int a = 0; a < achrColl.size(); ++a)
-    {
-        const auto& rec = achrColl.getRecord(a);
-        if (rec.state != State_Modified && rec.state != State_ModifiedOnly
-            && rec.state != State_Deleted)
-            continue;
-        if (data->parentCellOfRefr(rec.get().formId) == cellId)
-            written.insert(saveKey(static_cast<uint32_t>('ACHR'), rec.get().formId));
-    }
-}
-
-void Document::writeCellChildrenGroups(ESMWriter& writer, quint32 cellId)
-{
-    const auto& refrColl = data->getRefrCollection();
-    const auto& achrColl = data->getAchrCollection();
-
-    QVector<const Record<RefrRecord>*> refrs;
-    for (int r = 0; r < refrColl.size(); ++r)
-    {
-        const auto& rec = refrColl.getRecord(r);
-        if (rec.state != State_Modified && rec.state != State_ModifiedOnly
-            && rec.state != State_Deleted)
-            continue;
-        if (data->parentCellOfRefr(rec.get().formId) == cellId)
-            refrs.append(&rec);
-    }
-    QVector<const Record<AchrRecord>*> achrs;
-    for (int a = 0; a < achrColl.size(); ++a)
-    {
-        const auto& rec = achrColl.getRecord(a);
-        if (rec.state != State_Modified && rec.state != State_ModifiedOnly
-            && rec.state != State_Deleted)
-            continue;
-        if (data->parentCellOfRefr(rec.get().formId) == cellId)
-            achrs.append(&rec);
-    }
-
-    if (refrs.isEmpty() && achrs.isEmpty())
+    const auto& children = data->childrenOfCell(cellId);
+    if (children.isEmpty())
         return;
 
-    // Cell-children group (type 6) labeled with the owning cell's id.
+    // Cell-children group (type 6) labeled with the owning cell's id. The
+    // children are walked in original file order so an untouched round-trip
+    // keeps the source's interleaving instead of regrouping by record type.
     writer.startGrup(cellId & 0xFFFFFF, 6);
-    for (const auto* rec : refrs)
-        writeRecordState(writer, static_cast<NAME>('REFR'), *rec);
-    for (const auto* rec : achrs)
-        writeRecordState(writer, static_cast<NAME>('ACHR'), *rec);
+    for (const auto& child : children)
+    {
+        const uint32_t tag = child.type;
+        const quint64 key = saveKey(tag, child.formId);
+        if (written.contains(key))
+            continue;
+        const auto itc = index.collByTag.constFind(tag);
+        if (itc != index.collByTag.constEnd())
+        {
+            const int idx = index.indexByTag.value(tag).value(child.formId, -1);
+            if (idx >= 0 && (*itc)->saveRecordAt(writer, tag, idx))
+                written.insert(key);
+            continue;
+        }
+        const auto op = index.opaqueByKey.constFind(key);
+        if (op != index.opaqueByKey.constEnd())
+        {
+            writeOpaqueRecord(writer, op.value());
+            written.insert(key);
+        }
+    }
     writer.endGrup();
+}
+
+void Document::writeOpaqueRecord(ESMWriter& writer, int opaqueIndex)
+{
+    const auto& opaques = data->opaqueRecords();
+    if (opaqueIndex < 0 || opaqueIndex >= opaques.size())
+        return;
+    const Data::OpaqueRecord& op = opaques.at(opaqueIndex);
+    RecHeader header = op.header;
+    // The subrecords are re-emitted uncompressed, so the on-disk compressed
+    // bit must not carry over or the saved record would be unreadable.
+    header.flags.val &= ~0x00040000u;
+    writer.startRecord(op.type, header);
+    for (const RawSubRecord& raw : op.subs)
+        writer.writeRawSubRecord(raw);
+    writer.endRecord();
 }
 
 void Document::createNew()

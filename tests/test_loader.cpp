@@ -149,6 +149,7 @@ EarlyPageHeap g_earlyPageHeap;
 #include "../../libs/files/esm/glob.hpp"
 #include "../../libs/files/esm/Statrecord.hpp"
 #include "../../libs/files/esm/Dialrecord.hpp"
+#include "../../libs/files/esm/pgrerecord.hpp"
 #include "../../libs/files/esm/subrecordsnapshot.hpp"
 #include <cstring>
 #include <QTextStream>
@@ -173,6 +174,8 @@ private slots:
     void testFormIdAllocation();
     void testSaveRoundTripSubrecordIdentical();
     void testSyntheticMultiTypeRoundTrip();
+    void testSyntheticCellChildrenAndOpaque();
+    void testSyntheticRefrXownWidth();
     void testMasterRecordSaveStateMachine();
     void testMaterializationMatrixZeroWarnings();
     void testDialInfoParentWalking();
@@ -814,6 +817,189 @@ void TestLoaderSinglePass::testSyntheticMultiTypeRoundTrip()
         qPrintable(QStringLiteral("synthetic round-trip is not payload-identical (%1 differ)")
             .arg(diffs.size())));
     qDebug() << "synthetic multi-type round-trip OK" << src.size() << "records";
+}
+
+// Cell children of non-reference types (PGRE) must stay under their CELL in
+// their original order, and record types with no loader (GPOF) must survive a
+// round-trip verbatim. Both were dropped or relocated before.
+void TestLoaderSinglePass::testSyntheticCellChildrenAndOpaque()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString pluginPath = tmp.filePath("synth_children.esp");
+    const quint32 cellId = 0x801;
+    const quint32 pgreA = 0x802, pgreB = 0x803, pgreTop = 0x804, gpof = 0x805;
+
+    {
+        QFile file(pluginPath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        ESMWriter writer;
+        writer.setAuthor("Synthetic Cell Children Test");
+        writer.save(file);
+
+        writer.startGrup('CELL', 0);
+        {
+            RecHeader h; h.id = cellId;
+            writer.startRecord('CELL', h);
+            writer.writeSubZString('EDID', QStringLiteral("SynthCell"));
+            writer.startSubRecord('DATA');
+            writer.writeType<quint8>(0); writer.writeType<quint8>(0);
+            writer.writeType<quint8>(0); writer.writeType<quint8>(0);
+            writer.endSubRecord();
+            writer.endRecord();
+        }
+        // Cell-children group: a typed child, an unmodelled child, a second
+        // typed child — order must survive.
+        writer.startGrup(cellId & 0xFFFFFF, 6);
+        {
+            PgreRecord pgre;
+            pgre.editorId = QStringLiteral("SynthPGRE_A");
+            pgre.formId = pgreA;
+            RecHeader h; h.id = pgreA;
+            writer.startRecord('PGRE', h);
+            pgre.save(writer);
+            writer.endRecord();
+        }
+        {
+            RecHeader h; h.id = gpof;
+            writer.startRecord('GPOF', h);
+            writer.writeSubZString('EDID', QStringLiteral("SynthGPOF"));
+            writer.startSubRecord('DATA');
+            writer.writeType<quint32>(0xDEADBEEF);
+            writer.endSubRecord();
+            writer.endRecord();
+        }
+        {
+            PgreRecord pgre;
+            pgre.editorId = QStringLiteral("SynthPGRE_B");
+            pgre.formId = pgreB;
+            RecHeader h; h.id = pgreB;
+            writer.startRecord('PGRE', h);
+            pgre.save(writer);
+            writer.endRecord();
+        }
+        writer.endGrup();
+        writer.endGrup();
+
+        // A top-level PGRE outside any cell-children group must not be
+        // attributed to the previous CELL.
+        writer.startGrup('PGRE', 0);
+        {
+            PgreRecord pgre;
+            pgre.editorId = QStringLiteral("SynthPGRE_Top");
+            pgre.formId = pgreTop;
+            RecHeader h; h.id = pgreTop;
+            writer.startRecord('PGRE', h);
+            pgre.save(writer);
+            writer.endRecord();
+        }
+        writer.endGrup();
+
+        writer.close();
+        file.close();
+    }
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+    Document* doc = mediator.makeDocument(
+        QStringList{ QStringLiteral("synth_children.esp") }, pluginPath, false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(doc);
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+
+    const Data& data = doc->getData();
+    QCOMPARE(data.opaqueRecords().size(), 1);
+    QCOMPARE(data.opaqueRecords().first().type, static_cast<NAME>('GPOF'));
+    QCOMPARE(data.childrenOfCell(cellId).size(), 3);
+    QCOMPARE(data.parentCellOfRecord(pgreA), cellId);
+    QCOMPARE(data.parentCellOfRecord(gpof), cellId);
+    QCOMPARE(data.parentCellOfRecord(pgreTop), 0u);
+
+    QTemporaryDir out;
+    const QString savedPath = out.path() + QStringLiteral("/synth_children_saved.esp");
+    doc->save(savedPath);
+    QVERIFY(QFileInfo::exists(savedPath));
+
+    const auto src = openck::collectRecordSnapshots(pluginPath);
+    const auto dst = openck::collectRecordSnapshots(savedPath);
+    QCOMPARE(src.size(), dst.size());
+    QStringList diffs;
+    const int n = qMin(src.size(), dst.size());
+    for (int i = 0; i < n; ++i)
+    {
+        if (src.at(i) != dst.at(i))
+            diffs.append(QStringLiteral("%1: %2 0x%3")
+                .arg(i).arg(openck::snapshotName(src.at(i).type))
+                .arg(src.at(i).formId, 8, 16, QChar('0')));
+    }
+    if (!diffs.isEmpty())
+        qWarning().noquote() << "cell-children round-trip diffs:\n" << diffs.join(QStringLiteral("\n"));
+    QVERIFY2(diffs.isEmpty(),
+        qPrintable(QStringLiteral("cell-children round-trip is not payload-identical (%1 differ)")
+            .arg(diffs.size())));
+    qDebug() << "synthetic cell children + opaque round-trip OK" << src.size() << "records";
+}
+
+// Starfield writes REFR XOWN wider than a single FormID; the trailing bytes
+// must survive an untouched round-trip instead of being narrowed to 4.
+void TestLoaderSinglePass::testSyntheticRefrXownWidth()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString pluginPath = tmp.filePath("synth_xown.esp");
+
+    {
+        QFile file(pluginPath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        ESMWriter writer;
+        writer.setAuthor("Synthetic XOWN Width Test");
+        writer.save(file);
+
+        writer.startGrup('REFR', 0);
+        RecHeader h; h.id = 0x801;
+        writer.startRecord('REFR', h);
+        writer.writeSubData<quint32>('NAME', 0x1234);
+        writer.startSubRecord('DATA');
+        for (int i = 0; i < 6; ++i)
+            writer.writeType<float>(0.0f);
+        writer.endSubRecord();
+        writer.startSubRecord('XOWN');
+        writer.writeType<quint32>(0x999);
+        writer.writeType<quint32>(0x1111);
+        writer.writeType<quint32>(0x2222);
+        writer.endSubRecord();
+        writer.endRecord();
+        writer.endGrup();
+
+        writer.close();
+        file.close();
+    }
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+    Document* doc = mediator.makeDocument(
+        QStringList{ QStringLiteral("synth_xown.esp") }, pluginPath, false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(doc);
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+
+    QTemporaryDir out;
+    const QString savedPath = out.path() + QStringLiteral("/synth_xown_saved.esp");
+    doc->save(savedPath);
+    QVERIFY(QFileInfo::exists(savedPath));
+
+    const auto src = openck::collectRecordSnapshots(pluginPath);
+    const auto dst = openck::collectRecordSnapshots(savedPath);
+    QCOMPARE(src.size(), dst.size());
+    QCOMPARE(src.size(), 1);
+    QCOMPARE(src.at(0).subs.size(), 3);
+    for (int j = 0; j < src.at(0).subs.size(); ++j)
+    {
+        QCOMPARE(dst.at(0).subs.at(j).name, src.at(0).subs.at(j).name);
+        QCOMPARE(dst.at(0).subs.at(j).payload, src.at(0).subs.at(j).payload);
+    }
 }
 
 // Untouched round-trip must be payload-identical (Phase 1.2): load SeydaNeen

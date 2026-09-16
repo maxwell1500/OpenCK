@@ -33,6 +33,7 @@ struct NavmRecord {
     QVector<quint8> coverData; // NVCV: per-vertex cover flags
     QVector<quint32> externalConnections;
     QVector<RawSubRecord> rawSubRecords;
+    bool hasEdid = false;
 
     openck::FormComponents components;
 

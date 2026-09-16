@@ -19,6 +19,7 @@ struct DialRecord {
     QVector<quint32> animationIds;
     QVector<quint32> emotionIds;
     bool hasInam = false;
+    bool hasEdid = false;
     QVector<RawSubRecord> rawSubRecords;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

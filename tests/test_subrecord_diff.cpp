@@ -2,7 +2,9 @@
 
 #include <QString>
 #include <QTextStream>
+#include <QHash>
 
+#include <algorithm>
 #include <cstdio>
 
 // Subrecord-diff tool (Phase 1.2). Compares two plugin files at the
@@ -44,6 +46,10 @@ int main(int argc, char** argv)
     const QVector<RecordSnapshot> b = collectRecordSnapshots(savedPath);
 
     int mismatch = 0;
+    int shifted = 0;
+    int shown = 0;
+    QHash<QString, int> mismatchByType;
+    QHash<QString, int> payloadDiffByType;
     const int n = qMin(a.size(), b.size());
     for (int i = 0; i < n; ++i)
     {
@@ -53,8 +59,15 @@ int main(int argc, char** argv)
             continue;
 
         ++mismatch;
-        if (mismatch <= 50)
+        const QString tn = snapshotName(ra.type);
+        ++mismatchByType[tn];
+        if (ra.type == rb.type && ra.formId == rb.formId)
+            ++payloadDiffByType[tn];
+        else
+            ++shifted;
+        if (mismatchByType[tn] <= 2 && shown < 200)
         {
+            ++shown;
             printf("MISMATCH #%d idx %d: %s 0x%08X subs %lld -> subs %lld (flags 0x%X->0x%X, size %u->%u)\n",
                 mismatch, i,
                 snapshotName(ra.type).toUtf8().constData(), ra.formId,
@@ -90,6 +103,21 @@ int main(int argc, char** argv)
         printf("RECORD COUNT DIFFERS: source %lld, saved %lld\n",
             static_cast<long long>(a.size()), static_cast<long long>(b.size()));
         mismatch += (a.size() != b.size()) ? (b.size() > a.size() ? b.size() - a.size() : a.size() - b.size()) : 0;
+    }
+
+    QVector<QPair<QString, int>> hist;
+    for (auto it = mismatchByType.constBegin(); it != mismatchByType.constEnd(); ++it)
+        hist.append({ it.key(), it.value() });
+    std::sort(hist.begin(), hist.end(),
+        [](const QPair<QString, int>& l, const QPair<QString, int>& r) {
+            return l.second > r.second;
+        });
+    printf("mismatch by type (total %d, positional-shift %d):\n", mismatch, shifted);
+    for (const auto& h : hist)
+    {
+        const int payload = payloadDiffByType.value(h.first, 0);
+        printf("  %-6s %6d (%d same-id payload)\n",
+            h.first.toUtf8().constData(), h.second, payload);
     }
 
     printf("source records %lld, saved records %lld, mismatched records %d\n",

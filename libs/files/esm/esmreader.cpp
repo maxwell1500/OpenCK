@@ -198,11 +198,11 @@ void ESMReader::skipGrupHeader()
     {
         // TES3 group header: 4 name + 4 size + 4 unknown + 4 flags.
         readType<quint32>(true);    // unknown
-        readType<quint32>(true);    // flags
+        mLastGrupType = readType<quint32>(true);    // flags
         return;
     }
     readType<quint32>(true);    // label
-    readType<quint32>(true);    // group type
+    mLastGrupType = readType<quint32>(true);    // group type
     readType<quint8>(true);        // vc day
     readType<quint8>(true);        // vc month
     readType<quint8>(true);        // recent user

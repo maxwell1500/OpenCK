@@ -12,6 +12,7 @@ struct AchrRecord {
     QString editorId;
     quint32 formId = 0;
     QVector<RawSubRecord> rawSubRecords;
+    bool hasEdid = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

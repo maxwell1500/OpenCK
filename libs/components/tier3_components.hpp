@@ -299,8 +299,13 @@ public:
     float rotX = 0, rotY = 0, rotZ = 0;
     float scale = 1.0f;
     quint32 owner = 0;
+    // Trailing bytes of an XOWN subrecord wider than the owner FormID
+    // (Starfield writes 12-byte XOWN); preserved so the width round-trips.
+    QByteArray ownerExtra;
     quint32 lockLevel = 0;
     bool initiallyDisabled = false;
+    // Trailing bytes of an XESP wider than the enable/disable flag.
+    QByteArray xespExtra;
     QVector<quint32> scriptIds;
 
     QString name() const override { return QStringLiteral("Reference Data"); }
@@ -361,6 +366,7 @@ public:
                 scale = esm.readType<float>();
             break;
         case NAME('XOWN'):
+            ownerExtra.clear();
             if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
             {
                 quint32 v = 0;
@@ -370,7 +376,11 @@ public:
                 owner = v;
             }
             else
+            {
                 owner = esm.readType<quint32>();
+                if (esm.subLeft() > 0)
+                    esm.readRawSubData(ownerExtra);
+            }
             break;
         case NAME('DNAM'):
             if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
@@ -385,17 +395,17 @@ public:
                 lockLevel = esm.readType<quint32>();
             break;
         case NAME('XESP'):
-            // Observed as 1-byte in the wild; read declared bytes LE.
-            if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
+            // Some records carry a wider XESP than the enable/disable flag;
+            // keep the whole payload so the width and unknown words survive.
+            xespExtra.clear();
+            esm.readRawSubData(xespExtra);
             {
                 quint32 v = 0;
-                qint64 n = esm.subLeft();
-                for (qint64 i = 0; i < n; ++i)
-                    v |= quint32(esm.readType<quint8>()) << (8 * i);
+                const int n = qMin<int>(xespExtra.size(), 4);
+                for (int i = 0; i < n; ++i)
+                    v |= quint32(static_cast<quint8>(xespExtra.at(i))) << (8 * i);
                 initiallyDisabled = (v != 0);
             }
-            else
-                initiallyDisabled = (esm.readType<quint32>() != 0);
             break;
         case NAME('SCRI'):
         {
@@ -431,11 +441,24 @@ public:
         if (scale != 1.0f)
             esm.writeSubData<float>(NAME('XSCL'), scale);
         if (owner != 0)
-            esm.writeSubData<quint32>(NAME('XOWN'), owner);
+        {
+            esm.startSubRecord(NAME('XOWN'));
+            esm.writeType<quint32>(owner);
+            if (!ownerExtra.isEmpty())
+                esm.writeRawData(ownerExtra.constData(), ownerExtra.size());
+            esm.endSubRecord();
+        }
         if (lockLevel != 0)
             esm.writeSubData<quint32>(NAME('DNAM'), lockLevel);
-        if (initiallyDisabled)
-            esm.writeSubData<quint32>(NAME('XESP'), 1);
+        if (initiallyDisabled || !xespExtra.isEmpty())
+        {
+            esm.startSubRecord(NAME('XESP'));
+            if (!xespExtra.isEmpty())
+                esm.writeRawData(xespExtra.constData(), xespExtra.size());
+            else
+                esm.writeType<quint32>(initiallyDisabled ? 1u : 0u);
+            esm.endSubRecord();
+        }
         if (!scriptIds.isEmpty())
         {
             esm.startSubRecord(NAME('SCRI'));
@@ -475,7 +498,13 @@ public:
             return true;
         case NAME('XOWN'):
             if (fromLoad || owner != 0)
-                esm.writeSubData<quint32>(NAME('XOWN'), owner);
+            {
+                esm.startSubRecord(NAME('XOWN'));
+                esm.writeType<quint32>(owner);
+                if (!ownerExtra.isEmpty())
+                    esm.writeRawData(ownerExtra.constData(), ownerExtra.size());
+                esm.endSubRecord();
+            }
             else
                 return false;
             return true;
@@ -486,8 +515,15 @@ public:
                 return false;
             return true;
         case NAME('XESP'):
-            if (fromLoad || initiallyDisabled)
-                esm.writeSubData<quint32>(NAME('XESP'), initiallyDisabled ? 1u : 0u);
+            if (fromLoad || initiallyDisabled || !xespExtra.isEmpty())
+            {
+                esm.startSubRecord(NAME('XESP'));
+                if (fromLoad && !xespExtra.isEmpty())
+                    esm.writeRawData(xespExtra.constData(), xespExtra.size());
+                else
+                    esm.writeType<quint32>(initiallyDisabled ? 1u : 0u);
+                esm.endSubRecord();
+            }
             else
                 return false;
             return true;
@@ -543,8 +579,10 @@ public:
         c->rotX = rotX; c->rotY = rotY; c->rotZ = rotZ;
         c->scale = scale;
         c->owner = owner;
+        c->ownerExtra = ownerExtra;
         c->lockLevel = lockLevel;
         c->initiallyDisabled = initiallyDisabled;
+        c->xespExtra = xespExtra;
         c->scriptIds = scriptIds;
         return c;
     }
@@ -558,8 +596,10 @@ public:
         rotX = o->rotX; rotY = o->rotY; rotZ = o->rotZ;
         scale = o->scale;
         owner = o->owner;
+        ownerExtra = o->ownerExtra;
         lockLevel = o->lockLevel;
         initiallyDisabled = o->initiallyDisabled;
+        xespExtra = o->xespExtra;
         scriptIds = o->scriptIds;
     }
 
@@ -569,8 +609,9 @@ public:
         const auto* o = static_cast<const BGSRefData_Component*>(other);
         return baseId == o->baseId && posX == o->posX && posY == o->posY && posZ == o->posZ
             && rotX == o->rotX && rotY == o->rotY && rotZ == o->rotZ && scale == o->scale
-            && owner == o->owner && lockLevel == o->lockLevel
-            && initiallyDisabled == o->initiallyDisabled && scriptIds == o->scriptIds;
+            && owner == o->owner && ownerExtra == o->ownerExtra && lockLevel == o->lockLevel
+            && initiallyDisabled == o->initiallyDisabled && xespExtra == o->xespExtra
+            && scriptIds == o->scriptIds;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }

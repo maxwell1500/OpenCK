@@ -233,7 +233,7 @@ void CellRecord::save(ESMWriter& esm) const
         esm.writeSubZString('EDID', editorId);
     if (!wroteFull && !cellName.isEmpty())
         esm.writeSubZString('FULL', cellName);
-    if (!wroteData)
+    if (!wroteData && (hasData || flags != 0 || !dataExtra.isEmpty()))
         writeData();
     if (!wroteXclc && (cellX != 0 || cellY != 0))
         writeXclc();

@@ -168,20 +168,45 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
        (`isNextName` check + `hasData` gate).
      - Rule of thumb established: never emit a subrecord the source lacked
        unless it carries a user edit.
-     SFBGS00D.esm round-trip still open (434,976/434,990 records; the rest
-     is positional cascade, not payload — type counts match exactly):
-     - 14 records of 3 unhandled types (GPOF 12, GPOG 1, GWED 1) are skipped
-       at load and dropped on save. Needs a generic opaque-record preserve
-       path (store raw bytes keyed by type+formId, re-emit in order).
-     - Non-REFR/ACHR cell children (PGRE nested in CELL groups, etc.) are
-       relocated to top-level groups: `writeCellChildrenGroups` /
-       `markCellChildrenWritten` / the replay skip cover REFR/ACHR only.
-       Needs generic child coverage driven by the parent-cell index.
-     - Unverified payload diffs needing per-formId comparison once the
-       cascade clears: several FACTs, RACE 0x106e2bc (138→126 subs),
-       MGEF 0x101ea08 (4→7 subs).
+     **Status 2026-09-16 (SFBGS00D order + payload):** the flat record
+     stream is now exactly reproduced — 434,990/434,990 records, and
+     `test_subrecord_diff` reports `positional-shift 0`. Two structural
+     gaps closed:
+     - Records with no typed loader (GPOF/GPOG/GWED and any future type)
+       are preserved verbatim as `Data::OpaqueRecord` (header + ordered
+       raw subrecords, compressed bit cleared on re-emit) and written back
+       in load order. `Data::opaqueRecords()` exposes them.
+     - Cell children are now tracked generically. While loading, a GRUP
+       stack (`Data::inCellChildrenGroup`, group type 6) attributes every
+       placeable record to its owning CELL via `m_recordParentCell`;
+       `Data::childrenOfCell()` returns them in file order and
+       `Document::writeCellChildrenGroups` re-emits the interleaved
+       sequence (REFR/ACHR/PGRE/PHZD/... + opaque) instead of regrouping.
+     `testSyntheticCellChildrenAndOpaque` covers both (typed + unmodelled
+     child interleaving, no cross-cell attribution).
+     Payload diffs fell 38,838 → ~1,850 of 434,990 (95%). Fixed classes so
+     far: invented EDID on records whose source lacked it (RFGP, DIAL,
+     NAVM, PGRE, ACHR, PHZD); invented CNAM/TLOI on INFO with an ordered
+     CTDA replay; Starfield wide XOWN/XESP payloads (12/8-byte) now keep
+     their trailing words (component fields must also be copied in
+     `clone()`/`copyFrom()` or they silently vanish on the baseRecord →
+     modifiedRecord copy); CELL no longer invents DATA.
+     Remaining ~1,850, by type (all same-id payload, no ordering):
+     - SCEN 364 / PACK 246: fixed preamble vs. on-disk order.
+     - LVLI/LCTN/MISC/BOOK/QUST/MGEF/PERK/ACTI/MSTT/CONT/SPEL/LIGH/KEYM/
+       ENCH/FURN/EFSH/ARMO/FLST/OTFT (~50-100 each): the loader writes a
+       fixed preamble (EDID/FULL/OBND/ODTY/...) then raws, so a source
+       whose preamble differs in presence/order drifts. These need the
+       positional load-order replay pattern (RefrRecord/InfoRecord) rather
+       than a fixed emitter.
+     - FACT/WRLD/LCTN `FULL` width (localized u32 id vs. written string),
+       INFO FNAM/HNAM width, OTFT INAM (list-in-one-subrecord vs. one per
+       item).
+     The nightly gate should be re-run after each per-type conversion.
      Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
      in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.
+     `test_subrecord_diff` now prints a per-type mismatch histogram plus
+     the first two examples per type.
 
     **Status 2026-09-04:** `LocationRecord::locationName` is persisted now.
     `FULL` was consumed as an opaque raw (the shared

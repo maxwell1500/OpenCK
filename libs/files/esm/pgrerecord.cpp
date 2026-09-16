@@ -29,7 +29,7 @@ void PgreRecord::load(ESMReader& esm, bool)
 
         switch (sub)
         {
-            case 'EDID': editorId = esm.readZString(); break;
+            case 'EDID': editorId = esm.readZString(); hasEdid = true; break;
             default:
             {
                 RawSubRecord raw;
@@ -44,7 +44,8 @@ void PgreRecord::load(ESMReader& esm, bool)
 
 void PgreRecord::save(ESMWriter& esm) const
 {
-    esm.writeSubZString('EDID', editorId);
+    if (hasEdid || !editorId.isEmpty())
+        esm.writeSubZString('EDID', editorId);
 
     for (const auto& raw : rawSubRecords)
     {
@@ -57,5 +58,6 @@ void PgreRecord::blank()
     editorId.clear();
     formId = 0;
     rawSubRecords.clear();
+    hasEdid = false;
     initComponents();
 }

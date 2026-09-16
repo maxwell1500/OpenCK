@@ -7,7 +7,7 @@ void NavmRecord::load(ESMReader& esm, bool) {
         NAME sub = esm.readNSubHeader(); if (sub == 0) break;
         bool handled = false;
         switch (sub) {
-        case 'EDID': editorId = esm.readZString(); handled = true; break;
+        case 'EDID': editorId = esm.readZString(); hasEdid = true; handled = true; break;
         case 'NVMV': {
             qint64 count = esm.subLeft() / 12;
             for (qint64 i = 0; i < count; ++i) {
@@ -55,7 +55,8 @@ void NavmRecord::load(ESMReader& esm, bool) {
     }
 }
 void NavmRecord::save(ESMWriter& esm) const {
-    esm.writeSubZString('EDID', editorId);
+    if (hasEdid || !editorId.isEmpty())
+        esm.writeSubZString('EDID', editorId);
     if (!vertices.isEmpty()) {
         esm.startSubRecord('NVMV');
         for (const auto& v : vertices) { esm.writeType<float>(v.x()); esm.writeType<float>(v.y()); esm.writeType<float>(v.z()); }
@@ -83,4 +84,4 @@ void NavmRecord::save(ESMWriter& esm) const {
     components.saveAll(esm);
     for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
-void NavmRecord::blank() { editorId = ""; formId = 0; flags = 0; cellFormId = 0; vertices.clear(); triangles.clear(); coverData.clear(); externalConnections.clear(); rawSubRecords.clear(); components.clear(); }
+void NavmRecord::blank() { editorId = ""; formId = 0; flags = 0; cellFormId = 0; vertices.clear(); triangles.clear(); coverData.clear(); externalConnections.clear(); rawSubRecords.clear(); hasEdid = false; components.clear(); }

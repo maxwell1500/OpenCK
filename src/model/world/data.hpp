@@ -342,34 +342,59 @@ public:
     /// (which is O(dials x infos) and unusable at full-master scale).
     int infosWithParentDialCount();
 
-    // Cell-children tracking for the save path. While the edited file is
-    // parsed eagerly, each REFR/ACHR records the CELL it is a child of, so
-    // saving can rebuild the cell-children GRUPs instead of emitting a flat
-    // list of references.
-    quint32 parentCellOfRefr(quint32 refrFormId) const
-    {
-        return m_refrParentCell.value(refrFormId, 0);
-    }
-
-    /// \brief Attach a placed reference to its CELL so the save path can
-    /// emit the cell-children GRUPs instead of a flat reference list.
-    void setRefrParentCell(quint32 refrFormId, quint32 cellFormId)
-    {
-        m_refrParentCell[refrFormId] = cellFormId;
-    }
-
-    /// \brief Link an INFO record to its parent DIAL (for tree walking).
-    void setInfoParentDial(quint32 infoFormId, quint32 dialFormId)
-    {
-        m_infoParentDial[infoFormId] = dialFormId;
-    }
-
     // One record of the edited plugin in file sequence (GRUPs excluded).
     struct PluginRecordRef
     {
         NAME type = 0;
         quint32 formId = 0;
     };
+
+    // Cell-children tracking for the save path. While the edited file is
+    // parsed eagerly, each REFR/ACHR records the CELL it is a child of, so
+    // saving can rebuild the cell-children GRUPs instead of emitting a flat
+    // list of references.
+    quint32 parentCellOfRefr(quint32 refrFormId) const
+    {
+        return m_recordParentCell.value(refrFormId, 0);
+    }
+
+    /// \brief Attach a placed reference to its CELL so the save path can
+    /// emit the cell-children GRUPs instead of a flat reference list.
+    void setRefrParentCell(quint32 refrFormId, quint32 cellFormId)
+    {
+        m_recordParentCell[refrFormId] = cellFormId;
+        m_childIndexDirty = true;
+    }
+
+    /// \brief Owning CELL of any placeable record (REFR/ACHR/PGRE/PHZD/...)
+    /// recorded inside that cell's children group while loading, or 0.
+    quint32 parentCellOfRecord(quint32 formId) const
+    {
+        return m_recordParentCell.value(formId, 0);
+    }
+
+    /// \brief The placeable records owned by the given CELL in their
+    /// original file order, so the save path can rebuild the interleaved
+    /// cell-children sequence instead of regrouping by type.
+    const QVector<PluginRecordRef>& childrenOfCell(quint32 cellFormId) const;
+
+    // One record the editor has no typed loader for. Its header and
+    // subrecords are kept verbatim so an untouched round-trip re-emits it in
+    // place instead of silently dropping it.
+    struct OpaqueRecord
+    {
+        NAME type = 0;
+        RecHeader header;
+        QVector<RawSubRecord> subs;
+    };
+
+    const QVector<OpaqueRecord>& opaqueRecords() const { return m_opaqueRecords; }
+
+    /// \brief Link an INFO record to its parent DIAL (for tree walking).
+    void setInfoParentDial(quint32 infoFormId, quint32 dialFormId)
+    {
+        m_infoParentDial[infoFormId] = dialFormId;
+    }
 
     /// \brief Flat load order of the edited plugin's own records, recorded
     /// during eager load. The save path replays it so an untouched
@@ -2052,10 +2077,29 @@ private:
     QMap<int, UndoStack*> mPluginUndoStacks;
     quint32 mNextLocalId = 0x800;
 
-    // Cell-children tracking for saving: which REFR/ACHR record belongs to
-    // which CELL, discovered while parsing the edited file's structure.
+    // Cell-children tracking for saving: the owning CELL of any placeable
+    // record (REFR/ACHR/PGRE/PHZD/...) found inside a cell-children group
+    // while parsing the edited file, keyed by the record's form id.
     quint32 m_lastCellFormId = 0;
-    QHash<quint32, quint32> m_refrParentCell;
+    QHash<quint32, quint32> m_recordParentCell;
+    // Lazy per-cell ordered child index derived from m_pluginOrder.
+    mutable QHash<quint32, QVector<PluginRecordRef>> m_cellChildren;
+    mutable bool m_childIndexDirty = true;
+
+    // Records with no typed loader, preserved verbatim on the edited
+    // plugin's behalf so the save pass can re-emit them.
+    QVector<OpaqueRecord> m_opaqueRecords;
+
+    // Open GRUP frames (end offset + group type) while walking the edited
+    // file, so a record can tell whether it sits inside a cell-children
+    // group (type 6) and should be saved back under its CELL.
+    struct GrupFrame
+    {
+        qint64 end = 0;
+        quint32 type = 0;
+    };
+    QVector<GrupFrame> m_grupStack;
+    bool inCellChildrenGroup(qint64 pos) const;
 
     // Worldspace-membership tracking for the cell list: the CELL records
     // physically following a WRLD record belong to that worldspace. Used by

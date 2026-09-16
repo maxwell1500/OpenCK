@@ -7,12 +7,23 @@
 #include "../../../libs/files/esm/esmwriter.hpp"
 #include "../../../libs/files/filepaths.hpp"
 
+#include <QHash>
 #include <QObject>
 #include <QSet>
 #include <memory>
 
 class ESMReader;
 class ESMWriter;
+class IRecordCollection;
+
+// Lookup tables built once per save so the ordered replay, the cell-children
+// passthrough and the grouped fallback all agree on which record lives where.
+struct SaveIndex
+{
+    QHash<uint32_t, const IRecordCollection*> collByTag;
+    QHash<uint32_t, QHash<quint32, int>> indexByTag;
+    QHash<quint64, int> opaqueByKey;
+};
 
 class Document : public QObject
 {
@@ -44,8 +55,9 @@ public:
 
 private:
     void createNew();
-    void writeCellChildrenGroups(ESMWriter& writer, quint32 cellId);
-    void markCellChildrenWritten(quint32 cellId, QSet<quint64>& written) const;
+    void writeCellChildrenGroups(ESMWriter& writer, quint32 cellId,
+        const SaveIndex& index, QSet<quint64>& written);
+    void writeOpaqueRecord(ESMWriter& writer, int opaqueIndex);
 
     FilePaths paths;
     QStringList contentFiles;

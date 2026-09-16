@@ -1382,6 +1382,34 @@ void Data::saveTes3Records(ESMWriter& writer)
     }
 }
 
+bool Data::inCellChildrenGroup(qint64 pos) const
+{
+    for (const GrupFrame& f : m_grupStack)
+    {
+        if (f.type == 6 && pos < f.end)
+            return true;
+    }
+    return false;
+}
+
+const QVector<Data::PluginRecordRef>& Data::childrenOfCell(quint32 cellFormId) const
+{
+    if (m_childIndexDirty)
+    {
+        m_cellChildren.clear();
+        for (const PluginRecordRef& ref : m_pluginOrder)
+        {
+            const quint32 cell = m_recordParentCell.value(ref.formId, 0);
+            if (cell != 0)
+                m_cellChildren[cell].append(ref);
+        }
+        m_childIndexDirty = false;
+    }
+    static const QVector<PluginRecordRef> empty;
+    const auto it = m_cellChildren.constFind(cellFormId);
+    return it == m_cellChildren.constEnd() ? empty : it.value();
+}
+
 int Data::preload(const QString& filename, bool base_)
 {
     LOG_INFO(QString("Data::preload: filename='%1' base=%2 length=%3")
@@ -1408,6 +1436,12 @@ int Data::preload(const QString& filename, bool base_)
     reader->open();
     base = base_;
     m_lastPreloadPath = fullPath;
+    m_grupStack.clear();
+    m_opaqueRecords.clear();
+    m_recordParentCell.clear();
+    m_cellChildren.clear();
+    m_childIndexDirty = true;
+    m_lastCellFormId = 0;
 
     {
         QStringList masterNames;
@@ -1480,6 +1514,11 @@ bool Data::continueLoading(Messages& messages)
             name = reader->readName();
             reader->setCurrentRecordName(name);
 
+            // Retire GRUP frames the cursor has moved past, so
+            // inCellChildrenGroup() reflects only groups still open here.
+            while (!m_grupStack.isEmpty() && m_grupStack.last().end <= pos)
+                m_grupStack.removeLast();
+
             LOG_DEBUG(QString("Loading record type: %1%2%3%4")
                 .arg(QChar(static_cast<char>((name >> 24) & 0xFF)))
                 .arg(QChar(static_cast<char>((name >> 16) & 0xFF)))
@@ -1507,7 +1546,9 @@ bool Data::continueLoading(Messages& messages)
             {
             switch (name)
             {
-            case 'GRUP': reader->skipGrupHeader();              break;
+            case 'GRUP': reader->skipGrupHeader();
+                m_grupStack.append({ reader->grupEnd(), reader->lastGrupType() });
+                break;
             case 'GMST': gameSettings.load(*reader, base);     break;
             case 'NPC_': npcCollection.load(*reader, base);    break;
             case 'WEAP': weaponCollection.load(*reader, base); break;
@@ -1562,13 +1603,7 @@ bool Data::continueLoading(Messages& messages)
                 break;
             case 'LCTN': locationCollection.load(*reader, base); break;
             case 'PNDT': planetCollection.load(*reader, base); break;
-            case 'REFR': refrCollection.load(*reader, base);
-                if (!base && refrCollection.size() > 0)
-                {
-                    const quint32 fid = refrCollection.getRecord(refrCollection.size() - 1).get().formId;
-                    m_refrParentCell[fid] = m_lastCellFormId;
-                }
-                break;
+            case 'REFR': refrCollection.load(*reader, base); break;
             case 'MATL': materialCollection.load(*reader, base); break;
             case 'LAND': landCollection.load(*reader, base); break;
             case 'SOUN': sounCollection.load(*reader, base); break;
@@ -1639,13 +1674,7 @@ bool Data::continueLoading(Messages& messages)
             case 'AACT': aactCollection.load(*reader, base); break;
             case 'AAMD': aamdCollection.load(*reader, base); break;
             case 'AAPD': aapdCollection.load(*reader, base); break;
-            case 'ACHR': achrCollection.load(*reader, base);
-                if (!base && achrCollection.size() > 0)
-                {
-                    const quint32 fid = achrCollection.getRecord(achrCollection.size() - 1).get().formId;
-                    m_refrParentCell[fid] = m_lastCellFormId;
-                }
-                break;
+            case 'ACHR': achrCollection.load(*reader, base); break;
             case 'ADDN': addnCollection.load(*reader, base); break;
             case 'AFFE': affeCollection.load(*reader, base); break;
             case 'AMBS': ambsCollection.load(*reader, base); break;
@@ -1752,13 +1781,35 @@ bool Data::continueLoading(Messages& messages)
                 {
                     return true;
                 }
-                char buf[5] = {};
-                memcpy(buf, &name, 4);
-                LOG_WARNING(QString("Unknown record: %1 (0x%2) in %3")
-                    .arg(buf)
-                    .arg(name, 8, 16, QChar('0'))
-                    .arg(GameFormat::gameName(m_currentGame)));
-                reader->skipRecord();
+                if (!base)
+                {
+                    // No typed loader exists: keep the record verbatim so an
+                    // untouched save re-emits it instead of dropping it.
+                    OpaqueRecord op;
+                    op.type = name;
+                    op.header = reader->readHeader();
+                    while (reader->isRecLeft())
+                    {
+                        NAME sub = reader->readNSubHeader();
+                        if (sub == 0)
+                            break;
+                        RawSubRecord raw;
+                        raw.name = sub;
+                        reader->readRawSubData(raw.data);
+                        op.subs.push_back(raw);
+                    }
+                    m_opaqueRecords.push_back(op);
+                }
+                else
+                {
+                    char buf[5] = {};
+                    memcpy(buf, &name, 4);
+                    LOG_WARNING(QString("Unknown record: %1 (0x%2) in %3")
+                        .arg(buf)
+                        .arg(name, 8, 16, QChar('0'))
+                        .arg(GameFormat::gameName(m_currentGame)));
+                    reader->skipRecord();
+                }
                 break;
             }
             }
@@ -1768,7 +1819,18 @@ bool Data::continueLoading(Messages& messages)
             // indexed, and materialized records parse with base=true, so
             // neither pollutes it). The save path replays this sequence.
             if (name != static_cast<NAME>('GRUP') && name != 0 && !base)
-                m_pluginOrder.append({ name, reader->currentFormId() });
+            {
+                const quint32 fid = reader->currentFormId();
+                m_pluginOrder.append({ name, fid });
+                m_childIndexDirty = true;
+                // Attribute placed records to the enclosing CELL so the save
+                // path can rebuild the cell-children groups in file order.
+                const bool isReference = name == NAME('REFR') || name == NAME('ACHR');
+                if (isReference)
+                    m_recordParentCell[fid] = m_lastCellFormId;
+                else if (m_lastCellFormId != 0 && inCellChildrenGroup(pos))
+                    m_recordParentCell[fid] = m_lastCellFormId;
+            }
         }
         catch (const std::exception& e)
         {
