@@ -6,6 +6,11 @@
 #include <QVector>
 #include <QMap>
 #include <QByteArray>
+#include <QHash>
+
+#include <memory>
+
+class Ba2Archive;
 
 namespace Nif {
 
@@ -200,7 +205,8 @@ struct BsMeshData {
     quint32 version = 0;
     float vertexScale = 1.0f;
     quint32 weightsPerVertex = 0;
-    QVector<Vector3> vertices;    // short * vertexScale
+    QVector<Vector3> vertices;    // short * vertexScale / 65536 (unit rule
+                                  // verified against NIF bounds on two scales)
     QVector<Vector2> uvs;         // half floats
     QVector<Vector2> uv2;         // second channel, may be empty
     QVector<Color4> colors;       // BGRA bytes / 255, may be empty
@@ -213,6 +219,33 @@ struct BsMeshData {
 // Parses a .mesh byte buffer. False on any structural surprise (sizes,
 // counts, trailing bytes) — never a partial mesh.
 bool parseBsMeshData(const QByteArray& bytes, BsMeshData& out);
+
+// Resolves the external .mesh paths shipped BSGeometry blocks carry
+// against the game's mesh BA2s, with a process-wide archive cache (opening
+// multi-GB archives per NIF load would dominate). Not thread-safe; NIF
+// loads run on the main thread.
+class MeshArchiveResolver {
+public:
+    // Builds a resolver for the install containing this NIF (walks up from
+    // the NIF's directory to the Data dir, opens *Meshes*.ba2). Always
+    // usable; simply finds no archives when there are none.
+    static MeshArchiveResolver forNif(const QString& nifPath);
+
+    bool hasArchives() const;
+    // Raw .mesh bytes for a NIF mesh path (hash form "h1\\h2", or a plain
+    // name resolved loosely and by archive search). Empty when
+    // unresolvable. Results are cached per path.
+    QByteArray meshBytes(const QString& meshPath);
+
+private:
+    bool addArchive(const QString& ba2Path);
+    const QHash<QString, quint32>* nameIndexFor(const QString& ba2Path);
+
+    QString m_dataDir;
+    QMap<QString, std::shared_ptr<Ba2Archive>> m_archives;
+    QMap<QString, QHash<QString, quint32>> m_nameIndex;
+    QHash<QString, QByteArray> m_bytesCache;
+};
 
 class NifParser {
 public:

@@ -38,6 +38,7 @@ private slots:
     void testPlaybackComposition();
     void testRealNifSurvey();
     void testExternalMeshData();
+    void testFaceSkinBlocks();
     void testSyntheticSkinnedFileLoad();
 };
 
@@ -540,11 +541,11 @@ void TestNifSkinning::testPlaybackComposition()
 void TestNifSkinning::testRealNifSurvey()
 {
     // Real-asset survey canary (§8.3): the Gamebryo 20.2.0.7 reader lands
-    // scene hierarchies from shipped NIFs. Shipped statics reference
-    // external .mesh streams (inside BA2s), so local files load as named
-    // node hierarchies with external mesh paths and zero local vertices.
-    // If totalVerts ever goes non-zero, inline mesh data decoded and the
-    // §8.3 gate must be re-run against a skinned animated mesh.
+    // scene hierarchies from shipped NIFs, and hash-style external mesh
+    // paths resolve through the mesh BA2s into real vertices (name-style
+    // paths match no shipped archive entry and stay vert-less). If a
+    // skinned animated mesh ever loads with skin weights, the §8.3 gate
+    // must be re-run against it.
     const QString meshesDir =
         qEnvironmentVariable("OPENCK_DATA_DIR",
                              QStringLiteral("C:/XboxGames/Starfield/Content/Data"))
@@ -588,7 +589,7 @@ void TestNifSkinning::testRealNifSurvey()
     QVERIFY2(loaded == files.size(), "A shipped NIF failed the Gamebryo reader");
     QVERIFY2(totalMeshRefs > 0, "No external mesh references resolved");
     QVERIFY2(namedNodes > 0, "No scene-graph nodes extracted");
-    QCOMPARE(totalVerts, 0);
+    QVERIFY2(totalVerts > 0, "No external mesh vertices resolved");
 }
 
 void TestNifSkinning::testExternalMeshData()
@@ -642,6 +643,74 @@ void TestNifSkinning::testExternalMeshData()
     QVERIFY(top < static_cast<quint32>(mesh.vertices.size()));
     for (const Nif::Vector3& v : mesh.vertices)
         QVERIFY(std::isfinite(v.x + v.y + v.z));
+}
+
+void TestNifSkinning::testFaceSkinBlocks()
+{
+    // Starfield BSSkin triplets from a shipped face NIF (FaceMeshes.ba2):
+    // BSGeometry + SkinAttach + BSSkin::Instance + BSSkin::BoneData.
+    // The load links bone names onto shapes whose meshes resolved.
+    const QString dataDir =
+        qEnvironmentVariable("OPENCK_DATA_DIR",
+                             QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
+    const QString archivePath = dataDir + QStringLiteral("/Starfield - FaceMeshes.ba2");
+    if (!QFileInfo::exists(archivePath))
+        QSKIP("No FaceMeshes.ba2; set OPENCK_DATA_DIR");
+
+    Ba2Archive ba2;
+    QVERIFY2(ba2.open(archivePath), "FaceMeshes.ba2 did not open");
+    const QString wanted = QStringLiteral(
+        "meshes/actors/character/facegendata/facegeom/starfield.esm/000124ac.nif");
+    int found = -1;
+    for (quint32 i = 0; i < ba2.fileCount(); ++i)
+    {
+        if (ba2.entries().at(i).relativePath == wanted)
+        {
+            found = static_cast<int>(i);
+            break;
+        }
+    }
+    QVERIFY2(found >= 0, "Known face NIF not in FaceMeshes.ba2");
+
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString nifPath = tmp.filePath(QStringLiteral("face.nif"));
+    QVERIFY(ba2.extract(static_cast<quint32>(found), nifPath));
+
+    Nif::NifParser parser;
+    QVERIFY2(parser.load(nifPath), "Face NIF did not load");
+    QVERIFY(parser.getRoot() != nullptr);
+
+    int shapes = 0;
+    int skinned = 0;
+    int verts = 0;
+    int namedBones = 0;
+    QStack<const Nif::Node*> stack;
+    stack.push(parser.getRoot());
+    while (!stack.isEmpty())
+    {
+        const Nif::Node* node = stack.pop();
+        for (const Nif::TriShape& shape : node->shapes)
+        {
+            ++shapes;
+            verts += shape.vertices.size();
+            if (!shape.skinBones.isEmpty())
+            {
+                ++skinned;
+                for (const Nif::SkinBone& b : shape.skinBones)
+                    if (!b.boneName.isEmpty())
+                        ++namedBones;
+            }
+        }
+        for (const Nif::Node* c : node->children)
+            stack.push(c);
+    }
+    qDebug() << "face:" << shapes << "shapes," << skinned << "skinned,"
+             << namedBones << "named bones," << verts << "verts";
+    QCOMPARE(shapes, 10);
+    QCOMPARE(skinned, 10);
+    QCOMPARE(namedBones, 129);
+    QCOMPARE(verts, 53444);
 }
 
 void TestNifSkinning::testSyntheticSkinnedFileLoad()

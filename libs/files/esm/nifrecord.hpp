@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QList>
 #include <QByteArray>
 #include <QVector>
@@ -97,6 +98,10 @@ public:
     NiPoint3 boundingCylinderAxis;
     float boundingCylinderHeight = 0.0f;
     float collisionLevel = 0.0f;
+    // Gamebryo-only: BSFaceGenNiNode roots carry 2 trailing bytes of
+    // unknown purpose (0x0001 in all samples). Never written by the
+    // dialect save path.
+    quint16 faceGenTail = 0;
 
     void parse(QIODevice& device, quint32 version, const QByteArray& fileHeader) override;
     void write(QIODevice& device, quint32 version) const override;
@@ -120,6 +125,10 @@ public:
     bool hasUVs = true;
     bool hasTangents = true;
     bool hasVertexColors = false;
+    // External .mesh streams referenced by Starfield BSGeometry slots
+    // (meshes live in BA2s). Filled by the Gamebryo reader; resolved to
+    // vertex data by Nif::MeshArchiveResolver.
+    QStringList externalMeshPaths;
 
     void parse(QIODevice& device, quint32 version, const QByteArray& fileHeader) override;
     void write(QIODevice& device, quint32 version) const override;
@@ -276,6 +285,43 @@ public:
 
     void parse(QIODevice& device, quint32 version, const QByteArray& fileHeader) override;
     void write(QIODevice& device, quint32 version) const override;
+};
+
+// Starfield BSSkin blocks (real Gamebryo binary encoding, FaceGen era).
+// Grammar validated structurally across shipped face NIFs (15 triplets in
+// 2 files: counts/strides consume exactly, refs resolve, attach name
+// counts match instance bone counts):
+//   SkinAttach: u32 unk(4), u32 nameCount, SizedStrings (bone names).
+//   BSSkin::Instance: u32 target, u32 boneDataRef, u32 boneCount,
+//     i32 headerFlag(-1), then 16 raw bytes per bone.
+//   BSSkin::BoneData: u32 boneCount, then per bone a 4x4 float matrix +
+//     float scale (~1.0).
+// The Instance per-bone 16B payload semantics are still unknown (only 5
+// distinct quads across 76 bones: three permutations of (0,1,1,*),
+// all -1, and one (-1,-1,-1,76)) -> preserved raw, never interpreted.
+// No parse()/write() overrides: these exist only in Gamebryo binaries and
+// are decoded by the Gamebryo reader in nifparser.cpp.
+class NifBSSkinInstance : public NifObject {
+public:
+    quint32 refTarget = 0;
+    quint32 refBoneData = 0;
+    qint32 headerFlag = -1;
+    QVector<QByteArray> bonePayloads;   // 16 raw bytes per bone
+};
+
+class NifBSSkinBoneData : public NifObject {
+public:
+    struct Bone {
+        float matrix[16];       // inverse-bind matrix (row-major presumed)
+        float scale = 1.0f;     // ~1.0 in all samples
+    };
+    QVector<Bone> bones;
+};
+
+class NifSkinAttach : public NifObject {
+public:
+    quint32 unknown = 0;        // 4 in all samples
+    QStringList boneNames;
 };
 
 struct ParticleSystemSettings {

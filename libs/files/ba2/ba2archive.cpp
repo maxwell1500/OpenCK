@@ -538,10 +538,11 @@ bool Ba2Archive::openLegacy(const QString&)
     return true;
 }
 
-bool Ba2Archive::extract(quint32 index, const QString& outputPath) const
+bool Ba2Archive::extractToBytes(quint32 index, QByteArray& out) const
 {
+    out.clear();
     if (mIsDx10)
-        return extractTexture(index, outputPath);
+        return false;
 
     if (index >= mEntries.size()) {
         LOG_ERROR(QString("BA2 extract: index %1 out of range").arg(index));
@@ -561,6 +562,38 @@ bool Ba2Archive::extract(quint32 index, const QString& outputPath) const
         return false;
     }
 
+    const uchar* fileDataPtr = mMappedData + static_cast<qint64>(entry.fileOffset);
+
+    if (entry.compressed) {
+        quint32 compressedSize = entry.compressedSize;
+        if (compressedSize == 0) {
+            if (index + 1 < mEntries.size()) {
+                compressedSize = static_cast<quint32>(mEntries[index + 1].fileOffset - entry.fileOffset);
+            } else {
+                compressedSize = static_cast<quint32>(mFileSize - entry.fileOffset);
+            }
+        }
+
+        if (!decompressChunk(fileDataPtr, compressedSize, entry.uncompressedSize,
+                             out, mUseLz4))
+        {
+            return false;
+        }
+    } else {
+        out = QByteArray(reinterpret_cast<const char*>(fileDataPtr), entry.uncompressedSize);
+    }
+    return true;
+}
+
+bool Ba2Archive::extract(quint32 index, const QString& outputPath) const
+{
+    if (mIsDx10)
+        return extractTexture(index, outputPath);
+
+    QByteArray data;
+    if (!extractToBytes(index, data))
+        return false;
+
     // Create output directory
     QFileInfo outInfo(outputPath);
     if (!outInfo.dir().mkpath(".")) {
@@ -574,31 +607,9 @@ bool Ba2Archive::extract(quint32 index, const QString& outputPath) const
         return false;
     }
 
-    const uchar* fileDataPtr = mMappedData + static_cast<qint64>(entry.fileOffset);
-
-    if (entry.compressed) {
-        quint32 compressedSize = entry.compressedSize;
-        if (compressedSize == 0) {
-            if (index + 1 < mEntries.size()) {
-                compressedSize = static_cast<quint32>(mEntries[index + 1].fileOffset - entry.fileOffset);
-            } else {
-                compressedSize = static_cast<quint32>(mFileSize - entry.fileOffset);
-            }
-        }
-
-        QByteArray decompressedBuf;
-        if (!decompressChunk(fileDataPtr, compressedSize, entry.uncompressedSize,
-                             decompressedBuf, mUseLz4))
-        {
-            return false;
-        }
-        outFile.write(decompressedBuf);
-    } else {
-        outFile.write(reinterpret_cast<const char*>(fileDataPtr), entry.uncompressedSize);
-    }
-
+    outFile.write(data);
     outFile.close();
-    LOG_INFO(QString("Extracted: %1 -> %2").arg(entry.relativePath).arg(outputPath));
+    LOG_INFO(QString("Extracted: %1 -> %2").arg(mEntries[index].relativePath).arg(outputPath));
     return true;
 }
 

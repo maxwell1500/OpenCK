@@ -63,6 +63,9 @@ public:
     // Extract a file by index to the given output path.
     // Returns true on success. For uncompressed files, copies directly.
     bool extract(quint32 index, const QString& outputPath) const;
+    // Extract a GNRL file by index into memory (false for DX10 archives).
+    // Backs extract(); used by the NIF mesh resolver to avoid temp files.
+    bool extractToBytes(quint32 index, QByteArray& out) const;
 
     // Get the archive name.
     QString name() const { return mName; }

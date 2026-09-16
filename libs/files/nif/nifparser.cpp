@@ -3,6 +3,8 @@
 #include <QFile>
 #include <QDataStream>
 #include <QFileInfo>
+#include <QDir>
+#include <cstdio>
 #include <QBuffer>
 #include <QDebug>
 #include <cmath>
@@ -11,6 +13,7 @@
 
 #include "logger.hpp"
 #include "nifrecord.hpp"
+#include "../ba2/ba2archive.hpp"
 
 namespace Nif {
 
@@ -880,6 +883,56 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
         LOG_INFO(QString("Linked skinning to shape '%1': %2 bones, %3 weights")
                      .arg(shape.name).arg(shape.skinBones.size()).arg(shape.skinWeights.size()));
     }
+
+    // Starfield BSSkin triplets (§8.3): [BSGeometry][extras]*[SkinAttach]
+    // [BSSkin::Instance][BSSkin::BoneData] (a BSClothExtraData may sit
+    // between Attach and Instance). Populates TriShape bone names from the
+    // attach block; bone nodes stay null and weights stay empty (no
+    // skeleton/weight streams wired yet), so shapes keep the rigid
+    // fallback via isSkinned().
+    {
+        qint32 lastGeom = -1;
+        qint32 pendingAttach = -1;
+        for (auto it = blocks.constBegin(); it != blocks.constEnd(); ++it) {
+            const QString& cn = it.value()->className;
+            if (cn == QLatin1String("BSGeometry")) {
+                if (dynamic_cast<NifTriShape*>(it.value()) != nullptr)
+                    lastGeom = static_cast<qint32>(it.key());
+                continue;
+            }
+            if (cn == QLatin1String("SkinAttach")) {
+                if (lastGeom >= 0 && dynamic_cast<NifSkinAttach*>(it.value()) != nullptr)
+                    pendingAttach = static_cast<qint32>(it.key());
+                continue;
+            }
+            if (cn != QLatin1String("BSSkin::Instance") || pendingAttach < 0)
+                continue;
+            auto* inst = dynamic_cast<NifBSSkinInstance*>(it.value());
+            auto* attach = dynamic_cast<NifSkinAttach*>(
+                blocks.value(static_cast<quint32>(pendingAttach)));
+            pendingAttach = -1;
+            if (!inst || !attach) continue;
+            auto* shell = dynamic_cast<NifTriShape*>(
+                blocks.value(static_cast<quint32>(lastGeom)));
+            if (!shell) continue;
+            auto target = skinShapeTargets.find(shell->dataRef);
+            if (target == skinShapeTargets.end()) continue;
+            Node* parentNode = target.value().first;
+            const int shapeIdx = target.value().second;
+            if (!parentNode || shapeIdx < 0 || shapeIdx >= parentNode->shapes.size())
+                continue;
+            TriShape& shape = parentNode->shapes[shapeIdx];
+            shape.skinBones.clear();
+            for (const QString& boneName : attach->boneNames) {
+                SkinBone bone;
+                bone.boneName = boneName;
+                bone.boneNode = nullptr;
+                shape.skinBones.append(bone);
+            }
+            LOG_INFO(QString("Linked BSSkin to shape '%1': %2 bones (names only)")
+                         .arg(shape.name).arg(shape.skinBones.size()));
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -918,7 +971,16 @@ struct Reader {
     quint32 u32() { quint32 v = 0; check(4); if (ok) s >> v; return v; }
     qint32 i32() { qint32 v = 0; check(4); if (ok) s >> v; return v; }
     quint64 u64() { quint64 v = 0; check(8); if (ok) s >> v; return v; }
-    float f32() { float v = 0.0f; check(4); if (ok) s >> v; return v; }
+    // NOTE: operator>>(float&) over-reads in this build (see parseBsMeshData);
+    // floats are read as bits explicitly.
+    float f32() {
+        quint32 bits = 0;
+        check(4);
+        if (ok) s >> bits;
+        float v = 0.0f;
+        memcpy(&v, &bits, 4);
+        return v;
+    }
     void skip(qint64 n) {
         if (n < 0 || s.device()->pos() + n > fileSize) { ok = false; return; }
         if (!s.device()->seek(s.device()->pos() + n)) ok = false;
@@ -932,6 +994,16 @@ struct Reader {
         if (!ok) return QString();
         if (s.readRawData(bytes.data(), len) != static_cast<int>(len)) { ok = false; return QString(); }
         return QString::fromLatin1(bytes);
+    }
+    // Raw bytes (opaque payloads): exact-length read, no interpretation.
+    QByteArray rawBytes(qint64 n, qint64 maxLen = 1048576) {
+        QByteArray out;
+        if (n < 0 || n > maxLen) { ok = false; return out; }
+        check(n);
+        if (!ok) return out;
+        out.resize(static_cast<int>(n));
+        if (n > 0 && s.readRawData(out.data(), n) != n) { ok = false; out.clear(); }
+        return out;
     }
     // NIF ExportString: u8 length (including NUL) + bytes.
     QString exportString() {
@@ -1122,13 +1194,275 @@ NifTriShape* parseGeometry(QFile& file, const Header& h, quint32 index,
         const QString path = r.sizedString(512);
         if (!r.ok || path.isEmpty()) { delete shape; return nullptr; }
         externalMeshes.append(path);
+        shape->externalMeshPaths.append(path);
     }
     if (!r.ok) { delete shape; return nullptr; }
     consumed = file.pos() - start;
     return shape;
 }
 
+// Starfield skin blocks (§8.3): SkinAttach (bone names), BSSkin::Instance
+// (target/bonedata refs, per-bone 16B opaque payloads), BSSkin::BoneData
+// (per-bone 4x4 matrix + scale). Strict counts (bones < 100000); the
+// caller verifies exact block-size consumption.
+NifSkinAttach* parseSkinAttach(QFile& file, const Header& h, quint32 index, qint64& consumed)
+{
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+    if (!file.seek(h.offsets[index])) return nullptr;
+    const qint64 start = file.pos();
+
+    auto* attach = new NifSkinAttach();
+    attach->className = QStringLiteral("SkinAttach");
+    attach->dataRef = index;
+    attach->unknown = r.u32();
+    const quint32 nameCount = r.u32();
+    if (!r.ok || nameCount > 100000) { delete attach; return nullptr; }
+    for (quint32 i = 0; i < nameCount; ++i) {
+        const QString name = r.sizedString(256);
+        if (!r.ok) { delete attach; return nullptr; }
+        attach->boneNames.append(name);
+    }
+    if (!r.ok) { delete attach; return nullptr; }
+    consumed = file.pos() - start;
+    return attach;
+}
+
+NifBSSkinInstance* parseSkinInstance(QFile& file, const Header& h, quint32 index, qint64& consumed)
+{
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+    if (!file.seek(h.offsets[index])) return nullptr;
+    const qint64 start = file.pos();
+
+    auto* inst = new NifBSSkinInstance();
+    inst->className = QStringLiteral("BSSkin::Instance");
+    inst->dataRef = index;
+    inst->refTarget = r.u32();
+    inst->refBoneData = r.u32();
+    const quint32 boneCount = r.u32();
+    inst->headerFlag = r.i32();
+    // 0xFFFFFFFF is the null-ref convention; anything else must index a block.
+    const bool refsOk = (inst->refTarget == 0xFFFFFFFFu || inst->refTarget < h.numBlocks)
+        && (inst->refBoneData == 0xFFFFFFFFu || inst->refBoneData < h.numBlocks);
+    if (!r.ok || boneCount > 100000 || !refsOk) {
+        delete inst;
+        return nullptr;
+    }
+    for (quint32 i = 0; i < boneCount; ++i) {
+        const QByteArray payload = r.rawBytes(16);
+        if (!r.ok) { delete inst; return nullptr; }
+        inst->bonePayloads.append(payload);
+    }
+    if (!r.ok) { delete inst; return nullptr; }
+    consumed = file.pos() - start;
+    return inst;
+}
+
+// BSFaceGenNiNode roots are NiNode bodies with 2 trailing bytes of unknown
+// purpose (0x0001 in all samples). Parsed as NifNode so the hierarchy walk
+// works unchanged; the tail is preserved on the node.
+NifNode* parseFaceGenNode(QFile& file, const Header& h, quint32 index, qint64& consumed)
+{
+    NifNode* node = parseNode(file, h, index, consumed);
+    if (!node) return nullptr;
+    node->className = QStringLiteral("BSFaceGenNiNode");
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+    node->faceGenTail = r.u16();
+    if (!r.ok) { delete node; return nullptr; }
+    consumed = file.pos() - h.offsets[index];
+    return node;
+}
+
+NifBSSkinBoneData* parseSkinBoneData(QFile& file, const Header& h, quint32 index, qint64& consumed)
+{
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+    if (!file.seek(h.offsets[index])) return nullptr;
+    const qint64 start = file.pos();
+
+    auto* bd = new NifBSSkinBoneData();
+    bd->className = QStringLiteral("BSSkin::BoneData");
+    bd->dataRef = index;
+    const quint32 boneCount = r.u32();
+    if (!r.ok || boneCount > 100000) { delete bd; return nullptr; }
+    for (quint32 i = 0; i < boneCount; ++i) {
+        NifBSSkinBoneData::Bone bone;
+        for (int f = 0; f < 16; ++f)
+            bone.matrix[f] = r.f32();
+        const quint32 scaleBits = r.u32();
+        if (!r.ok) { delete bd; return nullptr; }
+        memcpy(&bone.scale, &scaleBits, 4);
+        bd->bones.append(bone);
+    }
+    if (!r.ok) { delete bd; return nullptr; }
+    consumed = file.pos() - start;
+    return bd;
+}
+
 } // namespace Gamebryo
+
+namespace {
+
+// Process-wide BA2 cache: opening multi-GB mesh archives costs ~a second
+// each, so archives (and their filename indices) are opened once and shared
+// by every NIF load. NIF loads run on the main thread; not thread-safe.
+struct ArchiveCacheEntry {
+    std::shared_ptr<Ba2Archive> archive;
+    QHash<QString, quint32> byLowerPath;
+    bool indexed = false;
+};
+
+QMap<QString, ArchiveCacheEntry>& archiveCache()
+{
+    static QMap<QString, ArchiveCacheEntry> cache;
+    return cache;
+}
+
+bool isHexWord(const QString& s)
+{
+    if (s.isEmpty() || s.size() > 64) return false;
+    for (const QChar c : s) {
+        const char a = c.toLower().toLatin1();
+        if (!(a >= '0' && a <= '9') && !(a >= 'a' && a <= 'f')) return false;
+    }
+    return true;
+}
+
+} // namespace
+
+MeshArchiveResolver MeshArchiveResolver::forNif(const QString& nifPath)
+{
+    MeshArchiveResolver r;
+    QDir d = QFileInfo(nifPath).absoluteDir();
+    for (int i = 0; i < 6; ++i) {
+        if (d.dirName().compare(QStringLiteral("meshes"), Qt::CaseInsensitive) == 0) {
+            QDir data = d;
+            data.cdUp();
+            r.m_dataDir = data.absolutePath();
+            break;
+        }
+        QDir parent = d;
+        if (!parent.cdUp() || parent == d) break;
+        d = parent;
+    }
+    if (r.m_dataDir.isEmpty()) {
+        const QString env = qEnvironmentVariable("OPENCK_DATA_DIR",
+            QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
+        if (QDir(env).exists())
+            r.m_dataDir = env;
+        else
+            return r;
+    }
+    const QStringList ba2s = QDir(r.m_dataDir).entryList(
+        QStringList({ QStringLiteral("*Meshes*.ba2") }), QDir::Files);
+    for (const QString& b : ba2s) {
+        if (r.m_archives.size() >= 8) break;
+        r.addArchive(QDir(r.m_dataDir).filePath(b));
+    }
+    return r;
+}
+
+bool MeshArchiveResolver::hasArchives() const
+{
+    return !m_archives.isEmpty();
+}
+
+bool MeshArchiveResolver::addArchive(const QString& ba2Path)
+{
+    auto& cache = archiveCache();
+    auto hit = cache.find(ba2Path);
+    if (hit == cache.end()) {
+        auto archive = std::make_shared<Ba2Archive>();
+        if (!archive->open(ba2Path))
+            return false;
+        hit = cache.insert(ba2Path, ArchiveCacheEntry{ archive, {}, false });
+    }
+    m_archives.insert(ba2Path, hit.value().archive);
+    return true;
+}
+
+const QHash<QString, quint32>* MeshArchiveResolver::nameIndexFor(const QString& ba2Path)
+{
+    static const QHash<QString, quint32> empty;
+    auto ait = m_archives.find(ba2Path);
+    if (ait == m_archives.end()) return &empty;
+    auto& cache = archiveCache();
+    auto cit = cache.find(ba2Path);
+    if (cit == cache.end()) return &empty;
+    if (!cit.value().indexed) {
+        const QVector<Ba2FileEntry>& entries = ait.value()->entries();
+        cit.value().byLowerPath.reserve(entries.size());
+        for (int i = 0; i < entries.size(); ++i)
+            cit.value().byLowerPath.insert(entries.at(i).relativePath.toLower(), static_cast<quint32>(i));
+        cit.value().indexed = true;
+    }
+    return &cit.value().byLowerPath;
+}
+
+QByteArray MeshArchiveResolver::meshBytes(const QString& meshPath)
+{
+    if (meshPath.isEmpty()) return {};
+    auto cached = m_bytesCache.find(meshPath);
+    if (cached != m_bytesCache.end()) return cached.value();
+
+    QByteArray out;
+    // Normalize: forward slashes, single .mesh suffix.
+    QString norm = meshPath;
+    norm.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    if (norm.endsWith(QStringLiteral(".mesh"), Qt::CaseInsensitive))
+        norm.chop(5);
+    // Full "Geometries/h1/h2" form (face NIFs carry it with the suffix).
+    if (norm.startsWith(QStringLiteral("geometries/"), Qt::CaseInsensitive)) {
+        const QString arch = norm.toLower() + QStringLiteral(".mesh");
+        for (auto it = m_archives.begin(); it != m_archives.end(); ++it) {
+            const quint32 e = nameIndexFor(it.key())->value(arch, 0xFFFFFFFFu);
+            if (e == 0xFFFFFFFFu) continue;
+            if (it.value()->extractToBytes(e, out) && !out.isEmpty()) break;
+            out.clear();
+        }
+        if (!out.isEmpty()) {
+            m_bytesCache.insert(meshPath, out);
+            return out;
+        }
+    }
+    // Hash form "h1\h2" addresses geometries/h1/h2.mesh directly.
+    const int slash = norm.indexOf(QLatin1Char('/'));
+    if (slash > 0 && isHexWord(norm.left(slash)) && isHexWord(norm.mid(slash + 1))) {
+        const QString arch = QStringLiteral("geometries/")
+            + norm.left(slash).toLower() + QLatin1Char('/')
+            + norm.mid(slash + 1).toLower() + QStringLiteral(".mesh");
+        for (auto it = m_archives.begin(); it != m_archives.end(); ++it) {
+            const quint32 e = nameIndexFor(it.key())->value(arch, 0xFFFFFFFFu);
+            if (e == 0xFFFFFFFFu) continue;
+            if (it.value()->extractToBytes(e, out) && !out.isEmpty()) break;
+            out.clear();
+        }
+        if (!out.isEmpty()) {
+            m_bytesCache.insert(meshPath, out);
+            return out;
+        }
+    }
+    // Loose file fallback (modder-supplied meshes next to the NIFs).
+    if (!m_dataDir.isEmpty()) {
+        QFile loose(QDir(m_dataDir).filePath(QStringLiteral("meshes/") + norm + QStringLiteral(".mesh")));
+        if (loose.open(QIODevice::ReadOnly)) {
+            out = loose.readAll();
+            m_bytesCache.insert(meshPath, out);
+            return out;
+        }
+    }
+    // Name-style paths ("SomeFolder\\SomeMesh") match no BA2 entry anywhere
+    // in the shipped install (verified across all Meshes archives); they are
+    // left unresolved rather than guessed at. No substring search: it would
+    // risk false matches with zero demonstrated benefit.
+    return {};
+}
 
 static float halfToFloat(quint16 h)
 {
@@ -1219,7 +1553,7 @@ bool parseBsMeshData(const QByteArray& bytes, BsMeshData& out)
         s >> x >> y >> z;
         if (s.status() != QDataStream::Ok) return false;
         Vector3 v;
-        v.x = x * scale; v.y = y * scale; v.z = z * scale;
+        v.x = x * scale / 65536.0f; v.y = y * scale / 65536.0f; v.z = z * scale / 65536.0f;
         out.vertices.append(v);
     }
 
@@ -1303,16 +1637,22 @@ bool parseBsMeshData(const QByteArray& bytes, BsMeshData& out)
             }
         }
     }
-    if (!need(4)) return false;
-    s >> num;   // meshlets (16 bytes each)
+    // Trailing sections may be absent at EOF (shipped skinned meshes end
+    // right after the LOD count): a missing count reads as zero.
+    auto readCountOpt = [&](quint32& count) -> bool {
+        if (s.device()->pos() == end) { count = 0; return true; }
+        if (!need(4)) return false;
+        s >> count;
+        return s.status() == QDataStream::Ok;
+    };
+    if (!readCountOpt(num)) return false;   // meshlets (16 bytes each)
     if (!countOk(num, 16, 1000000u)) return false;
     for (quint32 i = 0; i < num; ++i) {
         quint32 a = 0, b = 0, c = 0, d = 0;
         s >> a >> b >> c >> d;
         if (s.status() != QDataStream::Ok) return false;
     }
-    if (!need(4)) return false;
-    s >> num;   // cull data (24 bytes each)
+    if (!readCountOpt(num)) return false;   // cull data (24 bytes each)
     if (!countOk(num, 24, 1000000u)) return false;
     for (quint32 i = 0; i < num; ++i) {
         for (int k = 0; k < 6; ++k) {
@@ -1446,12 +1786,33 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
                 { delete obj; obj = new NifObject(); }
             else
                 obj->className = QStringLiteral("NiNode");
+        } else if (type == QLatin1String("BSFaceGenNiNode")) {
+            qint64 consumed = 0;
+            obj = Gamebryo::parseFaceGenNode(file, header, i, consumed);
+            if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
+                { delete obj; obj = new NifObject(); }
+            // className already "BSFaceGenNiNode" on success.
         } else if (type == QLatin1String("BSGeometry")) {
             qint64 consumed = 0;
             obj = Gamebryo::parseGeometry(file, header, i, externalMeshes, consumed);
             if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
                 { delete obj; obj = new NifObject(); }
             // className already "BSGeometry" on success.
+        } else if (type == QLatin1String("BSSkin::Instance")) {
+            qint64 consumed = 0;
+            obj = Gamebryo::parseSkinInstance(file, header, i, consumed);
+            if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
+                { delete obj; obj = new NifObject(); }
+        } else if (type == QLatin1String("BSSkin::BoneData")) {
+            qint64 consumed = 0;
+            obj = Gamebryo::parseSkinBoneData(file, header, i, consumed);
+            if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
+                { delete obj; obj = new NifObject(); }
+        } else if (type == QLatin1String("SkinAttach")) {
+            qint64 consumed = 0;
+            obj = Gamebryo::parseSkinAttach(file, header, i, consumed);
+            if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
+                { delete obj; obj = new NifObject(); }
         } else {
             obj = new NifObject();
         }
@@ -1464,6 +1825,53 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
 
     LOG_INFO(QString("Parsed %1 Gamebryo blocks (%2 external meshes)")
                  .arg(blocks.size()).arg(externalMeshes.size()));
+
+    // Resolve external meshes: decode each shell's first resolvable slot
+    // into a synthetic data block so extractGeometry picks up real
+    // vertices. Unresolvable shells stay vert-less (extractGeometry skips
+    // them); the load still succeeds on hierarchy + paths.
+    if (!externalMeshes.isEmpty()) {
+        MeshArchiveResolver resolver = MeshArchiveResolver::forNif(fileName);
+        if (resolver.hasArchives()) {
+            int attached = 0;
+            for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+                auto* shell = dynamic_cast<NifTriShape*>(it.value());
+                if (!shell || shell->externalMeshPaths.isEmpty()) continue;
+                for (const QString& mp : shell->externalMeshPaths) {
+                    const QByteArray mbytes = resolver.meshBytes(mp);
+                    if (mbytes.isEmpty()) continue;
+                    BsMeshData md;
+                    if (!parseBsMeshData(mbytes, md) || md.vertices.isEmpty()) continue;
+                    auto* data = new NifTriShapeData();
+                    data->className = QStringLiteral("NiTriShapeData");
+                    for (const Vector3& v : md.vertices) {
+                        NiPoint3 p; p.x = v.x; p.y = v.y; p.z = v.z;
+                        data->vertices.append(p);
+                    }
+                    for (const Vector2& t : md.uvs) {
+                        NiPoint2 p; p.u = t.u; p.v = t.v;
+                        data->uvs.append(p);
+                    }
+                    for (const Vector3& n : md.normals) {
+                        NiPoint3 p; p.x = n.x; p.y = n.y; p.z = n.z;
+                        data->normals.append(p);
+                    }
+                    for (const Color4& c : md.colors) {
+                        NiColorRGBA col; col.r = c.r; col.g = c.g; col.b = c.b; col.a = c.a;
+                        data->vertexColors.append(col);
+                    }
+                    for (quint32 idx : md.triangles)
+                        data->indices.append(idx);
+                    const quint32 key = 0x40000000u | it.key();
+                    blocks.insert(key, data);
+                    shell->refGeometryData = key;
+                    ++attached;
+                    break;   // first resolvable slot wins
+                }
+            }
+            LOG_INFO(QString("Attached %1 external mesh data blocks").arg(attached));
+        }
+    }
 
     auto* rootNode = dynamic_cast<NifNode*>(blocks.value(0));
     if (!rootNode) {
@@ -1487,7 +1895,7 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
 
     LOG_INFO(QString("Loaded Gamebryo hierarchy: %1 nodes, %2 shapes, %3 vertices, %4 external meshes")
                  .arg(ourRoot->children.size())
-                 .arg(parser.getRoot()->shapes.size())
+                 .arg(parser.shapeCount())
                  .arg(parser.totalVertexCount())
                  .arg(externalMeshes.size()));
     return true;
@@ -1823,15 +2231,31 @@ int NifParser::totalVertexCount() const
 {
     if (!root) return 0;
     int count = 0;
-    for (const auto& shape : root->shapes) {
-        count += shape.vertices.size();
+    QStack<const Node*> stack;
+    stack.push(root);
+    while (!stack.isEmpty()) {
+        const Node* node = stack.pop();
+        for (const auto& shape : node->shapes)
+            count += shape.vertices.size();
+        for (const Node* child : node->children)
+            stack.push(child);
     }
     return count;
 }
 
 int NifParser::shapeCount() const
 {
-    return root ? root->shapes.size() : 0;
+    if (!root) return 0;
+    int count = 0;
+    QStack<const Node*> stack;
+    stack.push(root);
+    while (!stack.isEmpty()) {
+        const Node* node = stack.pop();
+        count += node->shapes.size();
+        for (const Node* child : node->children)
+            stack.push(child);
+    }
+    return count;
 }
 
 // ---------------------------------------------------------------------------

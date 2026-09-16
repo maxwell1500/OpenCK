@@ -1058,14 +1058,39 @@ this section is documentation of findings, per the §3 review).
     Debugging footnote: `QDataStream::operator>>(float&)` was observed
     consuming 8 bytes (not 4) in this build — the mesh parser reads float
     bits as u32 + memcpy (see AGENTS.md gotchas).
-    Still open: automatic mesh resolution inside `NifParser`/viewport
-    (BA2 management + caching across Meshes01/02/Patch), vertex unit
-    confirmation (short×scale magnitudes vs NIF bounds), real
-    `NiSkinInstance` / `NiSkinData` / `NiSkinPartition` layouts (no loose
-    shipped NIF contains a `*Skin*` block; skinned meshes are in BA2s),
-    plus the manual Play-confirm on a skinned animated mesh and a particle
-    mesh, which needs a display. Entry criterion restated: wire mesh
-    resolution into the load path (the survey's `totalVerts == 0`
-    assertion fails the moment any do), then load a skinned animated NIF
-    plus a particle NIF, press Play, confirm correct motion, and record
-    the result here.
+    **Auto-resolution 2026-09-16:** `Nif::MeshArchiveResolver`
+    (`nifparser.*`, process-wide BA2 cache) maps NIF mesh paths to mesh
+    BA2 entries — hash form `h1\h2` and full `Geometries\h1\h2[.mesh]`
+    address `geometries/h1/h2.mesh` directly; name-style paths
+    (`SomeFolder\SomeMesh`) match no shipped archive entry anywhere and
+    stay unresolved by design (no substring guessing). Resolved meshes
+    decode into synthetic data blocks so `extractGeometry` yields real
+    shapes: the survey now reports 53,715 verts over the 8 files
+    (`totalVerts > 0` replaces the old `== 0` tripwire). Vertex units
+    settled empirically: meters = int16 × vertexScale / 65536 (bound
+    sphere/box ratios exact on 6 axes across 2 scales). `Ba2Archive`
+    gained `extractToBytes` (backing `extract()`); `totalVertexCount` /
+    `shapeCount` now recurse the whole tree (they previously counted the
+    root only — the tree was always fully populated).
+    **Skinned meshes 2026-09-16:** Starfield does not use NiSkin — faces
+    use `BSSkin::Instance` + `BSSkin::BoneData` + `SkinAttach` triplets
+    (positional: geometry, extras, attach, instance, bonedata; a
+    `BSClothExtraData` may sit between attach and instance; the geometry's
+    skin ref points at its instance directly). Layouts validated across
+    15 triplets in 2 shipped face NIFs: attach = u32 unk(4) + names;
+    instance = target/bonedata/n + i32(-1) + 16 raw bytes per bone;
+    bonedata = count + per-bone 4×4 matrix + scale float (~1.0).
+    `BSFaceGenNiNode` roots parse as `NiNode` + 2 tail bytes. Bone names
+    link onto `TriShape.skinBones` (nodes null, weights empty — rigid
+    fallback preserved); `testFaceSkinBlocks` proves it on a shipped face
+    (10 shapes, 10 skinned, 129 named bones, 53,444 verts).
+    Still open: the Instance per-bone 16B semantics (only 5 distinct quads
+    across 76 bones — kept raw), per-vertex weight streams (`.mesh`
+    Weights sections decode structurally; bone-index→skeleton mapping
+    needs the external skeleton), skeleton resolution, GPU/CPU blend
+    wiring, plus the manual Play-confirm on a skinned animated mesh and a
+    particle mesh, which needs a display. Entry criterion restated: decode
+    the 16B payload + weights against a skeleton, blend one frame on the
+    face mesh and verify against the NIF bind pose, then load a skinned
+    animated NIF plus a particle NIF, press Play, confirm correct motion,
+    and record the result here.
