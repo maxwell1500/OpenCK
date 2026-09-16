@@ -292,6 +292,13 @@ target_include_directories(test_meshprobe PRIVATE ${TEST_INCLUDE_DIRS})
 # Always exits 0 (reports "open failed" when the archive is absent).
 openck_add_test(test_meshprobe)
 
+# Diagnostic: find/extract files in a BA2 by path substring (§8.3: resolve
+# the external .mesh paths shipped BSGeometry blocks carry).
+# Not registered with CTest (needs a real game install).
+add_executable(test_meshresolve test_meshresolve.cpp)
+target_link_libraries(test_meshresolve PRIVATE openck_model test_stubs Qt6::Core)
+target_include_directories(test_meshresolve PRIVATE ${TEST_INCLUDE_DIRS})
+
 # Diagnostic: subrecord-level diff of a source plugin against its untouched
 # round-trip save (test_subrecord_diff <source> <saved>). Exit 0 = identical.
 add_executable(test_subrecord_diff test_subrecord_diff.cpp)

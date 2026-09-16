@@ -186,6 +186,34 @@ struct Node {
     }
 };
 
+// Decoded Starfield .mesh stream (BSMeshData): the vertex payload that
+// shipped BSGeometry blocks reference externally (meshes live in BA2s).
+// Layout from NifSkope's #STF# definitions, validated by exact full-buffer
+// consumption against a shipped mesh. Bone weight encoding is still
+// unverified (no skinned mesh available loose), so weights stay raw.
+struct BsMeshBoneWeight {
+    quint16 bone = 0;
+    quint16 weightRaw = 0;
+};
+
+struct BsMeshData {
+    quint32 version = 0;
+    float vertexScale = 1.0f;
+    quint32 weightsPerVertex = 0;
+    QVector<Vector3> vertices;    // short * vertexScale
+    QVector<Vector2> uvs;         // half floats
+    QVector<Vector2> uv2;         // second channel, may be empty
+    QVector<Color4> colors;       // BGRA bytes / 255, may be empty
+    QVector<Vector3> normals;     // packed 10-10-10-2, may be empty
+    QVector<Vector3> tangents;    // packed 10-10-10-2, may be empty
+    QVector<quint32> triangles;   // flat index triples
+    QVector<BsMeshBoneWeight> weights;
+};
+
+// Parses a .mesh byte buffer. False on any structural surprise (sizes,
+// counts, trailing bytes) — never a partial mesh.
+bool parseBsMeshData(const QByteArray& bytes, BsMeshData& out);
+
 class NifParser {
 public:
     ~NifParser();

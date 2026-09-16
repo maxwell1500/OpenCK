@@ -6,9 +6,12 @@
 #include <QMatrix4x4>
 #include <QQuaternion>
 #include <QTemporaryFile>
+#include <QTemporaryDir>
+#include <cmath>
 
 #include "../../libs/files/nif/nifparser.hpp"
 #include "../../libs/files/nif/nifskinning.hpp"
+#include "../../libs/files/ba2/ba2archive.hpp"
 #include "nifrecord.hpp"
 #include "logger.hpp"
 #include "model/tools/nifanimationstate.hpp"
@@ -34,6 +37,7 @@ private slots:
     void testSyntheticWalkClean();
     void testPlaybackComposition();
     void testRealNifSurvey();
+    void testExternalMeshData();
     void testSyntheticSkinnedFileLoad();
 };
 
@@ -585,6 +589,59 @@ void TestNifSkinning::testRealNifSurvey()
     QVERIFY2(totalMeshRefs > 0, "No external mesh references resolved");
     QVERIFY2(namedNodes > 0, "No scene-graph nodes extracted");
     QCOMPARE(totalVerts, 0);
+}
+
+void TestNifSkinning::testExternalMeshData()
+{
+    // End of the §8.3 external-mesh chain: a shipped BSGeometry's mesh path
+    // resolves into Meshes01.ba2 and the extracted .mesh stream decodes to
+    // real vertices. The pair below is verified by hand (16 verts, 8 tris,
+    // exact 560-byte consumption).
+    const QString dataDir =
+        qEnvironmentVariable("OPENCK_DATA_DIR",
+                             QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
+    const QString archivePath = dataDir + QStringLiteral("/Starfield - Meshes01.ba2");
+    if (!QFileInfo::exists(archivePath))
+        QSKIP("No Meshes01.ba2; set OPENCK_DATA_DIR");
+
+    Ba2Archive ba2;
+    QVERIFY2(ba2.open(archivePath), "Meshes01.ba2 did not open");
+    const QString wanted =
+        QStringLiteral("geometries/00856bcea008815c2f5e/e866b4e0f724b36a7090.mesh");
+    int found = -1;
+    for (quint32 i = 0; i < ba2.fileCount(); ++i)
+    {
+        if (ba2.entries().at(i).relativePath == wanted)
+        {
+            found = static_cast<int>(i);
+            break;
+        }
+    }
+    QVERIFY2(found >= 0, "Known .mesh entry not in Meshes01.ba2");
+
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString meshPath = tmp.filePath(QStringLiteral("probe.mesh"));
+    QVERIFY(ba2.extract(static_cast<quint32>(found), meshPath));
+
+    QFile f(meshPath);
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    const QByteArray bytes = f.readAll();
+    QCOMPARE(bytes.size(), 560);
+
+    Nif::BsMeshData mesh;
+    QVERIFY2(Nif::parseBsMeshData(bytes, mesh), "BSMeshData decode failed");
+    QCOMPARE(mesh.vertices.size(), 16);
+    QCOMPARE(mesh.triangles.size(), 24);
+    QCOMPARE(mesh.uvs.size(), 16);
+    QCOMPARE(mesh.normals.size(), 16);
+    QCOMPARE(mesh.weights.size(), 0);
+    quint32 top = 0;
+    for (quint32 idx : mesh.triangles)
+        top = qMax(top, idx);
+    QVERIFY(top < static_cast<quint32>(mesh.vertices.size()));
+    for (const Nif::Vector3& v : mesh.vertices)
+        QVERIFY(std::isfinite(v.x + v.y + v.z));
 }
 
 void TestNifSkinning::testSyntheticSkinnedFileLoad()

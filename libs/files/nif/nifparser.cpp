@@ -1130,6 +1130,209 @@ NifTriShape* parseGeometry(QFile& file, const Header& h, quint32 index,
 
 } // namespace Gamebryo
 
+static float halfToFloat(quint16 h)
+{
+    const quint32 sign = (h >> 15) & 1;
+    quint32 exp = (h >> 10) & 0x1F;
+    quint32 mant = h & 0x3FF;
+    quint32 bits;
+    if (exp == 0) {
+        if (mant == 0) {
+            bits = sign << 31;
+        } else {
+            // Subnormal: normalize.
+            exp = 1;
+            while ((mant & 0x400) == 0) { mant <<= 1; --exp; }
+            mant &= 0x3FF;
+            bits = (sign << 31) | ((exp + 112) << 23) | (mant << 13);
+        }
+    } else if (exp == 31) {
+        bits = (sign << 31) | (0xFF << 23) | (mant << 13);
+    } else {
+        bits = (sign << 31) | ((exp + 112) << 23) | (mant << 13);
+    }
+    float f = 0.0f;
+    memcpy(&f, &bits, 4);
+    return f;
+}
+
+// UDecVector4 10-10-10-2 packing: xyz 10-bit, w 2-bit. xyz decoded to
+// [-1, 1]; the exact normal encoding is unvalidated against shipped data,
+// so treat values as approximate until a skinned/normal-mapped mesh lands.
+static Vector3 udecToVector3(quint32 v)
+{
+    Vector3 out;
+    out.x = static_cast<float>((v & 0x3FF)) / 1023.0f * 2.0f - 1.0f;
+    out.y = static_cast<float>(((v >> 10) & 0x3FF)) / 1023.0f * 2.0f - 1.0f;
+    out.z = static_cast<float>(((v >> 20) & 0x3FF)) / 1023.0f * 2.0f - 1.0f;
+    return out;
+}
+
+bool parseBsMeshData(const QByteArray& bytes, BsMeshData& out)
+{
+    out = BsMeshData();
+    QDataStream s(bytes);
+    s.setByteOrder(QDataStream::LittleEndian);
+    const qint64 end = bytes.size();
+    auto need = [&](qint64 n) -> bool {
+        return s.status() == QDataStream::Ok && s.device()->pos() + n <= end;
+    };
+    // Counts are validated before use so a corrupt stream fails here
+    // instead of over-allocating.
+    auto countOk = [&](quint32 n, quint32 elem, quint32 maxElems) -> bool {
+        return n <= maxElems
+            && s.device()->pos() + static_cast<qint64>(n) * elem <= end;
+    };
+
+    quint32 version = 0, indexSize = 0;
+    if (!need(8)) return false;
+    s >> version >> indexSize;
+    out.version = version;
+    if (indexSize > 30000000u || indexSize % 3 != 0) return false;
+    if (!countOk(indexSize / 3, 6, 10000000u)) return false;
+    out.triangles.reserve(indexSize);
+    for (quint32 i = 0; i < indexSize; ++i) {
+        quint16 idx = 0;
+        s >> idx;
+        if (s.status() != QDataStream::Ok) return false;
+        out.triangles.append(idx);
+    }
+
+    float scale = 1.0f;
+    quint32 weightsPerVertex = 0, numVerts = 0;
+    if (!need(12)) return false;
+    {
+        // NOTE: operator>>(float&) over-reads here (consumes 8, yields 0.0);
+        // read the bits explicitly until the Qt/MSVC overload is understood.
+        quint32 scaleBits = 0;
+        s >> scaleBits;
+        memcpy(&scale, &scaleBits, 4);
+    }
+    s >> weightsPerVertex >> numVerts;
+    if (weightsPerVertex > 8) return false;
+    out.vertexScale = scale;
+    out.weightsPerVertex = weightsPerVertex;
+    if (!countOk(numVerts, 6, 10000000u)) return false;
+    out.vertices.reserve(numVerts);
+    for (quint32 i = 0; i < numVerts; ++i) {
+        qint16 x = 0, y = 0, z = 0;
+        s >> x >> y >> z;
+        if (s.status() != QDataStream::Ok) return false;
+        Vector3 v;
+        v.x = x * scale; v.y = y * scale; v.z = z * scale;
+        out.vertices.append(v);
+    }
+
+    quint32 num = 0;
+    if (!need(4)) return false;
+    s >> num;   // UVs
+    if (!countOk(num, 4, 10000000u)) return false;
+    for (quint32 i = 0; i < num; ++i) {
+        quint16 u = 0, v = 0;
+        s >> u >> v;
+        if (s.status() != QDataStream::Ok) return false;
+        Vector2 t;
+        t.u = halfToFloat(u); t.v = halfToFloat(v);
+        out.uvs.append(t);
+    }
+    if (!need(4)) return false;
+    s >> num;   // UVs 2
+    if (num > 0) {
+        if (!countOk(num, 4, 10000000u)) return false;
+        for (quint32 i = 0; i < num; ++i) {
+            quint16 u = 0, v = 0;
+            s >> u >> v;
+            if (s.status() != QDataStream::Ok) return false;
+            Vector2 t;
+            t.u = halfToFloat(u); t.v = halfToFloat(v);
+            out.uv2.append(t);
+        }
+    }
+    if (!need(4)) return false;
+    s >> num;   // colors (BGRA bytes)
+    if (num > 0) {
+        if (!countOk(num, 4, 10000000u)) return false;
+        for (quint32 i = 0; i < num; ++i) {
+            quint8 b = 0, g = 0, r = 0, a = 0;
+            s >> b >> g >> r >> a;
+            if (s.status() != QDataStream::Ok) return false;
+            Color4 c;
+            c.r = r / 255.0f; c.g = g / 255.0f; c.b = b / 255.0f; c.a = a / 255.0f;
+            out.colors.append(c);
+        }
+    }
+    if (!need(4)) return false;
+    s >> num;   // normals
+    if (!countOk(num, 4, 10000000u)) return false;
+    for (quint32 i = 0; i < num; ++i) {
+        quint32 packed = 0;
+        s >> packed;
+        if (s.status() != QDataStream::Ok) return false;
+        out.normals.append(udecToVector3(packed));
+    }
+    if (!need(4)) return false;
+    s >> num;   // tangents
+    if (!countOk(num, 4, 10000000u)) return false;
+    for (quint32 i = 0; i < num; ++i) {
+        quint32 packed = 0;
+        s >> packed;
+        if (s.status() != QDataStream::Ok) return false;
+        out.tangents.append(udecToVector3(packed));
+    }
+    if (!need(4)) return false;
+    s >> num;   // bone weights
+    if (!countOk(num, 4, 10000000u)) return false;
+    for (quint32 i = 0; i < num; ++i) {
+        BsMeshBoneWeight w;
+        s >> w.bone >> w.weightRaw;
+        if (s.status() != QDataStream::Ok) return false;
+        out.weights.append(w);
+    }
+    if (out.version >= 1) {
+        if (!need(4)) return false;
+        s >> num;   // LODs
+        for (quint32 i = 0; i < num; ++i) {
+            quint32 lodSize = 0;
+            if (!need(4)) return false;
+            s >> lodSize;
+            if (lodSize % 3 != 0 || !countOk(lodSize / 3, 6, 10000000u)) return false;
+            for (quint32 k = 0; k < lodSize; ++k) {
+                quint16 idx = 0;
+                s >> idx;
+                if (s.status() != QDataStream::Ok) return false;
+            }
+        }
+    }
+    if (!need(4)) return false;
+    s >> num;   // meshlets (16 bytes each)
+    if (!countOk(num, 16, 1000000u)) return false;
+    for (quint32 i = 0; i < num; ++i) {
+        quint32 a = 0, b = 0, c = 0, d = 0;
+        s >> a >> b >> c >> d;
+        if (s.status() != QDataStream::Ok) return false;
+    }
+    if (!need(4)) return false;
+    s >> num;   // cull data (24 bytes each)
+    if (!countOk(num, 24, 1000000u)) return false;
+    for (quint32 i = 0; i < num; ++i) {
+        for (int k = 0; k < 6; ++k) {
+            quint32 bits = 0;
+            s >> bits;
+            if (s.status() != QDataStream::Ok) return false;
+        }
+    }
+
+    if (s.status() != QDataStream::Ok) return false;
+    if (s.device()->pos() != end) return false;   // exact consumption only
+    if (!out.triangles.isEmpty()) {
+        quint32 top = 0;
+        for (quint32 idx : out.triangles)
+            top = qMax(top, idx);
+        if (top >= static_cast<quint32>(out.vertices.size())) return false;
+    }
+    return true;
+}
+
 static bool loadRealNif(NifParser& parser, const QString& fileName)
 {
     QFile file(fileName);

@@ -1047,14 +1047,25 @@ this section is documentation of findings, per the §3 review).
     (meshes live in BA2s), recorded on the parser via
     `NifParser::externalMeshRefs()`. `testRealNifSurvey` flipped: 8/8
     shipped files load with 66 named nodes + 205 external mesh refs and 0
-    local verts. Still open: inline `BSMeshData` decode (no standard-layout
-    loose file carries any — the 229 inline slots sit in third-party
-    Blender-variant files whose bodies this reader strictly rejects),
-    `.mesh`/BA2 streams for actual vertices, real `NiSkinInstance` /
-    `NiSkinData` / `NiSkinPartition` layouts (no loose shipped NIF contains
-    a `*Skin*` block; skinned meshes are in BA2s), plus the manual
-    Play-confirm on a skinned animated mesh and a particle mesh, which
-    needs a display. Entry criterion restated: land inline/` .mesh`
-    vertex data (the survey's `totalVerts == 0` assertion fails the moment
-    any does), then load a skinned animated NIF plus a particle NIF, press
-    Play, confirm correct motion, and record the result here.
+    local verts. **Vertices 2026-09-15:** the external paths resolve —
+    NIF mesh path + `geometries/` prefix + `.mesh` suffix addresses
+    Meshes01.ba2 directly (320,483 files; verified by extraction), and
+    `Nif::parseBsMeshData` decodes the `.mesh` stream (scaled ShortVector3
+    verts, half UVs, BGRA colors, packed normals/tangents, weights, LODs,
+    meshlets, cull — exact full-buffer consumption). `testExternalMeshData`
+    proves it on a shipped mesh (16 verts, 8 tris, valid indices). New
+    diagnostic `test_meshresolve` finds/extracts BA2 entries by path.
+    Debugging footnote: `QDataStream::operator>>(float&)` was observed
+    consuming 8 bytes (not 4) in this build — the mesh parser reads float
+    bits as u32 + memcpy (see AGENTS.md gotchas).
+    Still open: automatic mesh resolution inside `NifParser`/viewport
+    (BA2 management + caching across Meshes01/02/Patch), vertex unit
+    confirmation (short×scale magnitudes vs NIF bounds), real
+    `NiSkinInstance` / `NiSkinData` / `NiSkinPartition` layouts (no loose
+    shipped NIF contains a `*Skin*` block; skinned meshes are in BA2s),
+    plus the manual Play-confirm on a skinned animated mesh and a particle
+    mesh, which needs a display. Entry criterion restated: wire mesh
+    resolution into the load path (the survey's `totalVerts == 0`
+    assertion fails the moment any do), then load a skinned animated NIF
+    plus a particle NIF, press Play, confirm correct motion, and record
+    the result here.

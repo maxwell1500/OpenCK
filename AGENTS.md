@@ -138,6 +138,12 @@ build, which is what the LGPL dynamic-link clause intends.
 - **`openck::FormComponents::findByName("TESModel")` returns a
   `Component*`**. To access the typed fields, `static_cast`:
   `static_cast<tescomponents::TESModel_Component*>(components.findByName("TESModel"))`.
+- **In strict binary parsers, read floats as u32 bits + memcpy, never
+  `QDataStream::operator>>(float&)`.** Observed 2026-09-15 in
+  `libs/files/nif/nifparser.cpp::parseBsMeshData`: `s >> floatVar`
+  consumed 8 bytes and yielded 0.0 where the same stream position read as
+  u32 + memcpy gave the correct 4-byte float (verified by device pos +
+  value against ground-truth bytes). u8/u16/u32/i32 reads are exact.
 - **Keep a `LOG_INFO` line at the top of new editor windows** so the
   log file shows when each window opens, matching the convention in
   the existing main window.
