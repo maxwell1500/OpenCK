@@ -882,6 +882,254 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
     }
 }
 
+// ---------------------------------------------------------------------------
+// Gamebryo 20.2.0.7 reader (§8.3). Shipped Starfield NIFs are real Gamebryo
+// binaries: index-based blocks (type table + per-block size table) whose
+// names live in a header string table. Layouts below are validated against
+// every loose shipped NIF (header grammar from nif.xml Header/BSStreamHeader,
+// NiNode/BSGeometry bodies from NifSkope's Starfield definitions, all
+// re-checked byte-for-byte in Python first). Anything unexpected rejects
+// the file (returns false) instead of guessing.
+// ---------------------------------------------------------------------------
+
+namespace Gamebryo {
+
+struct Header {
+    quint32 userVersion = 0;
+    quint32 numBlocks = 0;
+    quint32 bsVersion = 0;
+    QStringList blockTypes;
+    QVector<quint16> typeIndex;
+    QVector<quint32> blockSize;
+    QStringList strings;
+    QVector<qint64> offsets;
+    quint32 numGroups = 0;
+};
+
+// Bounds-checked little-endian reader. Every read validates range and
+// stream status; ok flips false (sticky) on the first failure.
+struct Reader {
+    QDataStream& s;
+    const qint64 fileSize;
+    bool ok = true;
+
+    quint8 u8() { quint8 v = 0; check(1); if (ok) s >> v; return v; }
+    quint16 u16() { quint16 v = 0; check(2); if (ok) s >> v; return v; }
+    quint32 u32() { quint32 v = 0; check(4); if (ok) s >> v; return v; }
+    qint32 i32() { qint32 v = 0; check(4); if (ok) s >> v; return v; }
+    quint64 u64() { quint64 v = 0; check(8); if (ok) s >> v; return v; }
+    float f32() { float v = 0.0f; check(4); if (ok) s >> v; return v; }
+    void skip(qint64 n) {
+        if (n < 0 || s.device()->pos() + n > fileSize) { ok = false; return; }
+        if (!s.device()->seek(s.device()->pos() + n)) ok = false;
+    }
+    // NIF SizedString: u32 length + bytes (may contain backslashes/NULs).
+    QString sizedString(quint32 maxLen = 4096) {
+        const quint32 len = u32();
+        if (!ok || len > maxLen) { ok = false; return QString(); }
+        QByteArray bytes(static_cast<int>(len), 0);
+        check(len);
+        if (!ok) return QString();
+        if (s.readRawData(bytes.data(), len) != static_cast<int>(len)) { ok = false; return QString(); }
+        return QString::fromLatin1(bytes);
+    }
+    // NIF ExportString: u8 length (including NUL) + bytes.
+    QString exportString() {
+        const quint8 len = u8();
+        if (!ok || len == 0 || len > 250) { ok = false; return QString(); }
+        QByteArray bytes(len, 0);
+        check(len);
+        if (!ok) return QString();
+        if (s.readRawData(bytes.data(), len) != static_cast<int>(len)) { ok = false; return QString(); }
+        return QString::fromLatin1(bytes.constData(), len);
+    }
+
+private:
+    void check(qint64 n) {
+        if (!ok || s.status() != QDataStream::Ok
+            || s.device()->pos() + n > fileSize)
+            ok = false;
+    }
+};
+
+static bool isAsciiName(const QString& s)
+{
+    if (s.isEmpty() || s.size() > 128) return false;
+    for (QChar c : s)
+        if (!c.isPrint() || c.unicode() > 127) return false;
+    return true;
+}
+
+bool parseHeader(QFile& file, Header& h)
+{
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+
+    // Magic line, NUL-free, exact version.
+    QByteArray magic;
+    while (magic.size() < 128) {
+        const quint8 c = r.u8();
+        if (!r.ok) return false;
+        if (c == '\n') break;
+        magic.append(static_cast<char>(c));
+    }
+    if (magic != "Gamebryo File Format, Version 20.2.0.7") return false;
+
+    if (r.u32() != 0x14020007) return false;   // version dword
+    if (r.u8() != 1) return false;             // little-endian
+    h.userVersion = r.u32();
+    h.numBlocks = r.u32();
+    if (!r.ok || h.numBlocks == 0 || h.numBlocks > 2000000) return false;
+    h.bsVersion = r.u32();
+    if (h.bsVersion == 0) return false;
+
+    r.exportString();                          // Author
+    r.u32();                                   // Unknown Int (BS > 130)
+    r.exportString();                          // Export Script
+    r.exportString();                          // Max Filepath
+    if (!r.ok) return false;
+
+    const quint16 numTypes = r.u16();
+    if (!r.ok || numTypes == 0 || numTypes > 1000) return false;
+    for (int i = 0; i < numTypes; ++i) {
+        const QString t = r.sizedString(128);
+        if (!r.ok || !isAsciiName(t)) return false;
+        h.blockTypes.append(t);
+    }
+    h.typeIndex.reserve(h.numBlocks);
+    for (quint32 i = 0; i < h.numBlocks; ++i) {
+        const quint16 ti = r.u16();
+        if (!r.ok || ti >= static_cast<quint16>(h.blockTypes.size())) return false;
+        h.typeIndex.append(ti);
+    }
+    h.blockSize.reserve(h.numBlocks);
+    for (quint32 i = 0; i < h.numBlocks; ++i)
+        h.blockSize.append(r.u32());
+    if (!r.ok) return false;
+
+    const quint32 numStrings = r.u32();
+    const quint32 maxStringLen = r.u32();
+    if (!r.ok || numStrings > 200000 || maxStringLen > 4096) return false;
+    for (quint32 i = 0; i < numStrings; ++i) {
+        h.strings.append(r.sizedString(maxStringLen + 1));
+        if (!r.ok) return false;
+    }
+    h.numGroups = r.u32();
+    if (!r.ok || h.numGroups > 10000) return false;
+    r.skip(static_cast<qint64>(h.numGroups) * 4);
+    if (!r.ok) return false;
+
+    h.offsets.reserve(h.numBlocks);
+    qint64 pos = file.pos();
+    for (quint32 i = 0; i < h.numBlocks; ++i) {
+        h.offsets.append(pos);
+        pos += h.blockSize[i];
+        if (pos > file.size()) return false;
+    }
+    return true;
+}
+
+// NiObjectNET + NiAVObject prefix shared by NiNode/BSGeometry at BS172:
+// name index, extra-data list, controller, flags, TRS, collision ref.
+// Advances the reader past the prefix; name/flags out.
+bool parseAvPrefix(Reader& r, const Header& h, QString& nameOut, quint32& flagsOut)
+{
+    const quint32 nameIdx = r.u32();
+    if (!r.ok || nameIdx >= static_cast<quint32>(h.strings.size())) return false;
+    nameOut = h.strings.at(nameIdx);
+    const quint32 numExtra = r.u32();
+    if (!r.ok || numExtra > 10000) return false;
+    for (quint32 i = 0; i < numExtra; ++i) {
+        const qint32 ref = r.i32();
+        if (!r.ok || ref < -1 || ref >= static_cast<qint32>(h.numBlocks)) return false;
+    }
+    r.i32();                       // controller
+    flagsOut = r.u32();
+    r.skip(12 + 36 + 4);           // translation, rotation, scale
+    r.i32();                       // collision object
+    return r.ok;
+}
+
+NifNode* parseNode(QFile& file, const Header& h, quint32 index, qint64& consumed)
+{
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+    if (!file.seek(h.offsets[index])) return nullptr;
+    const qint64 start = file.pos();
+
+    QString name;
+    quint32 flags = 0;
+    if (!parseAvPrefix(r, h, name, flags)) return nullptr;
+    const quint32 numChildren = r.u32();
+    if (!r.ok || numChildren > 100000) return nullptr;
+    NifNode* node = new NifNode();
+    node->className = QStringLiteral("NiNode");
+    node->dataRef = index;
+    node->name = name;
+    for (quint32 i = 0; i < numChildren; ++i) {
+        const qint32 ref = r.i32();
+        if (!r.ok) { delete node; return nullptr; }
+        if (ref >= 0 && ref < static_cast<qint32>(h.numBlocks))
+            node->children.append(static_cast<quint32>(ref));
+    }
+    if (!r.ok) { delete node; return nullptr; }
+    consumed = file.pos() - start;
+    return node;
+}
+
+// Starfield BSGeometry shell (NifSkope's #STF# definition): bounds, box,
+// skin/shader/alpha refs, then 4 mesh slots. Slots either carry an external
+// .mesh path (Flags & 512 == 0, the shipped case — meshes live in BA2s) or
+// inline BSMeshData (Flags & 512; not decoded here). Returns a vert-less
+// NifTriShape shell plus any external paths. consumed must equal the
+// declared block size or the block is rejected.
+NifTriShape* parseGeometry(QFile& file, const Header& h, quint32 index,
+                           QStringList& externalMeshes, qint64& consumed)
+{
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+    if (!file.seek(h.offsets[index])) return nullptr;
+    const qint64 start = file.pos();
+
+    QString name;
+    quint32 flags = 0;
+    if (!parseAvPrefix(r, h, name, flags)) return nullptr;
+    r.skip(16);                    // bounding sphere
+    r.skip(24);                    // bounding box
+    for (int i = 0; i < 3; ++i) {
+        const qint32 ref = r.i32();  // skin, shader, alpha
+        if (!r.ok || ref < -1 || ref >= static_cast<qint32>(h.numBlocks)) return nullptr;
+    }
+    NifTriShape* shape = new NifTriShape();
+    shape->className = QStringLiteral("BSGeometry");
+    shape->dataRef = index;
+    shape->name = name;
+    shape->refGeometryData = 0xFFFFFFFFu;   // no local data block
+    for (int slot = 0; slot < 4; ++slot) {
+        if (r.u8() == 0) continue;          // empty slot
+        if (!r.ok) { delete shape; return nullptr; }
+        r.u32(); r.u32(); r.u32();          // indices size, num verts, flags
+        if (!r.ok) { delete shape; return nullptr; }
+        if (flags & 512) {
+            // Inline BSMeshData: not decoded in this slice. Reject the
+            // block (it seeks past by size) rather than misparse it.
+            delete shape;
+            return nullptr;
+        }
+        const QString path = r.sizedString(512);
+        if (!r.ok || path.isEmpty()) { delete shape; return nullptr; }
+        externalMeshes.append(path);
+    }
+    if (!r.ok) { delete shape; return nullptr; }
+    consumed = file.pos() - start;
+    return shape;
+}
+
+} // namespace Gamebryo
+
 static bool loadRealNif(NifParser& parser, const QString& fileName)
 {
     QFile file(fileName);
@@ -963,6 +1211,85 @@ static bool loadRealNif(NifParser& parser, const QString& fileName)
 // NifParser
 // ---------------------------------------------------------------------------
 
+static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
+{
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        LOG_ERROR(QString("Failed to open NIF file: %1").arg(fileName));
+        return false;
+    }
+
+    Gamebryo::Header header;
+    if (!Gamebryo::parseHeader(file, header)) {
+        LOG_ERROR(QString("Not a supported Gamebryo NIF: %1").arg(fileName));
+        return false;
+    }
+
+    // Index-based dispatch: every block is seekable by its declared size,
+    // so unknown blocks are skipped exactly and known ones parse in place.
+    QMap<quint32, NifObject*> blocks;
+    QStringList externalMeshes;
+    auto fail = [&]() {
+        qDeleteAll(blocks);
+        return false;
+    };
+    for (quint32 i = 0; i < header.numBlocks; ++i) {
+        const QString& type = header.blockTypes.at(header.typeIndex.at(i));
+        NifObject* obj = nullptr;
+        if (type == QLatin1String("NiNode")) {
+            qint64 consumed = 0;
+            obj = Gamebryo::parseNode(file, header, i, consumed);
+            if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
+                { delete obj; obj = new NifObject(); }
+            else
+                obj->className = QStringLiteral("NiNode");
+        } else if (type == QLatin1String("BSGeometry")) {
+            qint64 consumed = 0;
+            obj = Gamebryo::parseGeometry(file, header, i, externalMeshes, consumed);
+            if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
+                { delete obj; obj = new NifObject(); }
+            // className already "BSGeometry" on success.
+        } else {
+            obj = new NifObject();
+        }
+        obj->dataRef = i;
+        if (obj->className.isEmpty())
+            obj->className = type;
+        blocks.insert(i, obj);
+    }
+    file.close();
+
+    LOG_INFO(QString("Parsed %1 Gamebryo blocks (%2 external meshes)")
+                 .arg(blocks.size()).arg(externalMeshes.size()));
+
+    auto* rootNode = dynamic_cast<NifNode*>(blocks.value(0));
+    if (!rootNode) {
+        LOG_ERROR("No NiNode root block in Gamebryo NIF");
+        return fail();
+    }
+
+    Node* ourRoot = new Node();
+    ourRoot->name = QFileInfo(fileName).baseName();
+    parser.setRoot(ourRoot);
+    parser.setVersion(0x140200);   // display "20.2.0" like the dialect
+    parser.setExternalMeshRefs(externalMeshes);
+
+    extractGeometry(blocks, rootNode, ourRoot);
+
+    for (auto it = blocks.begin(); it != blocks.end(); ++it) {
+        if (it.value() != rootNode)
+            delete it.value();
+    }
+    delete rootNode;
+
+    LOG_INFO(QString("Loaded Gamebryo hierarchy: %1 nodes, %2 shapes, %3 vertices, %4 external meshes")
+                 .arg(ourRoot->children.size())
+                 .arg(parser.getRoot()->shapes.size())
+                 .arg(parser.totalVertexCount())
+                 .arg(externalMeshes.size()));
+    return true;
+}
+
 NifParser::~NifParser()
 {
     delete root;
@@ -980,6 +1307,24 @@ QString NifParser::getVersionString() const
 bool NifParser::load(const QString& fileName)
 {
     LOG_INFO(QString("Loading NIF file: %1").arg(fileName));
+
+    // Route by magic: real Gamebryo binaries go to the index-based reader,
+    // everything else keeps the dialect path.
+    {
+        QFile probe(fileName);
+        if (probe.open(QIODevice::ReadOnly)) {
+            const QByteArray head = probe.read(8);
+            probe.close();
+            if (head == "Gamebryo") {
+                m_externalMeshes.clear();
+                if (loadRealNifGamebryo(*this, fileName)) {
+                    LOG_INFO("NIF file loaded successfully (Gamebryo 20.2.0.7)");
+                    return true;
+                }
+                LOG_INFO("Gamebryo parse rejected the file; trying dialect path");
+            }
+        }
+    }
 
     // Try real Bethesda NIF parser first (nifrecord-based)
     if (loadRealNif(*this, fileName)) {

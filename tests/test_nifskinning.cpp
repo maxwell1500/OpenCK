@@ -535,10 +535,12 @@ void TestNifSkinning::testPlaybackComposition()
 
 void TestNifSkinning::testRealNifSurvey()
 {
-    // Real-asset survey canary (§8.3): Gamebryo binaries do not parse in this
-    // tree (the dialect header reader rejects them). If this ever reports a
-    // success, a real NIF reader has landed and the §8.3 gate must be
-    // re-run against a skinned animated mesh.
+    // Real-asset survey canary (§8.3): the Gamebryo 20.2.0.7 reader lands
+    // scene hierarchies from shipped NIFs. Shipped statics reference
+    // external .mesh streams (inside BA2s), so local files load as named
+    // node hierarchies with external mesh paths and zero local vertices.
+    // If totalVerts ever goes non-zero, inline mesh data decoded and the
+    // §8.3 gate must be re-run against a skinned animated mesh.
     const QString meshesDir =
         qEnvironmentVariable("OPENCK_DATA_DIR",
                              QStringLiteral("C:/XboxGames/Starfield/Content/Data"))
@@ -558,14 +560,31 @@ void TestNifSkinning::testRealNifSurvey()
         QSKIP("No .nif files under the meshes directory");
 
     int loaded = 0;
+    int totalVerts = 0;
+    int totalMeshRefs = 0;
+    int namedNodes = 0;
     for (const QString& path : files)
     {
         Nif::NifParser parser;
-        if (parser.load(path))
-            ++loaded;
+        if (!parser.load(path))
+            continue;
+        ++loaded;
+        totalVerts += parser.totalVertexCount();
+        totalMeshRefs += parser.externalMeshRefs().size();
+        if (parser.getRoot())
+        {
+            for (const Nif::Node* c : parser.getRoot()->children)
+                if (!c->name.isEmpty())
+                    ++namedNodes;
+        }
     }
-    QVERIFY2(loaded == 0, "A real NIF loaded: the §8.3 gate can now run "
-                          "against shipped meshes — update REMAINING.md");
+    qDebug() << "survey:" << loaded << "loaded," << namedNodes
+             << "named nodes," << totalMeshRefs << "external meshes,"
+             << totalVerts << "verts";
+    QVERIFY2(loaded == files.size(), "A shipped NIF failed the Gamebryo reader");
+    QVERIFY2(totalMeshRefs > 0, "No external mesh references resolved");
+    QVERIFY2(namedNodes > 0, "No scene-graph nodes extracted");
+    QCOMPARE(totalVerts, 0);
 }
 
 void TestNifSkinning::testSyntheticSkinnedFileLoad()

@@ -2,6 +2,7 @@
 #define NIFPARSER_HPP
 
 #include <QString>
+#include <QStringList>
 #include <QVector>
 #include <QMap>
 #include <QByteArray>
@@ -199,6 +200,13 @@ public:
     void setVersion(quint32 v) { m_version = v; }
     QString getVersionString() const;
 
+    // External mesh references recorded by the Gamebryo reader: Starfield
+    // BSGeometry blocks point at .mesh files (shipped inside BA2 archives),
+    // so a static NIF loads as a named node hierarchy with these paths and
+    // zero local vertices until the mesh streams are available.
+    const QStringList& externalMeshRefs() const { return m_externalMeshes; }
+    void setExternalMeshRefs(const QStringList& refs) { m_externalMeshes = refs; }
+
     // --- Whole-tree editing helpers ---
     void translateAll(float dx, float dy, float dz);
     void scaleAll(float factor);
@@ -221,6 +229,7 @@ private:
 
     Node* root = nullptr;
     quint32 m_version = 0;
+    QStringList m_externalMeshes;
 };
 
 } // namespace Nif

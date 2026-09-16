@@ -1030,16 +1030,31 @@ this section is documentation of findings, per the §3 review).
    stored quats; JSON/XML persist quats when present (old files keep the
    Euler path). `test_nifanimation` 11/11, incl. the 350°→−5° short-path
    proof (Euler lerp would sit at 175°).
-3. **Verification gate on real assets — PARTIAL 2026-09-14.** Headless half
-   is green: `testPlaybackComposition` runs state→palette→blend on a
-   slerped frame and checks the world position, and `testRealNifSurvey`
-   attempts the first 8 shipped 20.2.0.7 NIFs and asserts the honest
-   current boundary (0 load — the dialect header reader rejects Gamebryo
-   binaries, loudly, with no hang). What remains is a real Gamebryo block
-   reader (header string table, block-type index, real NiSkinInstance /
-   NiSkinData / NiSkinPartition layouts — the dialect shares names only)
-   plus the manual Play-confirm on a skinned animated mesh and a particle
-   mesh, which needs a display. Entry criterion restated: land the reader
-   (the survey canary fails the moment one does), then load a skinned
-   animated NIF plus a particle NIF, press Play, confirm correct motion,
-   and record the result here.
+ 3. **Verification gate on real assets — IN PROGRESS 2026-09-15 (reader
+    landed).** The Gamebryo 20.2.0.7 block reader is now in the tree
+    (`libs/files/nif/nifparser.cpp`, `Gamebryo::` section; `NifParser::load`
+    routes by magic, dialect path untouched). It strictly parses the real
+    header (magic line, version dword, BS172 `BSStreamHeader` with
+    byte-length `ExportString` tail, type table, per-block size table,
+    string table, footer — validated byte-exact in Python against all 255
+    loose shipped NIFs), dispatches blocks by type index with exact
+    seek-by-size (unknown blocks skipped, never guessed), builds `NiNode`
+    hierarchies with string-table names and child refs, and decodes the
+    Starfield `BSGeometry` shell (bounds, box, skin/shader/alpha refs, 4
+    mesh slots) from NifSkope's `#STF#` definitions. Layouts that were
+    guessed wrong first (FO4 `BSTriShape` inline vertices) were corrected
+    against real bytes: shipped statics carry **external `.mesh` paths**
+    (meshes live in BA2s), recorded on the parser via
+    `NifParser::externalMeshRefs()`. `testRealNifSurvey` flipped: 8/8
+    shipped files load with 66 named nodes + 205 external mesh refs and 0
+    local verts. Still open: inline `BSMeshData` decode (no standard-layout
+    loose file carries any — the 229 inline slots sit in third-party
+    Blender-variant files whose bodies this reader strictly rejects),
+    `.mesh`/BA2 streams for actual vertices, real `NiSkinInstance` /
+    `NiSkinData` / `NiSkinPartition` layouts (no loose shipped NIF contains
+    a `*Skin*` block; skinned meshes are in BA2s), plus the manual
+    Play-confirm on a skinned animated mesh and a particle mesh, which
+    needs a display. Entry criterion restated: land inline/` .mesh`
+    vertex data (the survey's `totalVerts == 0` assertion fails the moment
+    any does), then load a skinned animated NIF plus a particle NIF, press
+    Play, confirm correct motion, and record the result here.
