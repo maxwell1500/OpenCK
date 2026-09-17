@@ -93,5 +93,8 @@ void AlchRecord::blank()
     hasData = false;
     hasFlags = false;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

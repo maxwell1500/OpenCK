@@ -250,5 +250,8 @@ void PackageRecord::blank()
     ptdtRaws.clear();
     hasPkdt = false;
     hasPldt = false;
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

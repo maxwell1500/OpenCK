@@ -5,6 +5,8 @@
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 struct QuestRecord {
@@ -28,6 +30,10 @@ struct QuestRecord {
     QVector<QVector<RawSubRecord>> objectiveExtra;
     QVector<QVector<RawSubRecord>> aliasExtra;
     QVector<RawSubRecord> rawSubRecords;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<QuestRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

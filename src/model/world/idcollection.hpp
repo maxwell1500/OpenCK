@@ -4,6 +4,9 @@
 #include "../../../libs/files/esm/esmreader.hpp"
 #include "../../../libs/files/log/logger.hpp"
 #include "collection.hpp"
+#include "verbatimrecord.hpp"
+
+#include <memory>
 
 template<typename ESXRecord, typename IdAccessorT = IdAccessor<ESXRecord>>
 class IdCollection : public Collection<ESXRecord, IdAccessorT>
@@ -20,6 +23,21 @@ template<typename ESXRecord, typename IdAccessorT>
 void IdCollection<ESXRecord, IdAccessorT>::loadRecord(ESXRecord& record, ESMReader& reader, bool base)
 {
     record.load(reader, base);
+    // Verbatim round-trip support: stash the exact on-disk payload plus a
+    // snapshot of the parsed state. Guard on the form id so a loader that
+    // never called readHeader (stale snapshot) cannot misattribute bytes.
+    if constexpr (HasVerbatimRecord<ESXRecord>::value)
+    {
+        bool match = true;
+        if constexpr (HasFormIdField<ESXRecord>::value)
+            match = (record.formId == reader.currentFormId());
+        if (match && reader.lastRecordSize() > 0)
+        {
+            record.verbatimBody = reader.lastRecordBody();
+            record.verbatimFlags = reader.currentHeaderFlags();
+            record.verbatimSnapshot = std::make_shared<ESXRecord>(record);
+        }
+    }
 }
 
 template<typename ESXRecord, typename IdAccessorT>

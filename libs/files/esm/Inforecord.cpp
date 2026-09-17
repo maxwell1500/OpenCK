@@ -231,5 +231,8 @@ void InfoRecord::blank()
     hasCnam = false;
     hasTloi = false;
     hasVmap = false;
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

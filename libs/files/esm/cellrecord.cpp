@@ -294,5 +294,8 @@ void CellRecord::blank()
     hasOwner = false;
     hasLock = false;
     hasXclw = false;
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

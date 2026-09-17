@@ -63,7 +63,13 @@ public:
     }
 
     quint32 currentFormId() const { return mCurrentFormId; }
-    // TES3 records carry no form id in the header; the caller assigns a
+    // Exact on-disk bytes of the most recently read record payload (the
+    // `size` bytes following the 24-byte header; for compressed records
+    // this is the 4-byte decompressed-size word plus the zlib stream).
+    // Used by the verbatim round-trip path to re-emit untouched records
+    // byte-identically without trusting the structured parse.
+    QByteArray lastRecordBody() const;
+    qint64 lastRecordSize() const { return mLastRecordBodySize; }    // TES3 records carry no form id in the header; the caller assigns a
     // synthetic one after load so pluginOrder and save can key on it.
     void setCurrentFormId(quint32 id) { mCurrentFormId = id; }
     quint32 currentHeaderFlags() const { return mCurrentHeaderFlags; }
@@ -194,6 +200,8 @@ private:
     quint32 mCurrentFormId = 0;
     quint32 mCurrentHeaderFlags = 0;
     NAME mCurrentRecordName = 0;
+    qint64 mLastRecordBodyOff = -1;
+    qint64 mLastRecordBodySize = 0;
     qint64 mGrupEnd = 0;
     quint32 mLastGrupType = 0;
 

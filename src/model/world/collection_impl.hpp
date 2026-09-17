@@ -6,6 +6,7 @@
 #include "../tools/deleterecordcommandbase.hpp"
 #include "../tools/macrocommand.hpp"
 #include "../tools/undostack.hpp"
+#include "verbatimrecord.hpp"
 #include "../../../libs/files/esm/esmwriter.hpp"
 #include "../../../libs/files/log/logger.hpp"
 
@@ -97,6 +98,8 @@ void Collection<ESXRecord, IdAccessorT>::saveModifiedRecords(ESMWriter& writer, 
     {
         if (record.state == State_Modified || record.state == State_ModifiedOnly)
         {
+            if (tryWriteVerbatimRecord(writer, static_cast<NAME>(recordType), record))
+                continue;
             RecHeader recHeader;
             if constexpr (HasFormIdField<ESXRecord>::value)
                 recHeader.id = record.get().formId;
@@ -172,6 +175,8 @@ bool Collection<ESXRecord, IdAccessorT>::saveRecordAt(ESMWriter& writer, uint32_
     const auto& record = records.at(index);
     if (record.state == State_Modified || record.state == State_ModifiedOnly)
     {
+        if (tryWriteVerbatimRecord(writer, static_cast<NAME>(recordType), record))
+            return true;
         RecHeader recHeader;
         if constexpr (HasFormIdField<ESXRecord>::value)
             recHeader.id = record.get().formId;
@@ -224,6 +229,8 @@ void Collection<ESXRecord, IdAccessorT>::saveModifiedRecordsExcept(ESMWriter& wr
         }
         else
         {
+            if (tryWriteVerbatimRecord(writer, static_cast<NAME>(recordType), record))
+                continue;
             RecHeader recHeader;
             if constexpr (HasFormIdField<ESXRecord>::value)
                 recHeader.id = record.get().formId;

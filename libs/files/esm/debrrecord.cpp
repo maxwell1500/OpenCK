@@ -98,5 +98,8 @@ void DebrRecord::blank()
     formId = 0;
     debris.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

@@ -211,5 +211,8 @@ void QuestRecord::blank()
     objectiveExtra.clear();
     aliasExtra.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

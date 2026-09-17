@@ -200,6 +200,9 @@ void WorldspaceRecord::blank()
     navPointIds.clear();
     rawSubRecords.clear();
     mOrder.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }
 

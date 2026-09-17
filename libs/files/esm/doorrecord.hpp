@@ -8,6 +8,8 @@
 #include "../../components/tier1_components.hpp"
 #include <QString>
 #include <QVector>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 struct DoorRecord {
@@ -20,6 +22,11 @@ struct DoorRecord {
     QVector<RawSubRecord> rawSubRecords;
 
     openck::FormComponents components;
+
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<DoorRecord> verbatimSnapshot;
 
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

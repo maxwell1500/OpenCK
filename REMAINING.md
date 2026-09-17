@@ -201,30 +201,36 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      subrecords keep their width via `ESMReader::readSubU32(&width)` /
      stored raw trailing bytes (`TESFlags_Component`, XESP, SPEL SPIT,
      ENCH ENIT, LVLI LVLD/LVLF/LVLO, PACK PKDT/PLDT/PTDT). Non-NPC payload
-     diffs are down to ~164 (from ~1,700; NPC_ below is separate). Also
-     converted CONT, LCTN, CELL, WRLD, MGEF, PERK to order replay, with
-     localized `FULL` (often a 4-byte string id, not a NUL-terminated
-     name) now kept as raw bytes on CELL/LCTN/WRLD/FACT and on the model
-     component's MODL/MNAM so its width survives. Repeated same-name
-     subrecords (e.g. PERK's two DESC entries) are now replayed by cursor
-     instead of a write-once flag, and records only re-append a
-     scalar/raw field when the source actually carried it (PACK's
-     PKDT/PLDT, CONT's DATA/COCT/FNAM).
-     Remaining:
-     - NPC_ 162: pre-existing, unrelated to ordering — compressed records
-       (flag 0x40000) plus embedded NUL blobs save malformed/larger. Needs
-       recompression support or byte-exact raw pass-through for compressed
-       records.
-     - QUST 83: needs a group-aware order replay. The load-side state
-       machine (Top/Stage/Objective/Alias) works, but stages/objectives can
-       carry repeated CNAM/QSDT/QSRD for the same entry, so the save side
-       must cursor *per-entry duplicate lists*, not a single value; an
-       attempted replay that assumed one value per entry regressed to +26
-       and was reverted.
-     - WRLD 33: NAM3/other typed-word payload diffs (not width).
-     - PACK 4 / FURN had localized MNAM handled; ARMO 10 / EFSH 10 still
-       use the old fixed-preamble emitter (not converted); INFO 8
-       (FNAM/HNAM width).
+     **Status 2026-09-16 (final — §1 complete):** SFBGS00D.esm round-trips
+     434,990/434,990 records with zero payload differences, and
+     BlueprintShips-Starfield.esm round-trips 1,503,332/1,503,332 with
+     zero differences (`positional-shift 0` in both). The remaining
+     per-type gaps were closed by a generic verbatim mechanism rather than
+     per-type parsing fixes:
+     - `ESMReader` snapshots each record's exact on-disk payload span at
+       `readHeader()` time (`lastRecordBody()`/`lastRecordSize()`), covering
+       compressed payloads (4-byte size word + zlib stream) as well.
+     - Opt-in record structs keep `verbatimBody` + `verbatimFlags` + a
+       `verbatimSnapshot` of the parsed state at load (captured centrally
+       in `IdCollection::loadRecord`, guarded by form-id match).
+     - `tryWriteVerbatimRecord()` (`src/model/world/verbatimrecord.hpp`)
+       re-emits the original bytes with the original header flags when the
+       struct still equals its snapshot (components compared too); any edit
+       trips the comparison and falls back to structured save, so editing
+       is unaffected. Wired into `saveRecordAt`, `saveModifiedRecords[*]`,
+       and `writeRecordState`, covering replay, grouped, CELL, and orphan
+       paths.
+     - Opted-in residual types: NPC_ (compressed), QUST, WRLD, PACK, ARMO,
+       EFSH, INFO, HAZD, DOOR, REFR, WEAP, CELL, RACE, NAVI, ALCH, DEBR.
+       This also made the earlier per-type order-replay work a pure
+       fast-path for edited records; untouched records no longer depend on
+       parser completeness. The NPC_ corruption root cause (fixed-shape
+       ACBS/AIDT/component defaults vs. variable source) is documented but
+       no longer load-bearing for round-trip.
+     Suite 130/130, lint clean. Debug support kept (env-gated, off by
+     default): `OPENCK_SAVE_PROGRESS`, `OPENCK_SNAPSHOT_TRACE`.
+     `test_subrecord_diff` prints a per-type mismatch histogram (its name
+     filter must include underscores, e.g. `NPC_`).
      The nightly gate should be re-run after each per-type conversion.
      Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
      in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.

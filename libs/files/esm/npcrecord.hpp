@@ -8,6 +8,7 @@
 #include <QString>
 #include <QVector>
 #include <cstring>
+#include <memory>
 
 class ESMReader;
 class ESMWriter;
@@ -61,6 +62,12 @@ struct NpcRecord
     QVector<quint32> factionIds;
 
     QVector<RawSubRecord> rawSubRecords;
+
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp): exact
+    // on-disk payload, original header flags, and the parsed state at load.
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<NpcRecord> verbatimSnapshot;
 
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

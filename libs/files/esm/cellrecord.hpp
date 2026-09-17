@@ -8,6 +8,8 @@
 #include <QString>
 #include <QVector>
 
+#include <memory>
+
 class ESMReader;
 class ESMWriter;
 
@@ -42,6 +44,10 @@ struct CellRecord
     bool hasOwner = false;
     bool hasLock = false;
     bool hasXclw = false;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<CellRecord> verbatimSnapshot;
 
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

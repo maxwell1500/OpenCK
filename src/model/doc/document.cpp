@@ -4,6 +4,7 @@
 #include "../world/metadata.hpp"
 #include "../world/irecordcollection.hpp"
 #include "../world/basecollection.hpp"
+#include "../world/verbatimrecord.hpp"
 #include "../../view/messageboxhelper.hpp"
 #include "logger.hpp"
 
@@ -69,6 +70,8 @@ static void writeRecordState(ESMWriter& writer, NAME tag, const Record<ESXRecord
     }
     else
     {
+        if (tryWriteVerbatimRecord(writer, tag, rec))
+            return;
         writer.startRecord(tag, recHeader);
         rec.get().save(writer);
         writer.endRecord();

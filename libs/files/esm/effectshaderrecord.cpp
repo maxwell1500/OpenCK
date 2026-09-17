@@ -77,4 +77,4 @@ void EfshRecord::save(ESMWriter& esm) const {
     components.saveAll(esm);
     for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
-void EfshRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); data = Data(); }
+void EfshRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); data = Data(); verbatimBody.clear(); verbatimFlags = 0; verbatimSnapshot.reset(); }

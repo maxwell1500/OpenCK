@@ -72,5 +72,8 @@ void RaceRecord::blank()
     faceData.clear();
     headData.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

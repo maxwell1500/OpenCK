@@ -8,6 +8,8 @@
 #include <QString>
 #include <QVector>
 
+#include <memory>
+
 class ESMReader;
 class ESMWriter;
 
@@ -30,6 +32,10 @@ struct RefrRecord
     QVector<NAME> loadOrder;
     // True when an EDID subrecord was present at load (possibly empty).
     bool hasEdid = false;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<RefrRecord> verbatimSnapshot;
 
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

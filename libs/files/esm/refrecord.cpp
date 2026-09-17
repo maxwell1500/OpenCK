@@ -195,5 +195,8 @@ void RefrRecord::blank()
     rawSubRecords.clear();
     loadOrder.clear();
     hasEdid = false;
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

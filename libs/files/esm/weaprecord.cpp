@@ -116,5 +116,8 @@ void WeaponRecord::blank()
     magicSchool = 0;
     enchantLimit = 0;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

@@ -93,5 +93,8 @@ void ArmorRecord::blank()
     modelPath.clear();
     health = 0.0f;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

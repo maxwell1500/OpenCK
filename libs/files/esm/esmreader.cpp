@@ -2,6 +2,7 @@
 #include "../log/logger.hpp"
 
 #include <zlib.h>
+#include <limits>
 #include <sstream>
 #include <cstring>
 
@@ -117,6 +118,19 @@ bool ESMReader::peekBytesAt(qint64 off, void* dest, int len) const
         return false;
     memcpy(dest, m_mapped + off, static_cast<size_t>(len));
     return true;
+}
+
+QByteArray ESMReader::lastRecordBody() const
+{
+    QByteArray out;
+    if (mLastRecordBodyOff < 0 || mLastRecordBodySize <= 0
+        || mLastRecordBodySize > std::numeric_limits<int>::max())
+        return out;
+    out.resize(static_cast<int>(mLastRecordBodySize));
+    if (!peekBytesAt(mLastRecordBodyOff, out.data(),
+            static_cast<int>(mLastRecordBodySize)))
+        out.clear();
+    return out;
 }
 
 void ESMReader::buildRecordIndex(QVector<RecordIndexEntry>& out)
@@ -236,6 +250,8 @@ RecHeader ESMReader::readHeader()
         mCurrentHeaderFlags = header.flags.val;
         header.id = 0;
         mCurrentFormId = 0;
+        mLastRecordBodyOff = m_pos;
+        mLastRecordBodySize = header.size;
         return header;
     }
 
@@ -253,6 +269,11 @@ RecHeader ESMReader::readHeader()
     header.vcCurrUser = readType<quint8>(true);
     header.version = readType<quint16>(true);
     header.unknown = readType<quint16>(true);
+
+    // Snapshot the on-disk payload span before any decompression consumes
+    // it, so the verbatim path can copy the exact bytes later.
+    mLastRecordBodyOff = m_pos;
+    mLastRecordBodySize = header.size;
 
     // Detect compressed records (Starfield/Skyrim/FO4 use zlib).
     // Flag 0x00040000 = record data is zlib-compressed.

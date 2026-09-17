@@ -9,6 +9,8 @@
 #include <QByteArray>
 #include <QVector>
 
+#include <memory>
+
 class ESMReader;
 class ESMWriter;
 
@@ -54,6 +56,11 @@ struct WorldspaceRecord
     QVector<quint32> navPointIds;
     QVector<RawSubRecord> rawSubRecords;
     QVector<quint32> mOrder;  // subrecord emission order
+
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<WorldspaceRecord> verbatimSnapshot;
 
     float mapScale() const;
     void setMapScale(float scale);

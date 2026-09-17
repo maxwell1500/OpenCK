@@ -111,5 +111,8 @@ void HazdRecord::blank()
     target = 0;
     flags = 0;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

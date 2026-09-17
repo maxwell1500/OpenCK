@@ -5,6 +5,8 @@
 #include "../../components/component.hpp"
 #include "../../components/formcomponents.hpp"
 #include <QString>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 
@@ -31,6 +33,11 @@ struct EfshRecord {
         quint32 unk1 = 0;
         quint32 unk2 = 0;
     } data;
+
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<EfshRecord> verbatimSnapshot;
 
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

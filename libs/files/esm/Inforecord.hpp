@@ -7,6 +7,8 @@
 #include <QString>
 #include <QVariant>
 #include <QVector>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 
@@ -45,6 +47,10 @@ struct InfoRecord {
     bool hasCnam = false;
     bool hasTloi = false;
     bool hasVmap = false;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<InfoRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
