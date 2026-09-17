@@ -29,6 +29,7 @@ struct CellRecord
     quint32 owner = 0;
     quint32 lockLevel = 0;
     QString cellName;
+    QByteArray fullRaw;
     bool hasWaterHeight = false;
     float waterHeight = 0.0f;
     QVector<RawSubRecord> rawSubRecords;

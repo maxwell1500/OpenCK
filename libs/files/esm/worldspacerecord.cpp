@@ -62,7 +62,14 @@ void WorldspaceRecord::load(ESMReader& esm, bool)
             switch (sub)
             {
             case 'EDID': editorId = trimmedZString(esm.readZString()); break;
-            case 'FULL': name = trimmedZString(esm.readZString()); break;
+            case 'FULL':
+            {
+                esm.readRawSubData(fullRaw);
+                const int nul = fullRaw.indexOf('\0');
+                name = trimmedZString(QString::fromUtf8(fullRaw.constData(),
+                    nul >= 0 ? nul : fullRaw.size()));
+                break;
+            }
             case 'CNAM': climateId = esm.readType<quint32>(); break;
             case 'ZNAM': lightingId = esm.readType<quint32>(); break;
             case 'XNAM': waterType = esm.readType<quint32>(); break;
@@ -104,7 +111,12 @@ void WorldspaceRecord::save(ESMWriter& esm) const
         switch (sub)
         {
         case 'EDID': esm.writeSubZString('EDID', editorId); break;
-        case 'FULL': esm.writeSubZString('FULL', name); break;
+        case 'FULL':
+            if (!fullRaw.isEmpty())
+                esm.writeRawSubRecord(RawSubRecord{ NAME('FULL'), fullRaw });
+            else
+                esm.writeSubZString('FULL', name);
+            break;
         case 'CNAM': esm.writeSubData<quint32>('CNAM', climateId); break;
         case 'ZNAM': esm.writeSubData<quint32>('ZNAM', lightingId); break;
         case 'XNAM': esm.writeSubData<quint32>('XNAM', waterType); break;
@@ -159,6 +171,7 @@ void WorldspaceRecord::blank()
     formId = 0;
     flags = 0;
     name = "";
+    fullRaw.clear();
     iconPath = "";
     waterType = 0;
     climateId = 0;

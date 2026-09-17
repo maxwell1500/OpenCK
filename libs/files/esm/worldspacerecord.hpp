@@ -25,6 +25,7 @@ struct WorldspaceRecord
     quint32 formId = 0;
     quint32 flags = 0;
     QString name;
+    QByteArray fullRaw;       // FULL verbatim (localized id or name)
     QString iconPath;
     quint32 waterType = 0;    // XNAM
     quint32 climateId = 0;    // CNAM

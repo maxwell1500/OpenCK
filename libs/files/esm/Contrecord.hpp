@@ -19,6 +19,12 @@ struct ContRecord {
     quint32 inventoryControl = 0;
     float weight = 0.0f;
     quint32 value = 0;
+    QVector<NAME> loadOrder;
+    bool hasFlags = false;
+    NAME flagsSpelling = NAME('FNAM');
+    quint8 flagsWidth = 4;
+    QByteArray dataRaw;
+    QByteArray coctRaw;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

@@ -19,6 +19,7 @@ struct LocationRecord
     quint32 formId = 0;
     quint32 flags = 0;
     QString locationName;
+    QByteArray fullRaw;
     quint32 parentId = 0;
     quint32 x = 0;
     quint32 y = 0;

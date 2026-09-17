@@ -201,19 +201,23 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      subrecords keep their width via `ESMReader::readSubU32(&width)` /
      stored raw trailing bytes (`TESFlags_Component`, XESP, SPEL SPIT,
      ENCH ENIT, LVLI LVLD/LVLF/LVLO, PACK PKDT/PLDT/PTDT). Non-NPC payload
-     diffs are down to ~635 (from ~1,700). Remaining:
+     diffs are down to ~358 (from ~1,700; NPC_ below is separate). Also
+     converted CONT, LCTN, CELL, WRLD, MGEF, PERK to order replay, with
+     localized `FULL` (often a 4-byte string id, not a NUL-terminated
+     name) now kept as raw bytes on CELL/LCTN/WRLD so its width survives.
+     Remaining:
      - NPC_ 162: pre-existing, unrelated to ordering — compressed records
        (flag 0x40000) plus embedded NUL blobs save malformed/larger. Needs
        recompression support or byte-exact raw pass-through for compressed
        records.
-     - CONT 49 / QUST 83 / MGEF 75 / PERK 74 / LCTN 96 / CELL 64 / WRLD 55:
-       same order-replay conversion not yet applied; QUST also has repeated
-       INDX/QSDT/NAM2/QSRD interleaving.
-     - FURN 11 / FACT 9 / CELL/WRLD `FULL` width (localized 4-byte string
-       id written back as an inline NUL-terminated string), ARMO/EFSH
-       preamble drift.
-     - PACK 76 (a handful of records with duplicate/extra FNAM/PLDT),
-       INFO 8 (FNAM/HNAM width).
+     - QUST 83: repeated INDX/QSDT/NAM2/QSRD interleaving not replayed.
+     - PACK 76 / PERK 74 / CONT 28: records that are overrides of a master
+       record still save the base record's subrecord order/payload (likely
+       a base→override merge/copy path that drops the per-instance
+       `loadOrder` and raw fields); needs the modified-record copy path
+       audited to carry the record-struct fields, not just components.
+     - WRLD 33 / FURN 11 / FACT 9 / ARMO 10 / EFSH 10: remaining preamble
+       or localized-width variants; INFO 8 (FNAM/HNAM width).
      The nightly gate should be re-run after each per-type conversion.
      Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
      in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.

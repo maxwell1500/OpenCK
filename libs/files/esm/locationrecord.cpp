@@ -55,7 +55,12 @@ void LocationRecord::load(ESMReader& esm, bool)
             // A repeated FULL is pathological; keep extras verbatim.
             if (!hasFull)
             {
-                locationName = esm.readZString();
+                // Starfield FULL is often a 4-byte localized string id, not a
+                // NUL-terminated name; keep the raw bytes for exact replay.
+                esm.readRawSubData(fullRaw);
+                const int nul = fullRaw.indexOf('\0');
+                locationName = QString::fromUtf8(fullRaw.constData(),
+                    nul >= 0 ? nul : fullRaw.size());
                 hasFull = true;
                 auto* fn = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
                 if (fn) fn->fullName = locationName;
@@ -176,7 +181,12 @@ void LocationRecord::save(ESMWriter& esm) const
         case 'FULL':
         {
             if (!wroteFull && (hasFull || !locationName.isEmpty()))
-                esm.writeSubZString('FULL', locationName);
+            {
+                if (!fullRaw.isEmpty())
+                    esm.writeRawSubRecord(RawSubRecord{ NAME('FULL'), fullRaw });
+                else
+                    esm.writeSubZString('FULL', locationName);
+            }
             else
             {
                 const QVector<int>& idx = rawByName[sub];
@@ -224,8 +234,13 @@ void LocationRecord::save(ESMWriter& esm) const
 
     if (!wroteEdid && !editorId.isEmpty())
         esm.writeSubZString('EDID', editorId);
-    if (!wroteFull && !locationName.isEmpty())
-        esm.writeSubZString('FULL', locationName);
+    if (!wroteFull && (hasFull || !locationName.isEmpty()))
+    {
+        if (!fullRaw.isEmpty())
+            esm.writeRawSubRecord(RawSubRecord{ NAME('FULL'), fullRaw });
+        else
+            esm.writeSubZString('FULL', locationName);
+    }
     if (!wroteFlags && (hasFlags || flags != 0))
         esm.writeSubData<quint32>(flagsSpelling, flags);
     if (!wroteParent && parentId != 0)
@@ -250,6 +265,7 @@ void LocationRecord::blank()
     formId = 0;
     flags = 0;
     locationName = "";
+    fullRaw.clear();
     parentId = 0;
     x = 0;
     y = 0;

@@ -1,6 +1,7 @@
 #include "Magicrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "subrecordreplay.hpp"
 #include "../../components/tier1_components.hpp"
 
 void MagicRecord::initComponents()
@@ -14,9 +15,12 @@ void MagicRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
+    loadOrder.clear();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        if (sub == 0) break;
+        loadOrder.append(sub);
         bool handled = false;
         for (auto& c : components.all())
         {
@@ -26,9 +30,19 @@ void MagicRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); break;
-            case 'MDOB': schools = esm.readType<quint32>(); break;
-            case 'SNAM': castingSound = esm.readType<quint32>(); break;
+            case 'FNAM': case 'FLAG':
+                flags = esm.readSubU32(&flagsWidth);
+                hasFlags = true;
+                flagsSpelling = sub;
+                break;
+            case 'MDOB':
+                schools = esm.readSubU32();
+                hasMdob = true;
+                break;
+            case 'SNAM':
+                castingSound = esm.readSubU32();
+                hasSnam = true;
+                break;
             default:
             {
                 RawSubRecord raw;
@@ -52,16 +66,60 @@ void MagicRecord::save(ESMWriter& esm) const
     auto* model = static_cast<tescomponents::TESModel_Component*>(const_cast<MagicRecord*>(this)->components.findByName(QStringLiteral("TESModel")));
     if (model) model->modelPath = modelPath;
 
-    esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
-    components.saveAll(esm);
-    esm.writeSubData<quint32>('MDOB', schools);
-    esm.writeSubData<quint32>('SNAM', castingSound);
+    SubrecordReplay replay;
+    replay.init(rawSubRecords);
 
-    for (const auto& raw : rawSubRecords)
+    const auto writeFlags = [&]()
     {
-        esm.writeRawSubRecord(raw);
+        esm.startSubRecord(flagsSpelling);
+        const quint8 w = flagsWidth == 0 ? 1 : flagsWidth;
+        for (quint8 i = 0; i < w; ++i)
+            esm.writeType<quint8>(static_cast<quint8>((flags >> (8 * i)) & 0xFF));
+        esm.endSubRecord();
+    };
+
+    bool wroteEdid = false, wroteFlags = false, wroteMdob = false, wroteSnam = false;
+    for (NAME sub : loadOrder)
+    {
+        switch (sub)
+        {
+            case 'EDID':
+                if (!wroteEdid) { esm.writeSubZString('EDID', editorId); wroteEdid = true; }
+                break;
+            case 'FNAM': case 'FLAG':
+                if (!wroteFlags && (hasFlags || flags != 0)) { writeFlags(); wroteFlags = true; }
+                break;
+            case 'MDOB':
+                if (!wroteMdob && (hasMdob || schools != 0))
+                {
+                    esm.writeSubData<quint32>('MDOB', schools);
+                    wroteMdob = true;
+                }
+                break;
+            case 'SNAM':
+                if (!wroteSnam && (hasSnam || castingSound != 0))
+                {
+                    esm.writeSubData<quint32>('SNAM', castingSound);
+                    wroteSnam = true;
+                }
+                break;
+            default:
+                if (!components.writeSubrecord(sub, esm))
+                    replay.write(sub, esm);
+                break;
+        }
     }
+
+    if (!wroteEdid && !editorId.isEmpty())
+        esm.writeSubZString('EDID', editorId);
+    if (!wroteFlags && (hasFlags || flags != 0))
+        writeFlags();
+    if (!wroteMdob && (hasMdob || schools != 0))
+        esm.writeSubData<quint32>('MDOB', schools);
+    if (!wroteSnam && (hasSnam || castingSound != 0))
+        esm.writeSubData<quint32>('SNAM', castingSound);
+
+    replay.writeLeftover(esm);
 }
 
 void MagicRecord::blank()
@@ -76,5 +134,11 @@ void MagicRecord::blank()
     modelPath.clear();
     effects.clear();
     rawSubRecords.clear();
+    loadOrder.clear();
+    hasFlags = false;
+    flagsSpelling = NAME('FNAM');
+    flagsWidth = 4;
+    hasMdob = false;
+    hasSnam = false;
     initComponents();
 }

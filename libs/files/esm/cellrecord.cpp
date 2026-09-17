@@ -51,8 +51,15 @@ void CellRecord::load(ESMReader& esm, bool)
         if (handled) continue;
         if (sub == 'FULL')
         {
+            // Starfield FULL is often a 4-byte localized string id rather
+            // than a NUL-terminated name; keep the raw bytes and only
+            // decode a best-effort name for display.
+            esm.readRawSubData(fullRaw);
+            const int nul = fullRaw.indexOf('\0');
+            cellName = QString::fromUtf8(fullRaw.constData(),
+                nul >= 0 ? nul : fullRaw.size());
             auto* fn = static_cast<tescomponents::TESFullName_Component*>(components.findByName(QStringLiteral("TESFullName")));
-            if (fn) fn->fullName = esm.readZString();
+            if (fn) fn->fullName = cellName;
             hasFull = true;
             continue;
         }
@@ -188,7 +195,12 @@ void CellRecord::save(ESMWriter& esm) const
             break;
         case 'FULL':
             if (!wroteFull && (hasFull || !cellName.isEmpty()))
-                esm.writeSubZString('FULL', cellName);
+            {
+                if (!fullRaw.isEmpty())
+                    esm.writeRawSubRecord(RawSubRecord{ NAME('FULL'), fullRaw });
+                else
+                    esm.writeSubZString('FULL', cellName);
+            }
             wroteFull = true;
             break;
         case 'DATA':
@@ -231,8 +243,13 @@ void CellRecord::save(ESMWriter& esm) const
 
     if (!wroteEdid && !editorId.isEmpty())
         esm.writeSubZString('EDID', editorId);
-    if (!wroteFull && !cellName.isEmpty())
-        esm.writeSubZString('FULL', cellName);
+    if (!wroteFull && (hasFull || !cellName.isEmpty()))
+    {
+        if (!fullRaw.isEmpty())
+            esm.writeRawSubRecord(RawSubRecord{ NAME('FULL'), fullRaw });
+        else
+            esm.writeSubZString('FULL', cellName);
+    }
     if (!wroteData && (hasData || flags != 0 || !dataExtra.isEmpty()))
         writeData();
     if (!wroteXclc && (cellX != 0 || cellY != 0))
@@ -266,6 +283,7 @@ void CellRecord::blank()
     owner = 0;
     lockLevel = 0;
     cellName = "";
+    fullRaw.clear();
     hasWaterHeight = false;
     waterHeight = 0.0f;
     rawSubRecords.clear();
