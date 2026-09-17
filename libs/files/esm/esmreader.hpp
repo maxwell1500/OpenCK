@@ -153,6 +153,27 @@ public:
         }
     }
 
+    // Reads an unsigned integer from the current subrecord, zero-extending
+    // from the bytes actually present (Starfield stores some flag/word
+    // subrecords narrower than 4 bytes; reading a fixed u32 would consume
+    // bytes belonging to the next subrecord and desync it). Any leftover
+    // bytes are skipped so the next header read starts clean. When
+    // `widthOut` is given it receives the on-disk byte count so the caller
+    // can re-emit the same width.
+    quint32 readSubU32(quint8* widthOut = nullptr)
+    {
+        const qint64 left = esm.subLeft;
+        if (widthOut)
+            *widthOut = static_cast<quint8>(qMin<qint64>(left, 255));
+        quint32 v = 0;
+        const qint64 n = qMin<qint64>(left, 4);
+        for (qint64 i = 0; i < n; ++i)
+            v |= quint32(readType<quint8>()) << (8 * i);
+        if (esm.subLeft > 0)
+            skip(static_cast<int>(esm.subLeft));
+        return v;
+    }
+
 private:
     // Copies `len` bytes from the current read position into `dest` and
     // advances the position. Short reads are zero-filled (mirrors the old

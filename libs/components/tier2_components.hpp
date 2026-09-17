@@ -307,6 +307,21 @@ public:
         }
     }
 
+    bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const override
+    {
+        if (subrecordName == NAME('YNAM') || subrecordName == NAME('PICK'))
+        {
+            if (pickupSound != 0) esm.writeSubData<quint32>(pickupSpelling, pickupSound);
+            return true;
+        }
+        if (subrecordName == NAME('ZNAM') || subrecordName == NAME('PUTD'))
+        {
+            if (putdownSound != 0) esm.writeSubData<quint32>(putdownSpelling, putdownSound);
+            return true;
+        }
+        return false;
+    }
+
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
     {
         std::vector<std::unique_ptr<EditorProperty>> out;

@@ -77,6 +77,12 @@ public:
     // subrecords preserved from load() must be emitted back out.
     virtual void save(ESMWriter& esm) const = 0;
 
+    // Writes a single subrecord owned by this component. Used by record
+    // save() implementations that replay the on-disk subrecord order
+    // instead of emitting the whole component at a fixed position.
+    // Returns true when the component recognizes and emits the name.
+    virtual bool writeSubrecord(NAME /*subrecordName*/, ESMWriter& /*esm*/) const { return false; }
+
     // Builds the list of EditorProperty leaves that the property
     // grid will render. Each call returns a fresh list; the grid
     // takes ownership via unique_ptr.

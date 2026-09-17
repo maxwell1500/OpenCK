@@ -1,6 +1,7 @@
 #include "furnrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "subrecordreplay.hpp"
 
 void FurnRecord::load(ESMReader& esm, bool)
 {
@@ -11,17 +12,23 @@ void FurnRecord::load(ESMReader& esm, bool)
     if (!components.findByName(QStringLiteral("TESModel")))
         components.add<tescomponents::TESModel_Component>();
 
+    loadOrder.clear();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
         if (sub == 0) break;
+        loadOrder.append(sub);
 
         bool handled = false;
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); handled = true; break;
-            case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
-
+            case 'FNAM': case 'FLAG':
+                flags = esm.readSubU32(&flagsWidth);
+                hasFlags = true;
+                flagsSpelling = sub;
+                handled = true;
+                break;
             default: break;
         }
         if (handled) continue;
@@ -57,14 +64,42 @@ void FurnRecord::load(ESMReader& esm, bool)
 
 void FurnRecord::save(ESMWriter& esm) const
 {
-    esm.writeSubZString('EDID', editorId);
-    esm.writeSubData<quint32>('FNAM', flags);
-    components.saveAll(esm);
+    SubrecordReplay replay;
+    replay.init(rawSubRecords);
 
-    for (const auto& raw : rawSubRecords)
+    const auto writeFlags = [&]()
     {
-        esm.writeRawSubRecord(raw);
+        esm.startSubRecord(flagsSpelling);
+        const quint8 w = flagsWidth == 0 ? 1 : flagsWidth;
+        for (quint8 i = 0; i < w; ++i)
+            esm.writeType<quint8>(static_cast<quint8>((flags >> (8 * i)) & 0xFF));
+        esm.endSubRecord();
+    };
+
+    bool wroteEdid = false, wroteFlags = false;
+    for (NAME sub : loadOrder)
+    {
+        switch (sub)
+        {
+            case 'EDID':
+                if (!wroteEdid) { esm.writeSubZString('EDID', editorId); wroteEdid = true; }
+                break;
+            case 'FNAM': case 'FLAG':
+                if (!wroteFlags && (hasFlags || flags != 0)) { writeFlags(); wroteFlags = true; }
+                break;
+            default:
+                if (!components.writeSubrecord(sub, esm))
+                    replay.write(sub, esm);
+                break;
+        }
     }
+
+    if (!wroteEdid && !editorId.isEmpty())
+        esm.writeSubZString('EDID', editorId);
+    if (!wroteFlags && (hasFlags || flags != 0))
+        writeFlags();
+
+    replay.writeLeftover(esm);
 }
 
 void FurnRecord::blank()
@@ -74,7 +109,10 @@ void FurnRecord::blank()
     flags = 0;
     fullName = "";
     modelPath = "";
-
     rawSubRecords.clear();
+    loadOrder.clear();
+    hasFlags = false;
+    flagsSpelling = NAME('FNAM');
+    flagsWidth = 4;
     components.clear();
 }

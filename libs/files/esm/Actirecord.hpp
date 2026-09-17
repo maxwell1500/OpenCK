@@ -15,6 +15,10 @@ struct ActiRecord {
     QString iconPath;
     QString modelPath;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    bool hasFlags = false;
+    NAME flagsSpelling = NAME('FNAM');
+    quint8 flagsWidth = 4;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

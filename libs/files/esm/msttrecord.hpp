@@ -17,6 +17,9 @@ struct MsttRecord {
     quint32 msttFlags = 0;
     quint8 fnamWidth = 4;
     quint8 dataWidth = 4;
+    bool hasFnam = false;
+    bool hasData = false;
+    QVector<NAME> loadOrder;
     QVector<RawSubRecord> rawSubRecords;
 
     openck::FormComponents components;

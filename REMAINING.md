@@ -191,22 +191,35 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      their trailing words (component fields must also be copied in
      `clone()`/`copyFrom()` or they silently vanish on the baseRecord →
      modifiedRecord copy); CELL no longer invents DATA.
-     Remaining ~1,850, by type (all same-id payload, no ordering):
-     - SCEN 364 / PACK 246: fixed preamble vs. on-disk order.
-     - LVLI/LCTN/MISC/BOOK/QUST/MGEF/PERK/ACTI/MSTT/CONT/SPEL/LIGH/KEYM/
-       ENCH/FURN/EFSH/ARMO/FLST/OTFT (~50-100 each): the loader writes a
-       fixed preamble (EDID/FULL/OBND/ODTY/...) then raws, so a source
-       whose preamble differs in presence/order drifts. These need the
-       positional load-order replay pattern (RefrRecord/InfoRecord) rather
-       than a fixed emitter.
-     - FACT/WRLD/LCTN `FULL` width (localized u32 id vs. written string),
-       INFO FNAM/HNAM width, OTFT INAM (list-in-one-subrecord vs. one per
-       item).
+     **Status 2026-09-16 (later):** the fixed-preamble class is largely
+     converted. Records now replay the source subrecord order via a shared
+     `SubrecordReplay` helper (`libs/files/esm/subrecordreplay.hpp`) plus
+     `Component::writeSubrecord` (so component-owned names such as
+     MODL/ICON/FULL/YNAM emit at their original position instead of a
+     fixed one): ACTI, MISC, BOOK, MSTT, FURN, ENCH, KEYM, LIGH, SPEL,
+     SCEN, FLST, OTFT, LVLI, PACK. Sub-4-byte and wider-than-4-byte scalar
+     subrecords keep their width via `ESMReader::readSubU32(&width)` /
+     stored raw trailing bytes (`TESFlags_Component`, XESP, SPEL SPIT,
+     ENCH ENIT, LVLI LVLD/LVLF/LVLO, PACK PKDT/PLDT/PTDT). Non-NPC payload
+     diffs are down to ~635 (from ~1,700). Remaining:
+     - NPC_ 162: pre-existing, unrelated to ordering — compressed records
+       (flag 0x40000) plus embedded NUL blobs save malformed/larger. Needs
+       recompression support or byte-exact raw pass-through for compressed
+       records.
+     - CONT 49 / QUST 83 / MGEF 75 / PERK 74 / LCTN 96 / CELL 64 / WRLD 55:
+       same order-replay conversion not yet applied; QUST also has repeated
+       INDX/QSDT/NAM2/QSRD interleaving.
+     - FURN 11 / FACT 9 / CELL/WRLD `FULL` width (localized 4-byte string
+       id written back as an inline NUL-terminated string), ARMO/EFSH
+       preamble drift.
+     - PACK 76 (a handful of records with duplicate/extra FNAM/PLDT),
+       INFO 8 (FNAM/HNAM width).
      The nightly gate should be re-run after each per-type conversion.
      Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
      in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.
      `test_subrecord_diff` now prints a per-type mismatch histogram plus
-     the first two examples per type.
+     the first two examples per type (its name filter must include
+     underscores, e.g. `NPC_`).
 
     **Status 2026-09-04:** `LocationRecord::locationName` is persisted now.
     `FULL` was consumed as an opaque raw (the shared

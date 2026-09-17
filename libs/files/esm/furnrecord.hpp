@@ -17,6 +17,10 @@ struct FurnRecord {
     QString fullName;
     QString modelPath;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    bool hasFlags = false;
+    NAME flagsSpelling = NAME('FNAM');
+    quint8 flagsWidth = 4;
 
     openck::FormComponents components;
 

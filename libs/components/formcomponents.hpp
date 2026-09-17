@@ -124,6 +124,19 @@ public:
         }
     }
 
+    // Emits a single subrecord from the first component that owns the
+    // name, for records that replay on-disk order. Returns true if some
+    // component recognized the name.
+    inline bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const
+    {
+        for (const auto& c : m_components)
+        {
+            if (c && c->canHandle(subrecordName) && c->writeSubrecord(subrecordName, esm))
+                return true;
+        }
+        return false;
+    }
+
 private:
     std::vector<std::unique_ptr<Component>> m_components;
 };

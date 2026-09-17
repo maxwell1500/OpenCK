@@ -31,6 +31,12 @@ struct LvliRecord {
     quint32 levelFlagsSize = 1;
     QVector<LvloEntry> entries;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    bool hasLvld = false;
+    bool hasLvlf = false;
+    QByteArray lvldRaw;
+    QByteArray lvlfRaw;
+    QVector<QByteArray> lvloRaws;
 
     openck::FormComponents components;
 

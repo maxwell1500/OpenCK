@@ -20,6 +20,14 @@ struct PackageRecord {
     QVector<quint32> parameters;
     QVector<CtdaCondition> conditions;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    QVector<int> conditionOrder;
+    bool hasFlags = false;
+    NAME flagsSpelling = NAME('FNAM');
+    quint8 flagsWidth = 4;
+    QByteArray pkdtRaw;
+    QByteArray pldtRaw;
+    QVector<QByteArray> ptdtRaws;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

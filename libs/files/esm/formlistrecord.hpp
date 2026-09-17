@@ -15,6 +15,7 @@ struct FormListRecord {
     quint32 flags = 0;
     QVector<quint32> formIds;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
     openck::FormComponents components;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

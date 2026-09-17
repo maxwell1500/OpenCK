@@ -19,6 +19,13 @@ struct SpellRecord {
     QVector<quint32> effects;
     quint32 enchantment = 0;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    bool hasFlags = false;
+    NAME flagsSpelling = NAME('FNAM');
+    quint8 flagsWidth = 4;
+    bool hasSpit = false;
+    QByteArray spitExtra;
+    bool hasSnam = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

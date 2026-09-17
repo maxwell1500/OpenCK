@@ -29,6 +29,9 @@ public:
     void load(ESMReader& esm) override {}
 
     quint32 flags = 0;
+    bool hasFlags = false;
+    quint8 flagsWidth = 4;
+    QByteArray flagsExtra;
     std::vector<BitfieldDef> bitDefs;
 
     void setBitDefs(std::vector<BitfieldDef> defs) { bitDefs = std::move(defs); }
@@ -47,16 +50,55 @@ public:
     {
         if (subrecordName == NAME('FNAM') || subrecordName == NAME('FLAG'))
         {
-            flags = esm.readType<quint32>();
+            flagsExtra.clear();
+            const qint64 left = esm.subLeft();
+            if (left >= 4)
+            {
+                flags = esm.readType<quint32>();
+                flagsWidth = 4;
+            }
+            else
+            {
+                flags = 0;
+                flagsWidth = static_cast<quint8>(qMax<qint64>(left, 0));
+                for (qint64 i = 0; i < left; ++i)
+                    flags |= quint32(esm.readType<quint8>()) << (8 * i);
+            }
+            if (esm.subLeft() > 0)
+                esm.readRawSubData(flagsExtra);
+            hasFlags = true;
         }
     }
 
     void save(ESMWriter& esm) const override
     {
-        if (flags != 0)
+        if (hasFlags || flags != 0)
         {
-            esm.writeSubData<quint32>(NAME('FNAM'), flags);
+            esm.startSubRecord(NAME('FNAM'));
+            const quint8 w = flagsWidth == 0 ? 1 : flagsWidth;
+            for (quint8 i = 0; i < w; ++i)
+                esm.writeType<quint8>(static_cast<quint8>((flags >> (8 * i)) & 0xFF));
+            if (!flagsExtra.isEmpty())
+                esm.writeRawData(flagsExtra.constData(), flagsExtra.size());
+            esm.endSubRecord();
         }
+    }
+
+    bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const override
+    {
+        if (subrecordName != NAME('FNAM') && subrecordName != NAME('FLAG'))
+            return false;
+        if (hasFlags || flags != 0)
+        {
+            esm.startSubRecord(subrecordName);
+            const quint8 w = flagsWidth == 0 ? 1 : flagsWidth;
+            for (quint8 i = 0; i < w; ++i)
+                esm.writeType<quint8>(static_cast<quint8>((flags >> (8 * i)) & 0xFF));
+            if (!flagsExtra.isEmpty())
+                esm.writeRawData(flagsExtra.constData(), flagsExtra.size());
+            esm.endSubRecord();
+        }
+        return true;
     }
 
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
@@ -79,19 +121,28 @@ public:
     {
         auto c = std::make_unique<TESFlags_Component>();
         c->flags = flags;
+        c->hasFlags = hasFlags;
+        c->flagsWidth = flagsWidth;
+        c->flagsExtra = flagsExtra;
         return c;
     }
 
     void copyFrom(const Component* other) override
     {
         if (!other || other->className() != className()) return;
-        flags = static_cast<const TESFlags_Component*>(other)->flags;
+        const auto* o = static_cast<const TESFlags_Component*>(other);
+        flags = o->flags;
+        hasFlags = o->hasFlags;
+        flagsWidth = o->flagsWidth;
+        flagsExtra = o->flagsExtra;
     }
 
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
-        return flags == static_cast<const TESFlags_Component*>(other)->flags;
+        const auto* o = static_cast<const TESFlags_Component*>(other);
+        return flags == o->flags && hasFlags == o->hasFlags
+            && flagsWidth == o->flagsWidth && flagsExtra == o->flagsExtra;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }

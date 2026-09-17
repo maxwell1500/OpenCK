@@ -3,14 +3,19 @@
 #include "esmwriter.hpp"
 #include "conditionrecord.hpp"
 
+#include <QHash>
+
 void ScenRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
+    loadOrder.clear();
+    conditionOrder.clear();
 
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
         if (sub == 0) break;
+        loadOrder.append(sub);
 
         bool handled = false;
         switch (sub)
@@ -24,18 +29,26 @@ void ScenRecord::load(ESMReader& esm, bool)
             if (CtdaCondition::unpack(bytes, condition))
             {
                 conditions.append(condition);
+                conditionOrder.append(-1);
             }
             else
             {
                 const QVector<CtdaCondition> parsed = CtdaCondition::unpackList(bytes);
                 if (!parsed.isEmpty())
-                    conditions.append(parsed);
+                {
+                    for (const CtdaCondition& c : parsed)
+                    {
+                        conditions.append(c);
+                        conditionOrder.append(-1);
+                    }
+                }
                 else
                 {
                     RawSubRecord raw;
                     raw.name = sub;
                     raw.data = bytes;
                     rawSubRecords.push_back(raw);
+                    conditionOrder.append(rawSubRecords.size() - 1);
                 }
             }
             handled = true;
@@ -65,20 +78,70 @@ void ScenRecord::load(ESMReader& esm, bool)
 
 void ScenRecord::save(ESMWriter& esm) const
 {
-    esm.writeSubZString('EDID', editorId);
-    components.saveAll(esm);
-
-    for (const CtdaCondition& condition : conditions)
+    const auto writeCondition = [&](int conditionRawIndex, int parsedIndex) -> bool
     {
-        const QByteArray bytes = condition.pack();
+        if (conditionRawIndex >= 0)
+        {
+            if (conditionRawIndex >= rawSubRecords.size())
+                return false;
+            esm.writeRawSubRecord(rawSubRecords[conditionRawIndex]);
+            return true;
+        }
+        if (parsedIndex >= conditions.size())
+            return false;
+        const QByteArray bytes = conditions[parsedIndex].pack();
         esm.startSubRecord('CTDA');
         esm.writeRawData(bytes.constData(), bytes.size());
         esm.endSubRecord();
+        return true;
+    };
+
+    if (loadOrder.isEmpty())
+    {
+        esm.writeSubZString('EDID', editorId);
+        components.saveAll(esm);
+        for (const CtdaCondition& condition : conditions)
+        {
+            const QByteArray bytes = condition.pack();
+            esm.startSubRecord('CTDA');
+            esm.writeRawData(bytes.constData(), bytes.size());
+            esm.endSubRecord();
+        }
+        for (const auto& raw : rawSubRecords)
+            esm.writeRawSubRecord(raw);
+        return;
     }
 
-    for (const auto& raw : rawSubRecords)
+    QHash<NAME, QVector<int>> rawByName;
+    for (int i = 0; i < rawSubRecords.size(); ++i)
+        rawByName[rawSubRecords[i].name].append(i);
+    QHash<NAME, int> rawCursor;
+
+    int parsedIdx = 0;
+    int ctdaSeen = 0;
+    for (NAME sub : loadOrder)
     {
-        esm.writeRawSubRecord(raw);
+        switch (sub)
+        {
+        case 'EDID':
+            esm.writeSubZString('EDID', editorId);
+            break;
+        case 'CTDA':
+            if (ctdaSeen < conditionOrder.size())
+                writeCondition(conditionOrder[ctdaSeen], parsedIdx++);
+            else
+                writeCondition(-1, parsedIdx++);
+            ++ctdaSeen;
+            break;
+        default:
+        {
+            const QVector<int>& idx = rawByName[sub];
+            int& cur = rawCursor[sub];
+            if (cur < idx.size())
+                esm.writeRawSubRecord(rawSubRecords[idx[cur++]]);
+            break;
+        }
+        }
     }
 }
 
@@ -89,5 +152,7 @@ void ScenRecord::blank()
     flags = 0;
     conditions.clear();
     rawSubRecords.clear();
+    loadOrder.clear();
+    conditionOrder.clear();
     components.clear();
 }

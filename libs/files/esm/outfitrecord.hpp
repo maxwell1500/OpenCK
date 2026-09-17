@@ -15,6 +15,8 @@ struct OutfitRecord {
     quint32 flags = 0;
     QVector<quint32> itemFormIds;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    NAME itemSub = NAME('INAM');
     openck::FormComponents components;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;

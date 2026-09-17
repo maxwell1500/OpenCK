@@ -78,6 +78,21 @@ public:
         }
     }
 
+    bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const override
+    {
+        if (subrecordName == NAME('MODL'))
+        {
+            if (!modelPath.isEmpty()) esm.writeSubZString(NAME('MODL'), modelPath);
+            return true;
+        }
+        if (subrecordName == NAME('MNAM'))
+        {
+            if (!lodModelPath.isEmpty()) esm.writeSubZString(NAME('MNAM'), lodModelPath);
+            return true;
+        }
+        return false;
+    }
+
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
     {
         std::vector<std::unique_ptr<EditorProperty>> out;
@@ -159,6 +174,21 @@ public:
         {
             esm.writeSubZString(NAME('ICO2'), smallIconPath);
         }
+    }
+
+    bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const override
+    {
+        if (subrecordName == NAME('ICON'))
+        {
+            if (!iconPath.isEmpty()) esm.writeSubZString(NAME('ICON'), iconPath);
+            return true;
+        }
+        if (subrecordName == NAME('ICO2'))
+        {
+            if (!smallIconPath.isEmpty()) esm.writeSubZString(NAME('ICO2'), smallIconPath);
+            return true;
+        }
+        return false;
     }
 
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override

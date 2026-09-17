@@ -24,6 +24,12 @@ struct ScenRecord
     quint32 flags = 0;
     QVector<CtdaCondition> conditions;
     QVector<RawSubRecord> rawSubRecords;
+    // Subrecord names in on-disk order so save can re-emit them positionally
+    // (CTDA is parsed out of rawSubRecords and would otherwise be hoisted).
+    QVector<NAME> loadOrder;
+    // Per CTDA occurrence: index into rawSubRecords for an unparsed condition
+    // or -1 when it lives in `conditions` (consumed in order).
+    QVector<int> conditionOrder;
 
     openck::FormComponents components;
 

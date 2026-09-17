@@ -22,6 +22,12 @@ struct EnchRecord {
     float magnitude = 0.0f;
     quint32 type = 0;
     quint32 soulGem = 0;
+    QVector<NAME> loadOrder;
+    bool hasFlags = false;
+    NAME flagsSpelling = NAME('FNAM');
+    quint8 flagsWidth = 4;
+    bool hasEnit = false;
+    QByteArray enitExtra;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

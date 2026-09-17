@@ -1,27 +1,22 @@
 #include "outfitrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include "subrecordreplay.hpp"
 void OutfitRecord::load(ESMReader& esm, bool) {
     esm.readHeader(); formId = esm.currentFormId();
+    loadOrder.clear();
     while (esm.isRecLeft()) {
         NAME sub = esm.readNSubHeader(); if (sub == 0) break;
+        loadOrder.append(sub);
         bool handled = false;
         switch (sub) {
         case 'EDID': editorId = esm.readZString(); handled = true; break;
-        // Some outfits carry an empty (0-byte) DATA marker; reading a fixed
-        // 32-bit value there walked past the record end and desynced the
-        // stream. Only consume what was declared.
         case 'INAM': case 'DATA':
-            if (esm.subLeft() >= 4)
+            itemSub = sub;
+            while (esm.subLeft() >= 4)
                 itemFormIds.append(esm.readType<quint32>());
-            else if (esm.subLeft() > 0)
-            {
-                quint32 v = 0;
-                const int n = static_cast<int>(esm.subLeft());
-                for (int i = 0; i < n; ++i)
-                    v |= quint32(esm.readType<quint8>()) << (8 * i);
-                itemFormIds.append(v);
-            }
+            if (esm.subLeft() > 0)
+                esm.skip(static_cast<int>(esm.subLeft()));
             handled = true; break;
         default: break;
         }
@@ -32,9 +27,29 @@ void OutfitRecord::load(ESMReader& esm, bool) {
     }
 }
 void OutfitRecord::save(ESMWriter& esm) const {
-    esm.writeSubZString('EDID', editorId);
-    for (quint32 fid : itemFormIds) esm.writeSubData<quint32>('INAM', fid);
-    components.saveAll(esm);
-    for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
+    SubrecordReplay replay;
+    replay.init(rawSubRecords);
+    const auto writeItems = [&]() {
+        esm.startSubRecord(itemSub);
+        for (quint32 fid : itemFormIds) esm.writeType<quint32>(fid);
+        esm.endSubRecord();
+    };
+    bool wroteEdid = false, wroteItems = false;
+    for (NAME sub : loadOrder) {
+        switch (sub) {
+        case 'EDID':
+            if (!wroteEdid) { esm.writeSubZString('EDID', editorId); wroteEdid = true; }
+            break;
+        case 'INAM': case 'DATA':
+            if (!wroteItems) { writeItems(); wroteItems = true; }
+            break;
+        default:
+            if (!components.writeSubrecord(sub, esm)) replay.write(sub, esm);
+            break;
+        }
+    }
+    if (!wroteEdid && !editorId.isEmpty()) esm.writeSubZString('EDID', editorId);
+    if (!wroteItems && !itemFormIds.isEmpty()) writeItems();
+    replay.writeLeftover(esm);
 }
-void OutfitRecord::blank() { editorId = ""; formId = 0; flags = 0; itemFormIds.clear(); rawSubRecords.clear(); components.clear(); }
+void OutfitRecord::blank() { editorId = ""; formId = 0; flags = 0; itemFormIds.clear(); itemSub = NAME('INAM'); rawSubRecords.clear(); loadOrder.clear(); components.clear(); }
