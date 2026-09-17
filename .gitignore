@@ -110,3 +110,5 @@ _CPack_Packages/
 *.exe
 
 /build-asan/
+
+Testing/
