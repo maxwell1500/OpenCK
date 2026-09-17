@@ -201,23 +201,30 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      subrecords keep their width via `ESMReader::readSubU32(&width)` /
      stored raw trailing bytes (`TESFlags_Component`, XESP, SPEL SPIT,
      ENCH ENIT, LVLI LVLD/LVLF/LVLO, PACK PKDT/PLDT/PTDT). Non-NPC payload
-     diffs are down to ~358 (from ~1,700; NPC_ below is separate). Also
+     diffs are down to ~164 (from ~1,700; NPC_ below is separate). Also
      converted CONT, LCTN, CELL, WRLD, MGEF, PERK to order replay, with
      localized `FULL` (often a 4-byte string id, not a NUL-terminated
-     name) now kept as raw bytes on CELL/LCTN/WRLD so its width survives.
+     name) now kept as raw bytes on CELL/LCTN/WRLD/FACT and on the model
+     component's MODL/MNAM so its width survives. Repeated same-name
+     subrecords (e.g. PERK's two DESC entries) are now replayed by cursor
+     instead of a write-once flag, and records only re-append a
+     scalar/raw field when the source actually carried it (PACK's
+     PKDT/PLDT, CONT's DATA/COCT/FNAM).
      Remaining:
      - NPC_ 162: pre-existing, unrelated to ordering — compressed records
        (flag 0x40000) plus embedded NUL blobs save malformed/larger. Needs
        recompression support or byte-exact raw pass-through for compressed
        records.
-     - QUST 83: repeated INDX/QSDT/NAM2/QSRD interleaving not replayed.
-     - PACK 76 / PERK 74 / CONT 28: records that are overrides of a master
-       record still save the base record's subrecord order/payload (likely
-       a base→override merge/copy path that drops the per-instance
-       `loadOrder` and raw fields); needs the modified-record copy path
-       audited to carry the record-struct fields, not just components.
-     - WRLD 33 / FURN 11 / FACT 9 / ARMO 10 / EFSH 10: remaining preamble
-       or localized-width variants; INFO 8 (FNAM/HNAM width).
+     - QUST 83: needs a group-aware order replay. The load-side state
+       machine (Top/Stage/Objective/Alias) works, but stages/objectives can
+       carry repeated CNAM/QSDT/QSRD for the same entry, so the save side
+       must cursor *per-entry duplicate lists*, not a single value; an
+       attempted replay that assumed one value per entry regressed to +26
+       and was reverted.
+     - WRLD 33: NAM3/other typed-word payload diffs (not width).
+     - PACK 4 / FURN had localized MNAM handled; ARMO 10 / EFSH 10 still
+       use the old fixed-preamble emitter (not converted); INFO 8
+       (FNAM/HNAM width).
      The nightly gate should be re-run after each per-type conversion.
      Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
      in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.

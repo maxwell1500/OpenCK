@@ -43,6 +43,10 @@ public:
 
     QString modelPath;
     QString lodModelPath;
+    QByteArray rawModl;
+    QByteArray rawMnam;
+    QString loadedModel;
+    QString loadedLod;
 
     QString name() const override { return QStringLiteral("Model"); }
     QString className() const override { return QStringLiteral("TESModel"); }
@@ -58,23 +62,39 @@ public:
     {
         if (subrecordName == NAME('MODL'))
         {
-            modelPath = esm.readZString();
+            rawModl.clear();
+            esm.readRawSubData(rawModl);
+            const int nul = rawModl.indexOf('\0');
+            modelPath = QString::fromUtf8(rawModl.constData(),
+                nul >= 0 ? nul : rawModl.size());
+            loadedModel = modelPath;
         }
         else if (subrecordName == NAME('MNAM'))
         {
-            lodModelPath = esm.readZString();
+            rawMnam.clear();
+            esm.readRawSubData(rawMnam);
+            const int nul = rawMnam.indexOf('\0');
+            lodModelPath = QString::fromUtf8(rawMnam.constData(),
+                nul >= 0 ? nul : rawMnam.size());
+            loadedLod = lodModelPath;
         }
     }
 
     void save(ESMWriter& esm) const override
     {
-        if (!modelPath.isEmpty())
+        if (!modelPath.isEmpty() || !rawModl.isEmpty())
         {
-            esm.writeSubZString(NAME('MODL'), modelPath);
+            if (!rawModl.isEmpty() && modelPath == loadedModel)
+                esm.writeRawSubRecord(RawSubRecord{ NAME('MODL'), rawModl });
+            else if (!modelPath.isEmpty())
+                esm.writeSubZString(NAME('MODL'), modelPath);
         }
-        if (!lodModelPath.isEmpty())
+        if (!lodModelPath.isEmpty() || !rawMnam.isEmpty())
         {
-            esm.writeSubZString(NAME('MNAM'), lodModelPath);
+            if (!rawMnam.isEmpty() && lodModelPath == loadedLod)
+                esm.writeRawSubRecord(RawSubRecord{ NAME('MNAM'), rawMnam });
+            else if (!lodModelPath.isEmpty())
+                esm.writeSubZString(NAME('MNAM'), lodModelPath);
         }
     }
 
@@ -82,12 +102,18 @@ public:
     {
         if (subrecordName == NAME('MODL'))
         {
-            if (!modelPath.isEmpty()) esm.writeSubZString(NAME('MODL'), modelPath);
+            if (!rawModl.isEmpty() && modelPath == loadedModel)
+                esm.writeRawSubRecord(RawSubRecord{ NAME('MODL'), rawModl });
+            else if (!modelPath.isEmpty())
+                esm.writeSubZString(NAME('MODL'), modelPath);
             return true;
         }
         if (subrecordName == NAME('MNAM'))
         {
-            if (!lodModelPath.isEmpty()) esm.writeSubZString(NAME('MNAM'), lodModelPath);
+            if (!rawMnam.isEmpty() && lodModelPath == loadedLod)
+                esm.writeRawSubRecord(RawSubRecord{ NAME('MNAM'), rawMnam });
+            else if (!lodModelPath.isEmpty())
+                esm.writeSubZString(NAME('MNAM'), lodModelPath);
             return true;
         }
         return false;
@@ -108,6 +134,10 @@ public:
         auto c = std::make_unique<TESModel_Component>();
         c->modelPath = modelPath;
         c->lodModelPath = lodModelPath;
+        c->rawModl = rawModl;
+        c->rawMnam = rawMnam;
+        c->loadedModel = loadedModel;
+        c->loadedLod = loadedLod;
         return c;
     }
 
@@ -117,13 +147,19 @@ public:
         const auto* o = static_cast<const TESModel_Component*>(other);
         modelPath = o->modelPath;
         lodModelPath = o->lodModelPath;
+        rawModl = o->rawModl;
+        rawMnam = o->rawMnam;
+        loadedModel = o->loadedModel;
+        loadedLod = o->loadedLod;
     }
 
     bool isEqualTo(const Component* other) const override
     {
         if (!other || other->className() != className()) return false;
         const auto* o = static_cast<const TESModel_Component*>(other);
-        return modelPath == o->modelPath && lodModelPath == o->lodModelPath;
+        return modelPath == o->modelPath && lodModelPath == o->lodModelPath
+            && rawModl == o->rawModl && rawMnam == o->rawMnam
+            && loadedModel == o->loadedModel && loadedLod == o->loadedLod;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }

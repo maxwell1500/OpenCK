@@ -21,7 +21,7 @@ struct PerkRecord {
     bool hasFlags = false;
     NAME flagsSpelling = NAME('FNAM');
     quint8 flagsWidth = 4;
-    QByteArray descRaw;
+    QVector<QByteArray> descRaws;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

@@ -26,7 +26,15 @@ void FactRecord::load(ESMReader& esm, bool)
         {
             case 'EDID': editorId = esm.readZString(); break;
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); hasFlags = true; break;
-            case 'FULL': factionName = esm.readZString(); hasFull = true; break;
+            case 'FULL':
+            {
+                esm.readRawSubData(fullRaw);
+                const int nul = fullRaw.indexOf('\0');
+                factionName = QString::fromUtf8(fullRaw.constData(),
+                    nul >= 0 ? nul : fullRaw.size());
+                hasFull = true;
+                break;
+            }
             case 'XNAM':
             {
                 // Fixed-size relation struct (faction id, reaction mod,
@@ -70,7 +78,12 @@ void FactRecord::save(ESMWriter& esm) const
     if (hasFlags || flags != 0)
         esm.writeSubData<quint32>('FNAM', flags);
     if (hasFull || !factionName.isEmpty())
-        esm.writeSubZString('FULL', factionName);
+    {
+        if (!fullRaw.isEmpty() && factionName == QString::fromUtf8(fullRaw.constData(), fullRaw.indexOf('\0') >= 0 ? fullRaw.indexOf('\0') : fullRaw.size()))
+            esm.writeRawSubRecord(RawSubRecord{ NAME('FULL'), fullRaw });
+        else
+            esm.writeSubZString('FULL', factionName);
+    }
     components.saveAll(esm);
 
     for (const auto& raw : rawSubRecords)
@@ -85,6 +98,7 @@ void FactRecord::blank()
     formId = 0;
     flags = 0;
     factionName.clear();
+    fullRaw.clear();
     description.clear();
     iconPath.clear();
     ranks.clear();

@@ -136,16 +136,16 @@ void ContRecord::save(ESMWriter& esm) const
 
     if (!wroteEdid && !editorId.isEmpty())
         esm.writeSubZString('EDID', editorId);
-    if (!wroteFlags && (hasFlags || flags != 0))
+    if (!wroteFlags && (hasFlags || loadOrder.isEmpty()))
         writeFlags();
-    if (!wroteData)
+    if (!wroteData && (!dataRaw.isEmpty() || loadOrder.isEmpty()))
     {
         if (!dataRaw.isEmpty())
             esm.writeRawSubRecord(RawSubRecord{ NAME('DATA'), dataRaw });
         else
             esm.writeSubData<quint32>('DATA', flags);
     }
-    if (!wroteCoct)
+    if (!wroteCoct && (!coctRaw.isEmpty() || loadOrder.isEmpty()))
     {
         if (!coctRaw.isEmpty())
             esm.writeRawSubRecord(RawSubRecord{ NAME('COCT'), coctRaw });

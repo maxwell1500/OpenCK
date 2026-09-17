@@ -15,7 +15,7 @@ void PerkRecord::load(ESMReader& esm, bool)
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
     loadOrder.clear();
-    descRaw.clear();
+    descRaws.clear();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
@@ -37,10 +37,15 @@ void PerkRecord::load(ESMReader& esm, bool)
                 break;
             case 'DESC':
             {
-                esm.readRawSubData(descRaw);
-                const int nul = descRaw.indexOf('\0');
-                description = QString::fromUtf8(descRaw.constData(),
-                    nul >= 0 ? nul : descRaw.size());
+                QByteArray bytes;
+                esm.readRawSubData(bytes);
+                descRaws.append(bytes);
+                if (descRaws.size() == 1)
+                {
+                    const int nul = bytes.indexOf('\0');
+                    description = QString::fromUtf8(bytes.constData(),
+                        nul >= 0 ? nul : bytes.size());
+                }
                 break;
             }
             case 'CTDA':
@@ -75,7 +80,8 @@ void PerkRecord::save(ESMWriter& esm) const
         esm.endSubRecord();
     };
 
-    bool wroteEdid = false, wroteFlags = false, wroteDesc = false;
+    bool wroteEdid = false, wroteFlags = false;
+    int descIdx = 0;
     for (NAME sub : loadOrder)
     {
         switch (sub)
@@ -87,14 +93,11 @@ void PerkRecord::save(ESMWriter& esm) const
                 if (!wroteFlags && (hasFlags || flags != 0)) { writeFlags(); wroteFlags = true; }
                 break;
             case 'DESC':
-                if (!wroteDesc && (!descRaw.isEmpty() || !description.isEmpty()))
-                {
-                    if (!descRaw.isEmpty())
-                        esm.writeRawSubRecord(RawSubRecord{ NAME('DESC'), descRaw });
-                    else
-                        esm.writeSubZString('DESC', description);
-                    wroteDesc = true;
-                }
+                if (descIdx < descRaws.size())
+                    esm.writeRawSubRecord(RawSubRecord{ NAME('DESC'), descRaws[descIdx] });
+                else if (descIdx == descRaws.size() && !description.isEmpty())
+                    esm.writeSubZString('DESC', description);
+                ++descIdx;
                 break;
             default:
                 if (!components.writeSubrecord(sub, esm))
@@ -107,13 +110,13 @@ void PerkRecord::save(ESMWriter& esm) const
         esm.writeSubZString('EDID', editorId);
     if (!wroteFlags && (hasFlags || flags != 0))
         writeFlags();
-    if (!wroteDesc && (!descRaw.isEmpty() || !description.isEmpty()))
+    while (descIdx < descRaws.size())
     {
-        if (!descRaw.isEmpty())
-            esm.writeRawSubRecord(RawSubRecord{ NAME('DESC'), descRaw });
-        else
-            esm.writeSubZString('DESC', description);
+        esm.writeRawSubRecord(RawSubRecord{ NAME('DESC'), descRaws[descIdx] });
+        ++descIdx;
     }
+    if (descRaws.isEmpty() && !description.isEmpty())
+        esm.writeSubZString('DESC', description);
 
     replay.writeLeftover(esm);
 }
@@ -132,6 +135,6 @@ void PerkRecord::blank()
     hasFlags = false;
     flagsSpelling = NAME('FNAM');
     flagsWidth = 4;
-    descRaw.clear();
+    descRaws.clear();
     initComponents();
 }

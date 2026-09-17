@@ -57,10 +57,12 @@ void PackageRecord::load(ESMReader& esm, bool)
             case 'PKDT':
                 esm.readRawSubData(pkdtRaw);
                 packageType = leU32(pkdtRaw, 0);
+                hasPkdt = true;
                 break;
             case 'PLDT':
                 esm.readRawSubData(pldtRaw);
                 targetType = leU32(pldtRaw, 0);
+                hasPldt = true;
                 break;
             case 'PTDT':
             {
@@ -207,9 +209,9 @@ void PackageRecord::save(ESMWriter& esm) const
 
     if (!wroteEdid && !editorId.isEmpty())
         esm.writeSubZString('EDID', editorId);
-    if (!wrotePkdt)
+    if (!wrotePkdt && (hasPkdt || packageType != 0 || loadOrder.isEmpty()))
         writePkdt();
-    if (!wrotePldt)
+    if (!wrotePldt && (hasPldt || targetType != 0 || loadOrder.isEmpty()))
         writePldt();
     for (int i = ptdtSeen; i < targetIds.size(); ++i)
     {
@@ -246,5 +248,7 @@ void PackageRecord::blank()
     pkdtRaw.clear();
     pldtRaw.clear();
     ptdtRaws.clear();
+    hasPkdt = false;
+    hasPldt = false;
     initComponents();
 }

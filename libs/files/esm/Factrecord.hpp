@@ -13,6 +13,7 @@ struct FactRecord {
     quint32 formId = 0;
     quint32 flags = 0;
     QString factionName;
+    QByteArray fullRaw;
     QString description;
     QString iconPath;
     QVector<QString> ranks;

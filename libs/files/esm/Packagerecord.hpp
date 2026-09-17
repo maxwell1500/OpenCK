@@ -28,6 +28,8 @@ struct PackageRecord {
     QByteArray pkdtRaw;
     QByteArray pldtRaw;
     QVector<QByteArray> ptdtRaws;
+    bool hasPkdt = false;
+    bool hasPldt = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
