@@ -10,6 +10,8 @@ class ESMWriter;
 #include <QString>
 #include <QVector>
 
+#include <memory>
+
 struct LocationRefType
 {
     quint32 formId = 0;
@@ -17,6 +19,10 @@ struct LocationRefType
     Color color;
     QVector<RawSubRecord> rawSubRecords;
 
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<LocationRefType> verbatimSnapshot;
     void load(ESMReader& esm, bool base = false);
     void save(ESMWriter& esm) const;
     void blank();

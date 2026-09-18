@@ -202,9 +202,11 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      stored raw trailing bytes (`TESFlags_Component`, XESP, SPEL SPIT,
      ENCH ENIT, LVLI LVLD/LVLF/LVLO, PACK PKDT/PLDT/PTDT). Non-NPC payload
      **Status 2026-09-16 (final — §1 complete):** SFBGS00D.esm round-trips
-     434,990/434,990 records with zero payload differences, and
+     434,990/434,990 records with zero payload differences,
      BlueprintShips-Starfield.esm round-trips 1,503,332/1,503,332 with
-     zero differences (`positional-shift 0` in both). The remaining
+     zero differences, and the full Starfield.esm master round-trips
+     3,829,246/3,829,246 with zero differences (`positional-shift 0` in
+     all three; ~5.77M records verified total). The remaining
      per-type gaps were closed by a generic verbatim mechanism rather than
      per-type parsing fixes:
      - `ESMReader` snapshots each record's exact on-disk payload span at
@@ -221,12 +223,15 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
        and `writeRecordState`, covering replay, grouped, CELL, and orphan
        paths.
      - Opted-in residual types: NPC_ (compressed), QUST, WRLD, PACK, ARMO,
-       EFSH, INFO, HAZD, DOOR, REFR, WEAP, CELL, RACE, NAVI, ALCH, DEBR.
+       EFSH, INFO, HAZD, DOOR, REFR, WEAP, CELL, RACE, NAVI, ALCH, DEBR,
+       plus the Starfield.esm-only set: IPCT, LTEX, FLOR, DIAL, IPDS, MUST,
+       MRPH, AMMO, LCTN, ANIO, FURN, WATR, SMEN, CLAS, PDCL, GLOB, WTHR,
+       SFBK, LCRT, ASPC, PKIN, SMBN, FACT, EFSQ, REGN, IDLE, EXPL, STMP.
        This also made the earlier per-type order-replay work a pure
        fast-path for edited records; untouched records no longer depend on
        parser completeness. The NPC_ corruption root cause (fixed-shape
-       ACBS/AIDT/component defaults vs. variable source) is documented but
-       no longer load-bearing for round-trip.
+       ACBS/AIDT reads vs. variable source + invented component defaults)
+       is documented but no longer load-bearing for round-trip.
      Suite 130/130, lint clean. Debug support kept (env-gated, off by
      default): `OPENCK_SAVE_PROGRESS`, `OPENCK_SNAPSHOT_TRACE`.
      `test_subrecord_diff` prints a per-type mismatch histogram (its name

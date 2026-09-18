@@ -93,5 +93,8 @@ void IpctRecord::blank()
     flags = 0;
     effectFormId = 0;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

@@ -71,5 +71,8 @@ void ClassRecord::blank()
     serviceFlags = 0;
     iconPath.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

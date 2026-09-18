@@ -73,5 +73,8 @@ void IpdsRecord::blank()
     formId = 0;
     impactFormIds.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

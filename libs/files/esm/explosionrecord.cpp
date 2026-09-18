@@ -31,4 +31,4 @@ void ExplRecord::save(ESMWriter& esm) const
     }
 }
 
-void ExplRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); }
+void ExplRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); verbatimBody.clear(); verbatimFlags = 0; verbatimSnapshot.reset(); }

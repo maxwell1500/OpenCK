@@ -18,4 +18,4 @@ void IdleAnimationRecord::save(ESMWriter& esm) const {
     components.saveAll(esm);
     for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
 }
-void IdleAnimationRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); }
+void IdleAnimationRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); verbatimBody.clear(); verbatimFlags = 0; verbatimSnapshot.reset(); }

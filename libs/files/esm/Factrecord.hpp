@@ -5,6 +5,8 @@
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 struct FactRecord {
@@ -23,6 +25,10 @@ struct FactRecord {
     // lacked (spurious FNAM/FULL break payload-identical round-trips).
     bool hasFlags = false;
     bool hasFull = false;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<FactRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

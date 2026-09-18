@@ -5,6 +5,8 @@
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 struct MrhpRecord {
@@ -16,6 +18,10 @@ struct MrhpRecord {
     quint32 mobcFlags = 0xFF; // MOBC — always 0xFF000000 in surveyed data
     QString templatePath;     // TMPP — optional template morph folder
     QVector<RawSubRecord> rawSubRecords;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<MrhpRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

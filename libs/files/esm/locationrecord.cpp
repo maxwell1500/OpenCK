@@ -280,5 +280,8 @@ void LocationRecord::blank()
     hasData = false;
     dataFieldCount = 3;
     dataExtra.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

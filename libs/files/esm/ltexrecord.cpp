@@ -82,5 +82,8 @@ void LtexRecord::blank()
     havokMaterial = 0;
     grassFormIds.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

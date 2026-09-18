@@ -100,5 +100,8 @@ void DialRecord::blank()
     hasInam = false;
     hasEdid = false;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

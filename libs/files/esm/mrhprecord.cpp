@@ -68,5 +68,8 @@ void MrhpRecord::blank()
     mobcFlags = 0xFF;
     templatePath.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

@@ -114,5 +114,8 @@ void FurnRecord::blank()
     hasFlags = false;
     flagsSpelling = NAME('FNAM');
     flagsWidth = 4;
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     components.clear();
 }

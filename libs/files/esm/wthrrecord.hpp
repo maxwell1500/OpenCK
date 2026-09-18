@@ -7,6 +7,8 @@
 #include <QString>
 #include <QVector>
 
+#include <memory>
+
 class ESMReader;
 class ESMWriter;
 
@@ -18,6 +20,10 @@ struct WthrRecord {
     QString sunTexture;
     QVector<RawSubRecord> rawSubRecords;
 
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<WthrRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

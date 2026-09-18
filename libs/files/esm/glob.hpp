@@ -11,6 +11,8 @@ class ESMWriter;
 #include <QVariant>
 #include <QVector>
 
+#include <memory>
+
 struct GlobalVariable
 {
     enum Flag
@@ -27,6 +29,10 @@ struct GlobalVariable
     // GLOBs carry FLTV only; the save must not invent an FNAM for those.
     bool hasType = true;
 
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<GlobalVariable> verbatimSnapshot;
     void load(ESMReader& esm, bool base = false);
     void save(ESMWriter& esm) const;
     void blank();

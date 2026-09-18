@@ -137,5 +137,8 @@ void AmmoRecord::blank()
     enchantmentCharge = 0.0f;
     dataSize = 20;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     components.clear();
 }

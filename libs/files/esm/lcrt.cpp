@@ -50,4 +50,7 @@ void LocationRefType::blank()
     formId = 0;
     editorId = "";
     color = 0;
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
 }

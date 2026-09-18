@@ -57,5 +57,8 @@ void PdclRecord::blank()
     editorId.clear();
     formId = 0;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

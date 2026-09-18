@@ -98,5 +98,8 @@ void WateRecord::blank()
     waveHeight = 0.0f;
     damage = 0.0f;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     components.clear();
 }

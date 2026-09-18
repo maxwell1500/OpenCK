@@ -73,5 +73,8 @@ void AnioRecord::blank()
     formId = 0;
     modelPath.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

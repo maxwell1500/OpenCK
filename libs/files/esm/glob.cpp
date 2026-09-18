@@ -87,4 +87,7 @@ void GlobalVariable::blank()
     constant = false;
     hasType = true;
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
 }

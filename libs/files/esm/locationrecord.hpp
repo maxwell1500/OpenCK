@@ -9,6 +9,8 @@
 #include <QVector>
 #include <QByteArray>
 
+#include <memory>
+
 class ESMReader;
 class ESMWriter;
 
@@ -49,6 +51,10 @@ struct LocationRecord
         QVector<quint32> linkedIds;
     };
     QVector<LinkedRef> linkedRefs;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<LocationRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

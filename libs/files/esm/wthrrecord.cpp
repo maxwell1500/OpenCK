@@ -77,5 +77,8 @@ void WthrRecord::blank()
     flags = 0;
     sunTexture.clear();
     rawSubRecords.clear();
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

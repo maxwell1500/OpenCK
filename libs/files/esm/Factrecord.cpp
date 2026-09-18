@@ -106,5 +106,8 @@ void FactRecord::blank()
     rawSubRecords.clear();
     hasFlags = false;
     hasFull = false;
+    verbatimBody.clear();
+    verbatimFlags = 0;
+    verbatimSnapshot.reset();
     initComponents();
 }

@@ -5,6 +5,8 @@
 #include "../../components/component.hpp"
 #include "../../components/formcomponents.hpp"
 #include <QString>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 
@@ -16,6 +18,10 @@ struct ExplRecord {
 
     openck::FormComponents components;
 
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<ExplRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();

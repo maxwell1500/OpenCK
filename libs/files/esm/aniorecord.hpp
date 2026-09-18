@@ -5,6 +5,8 @@
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
+
+#include <memory>
 class ESMReader;
 class ESMWriter;
 struct AnioRecord {
@@ -13,6 +15,10 @@ struct AnioRecord {
     quint32 formId = 0;
     QString modelPath;
     QVector<RawSubRecord> rawSubRecords;
+    // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
+    QByteArray verbatimBody;
+    quint32 verbatimFlags = 0;
+    std::shared_ptr<AnioRecord> verbatimSnapshot;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
