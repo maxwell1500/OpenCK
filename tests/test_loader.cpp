@@ -149,6 +149,7 @@ EarlyPageHeap g_earlyPageHeap;
 #include "../../libs/files/esm/glob.hpp"
 #include "../../libs/files/esm/Statrecord.hpp"
 #include "../../libs/files/esm/Dialrecord.hpp"
+#include "../../libs/files/esm/Inforecord.hpp"
 #include "../../libs/files/esm/pgrerecord.hpp"
 #include "../../libs/files/esm/subrecordsnapshot.hpp"
 #include <cstring>
@@ -175,6 +176,7 @@ private slots:
     void testSaveRoundTripSubrecordIdentical();
     void testSyntheticMultiTypeRoundTrip();
     void testSyntheticCellChildrenAndOpaque();
+    void testSyntheticDialInfoReverseIndex();
     void testSyntheticRefrXownWidth();
     void testMasterRecordSaveStateMachine();
     void testMaterializationMatrixZeroWarnings();
@@ -941,6 +943,95 @@ void TestLoaderSinglePass::testSyntheticCellChildrenAndOpaque()
     qDebug() << "synthetic cell children + opaque round-trip OK" << src.size() << "records";
 }
 
+// DIAL/INFO reverse index: INFOs physically following a DIAL are attributed
+// to it, infosUnderDial() serves them from the index (no full INFO scan),
+// reparenting updates both sides, and duplicate links are stored once.
+void TestLoaderSinglePass::testSyntheticDialInfoReverseIndex()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString pluginPath = tmp.filePath("synth_dialinfo.esp");
+    const quint32 dialA = 0x901, dialB = 0x902;
+    const quint32 info1 = 0x911, info2 = 0x912, info3 = 0x913;
+
+    {
+        QFile file(pluginPath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        ESMWriter writer;
+        writer.setAuthor("Synthetic Dial Info Test");
+        writer.save(file);
+
+        writer.startGrup('DIAL', 0);
+        {
+            DialRecord dial;
+            dial.editorId = QStringLiteral("SynthDialA");
+            dial.formId = dialA;
+            dial.topicName = QStringLiteral("Topic A");
+            RecHeader h; h.id = dialA;
+            writer.startRecord('DIAL', h);
+            dial.save(writer);
+            writer.endRecord();
+        }
+        writer.endGrup();
+        writer.startGrup('INFO', 0);
+        const quint32 infos[3] = { info1, info2, info3 };
+        for (int i = 0; i < 3; ++i)
+        {
+            InfoRecord info;
+            info.editorId = QStringLiteral("SynthInfo%1").arg(i + 1);
+            info.formId = infos[i];
+            info.responseText = QStringLiteral("Response %1").arg(i + 1);
+            RecHeader h; h.id = infos[i];
+            writer.startRecord('INFO', h);
+            info.save(writer);
+            writer.endRecord();
+        }
+        writer.endGrup();
+        writer.startGrup('DIAL', 0);
+        {
+            DialRecord dial;
+            dial.editorId = QStringLiteral("SynthDialB");
+            dial.formId = dialB;
+            dial.topicName = QStringLiteral("Topic B");
+            RecHeader h; h.id = dialB;
+            writer.startRecord('DIAL', h);
+            dial.save(writer);
+            writer.endRecord();
+        }
+        writer.endGrup();
+
+        writer.close();
+        file.close();
+    }
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    QVERIFY(stopped.isValid());
+    Document* doc = mediator.makeDocument(
+        QStringList{ QStringLiteral("synth_dialinfo.esp") }, pluginPath, false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(doc);
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+
+    Data& data = doc->getData();
+    QCOMPARE(data.infosUnderDial(dialA), QVector<quint32>({ info1, info2, info3 }));
+    QVERIFY(data.infosUnderDial(dialB).isEmpty());
+    QVERIFY(data.infosUnderDial(0u).isEmpty());
+    QVERIFY(data.infosUnderDial(0x9999u).isEmpty());
+    QCOMPARE(data.infosWithParentDialCount(), 3);
+
+    // Reparenting updates both sides and stays duplicate-free.
+    data.setInfoParentDial(info1, dialB);
+    data.setInfoParentDial(info1, dialB);
+    QCOMPARE(data.infosUnderDial(dialA), QVector<quint32>({ info2, info3 }));
+    QCOMPARE(data.infosUnderDial(dialB), QVector<quint32>({ info1 }));
+    QCOMPARE(data.infosWithParentDialCount(), 3);
+    data.setInfoParentDial(info1, dialA);
+    QCOMPARE(data.infosUnderDial(dialA), QVector<quint32>({ info2, info3, info1 }));
+    QVERIFY(data.infosUnderDial(dialB).isEmpty());
+    qDebug() << "synthetic DIAL/INFO reverse index OK";
+}
+
 // Starfield writes REFR XOWN wider than a single FormID; the trailing bytes
 // must survive an untouched round-trip instead of being narrowed to 4.
 void TestLoaderSinglePass::testSyntheticRefrXownWidth()
@@ -1235,19 +1326,22 @@ void TestLoaderSinglePass::testDialInfoParentWalking()
     const int infosLoaded = data.ensureTypeLoaded(static_cast<int>(CkId::Type_Info_));
     QVERIFY(infosLoaded > 0);
 
-    // The per-topic API is O(infos) per call, so walking all 68k topics is
-    // O(dials x infos) — past QTest's 5-minute limit on full masters (this
-    // timed out at 300s). Gate on the linear count plus a spot-check that
-    // the per-topic call works.
-    QVERIFY(data.infosWithParentDialCount() > 0);
-    qDebug() << "parented infos:" << data.infosWithParentDialCount();
+    // infosUnderDial() is backed by a reverse index (O(responses) per
+    // topic), so walking every topic is linear overall — this used to be
+    // O(dials x infos) and timed out at 300s. The walked total must match
+    // the linear parented count.
+    const int parented = data.infosWithParentDialCount();
+    QVERIFY(parented > 0);
+    qDebug() << "parented infos:" << parented;
     const auto& dials = data.getDialCollection();
     QVERIFY(dials.size() > 0);
-    for (int i = 0; i < qMin(dials.size(), 5); ++i)
+    int walked = 0;
+    for (int i = 0; i < dials.size(); ++i)
     {
         const quint32 dialId = dials.getRecord(i).get().formId;
-        (void)data.infosUnderDial(dialId);
+        walked += data.infosUnderDial(dialId).size();
     }
+    QCOMPARE(walked, parented);
 }
 
 // ESMWriter group-size stack: nested groups (a CELL group containing a

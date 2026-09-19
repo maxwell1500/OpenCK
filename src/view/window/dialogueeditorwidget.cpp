@@ -17,6 +17,7 @@
 #include <QMessageBox>
 #include <QLabel>
 #include <QHeaderView>
+#include <QHash>
 
 DialogueEditorWidget::DialogueEditorWidget(Data* data, QWidget* parent) :
     QWidget(parent),
@@ -154,18 +155,27 @@ void DialogueEditorWidget::populateTree()
     const auto& infoCollection = mData->getInfoCollection();
     int count = 0;
 
+    // Index INFO records by form id once: the per-response linear scan
+    // below is O(responses x infos) and hangs on full-master dialogue
+    // (100k+ INFO records). First occurrence wins, matching the old scan.
+    QHash<quint32, int> infoByForm;
+    infoByForm.reserve(infoCollection.size());
+    for (int i = 0; i < infoCollection.size(); i++) {
+        const quint32 fid = infoCollection.getRecord(i).get().formId;
+        if (!infoByForm.contains(fid))
+            infoByForm.insert(fid, i);
+    }
+
     for (quint32 responseId : dial.responseIds) {
-        for (int i = 0; i < infoCollection.size(); i++) {
-            const InfoRecord& info = infoCollection.getRecord(i).get();
-            if (info.formId == responseId) {
-                auto* item = new QTreeWidgetItem(treeWidget);
-                item->setText(0, info.editorId);
-                item->setText(1, "Info");
-                item->setText(2, info.responseText.left(50));
-                count++;
-                break;
-            }
-        }
+        const int idx = infoByForm.value(responseId, -1);
+        if (idx < 0)
+            continue;
+        const InfoRecord& info = infoCollection.getRecord(idx).get();
+        auto* item = new QTreeWidgetItem(treeWidget);
+        item->setText(0, info.editorId);
+        item->setText(1, "Info");
+        item->setText(2, info.responseText.left(50));
+        count++;
     }
 
     LOG_INFO(QString("Loaded %1 info nodes for DIAL '%1'").arg(count).arg(currentDialId));

@@ -19,6 +19,7 @@
 #include <QInputDialog>
 #include <QHeaderView>
 #include <QDateTime>
+#include <QHash>
 
 DialogueTreeEditor::DialogueTreeEditor(Data* data, QWidget* parent)
     : QDialog(parent),
@@ -119,6 +120,19 @@ void DialogueTreeEditor::loadDialogueTree()
     auto& dialCollection = mData->getDialCollection();
     QVector<QString> dialIds = dialCollection.getIds(false);
 
+    // Index INFO records by form id once per tree build: resolving each
+    // response with a fresh getIds()/getIndex() scan is O(dials x
+    // responses x infos) and hangs on full-master dialogue. First
+    // occurrence wins, matching the old scan order.
+    auto& infoCollection = mData->getInfoCollection();
+    QHash<quint32, int> infoByForm;
+    infoByForm.reserve(infoCollection.size());
+    for (int i = 0; i < infoCollection.size(); i++) {
+        const quint32 fid = infoCollection.getRecord(i).get().formId;
+        if (!infoByForm.contains(fid))
+            infoByForm.insert(fid, i);
+    }
+
     for (const QString& dialId : dialIds) {
         int idx = dialCollection.getIndex(dialId);
         if (idx < 0) continue;
@@ -131,33 +145,16 @@ void DialogueTreeEditor::loadDialogueTree()
         dialItem->setData(0, Qt::UserRole, QVariant::fromValue<DialRecord*>(&dial));
 
         // Load INFO children
-        auto& infoCollection = mData->getInfoCollection();
         for (quint32 responseId : dial.responseIds) {
-            QString infoEditorId;
-            // Find INFO by formId
-            QVector<QString> infoIds = infoCollection.getIds(false);
-            for (const QString& infoId : infoIds) {
-                int infoIdx = infoCollection.getIndex(infoId);
-                if (infoIdx >= 0) {
-                    const InfoRecord& info = infoCollection.getRecord(infoIdx).get();
-                    if (info.formId == responseId) {
-                        infoEditorId = infoId;
-                        break;
-                    }
-                }
-            }
-
-                    if (!infoEditorId.isEmpty()) {
-                        int infoIdx = infoCollection.getIndex(infoEditorId);
-                        if (infoIdx >= 0) {
-                            InfoRecord& info = infoCollection.getRecord(infoIdx).get();
-                            QTreeWidgetItem* infoItem = new QTreeWidgetItem(dialItem);
-                            infoItem->setText(0, info.responseText.left(50));
-                            infoItem->setText(1, "INFO");
-                            infoItem->setText(2, QString("Response: %1...").arg(info.responseText.left(50)));
-                            infoItem->setData(0, Qt::UserRole, QVariant::fromValue<InfoRecord*>(&info));
-                        }
-                    }
+            const int infoIdx = infoByForm.value(responseId, -1);
+            if (infoIdx < 0)
+                continue;
+            InfoRecord& info = infoCollection.getRecord(infoIdx).get();
+            QTreeWidgetItem* infoItem = new QTreeWidgetItem(dialItem);
+            infoItem->setText(0, info.responseText.left(50));
+            infoItem->setText(1, "INFO");
+            infoItem->setText(2, QString("Response: %1...").arg(info.responseText.left(50)));
+            infoItem->setData(0, Qt::UserRole, QVariant::fromValue<InfoRecord*>(&info));
         }
     }
 

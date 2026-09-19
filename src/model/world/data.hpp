@@ -334,12 +334,13 @@ public:
     /// \brief Form IDs of the INFO records attached to the given DIAL,
     /// derived from the flat record stream while loading (INFO records
     /// physically nested under a DIAL's branch are attributed to it).
-    /// Empty when the dialogue (or its responses) has not been loaded.
+    /// Backed by a reverse index, so one call costs O(responses), not
+    /// O(all infos). Empty when the dialogue (or its responses) has not
+    /// been loaded.
     QVector<quint32> infosUnderDial(quint32 dialFormId);
 
     /// \brief How many loaded INFO records have a parent DIAL. Linear
-    /// single pass; use this instead of calling infosUnderDial() per topic
-    /// (which is O(dials x infos) and unusable at full-master scale).
+    /// single pass.
     int infosWithParentDialCount();
 
     // One record of the edited plugin in file sequence (GRUPs excluded).
@@ -391,9 +392,18 @@ public:
     const QVector<OpaqueRecord>& opaqueRecords() const { return m_opaqueRecords; }
 
     /// \brief Link an INFO record to its parent DIAL (for tree walking).
-    void setInfoParentDial(quint32 infoFormId, quint32 dialFormId)
+    /// Maintains the m_dialInfoChildren reverse index alongside
+    /// m_infoParentDial. infoIndex is the INFO's position in the info
+    /// collection when known (-1 = resolve lazily on read); the load path
+    /// passes it so the first walk needs no scan.
+    void setInfoParentDial(quint32 infoFormId, quint32 dialFormId, int infoIndex = -1)
     {
+        const quint32 old = m_infoParentDial.value(infoFormId, 0);
+        if (old != 0 && old != dialFormId)
+            removeInfoChild(old, infoFormId);
         m_infoParentDial[infoFormId] = dialFormId;
+        if (dialFormId != 0)
+            appendInfoChild(dialFormId, infoFormId, infoIndex);
     }
 
     /// \brief Flat load order of the edited plugin's own records, recorded
@@ -2112,6 +2122,15 @@ private:
     // dialogue editor can walk a topic's responses.
     quint32 m_lastDialFormId = 0;
     QHash<quint32, quint32> m_infoParentDial;
+    // Reverse index: parent DIAL form id -> (INFO form id, INFO collection
+    // index) pairs in load order. The stored index can go stale when the
+    // info collection is edited (insert/remove shift positions) or is -1
+    // when the caller did not know it; infosUnderDial() validates each
+    // entry against the collection and repairs it with a linear scan, so
+    // reads stay correct while the common case stays O(responses).
+    QHash<quint32, QVector<QPair<quint32, int>>> m_dialInfoChildren;
+    void appendInfoChild(quint32 dialFormId, quint32 infoFormId, int infoIndex);
+    void removeInfoChild(quint32 dialFormId, quint32 infoFormId);
 
     // Flat load order of the edited plugin's own records, recorded during
     // eager load (GRUP headers excluded). Lets the save path replay the

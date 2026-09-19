@@ -1440,6 +1440,9 @@ int Data::preload(const QString& filename, bool base_)
     m_opaqueRecords.clear();
     m_recordParentCell.clear();
     m_cellChildren.clear();
+    m_infoParentDial.clear();
+    m_dialInfoChildren.clear();
+    m_lastDialFormId = 0;
     m_childIndexDirty = true;
     m_lastCellFormId = 0;
 
@@ -1565,7 +1568,7 @@ bool Data::continueLoading(Messages& messages)
                 if (infoCollection.size() > 0)
                 {
                     const quint32 fid = infoCollection.getRecord(infoCollection.size() - 1).get().formId;
-                    m_infoParentDial[fid] = m_lastDialFormId;
+                    setInfoParentDial(fid, m_lastDialFormId, infoCollection.size() - 1);
                 }
                 break;
             case 'GLOB': globCollection.load(*reader, base);   break;
@@ -2101,19 +2104,72 @@ QVector<quint32> Data::cellsInWorldspace(quint32 worldspaceId)
     return out;
 }
 
+void Data::appendInfoChild(quint32 dialFormId, quint32 infoFormId, int infoIndex)
+{
+    auto& vec = m_dialInfoChildren[dialFormId];
+    for (auto& p : vec)
+    {
+        if (p.first == infoFormId)
+        {
+            if (infoIndex >= 0)
+                p.second = infoIndex;
+            return;
+        }
+    }
+    vec.append(qMakePair(infoFormId, infoIndex));
+}
+
+void Data::removeInfoChild(quint32 dialFormId, quint32 infoFormId)
+{
+    auto it = m_dialInfoChildren.find(dialFormId);
+    if (it == m_dialInfoChildren.end())
+        return;
+    auto& vec = it.value();
+    for (int i = vec.size() - 1; i >= 0; --i)
+    {
+        if (vec[i].first == infoFormId)
+            vec.removeAt(i);
+    }
+    if (vec.isEmpty())
+        m_dialInfoChildren.erase(it);
+}
+
 QVector<quint32> Data::infosUnderDial(quint32 dialFormId)
 {
     QVector<quint32> out;
     if (dialFormId == 0)
         return out;
+    auto it = m_dialInfoChildren.find(dialFormId);
+    if (it == m_dialInfoChildren.end())
+        return out;
     const auto& infos = infoCollection;
-    for (int i = 0; i < infos.size(); ++i)
+    auto& vec = it.value();
+    for (int k = 0; k < vec.size(); ++k)
     {
-        const Record<InfoRecord>& rec = infos.getRecord(i);
+        const quint32 fid = vec[k].first;
+        int idx = vec[k].second;
+        // The stored collection index goes stale when the info collection
+        // is edited (or was never known); validate and repair with a scan.
+        if (idx < 0 || idx >= infos.size()
+            || infos.getRecord(idx).get().formId != fid)
+        {
+            idx = -1;
+            for (int i = 0; i < infos.size(); ++i)
+            {
+                if (infos.getRecord(i).get().formId == fid)
+                {
+                    idx = i;
+                    break;
+                }
+            }
+            vec[k].second = idx;
+        }
+        if (idx < 0)
+            continue;
+        const Record<InfoRecord>& rec = infos.getRecord(idx);
         if (rec.isDeleted())
             continue;
-        if (m_infoParentDial.value(rec.get().formId, 0) == dialFormId)
-            out.append(rec.get().formId);
+        out.append(fid);
     }
     return out;
 }

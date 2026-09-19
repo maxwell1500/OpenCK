@@ -270,6 +270,12 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     offset) FormID reference layouts for future explicit-rule additions.
     Remaining: verify compaction on real-world plugins (the generic fix
     should handle all cases; explicit rules remain as optimization).
+    **Status 2026-09-19:** Verified. `tools/nightly-roundtrip.ps1` passes
+    end to end: Starfield.esm untouched round-trip 3,829,246/3,829,246
+    payload-identical, plus FormIdCompactor `--compact` reload-clean on
+    SeydaNeen.esp, SeydaNeen2.esp, SeydaNeen_Minimal.esp,
+    SeydaNeen_project_2026-07-04.esp (1367 owned/remapped), and
+    test_100.esp (84 owned/remapped). **Resolved.**
 
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
     parsed but not walked into a DIAL→INFO tree for the dialogue editor.
@@ -293,6 +299,22 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      same complexity and will hang on full-master dialogue trees; they need
      a reverse parent→children index maintained alongside
      `m_infoParentDial`.
+
+     **Status 2026-09-19:** Resolved. `Data` now maintains a
+     `m_dialInfoChildren` reverse index (parent DIAL → INFO form id +
+     collection index pairs) alongside `m_infoParentDial`: populated at
+     load with the known collection index, updated in `setInfoParentDial`
+     (reparent-safe, duplicate-free, dial 0 not indexed), cleared in
+     `preload`, and self-healing on read (stale/unknown indices are
+     validated against the collection and repaired with a scan, deleted
+     INFOs filtered). `infosUnderDial()` is O(responses); the master test
+     now walks all 68k topics (126,347 parented infos, ~6s) and asserts the
+     walked total equals the linear count, plus a synthetic
+     `testSyntheticDialInfoReverseIndex` covering attribution, reparenting,
+     and duplicates. `populateTree()` and `DialogueTreeEditor::
+     loadDialogueTree()` build a per-call formId→index hash instead of
+     rescanning the INFO collection per response (first occurrence wins,
+     same as the old scan).
 
  5. **Master-record state machine on save.** Verify that a materialized
     (deferred) master record saved without edits is not emitted as an override,
