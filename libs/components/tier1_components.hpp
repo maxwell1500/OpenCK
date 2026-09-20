@@ -47,6 +47,10 @@ public:
     QByteArray rawMnam;
     QString loadedModel;
     QString loadedLod;
+    // Every occurrence payload (MODL/MNAM repeat, e.g. ARMO biped slots);
+    // rawModl/rawMnam above track the last for the single-value save path.
+    QVector<QByteArray> modlRaws;
+    QVector<QByteArray> mnamRaws;
 
     QString name() const override { return QStringLiteral("Model"); }
     QString className() const override { return QStringLiteral("TESModel"); }
@@ -64,6 +68,7 @@ public:
         {
             rawModl.clear();
             esm.readRawSubData(rawModl);
+            modlRaws.append(rawModl);
             const int nul = rawModl.indexOf('\0');
             modelPath = QString::fromUtf8(rawModl.constData(),
                 nul >= 0 ? nul : rawModl.size());
@@ -73,6 +78,7 @@ public:
         {
             rawMnam.clear();
             esm.readRawSubData(rawMnam);
+            mnamRaws.append(rawMnam);
             const int nul = rawMnam.indexOf('\0');
             lodModelPath = QString::fromUtf8(rawMnam.constData(),
                 nul >= 0 ? nul : rawMnam.size());
@@ -138,6 +144,8 @@ public:
         c->rawMnam = rawMnam;
         c->loadedModel = loadedModel;
         c->loadedLod = loadedLod;
+        c->modlRaws = modlRaws;
+        c->mnamRaws = mnamRaws;
         return c;
     }
 
@@ -151,6 +159,8 @@ public:
         rawMnam = o->rawMnam;
         loadedModel = o->loadedModel;
         loadedLod = o->loadedLod;
+        modlRaws = o->modlRaws;
+        mnamRaws = o->mnamRaws;
     }
 
     bool isEqualTo(const Component* other) const override
@@ -159,7 +169,8 @@ public:
         const auto* o = static_cast<const TESModel_Component*>(other);
         return modelPath == o->modelPath && lodModelPath == o->lodModelPath
             && rawModl == o->rawModl && rawMnam == o->rawMnam
-            && loadedModel == o->loadedModel && loadedLod == o->loadedLod;
+            && loadedModel == o->loadedModel && loadedLod == o->loadedLod
+            && modlRaws == o->modlRaws && mnamRaws == o->mnamRaws;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }

@@ -136,14 +136,15 @@ void ESMWriter::endGrup()
         return;
     }
     qint64 currentPos{ stream.device()->pos() };
-    // The group size excludes the 'GRUP' name and the size field itself
-    // (matches ESMReader::skipGrupHeader, which adds grupSize to the
-    // position following the size field). Inner groups are counted as part
-    // of the outer group's payload, so pop the stack: this patches the
-    // most recently opened (innermost) group.
+    // Bethesda group sizes include the full 24-byte group header (name +
+    // size + 16-byte tail), matching ESMReader::skipGrupHeader. grupSizePos
+    // points at the size field itself, so the span is currentPos -
+    // grupSizePos + 4. Inner groups are counted as part of the outer
+    // group's payload, so pop the stack: this patches the most recently
+    // opened (innermost) group.
     const qint64 grupSizePos = grupSizePosStack.takeLast();
     stream.device()->seek(grupSizePos);
-    writeType<quint32>(static_cast<quint32>(currentPos - grupSizePos - 4));
+    writeType<quint32>(static_cast<quint32>(currentPos - grupSizePos + 4));
     stream.device()->seek(currentPos);
 }
 

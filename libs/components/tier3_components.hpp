@@ -75,7 +75,12 @@ public:
         if (hasFlags || flags != 0)
         {
             esm.startSubRecord(NAME('FNAM'));
-            const quint8 w = flagsWidth == 0 ? 1 : flagsWidth;
+            // Preserve a zero-width source exactly (empty FNAM stays empty);
+            // only widen to the full u32 when flags were set on a widthless
+            // record, so edited bits are never truncated to one byte.
+            quint8 w = flagsWidth;
+            if (w == 0 && flags != 0)
+                w = 4;
             for (quint8 i = 0; i < w; ++i)
                 esm.writeType<quint8>(static_cast<quint8>((flags >> (8 * i)) & 0xFF));
             if (!flagsExtra.isEmpty())
@@ -91,7 +96,9 @@ public:
         if (hasFlags || flags != 0)
         {
             esm.startSubRecord(subrecordName);
-            const quint8 w = flagsWidth == 0 ? 1 : flagsWidth;
+            quint8 w = flagsWidth;
+            if (w == 0 && flags != 0)
+                w = 4;
             for (quint8 i = 0; i < w; ++i)
                 esm.writeType<quint8>(static_cast<quint8>((flags >> (8 * i)) & 0xFF));
             if (!flagsExtra.isEmpty())

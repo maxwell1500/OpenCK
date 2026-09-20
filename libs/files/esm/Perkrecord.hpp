@@ -33,7 +33,7 @@ inline bool operator==(const PerkRecord& l, const PerkRecord& r)
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.description == r.description && l.requirements == r.requirements
         && l.iconPath == r.iconPath && l.conditions == r.conditions
-        && l.rawSubRecords == r.rawSubRecords;
+        && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 
 inline bool operator!=(const PerkRecord& l, const PerkRecord& r)

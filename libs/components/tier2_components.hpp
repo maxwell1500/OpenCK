@@ -42,7 +42,22 @@ public:
     quint32 maleSpelling = NAME('BNAM');
     quint32 flagsSpelling = NAME('BMDT');
     bool hasMale = false;
+    bool hasFemale = false;
     bool hasFlags = false;
+    // Verbatim snapshots for positional replay: unedited values re-emit the
+    // exact source bytes (spelling, width, NULs); edits emit current values.
+    QByteArray maleRaw;
+    QByteArray femaleRaw;
+    NAME maleRawName = 0;
+    NAME femaleRawName = 0;
+    QString loadedMale;
+    QString loadedFemale;
+    quint8 bipedWidth = 4;
+    QByteArray bipedExtra;
+    // Per-occurrence INDX/BMDT payloads (duplicates replay verbatim except
+    // the last, which goes through writeSubrecord so edits land there).
+    QVector<QByteArray> indxRaws;
+    QVector<QByteArray> bmdtRaws;
     QVector<RawSubRecord> rawSub;
 
     QString name() const override { return QStringLiteral("Biped Model"); }
@@ -64,28 +79,68 @@ public:
         switch (subrecordName)
         {
             case NAME('BNAM'):
-                maleSpelling = NAME('BNAM');
-                hasMale = true;
-                maleWorldPath = esm.readZString();
-                break;
             case NAME('CNAM'):
-                maleSpelling = NAME('CNAM');
+            {
+                maleSpelling = subrecordName;
+                maleRawName = subrecordName;
                 hasMale = true;
-                maleWorldPath = esm.readZString();
+                esm.readRawSubData(maleRaw);
+                maleWorldPath = QString::fromUtf8(maleRaw.constData(), maleRaw.size());
+                while (maleWorldPath.endsWith(QChar(0)))
+                    maleWorldPath.chop(1);
+                loadedMale = maleWorldPath;
                 break;
+            }
             case NAME('FNAM'):
-                femaleWorldPath = esm.readZString();
+            {
+                hasFemale = true;
+                femaleRawName = subrecordName;
+                esm.readRawSubData(femaleRaw);
+                femaleWorldPath = QString::fromUtf8(femaleRaw.constData(), femaleRaw.size());
+                while (femaleWorldPath.endsWith(QChar(0)))
+                    femaleWorldPath.chop(1);
+                loadedFemale = femaleWorldPath;
                 break;
+            }
             case NAME('INDX'):
-                flagsSpelling = NAME('INDX');
-                hasFlags = true;
-                bipedFlags = esm.readType<quint32>();
-                break;
             case NAME('BMDT'):
-                flagsSpelling = NAME('BMDT');
+            {
+                // Width-preserving scalar: Starfield writes 2-byte INDX
+                // here; a fixed u32 read would consume the next subrecord.
+                flagsSpelling = subrecordName;
+                const qint64 left = esm.subLeft();
+                bipedExtra.clear();
+                QByteArray payload;
+                if (left >= 4)
+                {
+                    bipedFlags = esm.readType<quint32>();
+                    bipedWidth = 4;
+                    for (int i = 0; i < 4; ++i)
+                        payload.append(char((bipedFlags >> (8 * i)) & 0xFF));
+                }
+                else
+                {
+                    bipedFlags = 0;
+                    bipedWidth = static_cast<quint8>(qMax<qint64>(left, 0));
+                    for (qint64 i = 0; i < left; ++i)
+                    {
+                        const quint8 byte = esm.readType<quint8>();
+                        bipedFlags |= quint32(byte) << (8 * i);
+                        payload.append(char(byte));
+                    }
+                }
+                if (esm.subLeft() > 0)
+                {
+                    esm.readRawSubData(bipedExtra);
+                    payload.append(bipedExtra);
+                }
+                if (subrecordName == NAME('INDX'))
+                    indxRaws.append(payload);
+                else
+                    bmdtRaws.append(payload);
                 hasFlags = true;
-                bipedFlags = esm.readType<quint32>();
                 break;
+            }
             case NAME('INDT'):
             default:
                 RawSubRecord raw;
@@ -100,13 +155,21 @@ public:
     {
         if (hasFlags || bipedFlags != 0)
         {
-            esm.writeSubData<quint32>(flagsSpelling, bipedFlags);
+            quint8 w = bipedWidth;
+            if (w == 0 && bipedFlags != 0)
+                w = 4;
+            esm.startSubRecord(flagsSpelling);
+            for (quint8 i = 0; i < w; ++i)
+                esm.writeType<quint8>(static_cast<quint8>((bipedFlags >> (8 * i)) & 0xFF));
+            if (!bipedExtra.isEmpty())
+                esm.writeRawData(bipedExtra.constData(), bipedExtra.size());
+            esm.endSubRecord();
         }
         if (hasMale || !maleWorldPath.isEmpty())
         {
             esm.writeSubZString(maleSpelling, maleWorldPath);
         }
-        if (!femaleWorldPath.isEmpty())
+        if (hasFemale || !femaleWorldPath.isEmpty())
         {
             esm.writeSubZString(NAME('FNAM'), femaleWorldPath);
         }
@@ -114,6 +177,53 @@ public:
         {
             esm.writeRawSubRecord(raw);
         }
+    }
+
+    bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const override
+    {
+        if (subrecordName == NAME('BNAM') || subrecordName == NAME('CNAM'))
+        {
+            if (!maleRaw.isEmpty() && maleWorldPath == loadedMale)
+                esm.writeRawSubRecord(RawSubRecord{ maleRawName, maleRaw });
+            else if (!maleWorldPath.isEmpty())
+                esm.writeSubZString(subrecordName, maleWorldPath);
+            else if (hasMale)
+            {
+                esm.startSubRecord(subrecordName);
+                esm.endSubRecord();
+            }
+            return true;
+        }
+        if (subrecordName == NAME('FNAM'))
+        {
+            if (!femaleRaw.isEmpty() && femaleWorldPath == loadedFemale)
+                esm.writeRawSubRecord(RawSubRecord{ femaleRawName, femaleRaw });
+            else if (!femaleWorldPath.isEmpty())
+                esm.writeSubZString(subrecordName, femaleWorldPath);
+            else if (hasFemale)
+            {
+                esm.startSubRecord(subrecordName);
+                esm.endSubRecord();
+            }
+            return true;
+        }
+        if (subrecordName == NAME('INDX') || subrecordName == NAME('BMDT'))
+        {
+            if (hasFlags || bipedFlags != 0)
+            {
+                quint8 w = bipedWidth;
+                if (w == 0 && bipedFlags != 0)
+                    w = 4;
+                esm.startSubRecord(subrecordName);
+                for (quint8 i = 0; i < w; ++i)
+                    esm.writeType<quint8>(static_cast<quint8>((bipedFlags >> (8 * i)) & 0xFF));
+                if (!bipedExtra.isEmpty())
+                    esm.writeRawData(bipedExtra.constData(), bipedExtra.size());
+                esm.endSubRecord();
+            }
+            return true;
+        }
+        return false;
     }
 
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
@@ -137,7 +247,18 @@ public:
         c->maleSpelling = maleSpelling;
         c->flagsSpelling = flagsSpelling;
         c->hasMale = hasMale;
+        c->hasFemale = hasFemale;
         c->hasFlags = hasFlags;
+        c->maleRaw = maleRaw;
+        c->femaleRaw = femaleRaw;
+        c->maleRawName = maleRawName;
+        c->femaleRawName = femaleRawName;
+        c->loadedMale = loadedMale;
+        c->loadedFemale = loadedFemale;
+        c->bipedWidth = bipedWidth;
+        c->bipedExtra = bipedExtra;
+        c->indxRaws = indxRaws;
+        c->bmdtRaws = bmdtRaws;
         c->rawSub = rawSub;
         return c;
     }
@@ -152,7 +273,18 @@ public:
         maleSpelling = o->maleSpelling;
         flagsSpelling = o->flagsSpelling;
         hasMale = o->hasMale;
+        hasFemale = o->hasFemale;
         hasFlags = o->hasFlags;
+        maleRaw = o->maleRaw;
+        femaleRaw = o->femaleRaw;
+        maleRawName = o->maleRawName;
+        femaleRawName = o->femaleRawName;
+        loadedMale = o->loadedMale;
+        loadedFemale = o->loadedFemale;
+        bipedWidth = o->bipedWidth;
+        bipedExtra = o->bipedExtra;
+        indxRaws = o->indxRaws;
+        bmdtRaws = o->bmdtRaws;
         rawSub = o->rawSub;
     }
 
@@ -166,7 +298,18 @@ public:
             && maleSpelling == o->maleSpelling
             && flagsSpelling == o->flagsSpelling
             && hasMale == o->hasMale
+            && hasFemale == o->hasFemale
             && hasFlags == o->hasFlags
+            && maleRaw == o->maleRaw
+            && femaleRaw == o->femaleRaw
+            && maleRawName == o->maleRawName
+            && femaleRawName == o->femaleRawName
+            && loadedMale == o->loadedMale
+            && loadedFemale == o->loadedFemale
+            && bipedWidth == o->bipedWidth
+            && bipedExtra == o->bipedExtra
+            && indxRaws == o->indxRaws
+            && bmdtRaws == o->bmdtRaws
             && rawSub == o->rawSub;
     }
 
@@ -185,6 +328,7 @@ public:
     quint32 enchantmentFormId = 0;
     quint32 maxCharge = 0;
     quint32 spelling = NAME('ENAM');
+    bool hasEnchant = false;
 
     QString name() const override { return QStringLiteral("Enchantment"); }
     QString className() const override { return QStringLiteral("TESEnchantableForm"); }
@@ -202,15 +346,27 @@ public:
         {
             spelling = subrecordName;
             enchantmentFormId = esm.readType<quint32>();
+            hasEnchant = true;
         }
     }
 
     void save(ESMWriter& esm) const override
     {
-        if (enchantmentFormId != 0)
+        if (hasEnchant || enchantmentFormId != 0)
         {
             esm.writeSubData<quint32>(spelling, enchantmentFormId);
         }
+    }
+
+    bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const override
+    {
+        if (subrecordName != NAME('ENAM') && subrecordName != NAME('ANAM'))
+            return false;
+        if (hasEnchant || enchantmentFormId != 0)
+        {
+            esm.writeSubData<quint32>(subrecordName, enchantmentFormId);
+        }
+        return true;
     }
 
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
@@ -229,6 +385,7 @@ public:
         c->enchantmentFormId = enchantmentFormId;
         c->maxCharge = maxCharge;
         c->spelling = spelling;
+        c->hasEnchant = hasEnchant;
         return c;
     }
 
@@ -239,6 +396,7 @@ public:
         enchantmentFormId = o->enchantmentFormId;
         maxCharge = o->maxCharge;
         spelling = o->spelling;
+        hasEnchant = o->hasEnchant;
     }
 
     bool isEqualTo(const Component* other) const override
@@ -247,7 +405,8 @@ public:
         const auto* o = static_cast<const TESEnchantableForm_Component*>(other);
         return enchantmentFormId == o->enchantmentFormId
             && maxCharge == o->maxCharge
-            && spelling == o->spelling;
+            && spelling == o->spelling
+            && hasEnchant == o->hasEnchant;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }
@@ -311,12 +470,12 @@ public:
     {
         if (subrecordName == NAME('YNAM') || subrecordName == NAME('PICK'))
         {
-            if (pickupSound != 0) esm.writeSubData<quint32>(pickupSpelling, pickupSound);
+            if (pickupSound != 0) esm.writeSubData<quint32>(subrecordName, pickupSound);
             return true;
         }
         if (subrecordName == NAME('ZNAM') || subrecordName == NAME('PUTD'))
         {
-            if (putdownSound != 0) esm.writeSubData<quint32>(putdownSpelling, putdownSound);
+            if (putdownSound != 0) esm.writeSubData<quint32>(subrecordName, putdownSound);
             return true;
         }
         return false;

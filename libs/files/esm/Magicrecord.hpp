@@ -37,7 +37,7 @@ inline bool operator==(const MagicRecord& l, const MagicRecord& r)
         && l.schools == r.schools && l.damageType == r.damageType
         && l.castingSound == r.castingSound && l.iconPath == r.iconPath
         && l.modelPath == r.modelPath && l.effects == r.effects
-        && l.rawSubRecords == r.rawSubRecords;
+        && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 
 inline bool operator!=(const MagicRecord& l, const MagicRecord& r)

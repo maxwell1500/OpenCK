@@ -56,6 +56,10 @@ struct WorldspaceRecord
     QVector<quint32> navPointIds;
     QVector<RawSubRecord> rawSubRecords;
     QVector<quint32> mOrder;  // subrecord emission order
+    // mOrder indices consumed as typed values; every other entry replays
+    // from rawSubRecords. First occurrence wins (later NAM2/NAM3/ZNAM/...
+    // duplicates are max-height-quad or sibling raws, not the typed field).
+    QVector<int> typedOrderPos;
 
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
@@ -93,6 +97,7 @@ inline bool operator==(const WorldspaceRecord& l, const WorldspaceRecord& r)
         && l.cellIds == r.cellIds && l.navPointIds == r.navPointIds
         && l.rawSubRecords == r.rawSubRecords
         && l.mOrder == r.mOrder
+        && l.typedOrderPos == r.typedOrderPos
         && l.components == r.components;
 }
 

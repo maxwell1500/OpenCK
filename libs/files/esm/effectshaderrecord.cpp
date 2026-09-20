@@ -12,16 +12,20 @@ constexpr int kDataSize = 36;  // 4 flags + 3x4 colors + 3x4 scales + 2x4 unk
 
 void EfshRecord::load(ESMReader& esm, bool) {
     esm.readHeader(); formId = esm.currentFormId();
+    loadOrder.clear();
+    hasEdid = false;
     while (esm.isRecLeft()) {
         NAME sub = esm.readNSubHeader(); if (sub == 0) break;
+        loadOrder.append(sub);
         bool handled = false;
         switch (sub) {
-        case 'EDID': editorId = esm.readZString(); handled = true; break;
+        case 'EDID': editorId = esm.readZString(); hasEdid = true; handled = true; break;
         case 'DATA':
         {
             QByteArray bytes;
             esm.readRawSubData(bytes);
             data.present = true;
+            data.dataWidth = bytes.size();
             if (bytes.size() >= 4)
                 data.shaderFlags = *reinterpret_cast<const quint32*>(bytes.constData());
             if (bytes.size() >= 16) {
@@ -57,8 +61,26 @@ void EfshRecord::load(ESMReader& esm, bool) {
     }
 }
 void EfshRecord::save(ESMWriter& esm) const {
-    esm.writeSubZString('EDID', editorId);
-    if (data.present) {
+    const auto writeData = [&] {
+        // Prefix layout: flags[4] colors[16] scales[28] unk[36]. Emit the
+        // source width (empty stays empty), growing only to fit fields an
+        // edit actually touched; assembled records emit only when edited.
+        int needed = 0;
+        if (data.shaderFlags != 0) needed = 4;
+        if (data.fillR != 255 || data.fillG != 255 || data.fillB != 255 || data.fillA != 255
+            || data.rimR != 255 || data.rimG != 255 || data.rimB != 255 || data.rimA != 255
+            || data.baseR != 255 || data.baseG != 255 || data.baseB != 255 || data.baseA != 255)
+            needed = 16;
+        if (data.fillScale != 1.0f || data.rimScale != 1.0f || data.baseScale != 1.0f)
+            needed = 28;
+        if (data.unk1 != 0 || data.unk2 != 0)
+            needed = 36;
+        const int emitSize = qMax(data.dataWidth, needed);
+        if (emitSize <= 0 && data.dataWidth < 0)
+        {
+            // Assembled with defaults: nothing to emit (save rule).
+            return;
+        }
         QByteArray bytes(kDataSize, Qt::Uninitialized);
         quint8* p = reinterpret_cast<quint8*>(bytes.data());
         memcpy(p, &data.shaderFlags, 4);
@@ -71,10 +93,38 @@ void EfshRecord::save(ESMWriter& esm) const {
         memcpy(p + 28, &data.unk1, 4);
         memcpy(p + 32, &data.unk2, 4);
         esm.startSubRecord('DATA');
-        esm.writeRawData(bytes.constData(), bytes.size());
+        esm.writeRawData(bytes.constData(), emitSize);
         esm.endSubRecord();
+    };
+
+    if (loadOrder.isEmpty())
+    {
+        if (hasEdid || !editorId.isEmpty())
+            esm.writeSubZString('EDID', editorId);
+        if (data.present)
+            writeData();
+        components.saveAll(esm);
+        for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
+        return;
     }
-    components.saveAll(esm);
-    for (const auto& raw : rawSubRecords) { esm.writeRawSubRecord(raw); }
+
+    int rawCur = 0;
+    for (NAME sub : loadOrder)
+    {
+        if (sub == NAME('EDID'))
+        {
+            esm.writeSubZString('EDID', editorId);
+        }
+        else if (sub == NAME('DATA'))
+        {
+            if (data.present)
+                writeData();
+        }
+        else if (rawCur < rawSubRecords.size())
+        {
+            esm.writeRawSubRecord(rawSubRecords[rawCur++]);
+        }
+    }
+    while (rawCur < rawSubRecords.size()) { esm.writeRawSubRecord(rawSubRecords[rawCur++]); }
 }
-void EfshRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); data = Data(); verbatimBody.clear(); verbatimFlags = 0; verbatimSnapshot.reset(); }
+void EfshRecord::blank() { editorId = ""; formId = 0; flags = 0; rawSubRecords.clear(); components.clear(); loadOrder.clear(); hasEdid = false; data = Data(); verbatimBody.clear(); verbatimFlags = 0; verbatimSnapshot.reset(); }

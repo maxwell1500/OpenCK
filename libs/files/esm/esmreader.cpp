@@ -207,7 +207,12 @@ bool ESMReader::isNextName(NAME name)
 void ESMReader::skipGrupHeader()
 {
     quint32 grupSize = readType<quint32>(true);    // size
-    mGrupEnd = m_pos + grupSize;
+    // Bethesda GRUP sizes include the full 24-byte group header (proven by
+    // exact tiling of consecutive groups in Starfield.esm: each group starts
+    // exactly where the previous one's size ends it). m_pos here is just
+    // past the size field, so subtract those 8 bytes. TES3 keeps the legacy
+    // formula: no shipped TES3 group exists to ground a change.
+    mGrupEnd = m_pos + grupSize - (m_tes3 ? 0 : 8);
     if (m_tes3)
     {
         // TES3 group header: 4 name + 4 size + 4 unknown + 4 flags.

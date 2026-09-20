@@ -40,7 +40,7 @@ inline bool operator==(const FactRecord& l, const FactRecord& r)
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.factionName == r.factionName && l.description == r.description
         && l.iconPath == r.iconPath && l.ranks == r.ranks && l.relations == r.relations
-        && l.rawSubRecords == r.rawSubRecords;
+        && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
 }
 
 inline bool operator!=(const FactRecord& l, const FactRecord& r)

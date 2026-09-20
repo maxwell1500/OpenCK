@@ -232,11 +232,53 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
        parser completeness. The NPC_ corruption root cause (fixed-shape
        ACBS/AIDT reads vs. variable source + invented component defaults)
        is documented but no longer load-bearing for round-trip.
-     Suite 130/130, lint clean. Debug support kept (env-gated, off by
-     default): `OPENCK_SAVE_PROGRESS`, `OPENCK_SNAPSHOT_TRACE`.
-     `test_subrecord_diff` prints a per-type mismatch histogram (its name
-     filter must include underscores, e.g. `NPC_`).
-     The nightly gate should be re-run after each per-type conversion.
+      Suite 130/130, lint clean. Debug support kept (env-gated, off by
+      default): `OPENCK_SAVE_PROGRESS`, `OPENCK_SNAPSHOT_TRACE`.
+      `test_subrecord_diff` prints a per-type mismatch histogram (its name
+      filter must include underscores, e.g. `NPC_`).
+      The nightly gate should be re-run after each per-type conversion.
+      **Status 2026-09-20 (structured fidelity zero — §1 polish):** a new
+      `test_structuredfidelity` gate loads every MISC/QUST/ARMO/EFSH/WRLD/
+      INFO from Starfield.esm, re-saves through the STRUCTURED path
+      (`record.save()`, bypassing the verbatim fast path that masks all of
+      this in file round-trips), and byte-compares each emitted body with
+      the source: **131,236 compared, mismatches driven to zero in every
+      type** (MISC 1319, QUST 2077, ARMO 1017, EFSH 47, WRLD 429, INFO
+      126,347; 4 compressed WRLDs skip). Fixed classes:
+      - QUST segment-ordered replay (per-position action codes freezing the
+        load-time routing, so interleaved stage/objective/alias/top runs
+        round-trip exactly), presence-gated QSDT/CNAM, per-occurrence
+        QSDT/CNAM values (duplicate QSDTs collapsed last-wins before),
+        questDesc/dialogueView positional re-emit (were DROPPED), and raw
+        preservation for binary/LString-index CNAM/desc/view payloads
+        (UTF-8 decoding corrupted `00e8f302` into U+FFFD text).
+      - ARMO full conversion (loadOrder replay, FLAG/DNAM/DATA presence +
+        width preservation, EDID gating, missing drain-break): TESBipedModel
+        gained width-aware INDX/BMDT reads (the fixed u32 read consumed the
+        next subrecord — silent, `recLeft` never went negative so no
+        warning), raw snapshots for male/female paths, `hasFemale`, and
+        `writeSubrecord`; TESEnchantableForm gained `hasEnchant` +
+        `writeSubrecord`; pickup sounds emit at position spelling; ARMO
+        ANAM/ENAM route by size (47-byte ANAM paths stay raw, 4-byte form
+        IDs go to the component); INDT stays record-level raw; duplicate
+        MODL/MNAM/INDX/BMDT replay verbatim except the last (edits land
+        there) via new occurrence lists on TESModel/TESBipedModel.
+      - INFO empty-FNAM preservation (TESFlags `==0?1` width clamp invented
+        a byte; now widens to u32 only when flags were actually set).
+      - EFSH DATA width rule (empty stays empty, grows only to fit edited
+        fields) + loadOrder replay (ENAM/DATA order).
+      - WRLD first-occurrence-typed replay (duplicate NAM2/NAM3/ZNAM
+        collapsed last-wins before) via a generic typedOrderPos set.
+      - `operator==` now includes `components` on ARMO + MISC/CONT/MAGIC/
+        PERK/FACT (component edits previously never tripped verbatim, so
+        the stale bytes were emitted and edits silently lost).
+      - `testSyntheticStructuredSaves` (always runs, no fixture):
+        hand-crafted tricky bodies (duplicate QSDT, binary CNAM, differing
+        MODL/INDX duplicates, empty FNAM/DATA, reordered EFSH, duplicate
+        NAM2/NAM3) round-trip byte-exact, plus positional edit checks
+        (QUST flag edit lands on the last duplicate only).
+      Full Starfield.esm round-trip still 3,829,246/3,829,246 zero-diff;
+      suite 132/132, zero-warning build, lint clean.
      Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
      in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.
      `test_subrecord_diff` now prints a per-type mismatch histogram plus
@@ -270,12 +312,30 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     offset) FormID reference layouts for future explicit-rule additions.
     Remaining: verify compaction on real-world plugins (the generic fix
     should handle all cases; explicit rules remain as optimization).
-    **Status 2026-09-19:** Verified. `tools/nightly-roundtrip.ps1` passes
-    end to end: Starfield.esm untouched round-trip 3,829,246/3,829,246
-    payload-identical, plus FormIdCompactor `--compact` reload-clean on
-    SeydaNeen.esp, SeydaNeen2.esp, SeydaNeen_Minimal.esp,
-    SeydaNeen_project_2026-07-04.esp (1367 owned/remapped), and
-    test_100.esp (84 owned/remapped). **Resolved.**
+     **Status 2026-09-19:** Verified. `tools/nightly-roundtrip.ps1` passes
+     end to end: Starfield.esm untouched round-trip 3,829,246/3,829,246
+     payload-identical, plus FormIdCompactor `--compact` reload-clean on
+     SeydaNeen.esp, SeydaNeen2.esp, SeydaNeen_Minimal.esp,
+     SeydaNeen_project_2026-07-04.esp (1367 owned/remapped), and
+     test_100.esp (84 owned/remapped). **Resolved.**
+
+  8. **GRUP size convention (found 2026-09-20, resolved).** Bethesda GRUP
+     sizes include the full 24-byte group header; our reader
+     (`skipGrupHeader`: end = pos-after-size + size) and writer
+     (`endGrup`: size = content-after-size-field) both used exclude-8,
+     so every group end was 8 bytes late and every size we wrote was 8
+     short of Bethesda's. Proven by exact tiling: consecutive groups
+     start exactly where the previous one's declared size ends them
+     (10 boundaries: nested type-4/5 block tiling plus top-level GMST/
+     KYWD spans), and our own round-trip file now carries Bethesda's
+     exact first-group size (157113). Invisible to all previous gates
+     (payload diffs ignore group headers; `testGrupSizeConsistent`
+     enshrined our own convention). A sequential walker using the old
+     ends desynced into garbage sizes and AV'd — that crash is what
+     exposed it. Fixed both sides; `testGrupSizeConsistent` asserts the
+     include-24 sizes (52/104) plus a fixture-gated tiling check over
+     the first 3 shipped top-level groups. TES3 untouched (no shipped
+     groups to ground a change).
 
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
     parsed but not walked into a DIAL→INFO tree for the dialogue editor.

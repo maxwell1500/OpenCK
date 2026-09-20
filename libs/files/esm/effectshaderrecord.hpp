@@ -16,6 +16,8 @@ struct EfshRecord {
     quint32 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
     openck::FormComponents components;
+    QVector<NAME> loadOrder;
+    bool hasEdid = false;
 
     // Typed view of the DATA subrecord (Skyrim EFSH): fill/rim/base colors
     // (RGBA bytes) and their intensity scales. Unpacked on load when the
@@ -23,6 +25,7 @@ struct EfshRecord {
     struct Data
     {
         bool present = false;
+        int dataWidth = -1; // on-disk DATA size (-1 = assembled, never loaded)
         quint32 shaderFlags = 0;
         quint8 fillR = 255, fillG = 255, fillB = 255, fillA = 255;
         quint8 rimR = 255, rimG = 255, rimB = 255, rimA = 255;
@@ -47,7 +50,8 @@ struct EfshRecord {
 inline bool operator==(const EfshRecord& l, const EfshRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
-        && l.data.present == r.data.present && l.data.shaderFlags == r.data.shaderFlags
+        && l.data.present == r.data.present && l.data.dataWidth == r.data.dataWidth
+        && l.data.shaderFlags == r.data.shaderFlags
         && l.data.fillR == r.data.fillR && l.data.fillG == r.data.fillG
         && l.data.fillB == r.data.fillB && l.data.fillA == r.data.fillA
         && l.data.rimR == r.data.rimR && l.data.rimG == r.data.rimG
@@ -56,7 +60,8 @@ inline bool operator==(const EfshRecord& l, const EfshRecord& r)
         && l.data.baseB == r.data.baseB && l.data.baseA == r.data.baseA
         && l.data.fillScale == r.data.fillScale && l.data.rimScale == r.data.rimScale
         && l.data.baseScale == r.data.baseScale
-        && l.rawSubRecords == r.rawSubRecords && l.components == r.components;
+        && l.rawSubRecords == r.rawSubRecords && l.components == r.components
+        && l.loadOrder == r.loadOrder && l.hasEdid == r.hasEdid;
 }
 inline bool operator!=(const EfshRecord& l, const EfshRecord& r) { return !(l == r); }
 #endif

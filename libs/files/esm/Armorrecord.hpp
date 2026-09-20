@@ -22,6 +22,21 @@ struct ArmorRecord {
     QString iconPath;
     QString modelPath;
     float health = 0.0f;
+    // Positional replay (loadOrder) + presence/width preservation. FLAG,
+    // DNAM and DATA keep their on-disk widths; short DATA falls back to raw.
+    // loadIsRaw parallels loadOrder: 1 replays from rawSubRecords, 0 runs
+    // the typed/component path (size-dispatched ENAM/ANAM live here).
+    QVector<NAME> loadOrder;
+    QVector<quint8> loadIsRaw;
+    bool hasEdid = false;
+    bool hasFlag = false;
+    quint8 flagWidth = 4;
+    QByteArray flagExtra;
+    bool hasDnam = false;
+    quint8 dnamWidth = 4;
+    QByteArray dnamExtra;
+    bool hasData = false;
+    QByteArray dataExtra;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;
@@ -37,7 +52,12 @@ inline bool operator==(const ArmorRecord& l, const ArmorRecord& r)
     return l.editorId == r.editorId && l.fullName == r.fullName && l.formId == r.formId && l.flags == r.flags
         && l.rawSubRecords == r.rawSubRecords && l.armorRating == r.armorRating
         && l.weight == r.weight && l.value == r.value && l.iconPath == r.iconPath
-        && l.modelPath == r.modelPath && l.health == r.health;
+        && l.modelPath == r.modelPath && l.health == r.health
+        && l.components == r.components
+        && l.loadOrder == r.loadOrder && l.loadIsRaw == r.loadIsRaw && l.hasEdid == r.hasEdid
+        && l.hasFlag == r.hasFlag && l.flagWidth == r.flagWidth && l.flagExtra == r.flagExtra
+        && l.hasDnam == r.hasDnam && l.dnamWidth == r.dnamWidth && l.dnamExtra == r.dnamExtra
+        && l.hasData == r.hasData && l.dataExtra == r.dataExtra;
 }
 
 inline bool operator!=(const ArmorRecord& l, const ArmorRecord& r)

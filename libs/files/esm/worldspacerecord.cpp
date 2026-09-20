@@ -7,6 +7,8 @@
 
 #include <cstring>
 
+#include <QSet>
+
 namespace {
 
 bool isTypedName(NAME sub)
@@ -51,14 +53,22 @@ void WorldspaceRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
+    mOrder.clear();
+    typedOrderPos.clear();
+    QSet<NAME> seenNames;
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
         if (sub == 0) break;
 
         mOrder.append(sub);
-        if (isTypedName(sub))
+        // First occurrence wins the typed parse; later duplicates of a
+        // typed name (second NAM2/NAM3/ZNAM, ...) are sibling raws.
+        const bool first = !seenNames.contains(sub);
+        seenNames.insert(sub);
+        if (first && isTypedName(sub))
         {
+            typedOrderPos.append(mOrder.size() - 1);
             switch (sub)
             {
             case 'EDID': editorId = trimmedZString(esm.readZString()); break;
@@ -106,8 +116,17 @@ void WorldspaceRecord::load(ESMReader& esm, bool)
 void WorldspaceRecord::save(ESMWriter& esm) const
 {
     int rawIdx = 0;
-    for (quint32 sub : mOrder)
+    for (int mi = 0; mi < mOrder.size(); ++mi)
     {
+        const quint32 sub = mOrder[mi];
+        if (!typedOrderPos.contains(mi))
+        {
+            if (rawIdx < rawSubRecords.size())
+            {
+                esm.writeRawSubRecord(rawSubRecords[rawIdx++]);
+            }
+            continue;
+        }
         switch (sub)
         {
         case 'EDID': esm.writeSubZString('EDID', editorId); break;
@@ -200,6 +219,7 @@ void WorldspaceRecord::blank()
     navPointIds.clear();
     rawSubRecords.clear();
     mOrder.clear();
+    typedOrderPos.clear();
     verbatimBody.clear();
     verbatimFlags = 0;
     verbatimSnapshot.reset();

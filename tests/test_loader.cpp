@@ -1426,16 +1426,54 @@ void TestLoaderSinglePass::testGrupSizeConsistent()
     QVERIFY2(groups.at(0).declaredSize > 0,
         "outer GRUP size is 0 — likely the single-slot grupSizePos bug");
 
-    // The GRUP size field counts everything after the size field itself:
-    // the 16-byte header tail (label+type+vc+unknown) plus content.
-    // Inner GRUP: 16 (header tail) + 28 (record: 24-byte hdr + 4 payload) = 44.
-    QCOMPARE(groups.at(1).declaredSize, static_cast<quint32>(44));
+    // The GRUP size field counts the full 24-byte group header plus content
+    // (Bethesda convention, proven by exact tiling of shipped groups):
+    // Inner GRUP: 24 (header) + 28 (record: 24-byte hdr + 4 payload) = 52.
+    QCOMPARE(groups.at(1).declaredSize, static_cast<quint32>(52));
 
-    // Outer GRUP: 16 (header tail) + 28 (TEST record) + 52 (inner GRUP) = 96.
-    QCOMPARE(groups.at(0).declaredSize, static_cast<quint32>(96));
+    // Outer GRUP: 24 (header) + 28 (TEST record) + 52 (inner GRUP) = 104.
+    QCOMPARE(groups.at(0).declaredSize, static_cast<quint32>(104));
 
     qDebug() << "nested grup sizes:" << groups.at(0).declaredSize
              << "(outer)" << groups.at(1).declaredSize << "(inner)";
+
+    // Shipped-data tiling: consecutive top-level groups in Starfield.esm
+    // must tile exactly (next start == start + declared size). Relative
+    // offsets only, so game updates cannot break it; skips on data-less
+    // machines.
+    const QString dataDir = qEnvironmentVariable(
+        "OPENCK_DATA_DIR", QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
+    const QString masterPath = dataDir + QStringLiteral("/Starfield.esm");
+    if (!QFile::exists(masterPath))
+        QSKIP("Starfield.esm not available for GRUP tiling check");
+    QFile master(masterPath);
+    QVERIFY(master.open(QIODevice::ReadOnly));
+    const QByteArray masterBytes = master.read(4000000);
+    master.close();
+    const quint8* mdata = reinterpret_cast<const quint8*>(masterBytes.constData());
+    auto mU32 = [&](qint64 p) {
+        return quint32(mdata[p]) | (quint32(mdata[p + 1]) << 8)
+            | (quint32(mdata[p + 2]) << 16) | (quint32(mdata[p + 3]) << 24);
+    };
+    QVERIFY(masterBytes.size() > 24);
+    QCOMPARE(QByteArray(masterBytes.constData(), 4), QByteArray("TES4"));
+    qint64 mpos = 24 + mU32(4);
+    for (int g = 0; g < 3; ++g)
+    {
+        QVERIFY(mpos + 24 <= masterBytes.size());
+        QCOMPARE(QByteArray(masterBytes.constData() + mpos, 4), QByteArray("GRUP"));
+        const quint32 grupSize = mU32(mpos + 4);
+        QVERIFY(grupSize >= 24);
+        qint64 p = mpos + 24;
+        while (p + 24 <= masterBytes.size()
+            && QByteArray(masterBytes.constData() + p, 4) != QByteArray("GRUP"))
+        {
+            p += 24 + mU32(p + 4);
+        }
+        QVERIFY(p + 24 <= masterBytes.size());
+        QCOMPARE(p, mpos + grupSize);
+        mpos = p;
+    }
 }
 
 void TestLoaderSinglePass::testDiscoverFormIdSubrecordLayouts()

@@ -37,7 +37,7 @@ inline bool operator==(const ContRecord& l, const ContRecord& r)
         && l.rawSubRecords == r.rawSubRecords && l.iconPath == r.iconPath
         && l.modelPath == r.modelPath && l.contents == r.contents
         && l.inventoryControl == r.inventoryControl && l.weight == r.weight
-        && l.value == r.value;
+        && l.value == r.value && l.components == r.components;
 }
 
 inline bool operator!=(const ContRecord& l, const ContRecord& r)
