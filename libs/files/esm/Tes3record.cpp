@@ -137,38 +137,135 @@ void Tes3Record::save(ESMWriter& esm) const
         rawByName[rawSubRecords[i].name].append(i);
     QHash<NAME, int> rawCursor;
 
+    // Component-backed values for the subrecords parseComponents() extracts.
+    // A stored raw is re-emitted verbatim when the component still matches
+    // the parse of its last raw occurrence (parse is last-wins for
+    // duplicates and lossy for non-UTF8 bytes, so byte comparison would flag
+    // untouched records as edited); a genuine component edit is written
+    // once, at the last occurrence's position, so untouched records stay
+    // byte-identical while form-dialog edits survive the save.
+    QHash<NAME, QString> editedStrings;
+    if (const auto* full = static_cast<const tescomponents::TESFullName_Component*>(
+            components.findByName(QStringLiteral("TESFullName"))))
+        editedStrings.insert(NAME('FULL'), full->fullName);
+    if (const auto* model = static_cast<const tescomponents::TESModel_Component*>(
+            components.findByName(QStringLiteral("TESModel"))))
+    {
+        editedStrings.insert(NAME('MODL'), model->modelPath);
+        editedStrings.insert(NAME('MNAM'), model->lodModelPath);
+    }
+    if (const auto* tex = static_cast<const tescomponents::TESTexture_Component*>(
+            components.findByName(QStringLiteral("TESTexture"))))
+    {
+        editedStrings.insert(NAME('ICON'), tex->iconPath);
+        editedStrings.insert(NAME('ICO2'), tex->smallIconPath);
+    }
+    const auto* dataComp = static_cast<const tescomponents::Tes3Data_Component*>(
+        components.findByName(QStringLiteral("Tes3Data")));
+
+    // Replica of the parseComponents() string decode (NUL-strip + UTF-8).
+    const auto parseString = [](const QByteArray& raw) {
+        QString s = QString::fromUtf8(raw.constData(), raw.size());
+        while (s.endsWith(QChar(0)))
+            s.chop(1);
+        return s;
+    };
+
+    QSet<NAME> dirty;
+    const auto checkString = [&](NAME sub) {
+        if (!editedStrings.contains(sub) || !rawByName.contains(sub))
+            return;
+        const QVector<int>& idx = rawByName[sub];
+        if (parseString(rawSubRecords[idx.last()].data) != editedStrings.value(sub))
+            dirty.insert(sub);
+    };
+    checkString(NAME('FULL'));
+    checkString(NAME('MODL'));
+    checkString(NAME('MNAM'));
+    checkString(NAME('ICON'));
+    checkString(NAME('ICO2'));
+    if (dataComp && rawByName.contains(NAME('DATA')))
+    {
+        const QVector<int>& idx = rawByName[NAME('DATA')];
+        if (rawSubRecords[idx.last()].data != dataComp->data)
+            dirty.insert(NAME('DATA'));
+    }
+
+    const auto matchesRaw = [](const QByteArray& raw, const QByteArray& payload) {
+        if (raw == payload)
+            return true;
+        return raw.size() > payload.size() && raw.startsWith(payload)
+            && std::all_of(raw.constBegin() + payload.size(), raw.constEnd(),
+                            [](char c) { return c == '\0'; });
+    };
+
+    const auto writeEdited = [&esm, &editedStrings, dataComp](NAME sub) {
+        if (sub == NAME('DATA'))
+        {
+            esm.startSubRecord(sub);
+            const QByteArray payload = dataComp ? dataComp->data : QByteArray();
+            esm.writeRawData(payload.constData(), payload.size());
+            esm.endSubRecord();
+            return;
+        }
+        esm.writeSubZString(sub, editedStrings.value(sub));
+    };
+
+    QSet<NAME> substituted;
     for (int i = 0; i < loadOrder.size(); ++i)
     {
         const NAME sub = loadOrder[i];
         if (i == nameIndex)
         {
             const QByteArray payload = editorId.toLatin1();
-            const bool unchanged = nameRaw.size() >= payload.size()
-                && nameRaw.startsWith(payload)
-                && std::all_of(nameRaw.constBegin() + payload.size(), nameRaw.constEnd(),
-                               [](char c) { return c == '\0'; });
-            esm.startSubRecord(NAME('NAME'));
-            if (unchanged)
+            if (matchesRaw(nameRaw, payload))
             {
+                esm.startSubRecord(NAME('NAME'));
                 esm.writeRawData(nameRaw.constData(), nameRaw.size());
+                esm.endSubRecord();
             }
             else
             {
-                esm.writeRawData(payload.constData(), payload.size());
-                const char nul = '\0';
-                esm.writeRawData(&nul, 1);
+                esm.writeSubZString(NAME('NAME'), editorId);
             }
-            esm.endSubRecord();
             continue;
         }
         const QVector<int>& idx = rawByName[sub];
         int& cur = rawCursor[sub];
-        if (cur < idx.size())
-            esm.writeRawSubRecord(rawSubRecords[idx[cur++]]);
+        if (cur >= idx.size())
+            continue;
+        const bool isLastOccurrence = (cur == idx.size() - 1);
+        const RawSubRecord& raw = rawSubRecords[idx[cur++]];
+        if (dirty.contains(sub) && isLastOccurrence && !substituted.contains(sub))
+        {
+            substituted.insert(sub);
+            writeEdited(sub);
+        }
+        else
+        {
+            esm.writeRawSubRecord(raw);
+        }
     }
 
     if (nameIndex < 0 && !editorId.isEmpty())
         esm.writeSubZString(NAME('NAME'), editorId);
+
+    // Component values for subrecords the source lacked are appended in a
+    // fixed order; anything else replays verbatim as before.
+    static const NAME kAppended[] = {
+        NAME('FULL'), NAME('MODL'), NAME('MNAM'),
+        NAME('ICON'), NAME('ICO2'), NAME('DATA')
+    };
+    for (NAME sub : kAppended)
+    {
+        if (rawByName.contains(sub))
+            continue;
+        const QByteArray payload = (sub == NAME('DATA') && dataComp)
+            ? dataComp->data
+            : editedStrings.value(sub).toUtf8();
+        if (!payload.isEmpty())
+            writeEdited(sub);
+    }
 
     for (auto it = rawByName.constBegin(); it != rawByName.constEnd(); ++it)
     {

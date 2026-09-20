@@ -102,8 +102,8 @@ inline QVector<RecordSnapshot> collectRecordSnapshots(const QString& path)
         snap.formId = header.id;
         snap.flags = header.flags.val;
         if (trace)
-            fprintf(stderr, "openck-snap: %d %s 0x%x size %u pos %lld\n",
-                out.size(), snapshotName(name).toLatin1().constData(),
+            fprintf(stderr, "openck-snap: %lld %s 0x%x size %u pos %lld\n",
+                static_cast<long long>(out.size()), snapshotName(name).toLatin1().constData(),
                 header.id, header.size,
                 static_cast<long long>(reader.filePos()));
         snap.size = header.size;

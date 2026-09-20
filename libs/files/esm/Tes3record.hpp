@@ -35,7 +35,8 @@ inline bool operator==(const Tes3Record& l, const Tes3Record& r)
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.unknownHeader == r.unknownHeader && l.nameIndex == r.nameIndex
         && l.nameRaw == r.nameRaw
-        && l.rawSubRecords == r.rawSubRecords && l.loadOrder == r.loadOrder;
+        && l.rawSubRecords == r.rawSubRecords && l.loadOrder == r.loadOrder
+        && l.components == r.components;
 }
 
 inline bool operator!=(const Tes3Record& l, const Tes3Record& r)

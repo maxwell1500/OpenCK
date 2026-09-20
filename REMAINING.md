@@ -825,6 +825,34 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      editor is generic hex), edit-through-component write-back wired into the
      UndoStack, and specialised editors for Morrowind record families.
 
+     **Status 2026-09-20 (component write-back — Phase 2c core):** done.
+     - `Tes3Record::operator==` now includes `components` (was raw-only), so
+       `EditRecordCommand::hasChanged()` detects form-dialog edits; the
+       component `clone()`/`copyFrom()`/`isEqualTo()` set was already
+       complete, so push→undo→redo works through the standard UndoStack.
+     - `Tes3Record::save()` emits component values for FULL/MODL/MNAM/ICON/
+       ICO2/DATA at their load-ordered positions when they differ from the
+       parse of the last raw occurrence, and appends component values for
+       subrecords the source lacked (fixed FULL…DATA order). Untouched
+       records replay raws verbatim and stay byte-identical. The
+       last-occurrence rule matters: parse is last-wins for duplicates and
+       lossy for non-UTF8 bytes, so byte comparison flagged untouched
+       records as edited (+27 KB drift on the full master, caught by the
+       byte-identical test). NAME edits now go through `writeSubZString`
+       (NUL-less in TES3 mode) instead of appending a stray NUL.
+     - `testSyntheticComponentWriteBack` (always runs, no fixture): synthetic
+       Morrowind.esp with two CLOTs — untouched save byte-identical;
+       FULL+DATA edit survives save/reload at original positions with MODL
+       intact; undo→save→reload restores the original bytes exactly;
+       redo re-applies; MODL added to a MODL-less record is appended.
+     Full Morrowind.esm round-trip still byte-identical (48,295 records);
+     suite 130/130, zero-warning build (also fixed a pre-existing C4477
+     `%d`→`%lld` in `subrecordsnapshot.hpp` that kept the gate red),
+     lint clean.
+     Remaining (Phase 2c rest): type-specific DATA parsing (generic hex
+     editor stays until then) and specialised Morrowind record-family
+     editors.
+
 ---
 
 ## 4. Test infrastructure
