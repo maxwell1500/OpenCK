@@ -853,6 +853,39 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      editor stays until then) and specialised Morrowind record-family
      editors.
 
+     **Status 2026-09-20 (type-specific DATA parsing):** done for every
+     DATA group with a survey-proven layout.
+     - `libs/files/esm/tes3datalayout.*` (openck_esm): data-driven
+       (code, size) → field table + LE decode/encode (floats via memcpy):
+       DIAL/1 dialogType; INFO/12 dialogType + disposition + flags + rank
+       + gender + pcRank; CELL/12 flags + gridX/Y; CELL/24 placed-ref
+       pos/rot floats; LAND/LEVC/LEVI u32 flags; SNDG type; SOUN
+       volume/minRange/maxRange; LTEX NUL-terminated texture path.
+     - Layouts grounded in `test_tes3data` diagnostics against the real
+       master: size histogram, per-lane ranges, INFO byte-0 == parent DIAL
+       type 23,693/23,693, CELL FRMR↔24-byte-DATA pairing 2,538/2,538,
+       INFO value sets (disposition ≤100 + journal indices, gender
+       {0,1,255}, ranks 0-9/255). PGRD/12 deliberately undecoded (lane 3
+       is not a point count; counts shadowing siblings are unsafe to
+       expose) — pinned by test to stay on hex.
+     - `Tes3Data_Component` decodes the mirrored occurrence into typed
+       fields with per-field editor properties (plus a committing hex
+       view); field edits re-encode into the raw bytes, so save/undo/hex
+       follow. The component is occurrence-explicit (`recordCode` +
+       `dataOccurrence`): multi-DATA CELLs expose the header occurrence,
+       transforms stay raw. `Tes3Record::save` substitutes at that
+       occurrence.
+     - Tests: `testLayoutConformance` decodes + re-encodes all 347,143
+       covered DATAs byte-exact (0 failures; only PGRD uncovered);
+       `testSyntheticTypedDataEdit` (always runs): typed decode, property
+       edit + u8 clamping, untouched-identical, undoable disposition/grid
+       edits round-tripping positionally.
+     Full Morrowind.esm round-trip still byte-identical; suite 131/131,
+     zero-warning build, lint clean.
+     Remaining (Phase 2c rest): specialised Morrowind record-family
+     editors (the generic QtFormDialog path already opens every TES3
+     record with the typed DATA fields).
+
 ---
 
 ## 4. Test infrastructure

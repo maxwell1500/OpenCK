@@ -740,6 +740,13 @@ target_link_libraries(test_tes3roundtrip PRIVATE openck_model test_stubs Qt6::Te
 target_include_directories(test_tes3roundtrip PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_tes3roundtrip)
 
+# TES3 DATA-subrecord layout survey + typed-layout conformance (real
+# Morrowind.esm when present; synthetic edit round-trip always runs).
+add_executable(test_tes3data test_tes3data.cpp)
+target_link_libraries(test_tes3data PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_tes3data PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_tes3data)
+
 # PACK record with typed CTDA conditions
 add_executable(test_packagerecord test_packagerecord.cpp)
 target_link_libraries(test_packagerecord PRIVATE openck_esm test_stubs Qt6::Test)
@@ -930,5 +937,5 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_fullscale_roundtrip
     test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
-    test_tes3 test_tes3roundtrip test_thememanager test_tier3_components test_undostack test_warningsdock
+    test_tes3 test_tes3roundtrip test_tes3data test_thememanager test_tier3_components test_undostack test_warningsdock
     test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)

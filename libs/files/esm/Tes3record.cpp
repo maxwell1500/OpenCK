@@ -29,7 +29,24 @@ void Tes3Record::parseComponents()
     components.add<tescomponents::TESTexture_Component>();
     components.add<tescomponents::Tes3Data_Component>();
 
+    // DATA occurrences: the typed component mirrors the first occurrence
+    // with a proven layout (e.g. the CELL header, not a nested ref
+    // transform); records without one keep last-wins like before.
+    int dataTarget = -1;
+    int dataSeen = -1;
+    for (const auto& raw : rawSubRecords)
+    {
+        if (raw.name != NAME('DATA'))
+            continue;
+        ++dataSeen;
+        if (dataTarget < 0 && tes3DataLayoutFor(code, raw.data.size()))
+            dataTarget = dataSeen;
+    }
+    if (dataTarget < 0)
+        dataTarget = dataSeen;
+
     // Parse subrecords into components for display/editing
+    int dataOccurrence = -1;
     for (const auto& raw : rawSubRecords)
     {
         if (raw.name == NAME('NAME'))
@@ -84,7 +101,12 @@ void Tes3Record::parseComponents()
             components.findByName(QStringLiteral("Tes3Data")));
         if (raw.name == NAME('DATA') && data)
         {
+            ++dataOccurrence;
+            if (dataOccurrence != dataTarget)
+                continue;
             data->data = raw.data;
+            data->dataOccurrence = dataTarget;
+            data->decode(code, raw.data);
             continue;
         }
     }
@@ -184,11 +206,18 @@ void Tes3Record::save(ESMWriter& esm) const
     checkString(NAME('MNAM'));
     checkString(NAME('ICON'));
     checkString(NAME('ICO2'));
+
+    // DATA substitutes at its mirrored occurrence (usually the last; the
+    // CELL header for multi-DATA CELLs), not blindly at the last raw.
+    int dataTargetPos = -1;
+    bool dataDirty = false;
     if (dataComp && rawByName.contains(NAME('DATA')))
     {
-        const QVector<int>& idx = rawByName[NAME('DATA')];
-        if (rawSubRecords[idx.last()].data != dataComp->data)
-            dirty.insert(NAME('DATA'));
+        const QVector<int>& didx = rawByName[NAME('DATA')];
+        dataTargetPos = (dataComp->dataOccurrence >= 0 && dataComp->dataOccurrence < didx.size())
+            ? dataComp->dataOccurrence
+            : didx.size() - 1;
+        dataDirty = rawSubRecords[didx[dataTargetPos]].data != dataComp->data;
     }
 
     const auto matchesRaw = [](const QByteArray& raw, const QByteArray& payload) {
@@ -234,9 +263,15 @@ void Tes3Record::save(ESMWriter& esm) const
         int& cur = rawCursor[sub];
         if (cur >= idx.size())
             continue;
-        const bool isLastOccurrence = (cur == idx.size() - 1);
+        const int occurrencePos = cur;
         const RawSubRecord& raw = rawSubRecords[idx[cur++]];
-        if (dirty.contains(sub) && isLastOccurrence && !substituted.contains(sub))
+        const bool isLastOccurrence = (occurrencePos == idx.size() - 1);
+        bool substitute = false;
+        if (sub == NAME('DATA'))
+            substitute = dataDirty && occurrencePos == dataTargetPos;
+        else
+            substitute = dirty.contains(sub) && isLastOccurrence;
+        if (substitute && !substituted.contains(sub))
         {
             substituted.insert(sub);
             writeEdited(sub);

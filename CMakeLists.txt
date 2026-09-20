@@ -63,6 +63,7 @@ set(ESM_SOURCES
     libs/files/esm/esmreader.cpp
     libs/files/esm/esmwriter.cpp
     libs/files/esm/Tes3record.cpp
+    libs/files/esm/tes3datalayout.cpp
     libs/files/esm/glob.cpp
     libs/files/esm/gmst.cpp
     libs/files/esm/lcrt.cpp

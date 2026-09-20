@@ -47,6 +47,7 @@ private slots:
     void testLoadAndSaveByteIdentical();
     void testPerTypeCounts();
     void testSyntheticComponentWriteBack();
+    void testSyntheticTypedDataEdit();
 
     static bool saveDataTo(Data& data, const QString& path);
     static bool loadDataFrom(Data& data, const QString& fileName);
@@ -404,6 +405,178 @@ void TestTes3RoundTrip::testSyntheticComponentWriteBack()
     QCOMPARE(tes3FullName(appendedColl->getRecord(0).get()), QStringLiteral("Edited Shirt"));
 
     qDebug() << "synthetic TES3 component write-back OK";
+}
+
+// Typed DATA layouts (tes3datalayout.*) decode on load, edit through the
+// UndoStack, and survive save/reload; unknown layouts stay hex-only.
+void TestTes3RoundTrip::testSyntheticTypedDataEdit()
+{
+    QTemporaryDir srcDir;
+    QVERIFY(srcDir.isValid());
+    const QString fileName = QStringLiteral("Morrowind.esp");
+    const QString srcPath = srcDir.filePath(fileName);
+    const QByteArray infoData("\x04\x00\x00\x00\x32\x00\x00\x00\x01\x00\x00\x00", 12);
+    const QByteArray cellData("\x02\x00\x00\x00\x07\x00\x00\x00\x03\x00\x00\x00", 12);
+    const QByteArray clotData("\xaa\xbb\xcc\xdd\xee\xff", 6);
+
+    {
+        QFile out(srcPath);
+        QVERIFY(out.open(QIODevice::WriteOnly));
+        ESMWriter writer;
+        writer.setTes3(true);
+        writer.setAuthor("Synthetic TES3 Test");
+        writer.setDescription("typed DATA fixture");
+        writer.save(out);
+
+        RecHeader h;
+        writer.startRecord(NAME('DIAL'), h);
+        writer.writeSubZString(NAME('NAME'), QStringLiteral("synth_topic"));
+        writer.startSubRecord(NAME('DATA'));
+        const char dialType = '\x04';
+        writer.writeRawData(&dialType, 1);
+        writer.endSubRecord();
+        writer.endRecord();
+
+        writer.startRecord(NAME('INFO'), h);
+        writer.writeSubZString(NAME('NAME'), QStringLiteral("synth_info"));
+        writer.startSubRecord(NAME('DATA'));
+        writer.writeRawData(infoData.constData(), infoData.size());
+        writer.endSubRecord();
+        writer.endRecord();
+
+        writer.startRecord(NAME('CELL'), h);
+        writer.writeSubZString(NAME('NAME'), QStringLiteral("synth_cell"));
+        writer.startSubRecord(NAME('DATA'));
+        writer.writeRawData(cellData.constData(), cellData.size());
+        writer.endSubRecord();
+        writer.endRecord();
+
+        writer.startRecord(NAME('CLOT'), h);
+        writer.writeSubZString(NAME('NAME'), QStringLiteral("synth_clot"));
+        writer.startSubRecord(NAME('DATA'));
+        writer.writeRawData(clotData.constData(), clotData.size());
+        writer.endSubRecord();
+        writer.endRecord();
+
+        writer.close();
+        out.close();
+    }
+    const QByteArray original = slurp(srcPath);
+    QVERIFY(!original.isEmpty());
+
+    const auto tes3DataOf = [](Tes3Record& rec) -> tescomponents::Tes3Data_Component* {
+        return static_cast<tescomponents::Tes3Data_Component*>(
+            rec.components.findByName(QStringLiteral("Tes3Data")));
+    };
+
+    FilePaths paths;
+    paths.dataDir.setPath(srcDir.path());
+    Data data(QStringList{ fileName }, paths);
+    QVERIFY(loadDataFrom(data, fileName));
+
+    auto* dialColl = dynamic_cast<IdCollection<Tes3Record>*>(
+        data.getCollectionByType(CkId::Type_Dial_));
+    auto* infoColl = dynamic_cast<IdCollection<Tes3Record>*>(
+        data.getCollectionByType(CkId::Type_Info_));
+    auto* cellColl = dynamic_cast<IdCollection<Tes3Record>*>(
+        data.getCollectionByType(CkId::Type_Cel_));
+    auto* clotColl = dynamic_cast<IdCollection<Tes3Record>*>(
+        data.getCollectionByType(CkId::Type_Clot_));
+    QVERIFY(dialColl && infoColl && cellColl && clotColl);
+    QCOMPARE(dialColl->size(), 1);
+    QCOMPARE(infoColl->size(), 1);
+    QCOMPARE(cellColl->size(), 1);
+    QCOMPARE(clotColl->size(), 1);
+
+    tescomponents::Tes3Data_Component* dialData = tes3DataOf(dialColl->getRecord(0).get());
+    tescomponents::Tes3Data_Component* infoDataComp = tes3DataOf(infoColl->getRecord(0).get());
+    tescomponents::Tes3Data_Component* cellDataComp = tes3DataOf(cellColl->getRecord(0).get());
+    tescomponents::Tes3Data_Component* clotDataComp = tes3DataOf(clotColl->getRecord(0).get());
+    QVERIFY(dialData && infoDataComp && cellDataComp && clotDataComp);
+
+    QVERIFY(dialData->typedValid);
+    QCOMPARE(dialData->typedFields.size(), 1);
+    QCOMPARE(dialData->typedFields[0].name, QStringLiteral("dialogType"));
+    QCOMPARE(dialData->typedFields[0].value.toUInt(), 4u);
+
+    QVERIFY(infoDataComp->typedValid);
+    QCOMPARE(infoDataComp->typedFields.size(), 6);
+    QCOMPARE(infoDataComp->typedFields[1].name, QStringLiteral("disposition"));
+    QCOMPARE(infoDataComp->typedFields[1].value.toUInt(), 50u);
+
+    QVERIFY(cellDataComp->typedValid);
+    QCOMPARE(cellDataComp->typedFields[1].name, QStringLiteral("gridX"));
+    QCOMPARE(cellDataComp->typedFields[1].value.toInt(), 7);
+
+    QVERIFY(!clotDataComp->typedValid);
+    QCOMPARE(clotDataComp->toHex(), QStringLiteral("AABBCCDDEEFF"));
+
+    // Typed properties: 6 fields + hex view; edits go through setValue.
+    {
+        auto props = infoDataComp->createEditorProperties();
+        QCOMPARE(int(props.size()), 7);
+        QCOMPARE(props[1]->name(), QStringLiteral("disposition"));
+        props[1]->setValue(QVariant(75u));
+        QCOMPARE(infoDataComp->typedFields[1].value.toUInt(), 75u);
+        // Back to the loaded value; the undoable edit below re-applies it.
+        props[1]->setValue(QVariant(50u));
+        // Unsigned widths clamp instead of overflowing the payload.
+        props[1]->setValue(QVariant(999u));
+        QCOMPARE(infoDataComp->typedFields[1].value.toUInt(), 255u);
+        props[1]->setValue(QVariant(50u));
+    }
+
+    QTemporaryDir untouchedDir;
+    QVERIFY(untouchedDir.isValid());
+    QVERIFY(saveDataTo(data, untouchedDir.filePath("untouched.esp")));
+    QCOMPARE(slurp(untouchedDir.filePath("untouched.esp")), original);
+
+    // Undoable typed edits on INFO disposition + CELL gridX.
+    UndoStack* stack = data.getUndoStack();
+    QVERIFY(stack != nullptr);
+    {
+        Tes3Record infoOriginal = infoColl->getRecord(0).get();
+        Tes3Record infoModified = infoOriginal;
+        QVERIFY(tes3DataOf(infoModified)->setTypedValue(1, QVariant(75u)));
+        EditRecordCommand<Tes3Record> probe(infoColl, 0, infoOriginal, infoModified);
+        QVERIFY(probe.hasChanged());
+        stack->push(new EditRecordCommand<Tes3Record>(infoColl, 0, infoOriginal, infoModified,
+                                                      "Edit INFO disposition"));
+    }
+    {
+        Tes3Record cellOriginal = cellColl->getRecord(0).get();
+        Tes3Record cellModified = cellOriginal;
+        QVERIFY(tes3DataOf(cellModified)->setTypedValue(1, QVariant(8)));
+        stack->push(new EditRecordCommand<Tes3Record>(cellColl, 0, cellOriginal, cellModified,
+                                                      "Edit CELL gridX"));
+    }
+
+    QTemporaryDir editedDir;
+    QVERIFY(editedDir.isValid());
+    const QString editedPath = editedDir.filePath(fileName);
+    QVERIFY(saveDataTo(data, editedPath));
+
+    FilePaths editedPaths;
+    editedPaths.dataDir.setPath(editedDir.path());
+    Data reloaded(QStringList{ fileName }, editedPaths);
+    QVERIFY(loadDataFrom(reloaded, fileName));
+    auto* reloadedInfo = dynamic_cast<IdCollection<Tes3Record>*>(
+        reloaded.getCollectionByType(CkId::Type_Info_));
+    auto* reloadedCell = dynamic_cast<IdCollection<Tes3Record>*>(
+        reloaded.getCollectionByType(CkId::Type_Cel_));
+    QVERIFY(reloadedInfo && reloadedCell);
+    QCOMPARE(tes3DataOf(reloadedInfo->getRecord(0).get())->typedFields[1].value.toUInt(), 75u);
+    QCOMPARE(tes3DataOf(reloadedInfo->getRecord(0).get())->typedFields[3].value.toUInt(), 1u);
+    QCOMPARE(tes3DataOf(reloadedCell->getRecord(0).get())->typedFields[1].value.toInt(), 8);
+    QCOMPARE(reloadedInfo->getRecord(0).get().loadOrder,
+             QVector<NAME>({ NAME('NAME'), NAME('DATA') }));
+
+    stack->undo();
+    stack->undo();
+    QCOMPARE(tes3DataOf(infoColl->getRecord(0).get())->typedFields[1].value.toUInt(), 50u);
+    QCOMPARE(tes3DataOf(cellColl->getRecord(0).get())->typedFields[1].value.toInt(), 7);
+
+    qDebug() << "synthetic TES3 typed DATA edit OK";
 }
 
 QTEST_MAIN(TestTes3RoundTrip)
