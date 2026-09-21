@@ -945,3 +945,11 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
     test_tes3 test_tes3roundtrip test_tes3data test_structuredfidelity test_thememanager test_tier3_components test_undostack test_warningsdock
     test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)
+
+# Vendored libogg self-tests are registered with CTest (external/ogg) but the
+# subdirectory is EXCLUDE_FROM_ALL, so nothing built them: CTest reported them
+# "Not Run" on a clean CI build. Pull them into all_tests so a test build
+# produces the executables CTest looks for.
+if(TARGET test_bitwise)
+    add_dependencies(all_tests test_bitwise test_framing)
+endif()
