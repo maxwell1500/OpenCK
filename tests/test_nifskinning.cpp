@@ -423,10 +423,9 @@ void TestNifSkinning::testSyntheticWalkClean()
 {
     // Replicates the loader's block walk over a synthetic file: every
     // framing must land and every parse() must consume exactly its body.
-    QTemporaryFile file(QStringLiteral("XXXXXX.nif"));
-    QVERIFY(file.open());
-    const QString path = file.fileName();
-    file.close();
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.filePath(QStringLiteral("synthetic.nif"));
     writeTestSkinnedFile(path);
 
     QFile in(path);
@@ -477,7 +476,6 @@ void TestNifSkinning::testSyntheticWalkClean()
         QCOMPARE(consumed, bodySizes[b]);
     }
     QCOMPARE(in.pos(), in.size());
-    QFile::remove(path);
 }
 
 void TestNifSkinning::testPlaybackComposition()
@@ -799,11 +797,9 @@ void TestNifSkinning::testFaceSkinBlocks()
 
 void TestNifSkinning::testSyntheticSkinnedFileLoad()
 {
-    QTemporaryFile file(QStringLiteral("XXXXXX.nif"));
-    QVERIFY(file.open());
-    const QString path = file.fileName();
-    file.setAutoRemove(false);
-    file.close();
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.filePath(QStringLiteral("skinned.nif"));
     writeTestSkinnedFile(path);
 
     Nif::NifParser parser;
@@ -834,7 +830,6 @@ void TestNifSkinning::testSyntheticSkinnedFileLoad()
     const Nif::Node* bone = findNamedChild(root, QStringLiteral("Bone01"));
     QVERIFY(bone != nullptr);
     QCOMPARE(shape.skinBones[0].boneNode, bone);
-    QFile::remove(path);
 }
 
 QTEST_MAIN(TestNifSkinning)
