@@ -7,7 +7,10 @@
 #include <QQuaternion>
 #include <QTemporaryFile>
 #include <QTemporaryDir>
+#include <QSet>
+#include <functional>
 #include <cmath>
+#include <cstring>
 
 #include "../../libs/files/nif/nifparser.hpp"
 #include "../../libs/files/nif/nifskinning.hpp"
@@ -39,6 +42,9 @@ private slots:
     void testRealNifSurvey();
     void testExternalMeshData();
     void testFaceSkinBlocks();
+    void testSkeletonLink();
+    void testGpuSkinPacking();
+    void testGpuSkinMatchesCpu();
     void testSyntheticSkinnedFileLoad();
 };
 
@@ -793,6 +799,259 @@ void TestNifSkinning::testFaceSkinBlocks()
         QVERIFY(qAbs(outNrm[i].y() - head->normals[i].y) < 1e-4f);
         QVERIFY(qAbs(outNrm[i].z() - head->normals[i].z) < 1e-4f);
     }
+}
+
+void TestNifSkinning::testSkeletonLink()
+{
+    const QString dataDir =
+        qEnvironmentVariable("OPENCK_DATA_DIR",
+                             QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
+    const QString archivePath = dataDir + QStringLiteral("/Starfield - Meshes01.ba2");
+    if (!QFileInfo::exists(archivePath))
+        QSKIP("No Meshes01.ba2; set OPENCK_DATA_DIR");
+
+    auto extractEntry = [&](Ba2Archive& ba2, const QString& wanted, const QString& dest) -> bool {
+        int found = -1;
+        for (quint32 i = 0; i < ba2.fileCount(); ++i)
+            if (ba2.entries().at(i).relativePath == wanted) { found = static_cast<int>(i); break; }
+        return found >= 0 && ba2.extract(static_cast<quint32>(found), dest);
+    };
+
+    Ba2Archive faceBa2;
+    QVERIFY2(faceBa2.open(dataDir + QStringLiteral("/Starfield - FaceMeshes.ba2")), "FaceMeshes");
+    Ba2Archive meshBa2;
+    QVERIFY2(meshBa2.open(archivePath), "Meshes01");
+
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString faceNif = tmp.filePath(QStringLiteral("face.nif"));
+    QVERIFY(extractEntry(faceBa2,
+        QStringLiteral("meshes/actors/character/facegendata/facegeom/starfield.esm/000124ac.nif"),
+        faceNif));
+    const QString skelNif = tmp.filePath(QStringLiteral("skel.nif"));
+    QVERIFY(extractEntry(meshBa2,
+        QStringLiteral("meshes/actors/human/characterassets/female/skeleton_facebones.nif"),
+        skelNif));
+
+    // §8.3 skeleton resolution: load the face NIF with its skeleton and
+    // prove every BSSkin bone resolves to a real skeleton node, that the
+    // captured bind pose blends to rest, and that moving one bone deforms
+    // exactly the vertices weighted to it (and its subtree).
+    Nif::NifParser parser;
+    QVERIFY2(parser.load(faceNif, skelNif), "Face NIF + skeleton did not load");
+    const Nif::TriShape* head = nullptr;
+    QStack<const Nif::Node*> stack;
+    stack.push(parser.getRoot());
+    while (!stack.isEmpty()) {
+        const Nif::Node* n = stack.pop();
+        for (const Nif::TriShape& sh : n->shapes)
+            if (sh.name == QStringLiteral("Human_Female_Head")) head = &sh;
+        for (const Nif::Node* c : n->children) stack.push(c);
+    }
+    QVERIFY(head != nullptr);
+    QCOMPARE(head->skinBones.size(), 50);
+    for (const Nif::SkinBone& b : head->skinBones)
+        QVERIFY2(b.boneNode != nullptr, qPrintable(b.boneName));
+
+    // Rest-pose world transforms for the merged face+skeleton tree.
+    QMap<const Nif::Node*, QMatrix4x4> world;
+    QMap<const Nif::Node*, const Nif::Node*> parent;
+    std::function<void(const Nif::Node*, const QMatrix4x4&, const Nif::Node*)> walk =
+        [&](const Nif::Node* n, const QMatrix4x4& p, const Nif::Node* par) {
+            if (!n) return;
+            QMatrix4x4 local;
+            local.translate(n->position.x, n->position.y, n->position.z);
+            local.rotate(n->rotation.z * 180.0f / 3.14159265f, 0, 0, 1);
+            local.rotate(n->rotation.y * 180.0f / 3.14159265f, 0, 1, 0);
+            local.rotate(n->rotation.x * 180.0f / 3.14159265f, 1, 0, 0);
+            const QMatrix4x4 w = p * local;
+            world.insert(n, w);
+            parent.insert(n, par);
+            for (const Nif::Node* c : n->children) walk(c, w, n);
+        };
+    walk(parser.getRoot(), QMatrix4x4(), nullptr);
+
+    // Bind inverse per bone; identity palettes at rest.
+    const int nb = head->skinBones.size();
+    QVector<QMatrix4x4> bindInv(nb);
+    for (int b = 0; b < nb; ++b) {
+        bool ok = false;
+        bindInv[b] = world.value(head->skinBones[b].boneNode).inverted(&ok);
+        QVERIFY(ok);
+    }
+
+    const int vc = head->vertices.size();
+    QVector<float> restPos(vc * 3), restNrm(vc * 3);
+    for (int i = 0; i < vc; ++i) {
+        restPos[i * 3 + 0] = head->vertices[i].x;
+        restPos[i * 3 + 1] = head->vertices[i].y;
+        restPos[i * 3 + 2] = head->vertices[i].z;
+        restNrm[i * 3 + 0] = head->normals[i].x;
+        restNrm[i * 3 + 1] = head->normals[i].y;
+        restNrm[i * 3 + 2] = head->normals[i].z;
+    }
+
+    auto blendWith = [&](const QMap<const Nif::Node*, QMatrix4x4>& w,
+                         QVector<QVector3D>& outPos, QVector<QVector3D>& outNrm) {
+        QVector<float> pal(nb * 16, 0.0f), npal(nb * 9, 0.0f);
+        for (int b = 0; b < nb; ++b) {
+            const QMatrix4x4 pal4 = w.value(head->skinBones[b].boneNode) * bindInv[b];
+            const float* cm = pal4.constData();
+            float* rm = pal.data() + b * 16;
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j) rm[i * 4 + j] = cm[j * 4 + i];
+            const QMatrix3x3 nm = pal4.normalMatrix();
+            const float* ncm = nm.constData();
+            float* nrm = npal.data() + b * 9;
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j) nrm[i * 3 + j] = ncm[j * 3 + i];
+        }
+        Nif::blendSkinnedLocal(
+            restPos.constData(), restNrm.constData(), vc,
+            reinterpret_cast<const float(*)[16]>(pal.constData()),
+            reinterpret_cast<const float(*)[9]>(npal.constData()),
+            nb, head->skinWeights.constData(), head->skinWeights.size(),
+            reinterpret_cast<float*>(outPos.data()), reinterpret_cast<float*>(outNrm.data()));
+    };
+
+    QVector<QVector3D> pos0(vc), nrm0(vc);
+    blendWith(world, pos0, nrm0);
+    for (int i = 0; i < vc; ++i) {
+        QVERIFY(qAbs(pos0[i].x() - head->vertices[i].x) < 1e-4f);
+        QVERIFY(qAbs(pos0[i].y() - head->vertices[i].y) < 1e-4f);
+        QVERIFY(qAbs(pos0[i].z() - head->vertices[i].z) < 1e-4f);
+    }
+
+    // Perturb the bone with the most weighted vertices, then check only the
+    // vertices weighted to it or its subtree move.
+    QVector<int> weightCount(nb, 0);
+    for (const Nif::SkinVertexWeight& w : head->skinWeights)
+        weightCount[w.bone] += 1;
+    int bone = 0;
+    for (int b = 0; b < nb; ++b)
+        if (weightCount[b] > weightCount[bone]) bone = b;
+    const Nif::Node* boneNode = head->skinBones[bone].boneNode;
+    QVERIFY(boneNode != nullptr);
+
+    QSet<const Nif::Node*> subtree;
+    std::function<void(const Nif::Node*)> collectSubtree = [&](const Nif::Node* n) {
+        subtree.insert(n);
+        for (const Nif::Node* c : n->children) collectSubtree(c);
+    };
+    collectSubtree(boneNode);
+
+    // Which head bones live in that subtree (by index).
+    QSet<int> affectedBones;
+    for (int b = 0; b < nb; ++b)
+        if (subtree.contains(head->skinBones[b].boneNode)) affectedBones.insert(b);
+
+    const_cast<Nif::Node*>(boneNode)->position.y += 0.25f;
+    walk(parser.getRoot(), QMatrix4x4(), nullptr);   // rebuild world in place
+
+    QVector<QVector3D> pos1(vc), nrm1(vc);
+    blendWith(world, pos1, nrm1);
+
+    QVector<char> affected(vc, 0);
+    for (const Nif::SkinVertexWeight& w : head->skinWeights)
+        if (affectedBones.contains(static_cast<int>(w.bone)))
+            affected[static_cast<int>(w.vertex)] = 1;
+
+    int affectedVerts = 0, movedVerts = 0;
+    for (int i = 0; i < vc; ++i) {
+        const float d = (pos1[i] - pos0[i]).length();
+        if (affected[i]) {
+            ++affectedVerts;
+            if (d > 1e-3f) ++movedVerts;
+        } else {
+            QVERIFY2(d < 1e-4f, "vertex outside the perturbed subtree moved");
+        }
+    }
+    QVERIFY(affectedVerts > 0);
+    QCOMPARE(movedVerts, affectedVerts);
+}
+
+void TestNifSkinning::testGpuSkinPacking()
+{
+    using Nif::SkinVertexWeight;
+    QVector<SkinVertexWeight> w;
+    w.append({0, 3, 1.0f});          // v0 single
+    w.append({1, 5, 0.25f});         // v1 two-bone, not normalized
+    w.append({1, 7, 0.75f});
+    w.append({2, 0, 0.0f});          // v2 zero weight -> ignored
+    w.append({1, 99, 0.5f});         // out-of-range bone -> ignored
+    w.append({5, 1, 1.0f});          // out-of-range vertex -> ignored
+
+    QVector<Nif::GpuSkinInfluence> out;
+    Nif::packGpuSkinInfluences(3, w.constData(), w.size(), 8, out);
+    QCOMPARE(out.size(), 3);
+
+    QCOMPARE(out[0].indices[0], 3.0f);
+    QCOMPARE(out[0].weights[0], 1.0f);
+    QCOMPARE(out[0].weights[1], 0.0f);
+
+    QCOMPARE(out[1].indices[0], 5.0f);
+    QCOMPARE(out[1].indices[1], 7.0f);
+    QVERIFY(qAbs(out[1].weights[0] - 0.25f) < 1e-6f);
+    QVERIFY(qAbs(out[1].weights[1] - 0.75f) < 1e-6f);
+
+    for (int k = 0; k < 8; ++k) {
+        QCOMPARE(out[2].indices[k], 0.0f);
+        QCOMPARE(out[2].weights[k], 0.0f);
+    }
+
+    // >8 influences: keep the first 8, normalize.
+    QVector<SkinVertexWeight> many;
+    for (int i = 0; i < 9; ++i) many.append({0, static_cast<quint32>(i), 1.0f});
+    Nif::packGpuSkinInfluences(1, many.constData(), many.size(), 16, out);
+    QCOMPARE(out.size(), 1);
+    float sum = 0.0f;
+    for (int k = 0; k < 8; ++k) sum += out[0].weights[k];
+    QVERIFY(qAbs(sum - 1.0f) < 1e-6f);
+    QCOMPARE(out[0].indices[7], 7.0f);
+}
+
+void TestNifSkinning::testGpuSkinMatchesCpu()
+{
+    // The GPU path transforms a vertex by sum_b w_b * palette_b (weights
+    // normalized first). Verify that equals the shared CPU blend for the
+    // same palettes and weights.
+    float palArr[2][16];
+    float nrmArr[2][9];
+    memset(palArr, 0, sizeof(palArr));
+    memset(nrmArr, 0, sizeof(nrmArr));
+    // p0: identity + translate x=1; p1: identity + translate y=0.7.
+    palArr[0][0] = palArr[0][5] = palArr[0][10] = palArr[0][15] = 1.0f;
+    palArr[0][3] = 1.0f;
+    palArr[1][0] = palArr[1][5] = palArr[1][10] = palArr[1][15] = 1.0f;
+    palArr[1][7] = 0.7f;
+    nrmArr[0][0] = nrmArr[0][4] = nrmArr[0][8] = 1.0f;
+    nrmArr[1][0] = nrmArr[1][4] = nrmArr[1][8] = 1.0f;
+
+    const float restPos[3] = {0.0f, 0.0f, 0.0f};
+    const float restNrm[3] = {0.0f, 0.0f, 1.0f};
+    Nif::SkinVertexWeight w[2] = {{0, 0, 0.4f}, {0, 1, 0.6f}};
+
+    float cpuPos[3], cpuNrm[3];
+    Nif::blendSkinnedLocal(restPos, restNrm, 1, palArr, nrmArr, 2, w, 2, cpuPos, cpuNrm);
+
+    QVector<Nif::GpuSkinInfluence> influences;
+    Nif::packGpuSkinInfluences(1, w, 2, 2, influences);
+    const Nif::GpuSkinInfluence& inf = influences[0];
+    float gpuPos[3] = {0.0f, 0.0f, 0.0f};
+    for (int k = 0; k < 8; ++k) {
+        if (inf.weights[k] <= 0.0f) continue;
+        const int b = static_cast<int>(inf.indices[k]);
+        float tp[3];
+        Nif::transformPointRowMajor(palArr[b], restPos, tp);
+        gpuPos[0] += inf.weights[k] * tp[0];
+        gpuPos[1] += inf.weights[k] * tp[1];
+        gpuPos[2] += inf.weights[k] * tp[2];
+    }
+    QVERIFY(qAbs(cpuPos[0] - gpuPos[0]) < 1e-5f);
+    QVERIFY(qAbs(cpuPos[1] - gpuPos[1]) < 1e-5f);
+    QVERIFY(qAbs(cpuPos[2] - gpuPos[2]) < 1e-5f);
+    QVERIFY(qAbs(cpuPos[0] - 0.4f) < 1e-5f);
+    QVERIFY(qAbs(cpuPos[1] - 0.42f) < 1e-5f);
 }
 
 void TestNifSkinning::testSyntheticSkinnedFileLoad()

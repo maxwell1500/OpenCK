@@ -340,6 +340,16 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
         glWidget->update();
     });
 
+    auto* gpuSkinBtn = new QPushButton(tr("GPU Skin"));
+    gpuSkinBtn->setCheckable(true);
+    gpuSkinBtn->setChecked(gpuSkinning);
+    gpuSkinBtn->setObjectName("gpuSkinBtn");
+    gpuSkinBtn->setToolTip(tr("Deform skinned meshes in the vertex shader"));
+    toolbar->addWidget(gpuSkinBtn);
+    connect(gpuSkinBtn, &QPushButton::toggled, this, [this](bool checked) {
+        setGpuSkinningEnabled(checked);
+    });
+
     auto* gridBtn = new QPushButton(tr("Grid"));
     gridBtn->setCheckable(true);
     gridBtn->setObjectName("gridBtn");
@@ -859,10 +869,16 @@ void NifViewportWidget::setupShaders()
         layout(location = 1) in vec3 aNormal;
         layout(location = 2) in vec2 aTexCoord;
         layout(location = 3) in vec4 aColor;
+        layout(location = 4) in vec4 aBoneIndices0;
+        layout(location = 5) in vec4 aBoneWeights0;
+        layout(location = 6) in vec4 aBoneIndices1;
+        layout(location = 7) in vec4 aBoneWeights1;
 
         uniform mat4 mModel;
         uniform mat4 mView;
         uniform mat4 mProjection;
+        uniform bool uSkinned;
+        uniform mat4 uBones[128];
 
         out vec3 vNormal;
         out vec2 vTexCoord;
@@ -870,8 +886,19 @@ void NifViewportWidget::setupShaders()
 
         void main()
         {
-            gl_Position = mProjection * mView * mModel * vec4(aPosition, 1.0);
-            vNormal = aNormal;
+            vec4 position = vec4(aPosition, 1.0);
+            vec3 normal = aNormal;
+            if (uSkinned) {
+                mat4 skin = mat4(0.0);
+                for (int i = 0; i < 4; ++i) {
+                    skin += aBoneWeights0[i] * uBones[int(aBoneIndices0[i])];
+                    skin += aBoneWeights1[i] * uBones[int(aBoneIndices1[i])];
+                }
+                position = skin * position;
+                normal = mat3(skin) * aNormal;
+            }
+            gl_Position = mProjection * mView * mModel * position;
+            vNormal = normal;
             vTexCoord = aTexCoord;
             vColor = aColor;
         }
@@ -1020,6 +1047,8 @@ void NifViewportWidget::buildMesh()
         shapeSkinBones[s] = bones;
         shapeSkinWeights[s] = weights;
     }
+    shapeSkinPalettes.clear();
+    shapeSkinPalettes.resize(shapeSkinBones.size());
 
     meshBuilt = !vertices.isEmpty();
     restVertices = vertices;
@@ -1279,25 +1308,79 @@ void NifViewportWidget::renderMesh()
     shaderProgram->bind();
 
     if (m_meshDirty) {
-    QVector<float> interleaved;
-    interleaved.reserve(vertices.size() * 12);
+    // 28 floats/vertex: position(3) normal(3) uv(2) color(4) +
+    // boneIdx0(4) boneW0(4) boneIdx1(4) boneW1(4). Bone attributes are zero
+    // for rigid vertices (uSkinned is false, so they are ignored).
+    constexpr int kFloatsPerVertex = 28;
+    QVector<int> gpuShapeOfVertex(vertices.size(), -1);
+    if (gpuSkinning) {
+        for (int s = 0; s < shapeVertexRanges.size(); ++s) {
+            if (!gpuSkinnable(s)) continue;
+            const int off = shapeVertexRanges[s].first;
+            const int cnt = shapeVertexRanges[s].second;
+            for (int lv = 0; lv < cnt; ++lv) {
+                const int gi = off + lv;
+                if (gi >= 0 && gi < gpuShapeOfVertex.size())
+                    gpuShapeOfVertex[gi] = s;
+            }
+        }
+    }
+
+    QVector<float> interleaved(vertices.size() * kFloatsPerVertex, 0.0f);
     for (int i = 0; i < vertices.size(); ++i) {
-        const QVector3D& p = vertices[i];
-        const QVector3D& n = (i < normals.size()) ? normals[i] : QVector3D(0.0f, 1.0f, 0.0f);
+        const bool gpu = gpuShapeOfVertex[i] >= 0;
+        const QVector3D& p = (gpu && i < restVertices.size()) ? restVertices[i] : vertices[i];
+        const QVector3D& n = gpu
+            ? (i < restNormals.size() ? restNormals[i] : QVector3D(0.0f, 1.0f, 0.0f))
+            : (i < normals.size() ? normals[i] : QVector3D(0.0f, 1.0f, 0.0f));
         const QVector2D& t = (i < uvs.size()) ? uvs[i] : QVector2D(0.0f, 0.0f);
         const QColor& c = shapeBaseColors.value(i, QColor(255, 255, 255, 255));
-        interleaved << p.x() << p.y() << p.z();
-        interleaved << n.x() << n.y() << n.z();
-        interleaved << t.x() << t.y();
-        interleaved << static_cast<float>(c.redF()) << static_cast<float>(c.greenF())
-                    << static_cast<float>(c.blueF()) << static_cast<float>(c.alphaF());
+        float* d = interleaved.data() + static_cast<qint64>(i) * kFloatsPerVertex;
+        d[0] = p.x(); d[1] = p.y(); d[2] = p.z();
+        d[3] = n.x(); d[4] = n.y(); d[5] = n.z();
+        d[6] = t.x(); d[7] = t.y();
+        d[8] = static_cast<float>(c.redF());
+        d[9] = static_cast<float>(c.greenF());
+        d[10] = static_cast<float>(c.blueF());
+        d[11] = static_cast<float>(c.alphaF());
+    }
+
+    // Pack up to 8 normalized bone influences per GPU-skinned vertex.
+    for (int s = 0; s < shapeVertexRanges.size(); ++s) {
+        if (!gpuSkinning || !gpuSkinnable(s)) continue;
+        const int off = shapeVertexRanges[s].first;
+        const int cnt = shapeVertexRanges[s].second;
+        QVector<Nif::SkinVertexWeight> raw;
+        raw.reserve(shapeSkinWeights[s].size());
+        for (const ShapeSkinWeight& w : shapeSkinWeights[s]) {
+            if (w.localVertex < 0 || w.localVertex >= cnt || w.weight <= 0.0f) continue;
+            Nif::SkinVertexWeight sw;
+            sw.vertex = static_cast<quint32>(w.localVertex);
+            sw.bone = static_cast<quint32>(w.bone);
+            sw.weight = w.weight;
+            raw.append(sw);
+        }
+        QVector<Nif::GpuSkinInfluence> influences;
+        Nif::packGpuSkinInfluences(cnt, raw.constData(), raw.size(),
+                                   shapeSkinBones[s].size(), influences);
+        for (int lv = 0; lv < cnt; ++lv) {
+            const int gi = off + lv;
+            if (gi < 0 || gi >= vertices.size()) continue;
+            float* d = interleaved.data() + static_cast<qint64>(gi) * kFloatsPerVertex;
+            for (int k = 0; k < 4; ++k) {
+                d[12 + k] = influences[lv].indices[k];
+                d[16 + k] = influences[lv].weights[k];
+                d[20 + k] = influences[lv].indices[4 + k];
+                d[24 + k] = influences[lv].weights[4 + k];
+            }
+        }
     }
 
     vao.bind();
     vbo.bind();
     vbo.allocate(interleaved.constData(), interleaved.size() * sizeof(float));
 
-    const int stride = 12 * sizeof(float);
+    const int stride = kFloatsPerVertex * sizeof(float);
     shaderProgram->setAttributeBuffer(0, GL_FLOAT, 0, 3, stride);
     shaderProgram->enableAttributeArray(0);
     shaderProgram->setAttributeBuffer(1, GL_FLOAT, 3 * sizeof(float), 3, stride);
@@ -1306,6 +1389,14 @@ void NifViewportWidget::renderMesh()
     shaderProgram->enableAttributeArray(2);
     shaderProgram->setAttributeBuffer(3, GL_FLOAT, 8 * sizeof(float), 4, stride);
     shaderProgram->enableAttributeArray(3);
+    shaderProgram->setAttributeBuffer(4, GL_FLOAT, 12 * sizeof(float), 4, stride);
+    shaderProgram->enableAttributeArray(4);
+    shaderProgram->setAttributeBuffer(5, GL_FLOAT, 16 * sizeof(float), 4, stride);
+    shaderProgram->enableAttributeArray(5);
+    shaderProgram->setAttributeBuffer(6, GL_FLOAT, 20 * sizeof(float), 4, stride);
+    shaderProgram->enableAttributeArray(6);
+    shaderProgram->setAttributeBuffer(7, GL_FLOAT, 24 * sizeof(float), 4, stride);
+    shaderProgram->enableAttributeArray(7);
 
     ibo.bind();
     ibo.allocate(indices.constData(), indices.size() * sizeof(unsigned int));
@@ -1404,6 +1495,19 @@ void NifViewportWidget::renderMesh()
         }
 
         shaderProgram->setUniformValue("opacity", shapeOpacity.value(s, 1.0f));
+
+        // GPU skinning: upload this shape's bone palettes and switch the
+        // vertex shader into skinned mode (rest vertices are in the VBO).
+        const bool gpuSkinned = gpuSkinning && s < shapeSkinPalettes.size()
+            && !shapeSkinPalettes[s].isEmpty();
+        if (gpuSkinned) {
+            const QVector<QMatrix4x4>& pal = shapeSkinPalettes[s];
+            shaderProgram->setUniformValue("uSkinned", true);
+            shaderProgram->setUniformValueArray(
+                "uBones", pal.constData(), pal.size());
+        } else {
+            shaderProgram->setUniformValue("uSkinned", false);
+        }
 
         const int start = shapeIndexRanges[s].first;
         const int count = shapeIndexRanges[s].second - shapeIndexRanges[s].first;
@@ -2871,8 +2975,11 @@ void NifViewportWidget::applyAnimationFrame()
     computeAnimTransforms(nifParser->getRoot(), QMatrix4x4());
 
     // Transform rest-pose vertices by animated cumulative transforms.
-    // Skinned shapes blend per-vertex bone palettes instead (§8.1).
+    // Skinned shapes blend per-vertex bone palettes instead (§8.1); with GPU
+    // skinning they are deformed in the vertex shader from the rest vertices
+    // already in the VBO, so only the palettes change.
     QVector<bool> normalTransformed(normals.size(), false);
+    bool cpuChanged = false;
     for (int s = 0; s < shapeIndexRanges.size(); ++s) {
         if (s >= shapeOwnerNode.size()) continue;
         Nif::Node* ownerNode = shapeOwnerNode[s];
@@ -2882,7 +2989,14 @@ void NifViewportWidget::applyAnimationFrame()
         if (s < shapeSkinWeights.size() && !shapeSkinWeights[s].isEmpty()
             && s < shapeSkinBones.size() && !shapeSkinBones[s].isEmpty()
             && s < shapeVertexRanges.size()) {
+            if (gpuSkinnable(s)) {
+                computeSkinPalettes(s, animXform);
+                continue;
+            }
+            if (s < shapeSkinPalettes.size())
+                shapeSkinPalettes[s].clear();
             applySkinnedShape(s, animXform, normalTransformed);
+            cpuChanged = true;
             continue;
         }
 
@@ -2910,8 +3024,44 @@ void NifViewportWidget::applyAnimationFrame()
                 m[6] * n.x() + m[7] * n.y() + m[8] * n.z()
             ).normalized();
         }
+        cpuChanged = true;
     }
-    m_meshDirty = true;
+    if (cpuChanged)
+        m_meshDirty = true;
+}
+
+bool NifViewportWidget::gpuSkinnable(int shapeIdx) const
+{
+    if (!gpuSkinning) return false;
+    if (shapeIdx < 0 || shapeIdx >= shapeSkinBones.size()
+        || shapeIdx >= shapeSkinWeights.size()
+        || shapeIdx >= shapeVertexRanges.size())
+        return false;
+    if (shapeSkinBones[shapeIdx].isEmpty() || shapeSkinWeights[shapeIdx].isEmpty())
+        return false;
+    return shapeSkinBones[shapeIdx].size() <= kMaxGpuBones;
+}
+
+void NifViewportWidget::computeSkinPalettes(int shapeIdx, const QMatrix4x4& ownerXform)
+{
+    const QVector<ShapeSkinBone>& bones = shapeSkinBones[shapeIdx];
+    QVector<QMatrix4x4> pal(bones.size());
+    for (int b = 0; b < bones.size(); ++b) {
+        if (bones[b].bone && nodeCumulativeTransforms.contains(bones[b].bone))
+            pal[b] = ownerXform * nodeCumulativeTransforms[bones[b].bone] * bones[b].bindInverse;
+        else
+            pal[b] = ownerXform;   // unresolved bone -> rigid under the owner
+    }
+    if (shapeIdx < shapeSkinPalettes.size())
+        shapeSkinPalettes[shapeIdx] = pal;
+}
+
+void NifViewportWidget::setGpuSkinningEnabled(bool on)
+{
+    if (gpuSkinning == on) return;
+    gpuSkinning = on;
+    m_meshDirty = true;   // VBO vertex source + attributes change
+    if (glWidget) glWidget->update();
 }
 
 void NifViewportWidget::applySkinnedShape(int s, const QMatrix4x4& ownerXform,

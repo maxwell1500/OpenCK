@@ -48,6 +48,22 @@ inline void transformDirectionRowMajor(const float m[9], const float in[3], floa
     out[2] = m[6] * in[0] + m[7] * in[1] + m[8] * in[2];
 }
 
+// GPU skinning attributes (§8.1): the vertex shader takes up to 8 bone
+// influences per vertex. Sparse influences are packed into fixed slots,
+// normalized per vertex (so a sparse list still sums to 1), with extra
+// influences beyond 8 dropped and unweighted vertices left all-zero.
+struct GpuSkinInfluence {
+    float indices[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    float weights[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+};
+
+/// Packs sparse per-vertex influences into `vertexCount` fixed 8-slot
+/// attributes. Out-of-range vertices/bones and non-positive weights are
+/// ignored; `out` is resized to `vertexCount`.
+void packGpuSkinInfluences(int vertexCount, const SkinVertexWeight* weights,
+                           int weightCount, int boneCount,
+                           QVector<GpuSkinInfluence>& out);
+
 } // namespace Nif
 
 #endif // NIFSKINNING_HPP

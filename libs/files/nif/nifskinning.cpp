@@ -72,4 +72,39 @@ void blendSkinnedLocal(const float* restPos, const float* restNrm, int vertexCou
     delete[] accW;
 }
 
+void packGpuSkinInfluences(int vertexCount, const SkinVertexWeight* weights,
+                           int weightCount, int boneCount,
+                           QVector<GpuSkinInfluence>& out)
+{
+    out.clear();
+    if (vertexCount <= 0)
+        return;
+    out.resize(vertexCount);
+
+    if (!weights || weightCount <= 0 || boneCount <= 0)
+        return;
+
+    for (int i = 0; i < weightCount; ++i) {
+        const SkinVertexWeight& w = weights[i];
+        if (w.weight <= 0.0f) continue;
+        if (w.vertex >= static_cast<quint32>(vertexCount)) continue;
+        if (w.bone >= static_cast<quint32>(boneCount)) continue;
+        GpuSkinInfluence& v = out[static_cast<int>(w.vertex)];
+        for (int k = 0; k < 8; ++k) {
+            if (v.weights[k] == 0.0f) {
+                v.indices[k] = static_cast<float>(w.bone);
+                v.weights[k] = w.weight;
+                break;
+            }
+        }
+    }
+
+    for (GpuSkinInfluence& v : out) {
+        float total = 0.0f;
+        for (int k = 0; k < 8; ++k) total += v.weights[k];
+        if (total <= 0.0f) continue;
+        for (int k = 0; k < 8; ++k) v.weights[k] /= total;
+    }
+}
+
 } // namespace Nif

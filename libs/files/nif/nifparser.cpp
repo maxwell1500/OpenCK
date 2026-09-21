@@ -1956,7 +1956,65 @@ QString NifParser::getVersionString() const
     return QString("%1.%2.%3").arg(major).arg(minor).arg(patch);
 }
 
-bool NifParser::load(const QString& fileName)
+bool NifParser::load(const QString& fileName, const QString& skeletonPath)
+{
+    const bool ok = loadFile(fileName);
+    if (ok && !skeletonPath.isEmpty())
+        attachSkeleton(skeletonPath);
+    return ok;
+}
+
+bool NifParser::attachSkeleton(const QString& skeletonPath)
+{
+    if (!root) return false;
+
+    NifParser skel;
+    if (!skel.loadFile(skeletonPath)) {
+        LOG_WARNING(QString("Skeleton NIF did not load: %1").arg(skeletonPath));
+        return false;
+    }
+    Node* skelRoot = skel.getRoot();
+    if (!skelRoot) return false;
+    skel.setRoot(nullptr);   // transfer the tree to us
+
+    // Merge the skeleton hierarchy under our root so its bones are part of
+    // the scene the viewport's rest-pose walk transforms.
+    for (Node* c : skelRoot->children)
+        root->children.append(c);
+    skelRoot->children.clear();
+    delete skelRoot;
+
+    QMap<QString, Node*> byName;
+    std::function<void(Node*)> collect = [&](Node* n) {
+        if (!n) return;
+        if (!n->name.isEmpty() && !byName.contains(n->name))
+            byName.insert(n->name, n);
+        for (Node* c : n->children) collect(c);
+    };
+    collect(root);
+
+    int linked = 0, total = 0;
+    std::function<void(Node*)> link = [&](Node* n) {
+        if (!n) return;
+        for (TriShape& s : n->shapes) {
+            for (SkinBone& b : s.skinBones) {
+                ++total;
+                if (!b.boneNode) {
+                    b.boneNode = byName.value(b.boneName, nullptr);
+                    if (b.boneNode) ++linked;
+                }
+            }
+        }
+        for (Node* c : n->children) link(c);
+    };
+    link(root);
+
+    LOG_INFO(QString("Attached skeleton '%1': %2/%3 bones linked")
+                 .arg(skeletonPath).arg(linked).arg(total));
+    return true;
+}
+
+bool NifParser::loadFile(const QString& fileName)
 {
     LOG_INFO(QString("Loading NIF file: %1").arg(fileName));
 

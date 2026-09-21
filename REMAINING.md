@@ -1353,3 +1353,32 @@ this section is documentation of findings, per the §3 review).
     face mesh and verify against the NIF bind pose, then load a skinned
     animated NIF plus a particle NIF, press Play, confirm correct motion,
     and record the result here.
+
+    **Skeleton resolution 2026-09-21:** the skeleton asset is shipped in
+    `Starfield - Meshes01.ba2` as `meshes/actors/<race>/characterassets/
+    skeleton.nif` (+ `_facebones` variant; e.g. `human/characterassets/
+    female/skeleton_facebones.nif`). `NifParser::load(path, skeletonPath)`
+    / `attachSkeleton()` loads it, merges its node tree under the main
+    root (so the viewport's rest-pose walk captures bind inverses) and
+    resolves BSSkin bone names to nodes. All 50 face-bone names in the
+    shipped female facegeom match the skeleton exactly. `testSkeletonProbe`
+    now loads the face + skeleton, asserts every head bone resolves, that
+    the bind-pose blend reproduces rest, and that translating the
+    most-weighted bone deforms exactly the vertices weighted to it or its
+    subtree (and no others) — real Starfield skinning, headlessly. Note the
+    *animation* stream is a separate undocumented format (`.ffxanim` in
+    `Starfield - FaceAnimation0*.ba2`), so animated playback still needs
+    that decoder.
+
+    **GPU skinning 2026-09-21:** the viewport vertex shader now supports
+    `uSkinned` + `uBones[128]` with per-vertex 8-slot bone index/weight
+    attributes (locations 4–7, 28 floats/vertex); skinned shapes upload
+    rest vertices and let the shader blend `Σ w·(owner·boneWorld·
+    bindInverse)`, while rigid shapes keep the CPU path and `uSkinned`
+    false. `Nif::packGpuSkinInfluences` (GUI-free, in `nifskinning.*`)
+    packs and normalizes influences; `testGpuSkinPacking` /
+    `testGpuSkinMatchesCpu` pin the packing (normalization, 8-slot cap,
+    out-of-range rejection) and that the GPU sum matches the CPU blend.
+    Shapes over the 128-bone budget or without bones fall back to CPU.
+    `setGpuSkinningEnabled()` toggles it (forces a VBO rebuild). The shader
+    itself needs a display to confirm visually.

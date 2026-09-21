@@ -138,6 +138,13 @@ public:
 
     void updateParticleSystem(const ParticleSystemData* data);
 
+    // GPU skinning (§8.1): deform skinned shapes in the vertex shader from
+    // rest vertices + per-vertex bone index/weight attributes and a per-shape
+    // bone-matrix uniform array, instead of the CPU path. Falls back to CPU
+    // for shapes that exceed the uniform budget. Toggling forces a rebuild.
+    void setGpuSkinningEnabled(bool on);
+    bool gpuSkinningEnabled() const { return gpuSkinning; }
+
 private:
     void setupOpenGL();
     void buildMesh();
@@ -246,6 +253,15 @@ private:
     QVector<QPair<Nif::Node*, int>> shapeSources; // (owner node, shape index)
     QVector<QVector<ShapeSkinBone>> shapeSkinBones;
     QVector<QVector<ShapeSkinWeight>> shapeSkinWeights;
+
+    // GPU skinning: per-shape bone palettes for the current frame (owner *
+    // boneWorld * bindInverse), parallel to shapeSkinBones. Empty when the
+    // shape renders rigid or via the CPU path.
+    static constexpr int kMaxGpuBones = 128;
+    QVector<QVector<QMatrix4x4>> shapeSkinPalettes;
+    bool gpuSkinning = true;
+    bool gpuSkinnable(int shapeIdx) const;
+    void computeSkinPalettes(int shapeIdx, const QMatrix4x4& ownerXform);
 
     QComboBox* m_shapePickerCombo = nullptr;
     QComboBox* m_cameraPresetCombo = nullptr;

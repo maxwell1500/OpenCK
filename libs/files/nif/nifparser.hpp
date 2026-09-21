@@ -251,8 +251,15 @@ class NifParser {
 public:
     ~NifParser();
 
-    bool load(const QString& fileName);
+    bool load(const QString& fileName, const QString& skeletonPath = QString());
     bool save(const QString& fileName) const;
+
+    // Starfield BSSkin bones carry names, not node refs, so a skinned shape
+    // loads with named-but-unresolved bones and renders rigid. This loads an
+    // external skeleton NIF, merges its node tree under ours (so the
+    // viewport's rest-pose walk captures each bone's bind inverse), and
+    // resolves skin-bone names to those nodes. Returns true if it loaded.
+    bool attachSkeleton(const QString& skeletonPath);
 
     Node* getRoot() const { return root; }
     void setRoot(Node* r) { root = r; }
@@ -282,8 +289,8 @@ public:
     QVector<AnimationClip> getAnimClips() const;
 
 private:
-    bool parseHeader(QDataStream& stream);
-    bool writeHeader(QDataStream& stream, const QString& fileName) const;
+    bool loadFile(const QString& fileName);
+    bool parseHeader(QDataStream& stream);    bool writeHeader(QDataStream& stream, const QString& fileName) const;
     void writeShape(QDataStream& stream, const TriShape& shape) const;
     void writeNodeTree(QDataStream& stream, const Node* node) const;
     bool readShape(QDataStream& stream, TriShape& shape);
