@@ -279,6 +279,44 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
         (QUST flag edit lands on the last duplicate only).
       Full Starfield.esm round-trip still 3,829,246/3,829,246 zero-diff;
       suite 132/132, zero-warning build, lint clean.
+
+      **Status 2026-09-20 (structured fidelity — every type zero):** the
+      fidelity gate now covers ACTI/BOOK/MSTT/FURN/ENCH/KEYM/LIGH/SPEL/
+      SCEN/FLST/OTFT/LVLI/CONT/LCTN/MGEF/PERK/FACT/HAZD/DOOR/WEAP/RACE/
+      NAVI/ALCH/DEBR/PACK/CELL/REFR alongside MISC/QUST/ARMO/EFSH/WRLD/
+      INFO: **3,465,828 records compared, 0 mismatches in every type**
+      (REFR alone 3,291,860; CELL 6,547 + 24,170 compressed skipped).
+      Fixed classes:
+      - Fixed-preamble saves converged to positional replay (WEAP, ALCH,
+        DOOR, HAZD, RACE, FACT): EDID/FNAM/FLAG present but never invented,
+        typed values emitted at their load position, component-owned names
+        via `writeSubrecord`, leftovers appended.
+      - Duplicate-subrecord collapse (the last-wins component stored one
+        raw for N occurrences): occurrence lists added to TESModel
+        (modlRaws/mnamRaws), TESFlags (flagsRaws), BGSPickupPutdownSounds
+        (ynamRaws/znamRaws), TESBipedModel (indxRaws/bmdtRaws); the record
+        replays occurrences 0..N-2 verbatim and the last via the component,
+        so edits land on the live value. Fixed PACK (5 FNAMs, 2 PKDT/PLDT),
+        ALCH (MNAM/ZNAM), FURN (MNAM), RACE (FNAM), DEBR (12 DATAs).
+      - Width preservation where the reader over-read into the next
+        subrecord: WEAP EAMT (2-byte), DOOR FNAM (1-byte)/SNAM.
+      - LCTN dropped every linked-ref group with refTypeId 0 (a valid
+        value); now emitted.
+      - DEBR DATA is not a u32-count/256-byte-model struct (12 repeats);
+        preserved raw + positional (assembled records still encode).
+      - REFR invented NAME/DATA: `BGSRefData_Component::saveSubrecord`
+        now gates both on load-presence (`hasName`/`hasData`) and re-emits
+        the exact DATA float count (6 or legacy 7). This was the largest
+        single fix (3.29M records).
+      - `TESBodyParts_Component` gained `writeSubrecord`; `TESModel`
+        gained occurrence lists.
+      - Replay-state (`loadOrder`/`loadIsRaw`/presence flags) stays out of
+        `operator==` so an assembled record equals its reloaded form (the
+        `test_missingrecords` contract); `components` is compared where the
+        original did. GRUP sizes re-checked (include-24 unchanged).
+      Full Starfield.esm round-trip still 3,829,246/3,829,246 zero-diff;
+      suite 132/132 (test_missingrecords 123/123), zero-warning build,
+      lint clean.
      Debug support kept (env-gated, off by default): `OPENCK_SAVE_PROGRESS`
      in `Document::save`, `OPENCK_SNAPSHOT_TRACE` in the snapshot walker.
      `test_subrecord_diff` now prints a per-type mismatch histogram plus

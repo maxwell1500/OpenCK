@@ -77,6 +77,9 @@ void FurnRecord::save(ESMWriter& esm) const
     };
 
     bool wroteEdid = false, wroteFlags = false;
+    auto* modelComp = static_cast<tescomponents::TESModel_Component*>(
+        const_cast<FurnRecord*>(this)->components.findByName(QStringLiteral("TESModel")));
+    int mnamCur = 0;
     for (NAME sub : loadOrder)
     {
         switch (sub)
@@ -86,6 +89,15 @@ void FurnRecord::save(ESMWriter& esm) const
                 break;
             case 'FNAM': case 'FLAG':
                 if (!wroteFlags && (hasFlags || flags != 0)) { writeFlags(); wroteFlags = true; }
+                break;
+            case 'MNAM':
+                // MNAM repeats (FURN data + LOD); non-last occurrences replay
+                // verbatim from the occurrence list.
+                if (modelComp && mnamCur >= 0 && mnamCur < modelComp->mnamRaws.size() - 1)
+                    esm.writeRawSubRecord(RawSubRecord{ sub, modelComp->mnamRaws[mnamCur] });
+                else if (!components.writeSubrecord(sub, esm))
+                    replay.write(sub, esm);
+                ++mnamCur;
                 break;
             default:
                 if (!components.writeSubrecord(sub, esm))

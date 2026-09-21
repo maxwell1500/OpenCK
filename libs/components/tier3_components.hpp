@@ -32,6 +32,9 @@ public:
     bool hasFlags = false;
     quint8 flagsWidth = 4;
     QByteArray flagsExtra;
+    // Every occurrence payload (FNAM/FLAG repeat; the fields above track the
+    // last, and non-last occurrences replay from here).
+    QVector<QByteArray> flagsRaws;
     std::vector<BitfieldDef> bitDefs;
 
     void setBitDefs(std::vector<BitfieldDef> defs) { bitDefs = std::move(defs); }
@@ -50,22 +53,27 @@ public:
     {
         if (subrecordName == NAME('FNAM') || subrecordName == NAME('FLAG'))
         {
+            QByteArray raw;
+            esm.readRawSubData(raw);
+            flagsRaws.append(raw);
             flagsExtra.clear();
-            const qint64 left = esm.subLeft();
-            if (left >= 4)
+            if (raw.size() >= 4)
             {
-                flags = esm.readType<quint32>();
+                quint32 v = 0;
+                for (int i = 0; i < 4; ++i)
+                    v |= quint32(static_cast<quint8>(raw.at(i))) << (8 * i);
+                flags = v;
                 flagsWidth = 4;
+                if (raw.size() > 4)
+                    flagsExtra = raw.mid(4);
             }
             else
             {
                 flags = 0;
-                flagsWidth = static_cast<quint8>(qMax<qint64>(left, 0));
-                for (qint64 i = 0; i < left; ++i)
-                    flags |= quint32(esm.readType<quint8>()) << (8 * i);
+                flagsWidth = static_cast<quint8>(raw.size());
+                for (int i = 0; i < raw.size(); ++i)
+                    flags |= quint32(static_cast<quint8>(raw.at(i))) << (8 * i);
             }
-            if (esm.subLeft() > 0)
-                esm.readRawSubData(flagsExtra);
             hasFlags = true;
         }
     }
@@ -131,6 +139,7 @@ public:
         c->hasFlags = hasFlags;
         c->flagsWidth = flagsWidth;
         c->flagsExtra = flagsExtra;
+        c->flagsRaws = flagsRaws;
         return c;
     }
 
@@ -142,6 +151,7 @@ public:
         hasFlags = o->hasFlags;
         flagsWidth = o->flagsWidth;
         flagsExtra = o->flagsExtra;
+        flagsRaws = o->flagsRaws;
     }
 
     bool isEqualTo(const Component* other) const override
@@ -149,7 +159,8 @@ public:
         if (!other || other->className() != className()) return false;
         const auto* o = static_cast<const TESFlags_Component*>(other);
         return flags == o->flags && hasFlags == o->hasFlags
-            && flagsWidth == o->flagsWidth && flagsExtra == o->flagsExtra;
+            && flagsWidth == o->flagsWidth && flagsExtra == o->flagsExtra
+            && flagsRaws == o->flagsRaws;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }
@@ -365,6 +376,11 @@ public:
     // Trailing bytes of an XESP wider than the enable/disable flag.
     QByteArray xespExtra;
     QVector<quint32> scriptIds;
+    // Presence + width so save never invents NAME/DATA the source lacked and
+    // re-emits the exact float count (24B = 6, legacy 7th scale = 7).
+    bool hasName = false;
+    bool hasData = false;
+    int dataFloats = 6;
 
     QString name() const override { return QStringLiteral("Reference Data"); }
     QString className() const override { return QStringLiteral("BGSRefData"); }
@@ -386,6 +402,7 @@ public:
         switch (subrecordName)
         {
         case NAME('NAME'):
+            hasName = true;
             // Starfield writes some NAME subrecords shorter than 32 bits.
             // Read only declared bytes LE so the stream never overruns.
             if (esm.subLeft() < static_cast<qint64>(sizeof(quint32)))
@@ -402,22 +419,45 @@ public:
         case NAME('DATA'):
             // DATA is 6 floats (24B) plus an optional 7th scale float.
             // Short variants exist; never read past the declared size.
+            hasData = true;
+            dataFloats = 0;
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+            {
                 posX = esm.readType<float>();
+                ++dataFloats;
+            }
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+            {
                 posY = esm.readType<float>();
+                ++dataFloats;
+            }
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+            {
                 posZ = esm.readType<float>();
+                ++dataFloats;
+            }
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+            {
                 rotX = esm.readType<float>();
+                ++dataFloats;
+            }
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+            {
                 rotY = esm.readType<float>();
+                ++dataFloats;
+            }
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+            {
                 rotZ = esm.readType<float>();
+                ++dataFloats;
+            }
             // Starfield/Skyrim DATA is 24 bytes (no scale); some legacy
             // records carry a 7th float. Only read it when it is present.
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
+            {
                 scale = esm.readType<float>();
+                ++dataFloats;
+            }
             break;
         case NAME('XSCL'):
             if (esm.subLeft() >= static_cast<qint64>(sizeof(float)))
@@ -536,16 +576,21 @@ public:
         switch (subrecordName)
         {
         case NAME('NAME'):
+            if (!fromLoad && !hasName)
+                return false;
             esm.writeSubData<quint32>(NAME('NAME'), baseId);
             return true;
         case NAME('DATA'):
+            if (!fromLoad && !hasData)
+                return false;
             esm.startSubRecord(NAME('DATA'));
-            esm.writeType<float>(posX);
-            esm.writeType<float>(posY);
-            esm.writeType<float>(posZ);
-            esm.writeType<float>(rotX);
-            esm.writeType<float>(rotY);
-            esm.writeType<float>(rotZ);
+            if (dataFloats > 0) esm.writeType<float>(posX);
+            if (dataFloats > 1) esm.writeType<float>(posY);
+            if (dataFloats > 2) esm.writeType<float>(posZ);
+            if (dataFloats > 3) esm.writeType<float>(rotX);
+            if (dataFloats > 4) esm.writeType<float>(rotY);
+            if (dataFloats > 5) esm.writeType<float>(rotZ);
+            if (dataFloats > 6) esm.writeType<float>(scale);
             esm.endSubRecord();
             return true;
         case NAME('XSCL'):
@@ -642,6 +687,9 @@ public:
         c->initiallyDisabled = initiallyDisabled;
         c->xespExtra = xespExtra;
         c->scriptIds = scriptIds;
+        c->hasName = hasName;
+        c->hasData = hasData;
+        c->dataFloats = dataFloats;
         return c;
     }
 
@@ -659,6 +707,9 @@ public:
         initiallyDisabled = o->initiallyDisabled;
         xespExtra = o->xespExtra;
         scriptIds = o->scriptIds;
+        hasName = o->hasName;
+        hasData = o->hasData;
+        dataFloats = o->dataFloats;
     }
 
     bool isEqualTo(const Component* other) const override
@@ -669,7 +720,9 @@ public:
             && rotX == o->rotX && rotY == o->rotY && rotZ == o->rotZ && scale == o->scale
             && owner == o->owner && ownerExtra == o->ownerExtra && lockLevel == o->lockLevel
             && initiallyDisabled == o->initiallyDisabled && xespExtra == o->xespExtra
-            && scriptIds == o->scriptIds;
+            && scriptIds == o->scriptIds
+            && hasName == o->hasName && hasData == o->hasData
+            && dataFloats == o->dataFloats;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }
@@ -914,6 +967,28 @@ public:
             esm.writeType<quint32>(partCount);
             esm.endSubRecord();
         }
+    }
+
+    bool writeSubrecord(NAME subrecordName, ESMWriter& esm) const override
+    {
+        if (subrecordName == NAME('BODT'))
+        {
+            esm.startSubRecord(NAME('BODT'));
+            esm.writeType<quint32>(partType);
+            esm.writeType<quint32>(flags);
+            esm.endSubRecord();
+            return true;
+        }
+        if (subrecordName == NAME('BOD2'))
+        {
+            esm.startSubRecord(NAME('BOD2'));
+            esm.writeType<quint32>(partType);
+            esm.writeType<quint32>(flags);
+            esm.writeType<quint32>(partCount);
+            esm.endSubRecord();
+            return true;
+        }
+        return false;
     }
 
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override

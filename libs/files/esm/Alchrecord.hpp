@@ -27,6 +27,10 @@ struct AlchRecord {
     int dataFields = 2;
     bool hasData = false;
     bool hasFlags = false;
+    // Positional replay (see ArmorRecord): loadOrder + loadIsRaw, EDID gate.
+    QVector<NAME> loadOrder;
+    QVector<quint8> loadIsRaw;
+    bool hasEdid = false;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;
@@ -42,6 +46,7 @@ inline bool operator==(const AlchRecord& l, const AlchRecord& r)
     return l.editorId == r.editorId && l.formId == r.formId && l.flags == r.flags
         && l.iconPath == r.iconPath && l.modelPath == r.modelPath
         && l.weight == r.weight && l.value == r.value
+        && l.components == r.components
         && l.rawSubRecords == r.rawSubRecords;
 }
 

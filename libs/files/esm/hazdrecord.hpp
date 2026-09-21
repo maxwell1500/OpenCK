@@ -21,6 +21,10 @@ struct HazdRecord {
     quint8 target = 0;
     quint8 flags = 0;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    QVector<quint8> loadIsRaw;
+    bool hasEdid = false;
+    bool hasData = false;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;

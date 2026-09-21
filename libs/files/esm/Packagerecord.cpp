@@ -34,6 +34,8 @@ void PackageRecord::load(ESMReader& esm, bool)
     pkdtRaw.clear();
     pldtRaw.clear();
     ptdtRaws.clear();
+    pkdtRaws.clear();
+    pldtRaws.clear();
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
@@ -56,11 +58,13 @@ void PackageRecord::load(ESMReader& esm, bool)
             case 'EDID': editorId = esm.readZString(); break;
             case 'PKDT':
                 esm.readRawSubData(pkdtRaw);
+                pkdtRaws.append(pkdtRaw);
                 packageType = leU32(pkdtRaw, 0);
                 hasPkdt = true;
                 break;
             case 'PLDT':
                 esm.readRawSubData(pldtRaw);
+                pldtRaws.append(pldtRaw);
                 targetType = leU32(pldtRaw, 0);
                 hasPldt = true;
                 break;
@@ -160,6 +164,12 @@ void PackageRecord::save(ESMWriter& esm) const
 
     bool wroteEdid = false, wrotePkdt = false, wrotePldt = false;
     int parsedIdx = 0, ctdaSeen = 0, ptdtSeen = 0;
+    int pkdtCur = 0, pldtCur = 0;
+    // FNAM/FLAG repeat (package flags per entry); non-last occurrences replay
+    // from the component's occurrence list, the last carries the live value.
+    auto* flagsComp = static_cast<tescomponents::TESFlags_Component*>(
+        const_cast<PackageRecord*>(this)->components.findByName(QStringLiteral("TESFlags")));
+    int flagsCur = 0;
     for (NAME sub : loadOrder)
     {
         switch (sub)
@@ -168,11 +178,25 @@ void PackageRecord::save(ESMWriter& esm) const
                 if (!wroteEdid) { esm.writeSubZString('EDID', editorId); wroteEdid = true; }
                 break;
             case 'PKDT':
-                if (!wrotePkdt) { writePkdt(); wrotePkdt = true; }
+            {
+                const int k = pkdtCur++;
+                if (k >= 0 && k < pkdtRaws.size() - 1)
+                    esm.writeRawSubRecord(RawSubRecord{ NAME('PKDT'), pkdtRaws[k] });
+                else
+                    writePkdt();
+                wrotePkdt = true;
                 break;
+            }
             case 'PLDT':
-                if (!wrotePldt) { writePldt(); wrotePldt = true; }
+            {
+                const int k = pldtCur++;
+                if (k >= 0 && k < pldtRaws.size() - 1)
+                    esm.writeRawSubRecord(RawSubRecord{ NAME('PLDT'), pldtRaws[k] });
+                else
+                    writePldt();
+                wrotePldt = true;
                 break;
+            }
             case 'PTDT':
                 if (ptdtSeen < ptdtRaws.size()
                     && ptdtSeen < targetIds.size()
@@ -191,7 +215,11 @@ void PackageRecord::save(ESMWriter& esm) const
                 ++ptdtSeen;
                 break;
             case 'FNAM': case 'FLAG':
-                components.writeSubrecord(sub, esm);
+                if (flagsComp && flagsCur >= 0 && flagsCur < flagsComp->flagsRaws.size() - 1)
+                    esm.writeRawSubRecord(RawSubRecord{ sub, flagsComp->flagsRaws[flagsCur] });
+                else
+                    components.writeSubrecord(sub, esm);
+                ++flagsCur;
                 break;
             case 'CTDA':
                 if (ctdaSeen < conditionOrder.size())
@@ -248,6 +276,8 @@ void PackageRecord::blank()
     pkdtRaw.clear();
     pldtRaw.clear();
     ptdtRaws.clear();
+    pkdtRaws.clear();
+    pldtRaws.clear();
     hasPkdt = false;
     hasPldt = false;
     verbatimBody.clear();

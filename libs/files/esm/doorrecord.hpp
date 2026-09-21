@@ -20,6 +20,17 @@ struct DoorRecord {
     QString modelPath;
     quint32 sound = 0;
     QVector<RawSubRecord> rawSubRecords;
+    // Positional replay + presence gates (see ArmorRecord).
+    QVector<NAME> loadOrder;
+    QVector<quint8> loadIsRaw;
+    bool hasEdid = false;
+    bool hasFlags = false;
+    bool hasSnam = false;
+    quint8 flagsWidth = 4;
+    QByteArray flagsExtra;
+    NAME flagsName = NAME('FNAM');
+    quint8 snamWidth = 4;
+    QByteArray snamExtra;
 
     openck::FormComponents components;
 

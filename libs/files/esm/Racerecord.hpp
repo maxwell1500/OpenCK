@@ -20,6 +20,9 @@ struct RaceRecord {
     QVector<quint32> faceData;
     QVector<quint32> headData;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    QVector<quint8> loadIsRaw;
+    bool hasEdid = false;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;

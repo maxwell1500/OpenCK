@@ -53,11 +53,7 @@ inline bool operator==(const ArmorRecord& l, const ArmorRecord& r)
         && l.rawSubRecords == r.rawSubRecords && l.armorRating == r.armorRating
         && l.weight == r.weight && l.value == r.value && l.iconPath == r.iconPath
         && l.modelPath == r.modelPath && l.health == r.health
-        && l.components == r.components
-        && l.loadOrder == r.loadOrder && l.loadIsRaw == r.loadIsRaw && l.hasEdid == r.hasEdid
-        && l.hasFlag == r.hasFlag && l.flagWidth == r.flagWidth && l.flagExtra == r.flagExtra
-        && l.hasDnam == r.hasDnam && l.dnamWidth == r.dnamWidth && l.dnamExtra == r.dnamExtra
-        && l.hasData == r.hasData && l.dataExtra == r.dataExtra;
+        && l.components == r.components;
 }
 
 inline bool operator!=(const ArmorRecord& l, const ArmorRecord& r)

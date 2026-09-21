@@ -25,6 +25,9 @@ struct FactRecord {
     // lacked (spurious FNAM/FULL break payload-identical round-trips).
     bool hasFlags = false;
     bool hasFull = false;
+    QVector<NAME> loadOrder;
+    QVector<quint8> loadIsRaw;
+    bool hasEdid = false;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;

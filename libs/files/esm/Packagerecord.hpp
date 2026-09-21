@@ -30,6 +30,10 @@ struct PackageRecord {
     QByteArray pkdtRaw;
     QByteArray pldtRaw;
     QVector<QByteArray> ptdtRaws;
+    // Every PKDT/PLDT occurrence (they repeat per entry; pkdtRaw/pldtRaw
+    // track the last, non-last occurrences replay from here).
+    QVector<QByteArray> pkdtRaws;
+    QVector<QByteArray> pldtRaws;
     bool hasPkdt = false;
     bool hasPldt = false;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
@@ -49,6 +53,9 @@ inline bool operator==(const PackageRecord& l, const PackageRecord& r)
         && l.packageType == r.packageType && l.targetType == r.targetType
         && l.targetIds == r.targetIds && l.parameters == r.parameters
         && l.conditions == r.conditions
+        && l.pkdtRaw == r.pkdtRaw && l.pldtRaw == r.pldtRaw
+        && l.pkdtRaws == r.pkdtRaws && l.pldtRaws == r.pldtRaws
+        && l.hasPkdt == r.hasPkdt && l.hasPldt == r.hasPldt
         && l.rawSubRecords == r.rawSubRecords;
 }
 

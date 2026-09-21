@@ -91,13 +91,7 @@ inline bool operator==(const QuestRecord& l, const QuestRecord& r)
         && l.stageFlags == r.stageFlags && l.objectiveFlags == r.objectiveFlags
         && l.aliasFlags == r.aliasFlags
         && l.stageExtra == r.stageExtra && l.objectiveExtra == r.objectiveExtra
-        && l.aliasExtra == r.aliasExtra && l.rawSubRecords == r.rawSubRecords
-        && l.loadOrder == r.loadOrder && l.loadAction == r.loadAction
-        && l.loadIndex == r.loadIndex && l.stageHasQsdt == r.stageHasQsdt
-        && l.stageHasCnam == r.stageHasCnam && l.hasEdid == r.hasEdid
-        && l.stageQsdtVals == r.stageQsdtVals && l.stageCnamVals == r.stageCnamVals
-        && l.stageCnamRaws == r.stageCnamRaws
-        && l.questDescRaw == r.questDescRaw && l.dialogueViewRaw == r.dialogueViewRaw;
+        && l.aliasExtra == r.aliasExtra && l.rawSubRecords == r.rawSubRecords;
 }
 
 inline bool operator!=(const QuestRecord& l, const QuestRecord& r)

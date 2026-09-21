@@ -15,6 +15,7 @@
 #include <QString>
 #include <QVector>
 
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -427,6 +428,10 @@ public:
     quint32 putdownSound = 0;
     quint32 pickupSpelling = NAME('YNAM');
     quint32 putdownSpelling = NAME('ZNAM');
+    // Every occurrence payload (YNAM/ZNAM repeat on ALCH/ARMO etc.); the
+    // scalar fields above track the last.
+    QVector<QByteArray> ynamRaws;
+    QVector<QByteArray> znamRaws;
 
     QString name() const override { return QStringLiteral("Pickup / Putdown Sounds"); }
     QString className() const override { return QStringLiteral("BGSPickupPutdownSounds"); }
@@ -445,12 +450,22 @@ public:
         if (subrecordName == NAME('YNAM') || subrecordName == NAME('PICK'))
         {
             pickupSpelling = subrecordName;
-            pickupSound = esm.readType<quint32>();
+            QByteArray raw;
+            esm.readRawSubData(raw);
+            ynamRaws.append(raw);
+            quint32 v = 0;
+            if (raw.size() >= 4) memcpy(&v, raw.constData(), 4);
+            pickupSound = v;
         }
         else if (subrecordName == NAME('ZNAM') || subrecordName == NAME('PUTD'))
         {
             putdownSpelling = subrecordName;
-            putdownSound = esm.readType<quint32>();
+            QByteArray raw;
+            esm.readRawSubData(raw);
+            znamRaws.append(raw);
+            quint32 v = 0;
+            if (raw.size() >= 4) memcpy(&v, raw.constData(), 4);
+            putdownSound = v;
         }
     }
 
@@ -498,6 +513,8 @@ public:
         c->putdownSound = putdownSound;
         c->pickupSpelling = pickupSpelling;
         c->putdownSpelling = putdownSpelling;
+        c->ynamRaws = ynamRaws;
+        c->znamRaws = znamRaws;
         return c;
     }
 
@@ -509,6 +526,8 @@ public:
         putdownSound = o->putdownSound;
         pickupSpelling = o->pickupSpelling;
         putdownSpelling = o->putdownSpelling;
+        ynamRaws = o->ynamRaws;
+        znamRaws = o->znamRaws;
     }
 
     bool isEqualTo(const Component* other) const override
@@ -517,7 +536,8 @@ public:
         const auto* o = static_cast<const BGSPickupPutdownSounds_Component*>(other);
         return pickupSound == o->pickupSound && putdownSound == o->putdownSound
             && pickupSpelling == o->pickupSpelling
-            && putdownSpelling == o->putdownSpelling;
+            && putdownSpelling == o->putdownSpelling
+            && ynamRaws == o->ynamRaws && znamRaws == o->znamRaws;
     }
 
     void mergeWith(const Component* other) override { copyFrom(other); }

@@ -13,6 +13,34 @@
 #include "../../libs/files/esm/effectshaderrecord.hpp"
 #include "../../libs/files/esm/worldspacerecord.hpp"
 #include "../../libs/files/esm/Inforecord.hpp"
+#include "../../libs/files/esm/Actirecord.hpp"
+#include "../../libs/files/esm/Bookrecord.hpp"
+#include "../../libs/files/esm/msttrecord.hpp"
+#include "../../libs/files/esm/furnrecord.hpp"
+#include "../../libs/files/esm/Enchrecord.hpp"
+#include "../../libs/files/esm/Keymrecord.hpp"
+#include "../../libs/files/esm/lighrecord.hpp"
+#include "../../libs/files/esm/Spellrecord.hpp"
+#include "../../libs/files/esm/scenrecord.hpp"
+#include "../../libs/files/esm/formlistrecord.hpp"
+#include "../../libs/files/esm/outfitrecord.hpp"
+#include "../../libs/files/esm/lvlistrecord.hpp"
+#include "../../libs/files/esm/Contrecord.hpp"
+#include "../../libs/files/esm/locationrecord.hpp"
+#include "../../libs/files/esm/Magicrecord.hpp"
+#include "../../libs/files/esm/Perkrecord.hpp"
+#include "../../libs/files/esm/Factrecord.hpp"
+#include "../../libs/files/esm/npcrecord.hpp"
+#include "../../libs/files/esm/hazdrecord.hpp"
+#include "../../libs/files/esm/doorrecord.hpp"
+#include "../../libs/files/esm/refrecord.hpp"
+#include "../../libs/files/esm/weaprecord.hpp"
+#include "../../libs/files/esm/Racerecord.hpp"
+#include "../../libs/files/esm/navirecord.hpp"
+#include "../../libs/files/esm/Alchrecord.hpp"
+#include "../../libs/files/esm/debrrecord.hpp"
+#include "../../libs/files/esm/Packagerecord.hpp"
+#include "../../libs/files/esm/cellrecord.hpp"
 #include "../../libs/files/log/logger.hpp"
 
 // Structured-save fidelity gate: loads every record of the target types from
@@ -154,6 +182,33 @@ private:
         case 'EFSH': { EfshRecord r; handleRecord(n, "EFSH", r); break; }
         case 'WRLD': { WorldspaceRecord r; handleRecord(n, "WRLD", r); break; }
         case 'INFO': { InfoRecord r; handleRecord(n, "INFO", r); break; }
+        case 'ACTI': { ActiRecord r; handleRecord(n, "ACTI", r); break; }
+        case 'BOOK': { BookRecord r; handleRecord(n, "BOOK", r); break; }
+        case 'MSTT': { MsttRecord r; handleRecord(n, "MSTT", r); break; }
+        case 'FURN': { FurnRecord r; handleRecord(n, "FURN", r); break; }
+        case 'ENCH': { EnchRecord r; handleRecord(n, "ENCH", r); break; }
+        case 'KEYM': { KeymRecord r; handleRecord(n, "KEYM", r); break; }
+        case 'LIGH': { LighRecord r; handleRecord(n, "LIGH", r); break; }
+        case 'SPEL': { SpellRecord r; handleRecord(n, "SPEL", r); break; }
+        case 'SCEN': { ScenRecord r; handleRecord(n, "SCEN", r); break; }
+        case 'FLST': { FormListRecord r; handleRecord(n, "FLST", r); break; }
+        case 'OTFT': { OutfitRecord r; handleRecord(n, "OTFT", r); break; }
+        case 'LVLI': { LvliRecord r; handleRecord(n, "LVLI", r); break; }
+        case 'CONT': { ContRecord r; handleRecord(n, "CONT", r); break; }
+        case 'LCTN': { LocationRecord r; handleRecord(n, "LCTN", r); break; }
+        case 'MGEF': { MagicRecord r; handleRecord(n, "MGEF", r); break; }
+        case 'PERK': { PerkRecord r; handleRecord(n, "PERK", r); break; }
+        case 'FACT': { FactRecord r; handleRecord(n, "FACT", r); break; }
+        case 'HAZD': { HazdRecord r; handleRecord(n, "HAZD", r); break; }
+        case 'DOOR': { DoorRecord r; handleRecord(n, "DOOR", r); break; }
+        case 'WEAP': { WeaponRecord r; handleRecord(n, "WEAP", r); break; }
+        case 'RACE': { RaceRecord r; handleRecord(n, "RACE", r); break; }
+        case 'NAVI': { NaviRecord r; handleRecord(n, "NAVI", r); break; }
+        case 'ALCH': { AlchRecord r; handleRecord(n, "ALCH", r); break; }
+        case 'DEBR': { DebrRecord r; handleRecord(n, "DEBR", r); break; }
+        case 'PACK': { PackageRecord r; handleRecord(n, "PACK", r); break; }
+        case 'CELL': { CellRecord r; handleRecord(n, "CELL", r); break; }
+        case 'REFR': { RefrRecord r; handleRecord(n, "REFR", r); break; }
         default: break;
         }
         if (++m_walked % 1000000 == 0)

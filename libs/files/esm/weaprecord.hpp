@@ -27,6 +27,22 @@ struct WeaponRecord {
     QString modelPath;
     quint32 magicSchool = 0;
     quint32 enchantLimit = 0;
+    // Positional replay: loadOrder + loadIsRaw (1 = replay rawSubRecords in
+    // order, 0 = emit the typed value/component). Presence spells the
+    // subrecord the value came from so absent fields are never invented.
+    QVector<NAME> loadOrder;
+    QVector<quint8> loadIsRaw;
+    bool hasEdid = false;
+    bool hasFlags = false;
+    NAME flagsName = NAME('FNAM');
+    bool hasData = false;
+    bool hasEamt = false;
+    bool hasMdob = false;
+    bool hasEnam = false;
+    // Starfield packs these scalars at narrower widths (2-byte EAMT).
+    quint8 eamtWidth = 4;
+    quint8 mdobWidth = 4;
+    quint8 enamWidth = 4;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;
@@ -45,7 +61,8 @@ inline bool operator==(const WeaponRecord& l, const WeaponRecord& r)
         && l.weight == r.weight && l.value == r.value
         && l.enchantment == r.enchantment && l.iconPath == r.iconPath
         && l.modelPath == r.modelPath && l.magicSchool == r.magicSchool
-        && l.enchantLimit == r.enchantLimit;
+        && l.enchantLimit == r.enchantLimit
+        && l.components == r.components;
 }
 
 inline bool operator!=(const WeaponRecord& l, const WeaponRecord& r)

@@ -29,6 +29,16 @@ struct DebrRecord {
     quint32 formId = 0;
     QVector<DebrisEntry> debris;
     QVector<RawSubRecord> rawSubRecords;
+    // Starfield DEBR DATA is not the u32-count/256-byte-model struct the
+    // parser assumed; the payload is preserved raw and re-emitted verbatim
+    // (debris stays a best-effort display parse).
+    bool hasEdid = false;
+    QVector<NAME> loadOrder;
+    // Preserved DATA payload (not part of rawSubRecords, so an assembled
+    // record and a loaded one compare equal). DATA repeats; dataRaw mirrors
+    // the last, dataRaws holds every occurrence for positional replay.
+    QByteArray dataRaw;
+    QVector<QByteArray> dataRaws;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;

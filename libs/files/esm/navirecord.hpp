@@ -14,6 +14,8 @@ struct NaviRecord {
     QString editorId;
     quint32 formId = 0;
     QVector<RawSubRecord> rawSubRecords;
+    QVector<NAME> loadOrder;
+    bool hasEdid = false;
     // Verbatim round-trip (see src/model/world/verbatimrecord.hpp).
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;
@@ -27,7 +29,8 @@ struct NaviRecord {
 inline bool operator==(const NaviRecord& l, const NaviRecord& r)
 {
     return l.editorId == r.editorId && l.formId == r.formId
-        && l.rawSubRecords == r.rawSubRecords;
+        && l.rawSubRecords == r.rawSubRecords
+        && l.components == r.components;
 }
 
 inline bool operator!=(const NaviRecord& l, const NaviRecord& r)

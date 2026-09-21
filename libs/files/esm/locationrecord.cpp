@@ -140,10 +140,10 @@ void LocationRecord::save(ESMWriter& esm) const
 
     auto writeLinkedRefs = [&]() {
         // Linked-reference groups: XNAM starts a group, LNAM appends links.
+        // Every loaded group is emitted, including refTypeId 0 (a valid
+        // value Starfield uses); only never-loaded records have no groups.
         for (const LinkedRef& group : linkedRefs)
         {
-            if (group.refTypeId == 0)
-                continue;
             esm.writeSubData<quint32>('XNAM', group.refTypeId);
             for (quint32 linkedId : group.linkedIds)
                 esm.writeSubData<quint32>('LNAM', linkedId);

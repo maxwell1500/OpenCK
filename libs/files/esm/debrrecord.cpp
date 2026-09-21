@@ -14,9 +14,13 @@ void DebrRecord::load(ESMReader& esm, bool)
 {
     esm.readHeader(); formId = esm.currentFormId();
     initComponents();
+    loadOrder.clear();
+    hasEdid = false;
     while (esm.isRecLeft())
     {
         NAME sub = esm.readNSubHeader();
+        if (sub == 0) break;
+        loadOrder.append(sub);
         bool handled = false;
         for (auto& c : components.all())
         {
@@ -31,13 +35,15 @@ void DebrRecord::load(ESMReader& esm, bool)
 
         switch (sub)
         {
-            case 'EDID': editorId = esm.readZString(); break;
+            case 'EDID': editorId = esm.readZString(); hasEdid = true; break;
             case 'DATA':
             {
-                // u32 count, then per entry: char[256] model path + u32 count
-                // + u16 scale + u16 flags.
-                QByteArray data;
-                esm.readRawSubData(data);
+                // Raw-preserved (see header): parse best-effort for display,
+                // keep the exact bytes for re-emit.
+                esm.readRawSubData(dataRaw);
+                dataRaws.append(dataRaw);
+
+                const QByteArray& data = dataRaw;
                 const quint32 n = data.size() >= 4
                     ? *reinterpret_cast<const quint32*>(data.constData()) : 0;
                 debris.clear();
@@ -69,27 +75,55 @@ void DebrRecord::load(ESMReader& esm, bool)
 
 void DebrRecord::save(ESMWriter& esm) const
 {
-    esm.writeSubZString('EDID', editorId);
-    QByteArray data;
-    const quint32 n = static_cast<quint32>(debris.size());
-    data.append(reinterpret_cast<const char*>(&n), 4);
-    for (const DebrisEntry& e : debris)
+    if (loadOrder.isEmpty())
     {
-        QByteArray path = e.modelPath.toLatin1();
-        data.append(path.constData(), qMin<int>(256, path.size()));
-        data.resize(data.size() + (256 - qMin<int>(256, path.size())));
-        data.append(reinterpret_cast<const char*>(&e.count), 4);
-        data.append(reinterpret_cast<const char*>(&e.scale), 2);
-        data.append(reinterpret_cast<const char*>(&e.flags), 2);
+        // Assembled record: encode the debris list.
+        if (hasEdid || !editorId.isEmpty())
+            esm.writeSubZString('EDID', editorId);
+        if (!debris.isEmpty())
+        {
+            QByteArray data;
+            const quint32 n = static_cast<quint32>(debris.size());
+            data.append(reinterpret_cast<const char*>(&n), 4);
+            for (const DebrisEntry& e : debris)
+            {
+                QByteArray path = e.modelPath.toLatin1();
+                data.append(path.constData(), qMin<int>(256, path.size()));
+                data.resize(data.size() + (256 - qMin<int>(256, path.size())));
+                data.append(reinterpret_cast<const char*>(&e.count), 4);
+                data.append(reinterpret_cast<const char*>(&e.scale), 2);
+                data.append(reinterpret_cast<const char*>(&e.flags), 2);
+            }
+            esm.startSubRecord('DATA');
+            esm.writeRawData(data.constData(), data.size());
+            esm.endSubRecord();
+        }
+        for (const auto& raw : rawSubRecords)
+            esm.writeRawSubRecord(raw);
+        return;
     }
-    esm.startSubRecord('DATA');
-    esm.writeRawData(data.constData(), data.size());
-    esm.endSubRecord();
-
-    for (const auto& raw : rawSubRecords)
+    // Loaded record: replay the preserved DATA/raws positionally.
+    int rawCur = 0;
+    int dataCur = 0;
+    for (NAME sub : loadOrder)
     {
-        esm.writeRawSubRecord(raw);
+        if (sub == NAME('EDID'))
+        {
+            if (hasEdid)
+                esm.writeSubZString('EDID', editorId);
+        }
+        else if (sub == NAME('DATA'))
+        {
+            if (dataCur < dataRaws.size())
+                esm.writeRawSubRecord(RawSubRecord{ NAME('DATA'), dataRaws[dataCur++] });
+        }
+        else if (rawCur < rawSubRecords.size())
+        {
+            esm.writeRawSubRecord(rawSubRecords[rawCur++]);
+        }
     }
+    while (rawCur < rawSubRecords.size())
+        esm.writeRawSubRecord(rawSubRecords[rawCur++]);
 }
 
 void DebrRecord::blank()
@@ -97,6 +131,10 @@ void DebrRecord::blank()
     editorId.clear();
     formId = 0;
     debris.clear();
+    loadOrder.clear();
+    hasEdid = false;
+    dataRaw.clear();
+    dataRaws.clear();
     rawSubRecords.clear();
     verbatimBody.clear();
     verbatimFlags = 0;
