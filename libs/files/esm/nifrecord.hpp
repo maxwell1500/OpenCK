@@ -142,6 +142,13 @@ public:
     QList<NiPoint4> tangents;
     QList<NiColorRGBA> vertexColors;
     QList<quint32> indices;
+    // Starfield .mesh per-vertex skin weights (attach-local bone index +
+    // u16 normalized weight, wpv slots per vertex), carried from the
+    // external mesh decode to the BSSkin triplet link. Empty for
+    // non-skinned meshes.
+    quint32 skinWeightsPerVertex = 0;
+    QVector<quint16> skinBoneIndices;
+    QVector<quint16> skinBoneWeights;
 
     void parse(QIODevice& device, quint32 version, const QByteArray& fileHeader) override;
     void write(QIODevice& device, quint32 version) const override;

@@ -1325,10 +1325,28 @@ this section is documentation of findings, per the §3 review).
     link onto `TriShape.skinBones` (nodes null, weights empty — rigid
     fallback preserved); `testFaceSkinBlocks` proves it on a shipped face
     (10 shapes, 10 skinned, 129 named bones, 53,444 verts).
-    Still open: the Instance per-bone 16B semantics (only 5 distinct quads
-    across 76 bones — kept raw), per-vertex weight streams (`.mesh`
-    Weights sections decode structurally; bone-index→skeleton mapping
-    needs the external skeleton), skeleton resolution, GPU/CPU blend
+    **Per-vertex weights 2026-09-21:** the `.mesh` weight stream is no
+    longer dropped. `NifTriShapeData` now carries
+    `skinWeightsPerVertex` + parallel `skinBoneIndices`/`skinBoneWeights`
+    (the synthetic block the external-mesh resolver builds), and the
+    BSSkin triplet link converts them into `TriShape::skinWeights`
+    (`weight = weightRaw / 65535`, zero-weight slots skipped). The bone
+    index is **attach-local**: across all 10 shipped face shapes
+    `maxBone == attachBones - 1` exactly (2→1, 14→13, 50→49, 54→53, …),
+    and `BSSkin::Instance` bone count == attach name count, so the mesh
+    index addresses `skinBones[i]` directly. `testFaceSkinBlocks` now
+    asserts 10/10 shapes weighted, 223,584 weights, every bone/vertex
+    index in range, per-vertex weights partitioning to 1.0, and a
+    bind-pose blend (identity palettes — the exact viewport state when no
+    animated skeleton is present) reproducing the rest pose vertex- and
+    normal-exact through `Nif::blendSkinnedLocal`. The viewport already
+    degrades to rigid when `boneNode` is null, so this changes no
+    rendering until a skeleton resolves. The `BSSkin::Instance` 16-byte
+    per-bone payload is **not** topology: only 5 distinct values across
+    the 50-bone head (bit patterns = 1.0f, 0, -1, and a small int),
+    matching the earlier 76-bone observation — kept raw, not interpreted.
+    Still open: the animated skeleton (an external asset; not present
+    loose and no on-disk reference documented), GPU/CPU animated blend
     wiring, plus the manual Play-confirm on a skinned animated mesh and a
     particle mesh, which needs a display. Entry criterion restated: decode
     the 16B payload + weights against a skeleton, blend one frame on the

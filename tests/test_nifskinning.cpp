@@ -685,6 +685,9 @@ void TestNifSkinning::testFaceSkinBlocks()
     int skinned = 0;
     int verts = 0;
     int namedBones = 0;
+    int weightedShapes = 0;
+    int totalWeights = 0;
+    const Nif::TriShape* head = nullptr;
     QStack<const Nif::Node*> stack;
     stack.push(parser.getRoot());
     while (!stack.isEmpty())
@@ -701,16 +704,97 @@ void TestNifSkinning::testFaceSkinBlocks()
                     if (!b.boneName.isEmpty())
                         ++namedBones;
             }
+            // §8.3: per-vertex weights decoded from the external .mesh and
+            // linked with attach-local bone indices.
+            if (!shape.skinWeights.isEmpty())
+            {
+                ++weightedShapes;
+                totalWeights += shape.skinWeights.size();
+                for (const Nif::SkinVertexWeight& w : shape.skinWeights)
+                {
+                    QVERIFY(w.bone < static_cast<quint32>(shape.skinBones.size()));
+                    QVERIFY(w.vertex < static_cast<quint32>(shape.vertices.size()));
+                    QVERIFY(w.weight > 0.0f);
+                }
+            }
+            if (shape.name == QStringLiteral("Human_Female_Head"))
+                head = &shape;
         }
         for (const Nif::Node* c : node->children)
             stack.push(c);
     }
     qDebug() << "face:" << shapes << "shapes," << skinned << "skinned,"
-             << namedBones << "named bones," << verts << "verts";
+             << namedBones << "named bones," << verts << "verts,"
+             << weightedShapes << "weighted," << totalWeights << "weights";
     QCOMPARE(shapes, 10);
     QCOMPARE(skinned, 10);
     QCOMPARE(namedBones, 129);
     QCOMPARE(verts, 53444);
+    QCOMPARE(weightedShapes, 10);
+    QVERIFY(totalWeights > 100000);
+
+    // The head shape is the only multi-bone mesh with a large skeleton
+    // subset; pin its geometry and prove the weights partition each vertex
+    // (weightRaw/65535 sums to 1) and that a bind-pose blend — identity
+    // palettes, the exact state the viewport uses when no animated
+    // skeleton is present — reproduces the rest pose through the core.
+    QVERIFY(head != nullptr);
+    QCOMPARE(head->skinBones.size(), 50);
+    quint32 maxBone = 0;
+    for (const Nif::SkinVertexWeight& w : head->skinWeights)
+        maxBone = qMax(maxBone, w.bone);
+    QCOMPARE(maxBone, quint32(49));   // attach-local: attachBones - 1
+
+    const int vc = head->vertices.size();
+    QVector<float> sums(vc, 0.0f);
+    for (const Nif::SkinVertexWeight& w : head->skinWeights)
+        sums[w.vertex] += w.weight;
+    int weightedVerts = 0;
+    for (float sw : sums)
+    {
+        if (sw <= 0.0f) continue;
+        ++weightedVerts;
+        QVERIFY(sw > 0.98f && sw < 1.0001f);
+    }
+    QVERIFY(weightedVerts > 0);
+
+    QVector<float> restPos(vc * 3), restNrm(vc * 3);
+    for (int i = 0; i < vc; ++i)
+    {
+        restPos[i * 3 + 0] = head->vertices[i].x;
+        restPos[i * 3 + 1] = head->vertices[i].y;
+        restPos[i * 3 + 2] = head->vertices[i].z;
+        const Nif::Vector3& n = head->normals[i];
+        restNrm[i * 3 + 0] = n.x;
+        restNrm[i * 3 + 1] = n.y;
+        restNrm[i * 3 + 2] = n.z;
+    }
+    const int nb = head->skinBones.size();
+    QVector<float> palettes(nb * 16, 0.0f);
+    QVector<float> normalPalettes(nb * 9, 0.0f);
+    for (int b = 0; b < nb; ++b)
+    {
+        palettes[b * 16 + 0] = palettes[b * 16 + 5] = palettes[b * 16 + 10] = palettes[b * 16 + 15] = 1.0f;
+        normalPalettes[b * 9 + 0] = normalPalettes[b * 9 + 4] = normalPalettes[b * 9 + 8] = 1.0f;
+    }
+    QVector<Nif::SkinVertexWeight> influences = head->skinWeights;
+    QVector<QVector3D> outPos(vc), outNrm(vc);
+    Nif::blendSkinnedLocal(
+        restPos.constData(), restNrm.constData(), vc,
+        reinterpret_cast<const float(*)[16]>(palettes.constData()),
+        reinterpret_cast<const float(*)[9]>(normalPalettes.constData()),
+        nb, influences.constData(), influences.size(),
+        reinterpret_cast<float*>(outPos.data()),
+        reinterpret_cast<float*>(outNrm.data()));
+    for (int i = 0; i < vc; ++i)
+    {
+        QVERIFY(qAbs(outPos[i].x() - head->vertices[i].x) < 1e-4f);
+        QVERIFY(qAbs(outPos[i].y() - head->vertices[i].y) < 1e-4f);
+        QVERIFY(qAbs(outPos[i].z() - head->vertices[i].z) < 1e-4f);
+        QVERIFY(qAbs(outNrm[i].x() - head->normals[i].x) < 1e-4f);
+        QVERIFY(qAbs(outNrm[i].y() - head->normals[i].y) < 1e-4f);
+        QVERIFY(qAbs(outNrm[i].z() - head->normals[i].z) < 1e-4f);
+    }
 }
 
 void TestNifSkinning::testSyntheticSkinnedFileLoad()

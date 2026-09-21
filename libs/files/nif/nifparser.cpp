@@ -10,6 +10,7 @@
 #include <cmath>
 #include <QMap>
 #include <QStack>
+#include <functional>
 
 #include "logger.hpp"
 #include "nifrecord.hpp"
@@ -887,10 +888,19 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
     // Starfield BSSkin triplets (§8.3): [BSGeometry][extras]*[SkinAttach]
     // [BSSkin::Instance][BSSkin::BoneData] (a BSClothExtraData may sit
     // between Attach and Instance). Populates TriShape bone names from the
-    // attach block; bone nodes stay null and weights stay empty (no
-    // skeleton/weight streams wired yet), so shapes keep the rigid
-    // fallback via isSkinned().
+    // attach block and per-vertex weights from the resolved external .mesh
+    // (weights are attach-local: maxBone == attachBones-1 on every shipped
+    // face shape). Bones link to scene nodes by name when the skeleton is
+    // present in the file; otherwise the bind-pose blend is an identity.
     {
+        QMap<QString, Node*> nameToNode;
+        std::function<void(Node*)> collectNames = [&](Node* n) {
+            if (!n) return;
+            if (!n->name.isEmpty() && !nameToNode.contains(n->name))
+                nameToNode.insert(n->name, n);
+            for (Node* c : n->children) collectNames(c);
+        };
+        collectNames(ourRoot);
         qint32 lastGeom = -1;
         qint32 pendingAttach = -1;
         for (auto it = blocks.constBegin(); it != blocks.constEnd(); ++it) {
@@ -926,11 +936,33 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
             for (const QString& boneName : attach->boneNames) {
                 SkinBone bone;
                 bone.boneName = boneName;
-                bone.boneNode = nullptr;
+                bone.boneNode = nameToNode.value(boneName, nullptr);
                 shape.skinBones.append(bone);
             }
-            LOG_INFO(QString("Linked BSSkin to shape '%1': %2 bones (names only)")
-                         .arg(shape.name).arg(shape.skinBones.size()));
+            shape.skinWeights.clear();
+            if (auto* mdata = dynamic_cast<NifTriShapeData*>(
+                    blocks.value(shell->refGeometryData))) {
+                const quint32 wpv = mdata->skinWeightsPerVertex;
+                const int n = mdata->skinBoneIndices.size();
+                if (wpv > 0 && n == mdata->skinBoneWeights.size()) {
+                    for (int e = 0, v = 0; e + static_cast<int>(wpv) <= n;
+                         e += static_cast<int>(wpv), ++v) {
+                        for (quint32 k = 0; k < wpv; ++k) {
+                            const quint16 b = mdata->skinBoneIndices[e + k];
+                            const quint16 w = mdata->skinBoneWeights[e + k];
+                            if (w == 0 || b >= shape.skinBones.size()) continue;
+                            SkinVertexWeight sw;
+                            sw.vertex = static_cast<quint32>(v);
+                            sw.bone = b;
+                            sw.weight = w / 65535.0f;
+                            shape.skinWeights.append(sw);
+                        }
+                    }
+                }
+            }
+            LOG_INFO(QString("Linked BSSkin to shape '%1': %2 bones, %3 weights")
+                         .arg(shape.name).arg(shape.skinBones.size())
+                         .arg(shape.skinWeights.size()));
         }
     }
 }
@@ -1862,6 +1894,15 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
                     }
                     for (quint32 idx : md.triangles)
                         data->indices.append(idx);
+                    // Per-vertex skin weights survive on the synthetic block
+                    // so the BSSkin triplet link can pair them with the
+                    // attach's bone names (indices are attach-local: verified
+                    // maxBone == attachBones-1 on every shipped face shape).
+                    data->skinWeightsPerVertex = md.weightsPerVertex;
+                    for (const BsMeshBoneWeight& w : md.weights) {
+                        data->skinBoneIndices.append(w.bone);
+                        data->skinBoneWeights.append(w.weightRaw);
+                    }
                     const quint32 key = 0x40000000u | it.key();
                     blocks.insert(key, data);
                     shell->refGeometryData = key;
