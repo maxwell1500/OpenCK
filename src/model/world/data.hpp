@@ -1593,6 +1593,9 @@ public:
     /// \brief Map an on-disk Morrowind record code to a CkId::Type.
     static CkId::Type tes3TypeForName(NAME code);
 
+    /// \brief Every on-disk Morrowind record code with a CkId::Type mapping.
+    static QVector<NAME> tes3MappedCodes();
+
     /// \brief Map a CkId::Type to its on-disk record code (0 if unknown).
     static NAME recordNameForType(CkId::Type type)
     {

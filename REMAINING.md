@@ -984,6 +984,25 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      editors (the generic QtFormDialog path already opens every TES3
      record with the typed DATA fields).
 
+     **Status 2026-09-22 (specialised Morrowind editors — Phase 2c done):**
+     done.
+     - Object Window gains a Morrowind category tree in
+       `ObjectWindowModel::initCategories` / `rebuildAllRecords`
+       (Body/Levc/Levi/Lock/Pgrd/Prob/Repa/Sndg/Skil group additions);
+       `editSelected` / `openRecordEditor` / `getFormComponentsForIndex`
+       early-route every TES3 type through `getCollectionByType` +
+       `resolveComponents` before the Starfield/NVSE switch, opening under
+       a `T3:<code>` factory key so TES3 and TES4 codes never clobber each
+       other.
+     - `Data::tes3TypeForName` is table-driven; `Data::tes3MappedCodes()`
+       enumerates all 41 mapped codes for factory registration.
+     - New read-only `Tes3RecordDataWidget` (`T3:` factories in
+       `ObjectWindowDialog::factoriesRegistered`) shows record code /
+       editor id / form id / flags plus the raw-subrecord table.
+     - `test_tes3recorddatawidget`: mapped-codes round-trip, null +
+       synthetic widget fields, `T3:` factory key via `openOrFocus`.
+     TES3 Phase 2c complete.
+
 ---
 
 ## 4. Test infrastructure
@@ -1395,9 +1414,17 @@ this section is documentation of findings, per the §3 review).
     `FxCompiledFaceGraph`, `FxMasterBoneList`, `FxNamedObject`, `FxName`…)
     whose nodes are graph controls (`browLowererL`, `Eyebrow Raise`, `Eye
     Yaw`) — not the `faceBone_*` skeleton names. Playing these therefore
-    means reimplementing the FaceFX runtime (evaluate the compiled face
-    graph to bone transforms per frame); OC3 themselves state they do not
-    know Starfield's exact implementation. Not attempted: it is a
-    middleware reimplementation, not a file-format decode, and no public
-    spec exists. The skinned pipeline it would feed is complete and tested;
-    only this data source is unsupported.
+     means reimplementing the FaceFX runtime (evaluate the compiled face
+     graph to bone transforms per frame); OC3 themselves state they do not
+     know Starfield's exact implementation. Not attempted: it is a
+     middleware reimplementation, not a file-format decode, and no public
+     spec exists. The skinned pipeline it would feed is complete and tested;
+     only this data source is unsupported.
+
+     **`.facefx` partial parser 2026-09-22:** `libs/files/facefx/facefxactor.*`
+     decodes the container framing (header magic/version, typed object
+     stream, node-name table) and rejects anything it does not recognize
+     rather than guessing; `test_facefxactor` covers the four actors under
+     `Content/Tools/FaceFX/` (plus a real-data gate via
+     `OPENCK_TEST_FACEFX_DIR`). Deeper `FxCompiledFaceGraph` evaluation
+     remains out of scope with the runtime reimplementation above.

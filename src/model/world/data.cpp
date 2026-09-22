@@ -1242,53 +1242,77 @@ Data::~Data()
     m_tes3Collections.clear();
 }
 
+namespace {
+
+struct Tes3CodeMapping
+{
+    NAME code;
+    CkId::Type type;
+};
+
+const Tes3CodeMapping kTes3CodeMappings[] = {
+    { 'GMST', CkId::Type_Gmst },
+    { 'NPC_', CkId::Type_Npc_ },
+    { 'WEAP', CkId::Type_Weap_ },
+    { 'ARMO', CkId::Type_Armor_ },
+    { 'SPEL', CkId::Type_Spel_ },
+    { 'MGEF', CkId::Type_Magic_ },
+    { 'DIAL', CkId::Type_Dial_ },
+    { 'INFO', CkId::Type_Info_ },
+    { 'GLOB', CkId::Type_Glob_ },
+    { 'ALCH', CkId::Type_Alch_ },
+    { 'INGR', CkId::Type_Ingr_ },
+    { 'CONT', CkId::Type_Cont_ },
+    { 'ENCH', CkId::Type_Ench_ },
+    { 'BOOK', CkId::Type_Book_ },
+    { 'MISC', CkId::Type_Misc_ },
+    { 'ACTI', CkId::Type_Acti_ },
+    { 'STAT', CkId::Type_Stat_ },
+    { 'RACE', CkId::Type_Race_ },
+    { 'CLAS', CkId::Type_Class_ },
+    { 'FACT', CkId::Type_Fact_ },
+    { 'CELL', CkId::Type_Cel_ },
+    { 'LAND', CkId::Type_Land_ },
+    { 'SOUN', CkId::Type_Soun_ },
+    { 'LTEX', CkId::Type_Ltex_ },
+    { 'APPA', CkId::Type_Appa_ },
+    { 'BSGN', CkId::Type_Bsgn_ },
+    { 'CLOT', CkId::Type_Clot_ },
+    { 'CREA', CkId::Type_Crea_ },
+    { 'DOOR', CkId::Type_Door_ },
+    { 'LIGH', CkId::Type_Ligh_ },
+    { 'REGN', CkId::Type_Regn_ },
+    { 'SCPT', CkId::Type_Scpt_ },
+    { 'BODY', CkId::Type_Body_ },
+    { 'LEVC', CkId::Type_Levc_ },
+    { 'LEVI', CkId::Type_Levi_ },
+    { 'LOCK', CkId::Type_Lock_ },
+    { 'PGRD', CkId::Type_Pgrd_ },
+    { 'PROB', CkId::Type_Prob_ },
+    { 'REPA', CkId::Type_Repa_ },
+    { 'SNDG', CkId::Type_Sndg_ },
+    { 'SKIL', CkId::Type_Skil_ },
+};
+
+} // namespace
+
 CkId::Type Data::tes3TypeForName(NAME code)
 {
-    switch (code)
+    for (const auto& mapping : kTes3CodeMappings)
     {
-    case 'GMST': return CkId::Type_Gmst;
-    case 'NPC_': return CkId::Type_Npc_;
-    case 'WEAP': return CkId::Type_Weap_;
-    case 'ARMO': return CkId::Type_Armor_;
-    case 'SPEL': return CkId::Type_Spel_;
-    case 'MGEF': return CkId::Type_Magic_;
-    case 'DIAL': return CkId::Type_Dial_;
-    case 'INFO': return CkId::Type_Info_;
-    case 'GLOB': return CkId::Type_Glob_;
-    case 'ALCH': return CkId::Type_Alch_;
-    case 'INGR': return CkId::Type_Ingr_;
-    case 'CONT': return CkId::Type_Cont_;
-    case 'ENCH': return CkId::Type_Ench_;
-    case 'BOOK': return CkId::Type_Book_;
-    case 'MISC': return CkId::Type_Misc_;
-    case 'ACTI': return CkId::Type_Acti_;
-    case 'STAT': return CkId::Type_Stat_;
-    case 'RACE': return CkId::Type_Race_;
-    case 'CLAS': return CkId::Type_Class_;
-    case 'FACT': return CkId::Type_Fact_;
-    case 'CELL': return CkId::Type_Cel_;
-    case 'LAND': return CkId::Type_Land_;
-    case 'SOUN': return CkId::Type_Soun_;
-    case 'LTEX': return CkId::Type_Ltex_;
-    case 'APPA': return CkId::Type_Appa_;
-    case 'BSGN': return CkId::Type_Bsgn_;
-    case 'CLOT': return CkId::Type_Clot_;
-    case 'CREA': return CkId::Type_Crea_;
-    case 'DOOR': return CkId::Type_Door_;
-    case 'LIGH': return CkId::Type_Ligh_;
-    case 'REGN': return CkId::Type_Regn_;
-    case 'SCPT': return CkId::Type_Scpt_;
-    case 'BODY': return CkId::Type_Body_;
-    case 'LEVC': return CkId::Type_Levc_;
-    case 'LEVI': return CkId::Type_Levi_;
-    case 'LOCK': return CkId::Type_Lock_;
-    case 'PGRD': return CkId::Type_Pgrd_;
-    case 'PROB': return CkId::Type_Prob_;
-    case 'REPA': return CkId::Type_Repa_;
-    case 'SNDG': return CkId::Type_Sndg_;
-    case 'SKIL': return CkId::Type_Skil_;
-    default: return CkId::Type_None;
+        if (mapping.code == code)
+            return mapping.type;
     }
+    return CkId::Type_None;
+}
+
+QVector<NAME> Data::tes3MappedCodes()
+{
+    QVector<NAME> codes;
+    codes.reserve(static_cast<int>(sizeof(kTes3CodeMappings) / sizeof(kTes3CodeMappings[0])));
+    for (const auto& mapping : kTes3CodeMappings)
+        codes.append(mapping.code);
+    return codes;
 }
 
 IdCollection<Tes3Record>* Data::tes3CollectionFor(NAME code)

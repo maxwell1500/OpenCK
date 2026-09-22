@@ -600,6 +600,7 @@ set(FILES_SOURCES
     libs/files/audio/oggencoder.cpp
     libs/files/audio/fuzparser.cpp
     libs/files/audio/xwmadecoder.cpp
+    libs/files/facefx/facefxactor.cpp
 )
 
 set(FILES_HEADERS
@@ -626,6 +627,7 @@ set(FILES_HEADERS
     libs/files/audio/oggencoder.hpp
     libs/files/audio/fuzparser.hpp
     libs/files/audio/xwmadecoder.hpp
+    libs/files/facefx/facefxactor.hpp
 )
 
 add_library(openck_files STATIC
@@ -643,6 +645,7 @@ target_include_directories(openck_files PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/files/ba2
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/files/nifanim
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/files/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/files/facefx
 )
 
 target_link_libraries(openck_files PUBLIC
@@ -983,6 +986,7 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/cellmapview.cpp
     src/view/window/npceditor.cpp
     src/view/window/npcrecorddatawidget.cpp
+    src/view/window/tes3recorddatawidget.cpp
     src/view/window/racedatawidget.cpp
     src/view/window/wthrdatawidget.cpp
     src/view/window/sounddatawidget.cpp
@@ -1104,6 +1108,7 @@ set(VIEW_HEADERS
     src/view/window/cellmapview.hpp
     src/view/window/npceditor.hpp
     src/view/window/npcrecorddatawidget.hpp
+    src/view/window/tes3recorddatawidget.hpp
     src/view/window/racedatawidget.hpp
     src/view/window/wthrdatawidget.hpp
     src/view/window/sounddatawidget.hpp

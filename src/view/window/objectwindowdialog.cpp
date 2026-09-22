@@ -34,6 +34,7 @@
 #include "scenetimelinewidget.hpp"
 #include "navmesheditordialog.hpp"
 #include "rawsubrecordwidget.hpp"
+#include "tes3recorddatawidget.hpp"
 #include "../../../libs/files/esm/effectshaderrecord.hpp"
 #include "../../../libs/files/esm/imagespacerecord.hpp"
 #include "../../../libs/files/esm/scenrecord.hpp"
@@ -268,6 +269,15 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
                     w->setSubrecords(rec->rawSubRecords);
                 return w;
             });
+        for (NAME code : Data::tes3MappedCodes())
+        {
+            QtFormDialogManager::instance().registerFactory(
+                QStringLiteral("T3:") + nameToQString(code),
+                [](FormComponents* comps, void* recPtr,
+                   QWidget* parent) -> QWidget* {
+                    return new Tes3RecordDataWidget(recPtr, comps, parent);
+                });
+        }
     }
 }
 
@@ -631,6 +641,35 @@ void ObjectWindowDialog::editSelected()
     int recordIndex = mModel->getRecordIndex(index);
     QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
     CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
+
+    if (mData->currentGame() == GameFormat::Game::Morrowind)
+    {
+        if (type != CkId::Type_None)
+        {
+            BaseCollection* coll = mData->getCollectionByType(type);
+            if (coll && recordIndex >= 0 && recordIndex < coll->size())
+            {
+                openck::FormComponents* comps = nullptr;
+                void* recPtr = nullptr;
+                if (resolveComponents(coll, recordIndex, comps, recPtr) && comps)
+                {
+                    quint32 formId = coll->getFormId(recordIndex);
+                    QString formIdKey = formId != 0
+                        ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
+                        : QStringLiteral("%1|%2").arg(editorId, QStringLiteral("0"));
+                    const NAME code = Data::recordNameForType(type);
+                    const QString recordType = QStringLiteral("T3:") + nameToQString(code);
+                    openck::QtFormDialogManager::instance().openOrFocus(
+                        formIdKey, recordType, comps, recPtr, this);
+                    return;
+                }
+            }
+        }
+        QMessageBox::information(this, "Edit Record",
+            QString("Record '%1' cannot be opened for editing because its data is not available.")
+                .arg(editorId));
+        return;
+    }
 
     switch (type)
     {
@@ -1238,7 +1277,9 @@ void ObjectWindowDialog::editSelected()
                     QString formIdKey = formId != 0
                         ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
                         : QStringLiteral("%1|%2").arg(editorId, QStringLiteral("0"));
-                    openck::QtFormDialogManager::instance().openOrFocus(formIdKey, comps, this);
+                    const QString recordType = nameToQString(Data::recordNameForType(type));
+                    openck::QtFormDialogManager::instance().openOrFocus(
+                        formIdKey, recordType, comps, recPtr, this);
                     break;
                 }
             }
@@ -3190,6 +3231,26 @@ ObjectWindowDialog::RecordLookupResult ObjectWindowDialog::getFormComponentsForI
 {
     RecordLookupResult result;
     CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
+
+    if (mData->currentGame() == GameFormat::Game::Morrowind)
+    {
+        if (type != CkId::Type_None)
+        {
+            BaseCollection* coll = mData->getCollectionByType(type);
+            if (coll && recordIndex >= 0 && recordIndex < coll->size())
+            {
+                openck::FormComponents* comps = nullptr;
+                void* recPtr = nullptr;
+                if (resolveComponents(coll, recordIndex, comps, recPtr) && comps)
+                {
+                    result.components = comps;
+                    result.recordPtr = recPtr;
+                    result.recordType = CkId(type).getTypeName();
+                }
+            }
+        }
+        return result;
+    }
 
     switch (type)
     {

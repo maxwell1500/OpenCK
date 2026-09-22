@@ -37,11 +37,34 @@ void ObjectWindowModel::setData(Data* data)
 
 void ObjectWindowModel::initCategories(Data* data)
 {
-    auto addCategory = [this, data](const QString& name, CkId::Type typeId) {
+    const bool isMorrowind = data->currentGame() == GameFormat::Game::Morrowind;
+
+    auto addCategory = [this, data, isMorrowind](const QString& name, CkId::Type typeId) {
         Category cat;
         cat.name = name;
         cat.typeId = static_cast<int>(typeId);
         cat.totalRecords = 0;
+
+        if (isMorrowind)
+        {
+            if (const BaseCollection* coll = data->getCollectionByType(typeId))
+            {
+                cat.totalRecords = coll->size();
+                for (int i = 0; i < cat.totalRecords; i++)
+                {
+                    VisibleRecord rec;
+                    rec.actualIndex = i;
+                    rec.editorId = coll->getId(i);
+                    rec.formId = formatFormId(coll->getFormId(i));
+                    cat.visibleRecords.append(rec);
+                }
+            }
+            if (cat.totalRecords == 0)
+                return;
+            cat.parsedCount = cat.totalRecords;
+            mCategories.append(cat);
+            return;
+        }
 
         switch (typeId)
         {
@@ -1711,6 +1734,18 @@ void ObjectWindowModel::initCategories(Data* data)
     addCategory("WWED", CkId::Type_Wwed_);
     addCategory("ZOOM", CkId::Type_Zoom_);
 
+    if (isMorrowind)
+    {
+        addCategory("Body Part", CkId::Type_Body_);
+        addCategory("Leveled Creature List", CkId::Type_Levc_);
+        addCategory("Leveled Item List", CkId::Type_Levi_);
+        addCategory("Lockpick", CkId::Type_Lock_);
+        addCategory("Path Grid", CkId::Type_Pgrd_);
+        addCategory("Probe", CkId::Type_Prob_);
+        addCategory("Repair Tool", CkId::Type_Repa_);
+        addCategory("Sound Generator", CkId::Type_Sndg_);
+        addCategory("Skill", CkId::Type_Skil_);
+    }
 
     auto addGroupNamed = [this](const QString& name, std::initializer_list<QString> catNames) {
         CategoryGroup group;
@@ -1739,11 +1774,12 @@ void ObjectWindowModel::initCategories(Data* data)
     }
 
     addGroupNamed("Actors", {"NPC", "Creature", "Leveled Actor", "Leveled NPC", "Actor Values", "Voice Types",
-                                "Eyes", "Hair", "Idle Animation"});
+                                "Eyes", "Hair", "Idle Animation", "Leveled Creature List"});
     addGroupNamed("Items", {"Armor", "Weapon", "Alchemy", "Ingredient", "Book", "Misc", "Container",
                             "Enchantment", "Spell", "Magic Effect", "Ammo", "Key", "Soul Gem", "Scroll",
                             "Potion", "Leveled Item", "Constructible Object", "Outfit",
-                            "Apparatus", "Clothing", "Form List", "Leveled Spell"});
+                            "Apparatus", "Clothing", "Form List", "Leveled Spell",
+                            "Lockpick", "Probe", "Repair Tool", "Leveled Item List"});
     addGroupNamed("World Objects", {"Static", "Activator", "Tree", "Movable Static", "Static Collection",
                                     "Door", "Furniture", "Flora", "Grass", "Debris", "Hazard", "Idle Marker",
                                     "Light", "Acoustic Space", "Image Space", "Explosion", "Projectile",
@@ -1751,11 +1787,11 @@ void ObjectWindowModel::initCategories(Data* data)
     addGroupNamed("Gameplay", {"Quest", "Package", "Global", "Game Setting", "Perk", "Class", "Faction",
                                "Race", "Combat Style", "Encounter Zone", "Body Part", "Head Part", "Location",
                                "Keyword", "Camera Path", "Camera Shot", "Impact Data", "Lens Flare",
-                               "Speech Challenge", "Birthsign", "Relationship", "Shout", "Movement Type"});
-    addGroupNamed("Audio", {"Sound", "Music Type", "Music Track", "Voice Type", "Sound Marker", "Reverb"});
+                               "Speech Challenge", "Birthsign", "Relationship", "Shout", "Movement Type", "Skill"});
+    addGroupNamed("Audio", {"Sound", "Music Type", "Music Track", "Voice Type", "Sound Marker", "Reverb", "Sound Generator"});
     addGroupNamed("Dialogue", {"Dialogue", "Info", "Topic", "Scene", "Message", "Note", "Terminal"});
     addGroupNamed("World", {"Cell", "Worldspace", "Navmesh", "Landscape", "Reference", "Weather",
-                            "Land Texture", "Climate", "Region", "Road"});
+                             "Land Texture", "Climate", "Region", "Road", "Path Grid"});
     addGroupNamed("Miscellaneous", {"Location Reference Type", "Effect Shader", "Art Object", "Water Shader",
                                     "Weather Shader", "Power", "Default Object", "Association Type",
                                     "Biome", "Snap Template", "Material", "Material Type", "Load Screen", "Script",
@@ -1819,9 +1855,29 @@ void ObjectWindowModel::applyObjectFilter(const ObjectWindowFilter& filter)
 
 void ObjectWindowModel::rebuildAllRecords()
 {
+    const bool isMorrowind = mData && mData->currentGame() == GameFormat::Game::Morrowind;
+
     for (auto& cat : mCategories)
     {
         cat.visibleRecords.clear();
+
+        if (isMorrowind)
+        {
+            if (const BaseCollection* coll = mData->getCollectionByType(static_cast<CkId::Type>(cat.typeId)))
+            {
+                const int count = coll->size();
+                for (int i = 0; i < count; i++)
+                {
+                    VisibleRecord rec;
+                    rec.actualIndex = i;
+                    rec.editorId = coll->getId(i);
+                    rec.formId = formatFormId(coll->getFormId(i));
+                    cat.visibleRecords.append(rec);
+                }
+            }
+            continue;
+        }
+
         for (int i = 0; i < cat.totalRecords; i++)
         {
             VisibleRecord rec;

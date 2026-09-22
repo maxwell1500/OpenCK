@@ -573,6 +573,31 @@ void SearchDialog::onDoubleClicked(QListWidgetItem* item)
 
 void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
 {
+    if (mData->currentGame() == GameFormat::Game::Morrowind)
+    {
+        if (result.type != CkId::Type_None)
+        {
+            BaseCollection* coll = mData->getCollectionByType(result.type);
+            if (coll && result.recordIndex >= 0 && result.recordIndex < coll->size())
+            {
+                openck::FormComponents* comps = nullptr;
+                void* recPtr = nullptr;
+                if (resolveComponents(coll, result.recordIndex, comps, recPtr) && comps)
+                {
+                    quint32 formId = coll->getFormId(result.recordIndex);
+                    QString formIdKey = formId != 0
+                        ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
+                        : result.editorId;
+                    const NAME code = Data::recordNameForType(result.type);
+                    const QString recordType = QStringLiteral("T3:") + nameToQString(code);
+                    openck::QtFormDialogManager::instance().openOrFocus(
+                        formIdKey, recordType, comps, recPtr, this);
+                }
+            }
+        }
+        return;
+    }
+
     switch (result.type)
     {
     case CkId::Type_Npc_:
@@ -1267,7 +1292,9 @@ void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
                     QString formIdKey = formId != 0
                         ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
                         : result.editorId;
-                    openck::QtFormDialogManager::instance().openOrFocus(formIdKey, comps, this);
+                    const QString recordType = nameToQString(Data::recordNameForType(result.type));
+                    openck::QtFormDialogManager::instance().openOrFocus(
+                        formIdKey, recordType, comps, recPtr, this);
                     break;
                 }
             }

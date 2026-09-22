@@ -885,6 +885,18 @@ target_link_libraries(test_fuzparser PRIVATE openck_files test_stubs Qt6::Test)
 target_include_directories(test_fuzparser PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_fuzparser)
 
+# Partial .facefx actor container parser (type table + node names)
+add_executable(test_facefxactor test_facefxactor.cpp)
+target_link_libraries(test_facefxactor PRIVATE openck_files test_stubs Qt6::Test)
+target_include_directories(test_facefxactor PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_facefxactor)
+
+# TES3 record data widget + tes3MappedCodes round-trip + T3: factory key
+add_executable(test_tes3recorddatawidget test_tes3recorddatawidget.cpp)
+target_link_libraries(test_tes3recorddatawidget PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_tes3recorddatawidget PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_tes3recorddatawidget)
+
 # Scene (SCEN) phase timeline model
 add_executable(test_scenephasemodel test_scenephasemodel.cpp)
 target_link_libraries(test_scenephasemodel PRIVATE openck_model test_stubs Qt6::Test)
@@ -919,7 +931,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_configpaths test_conflict test_creatureattachpoints test_creatureeditor
     test_crashhandler test_csvsnippet test_datamodel test_ddsdecoder test_dumpesm test_editor_lifecycle
     test_editor_widgets test_editor_writeback test_editorproperty test_editrecordcommand test_efshrecord
-    test_esl test_exportimport     test_fbximporter test_fuzparser test_gameformat test_gitrepository
+    test_esl test_exportimport     test_facefxactor test_fbximporter test_fuzparser test_gameformat test_gitrepository
     test_gizmomath test_groundtruth test_headerparsing test_hknpphysicssystem test_iconrenderer
     test_imgsrecord test_integration test_loader test_locationrecord test_lodgenerator
     test_mastermanagement test_materialpropertygraph test_materialruletemplate
@@ -943,7 +955,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_fullscale_roundtrip
     test_terrainblock
     test_terrainoverlaymask test_textureconversionrules test_texturelayer
-    test_tes3 test_tes3roundtrip test_tes3data test_structuredfidelity test_thememanager test_tier3_components test_undostack test_warningsdock
+    test_tes3 test_tes3roundtrip test_tes3data test_tes3recorddatawidget test_structuredfidelity test_thememanager test_tier3_components test_undostack test_warningsdock
     test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)
 
 # Vendored libogg self-tests are registered with CTest (external/ogg) but the
