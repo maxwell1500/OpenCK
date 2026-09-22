@@ -1261,7 +1261,7 @@ this section is documentation of findings, per the §3 review).
    latent loader bugs the tests exposed: `NiTriShapeData` misdispatched as
    `NiTriShape` (prefix match order), and a zero-progress infinite loop in
    `parseAllBlocks` on non-dialect input (now breaks cleanly). GPU skinning
-   stays future work.
+   landed 2026-09-21 (see §8.3).
 2. **Quaternion-correct interpolation — DONE 2026-09-14.** `AnimKeyframe`
    / `TransformKeyframe` carry `qw..qz` + `hasQuat` alongside the Euler
    angles; `interpolateChannel` slerps when both endpoints have quats
@@ -1382,3 +1382,22 @@ this section is documentation of findings, per the §3 review).
     Shapes over the 128-bone budget or without bones fall back to CPU.
     `setGpuSkinningEnabled()` toggles it (forces a VBO rebuild). The shader
     itself needs a display to confirm visually.
+
+    **Face animation (`__ffx`) 2026-09-21 — investigated, out of scope.**
+    Shipped face motion is not in the NIF: it is FaceFX middleware data.
+    `Starfield - FaceAnimation0*.ba2` holds `*.ffxanim` (76,659 entries in
+    vol. 01) carrying `__ffx\0` + version + u32 size + 20-byte id (last 8
+    bytes constant) + u32 record count, then `count` **12-byte records**
+    (`f32 value` + 4×u16; ~94 distinct channel ids, sparsely interleaved by
+    time). The channel→bone map lives in the **`.facefx` actor** (present
+    only in `Content/Tools/FaceFX/StarfieldHumanFemale.facefx`, 81 KB):
+    `FACE{` + `ZeniMax Media` + a typed object stream (`FxActor`,
+    `FxCompiledFaceGraph`, `FxMasterBoneList`, `FxNamedObject`, `FxName`…)
+    whose nodes are graph controls (`browLowererL`, `Eyebrow Raise`, `Eye
+    Yaw`) — not the `faceBone_*` skeleton names. Playing these therefore
+    means reimplementing the FaceFX runtime (evaluate the compiled face
+    graph to bone transforms per frame); OC3 themselves state they do not
+    know Starfield's exact implementation. Not attempted: it is a
+    middleware reimplementation, not a file-format decode, and no public
+    spec exists. The skinned pipeline it would feed is complete and tested;
+    only this data source is unsupported.
