@@ -10,8 +10,9 @@ struct BsaFileEntry {
     QString fullPath;          // folder\file.fuz
     QString folderName;
     QString fileName;
-    quint32 size = 0;          // on-disk size (bit 30 = per-file compression override)
-    quint32 offset = 0;        // absolute file offset of data
+    quint32 size = 0;          // uncompressed size
+    quint32 packedSize = 0;    // compressed size (0 = stored); BTDX only
+    quint64 offset = 0;        // absolute file offset of data
     quint64 nameHash = 0;
     bool compressed = false;
 
@@ -74,6 +75,7 @@ public:
 private:
     bool readCompressed(quint32 index, QByteArray& out) const;
     bool readUncompressed(quint32 index, QByteArray& out) const;
+    bool readBtdxCompressed(quint32 index, QByteArray& out) const;
 
     QString mName;
     QVector<BsaFileEntry> mEntries;
@@ -81,4 +83,12 @@ private:
     qint64 mFileSize = 0;
     quint32 mFlags = 0;
     quint32 mVersion = 0;
+
+    // 0 for the classic 'BSA\0' family, or the Starfield 'BTDX' version (2 for
+    // zlib general archives, 3 for LZ4 texture archives). The two families use
+    // different codecs, so the version selects the decompressor.
+    bool mBtdx = false;
+    bool mBtdxLz4 = false;
+
+    bool readBtdx();
 };

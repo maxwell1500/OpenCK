@@ -18,6 +18,8 @@ private slots:
     void testOpenVoicesArchive();
     void testOpenMeshesArchive();
     void testOpenMorrowindArchive();
+    void testOpenStarfieldBtdx();
+    void testStarfieldBtdxExtractsNif();
     void testExtractFuzRoundTrip();
 };
 
@@ -97,6 +99,69 @@ void TestBsaArchive::testOpenMorrowindArchive()
     QVERIFY(archive.readData(0, data));
     QVERIFY(data.size() > 0);
     qDebug() << "first entry:" << archive.entries()[0].fullPath << data.size() << "bytes";
+}
+
+// Starfield's 'BTDX' container is a different layout from the classic BSA
+// family: a 32-byte header, fixed 36-byte file declarations, the data, then a
+// trailing u16-length name table. Version 2 is zlib, version 3 a raw LZ4 block.
+static const char* kStarfieldData = "C:/XboxGames/Starfield/Content/Data/";
+static const char* kStarfieldArchive = "Starfield - LODMeshes.ba2";
+
+static bool starfieldInstalled()
+{
+    return QFile::exists(QString::fromLatin1(kStarfieldData) + QLatin1String(kStarfieldArchive));
+}
+
+void TestBsaArchive::testOpenStarfieldBtdx()
+{
+    if (!starfieldInstalled()) QSKIP("Starfield not found");
+
+    BsaArchive archive;
+    QVERIFY2(archive.open(QString::fromLatin1(kStarfieldData)
+                          + QLatin1String(kStarfieldArchive)),
+             "failed to open the Starfield BTDX archive");
+    QVERIFY(archive.fileCount() > 1000);
+
+    // Names come from the trailing name table and use forward slashes, so the
+    // stored paths are archive-relative, not Windows paths.
+    int withNifs = 0;
+    for (int i = 0; i < archive.fileCount(); ++i)
+        if (archive.entries()[i].fullPath.endsWith(".nif", Qt::CaseInsensitive))
+            ++withNifs;
+    QVERIFY2(withNifs > 0, "no NIF entries in the Starfield archive");
+
+    // Every declaration carries the 0xBAADF00D marker and a name; a parse that
+    // drifted would produce empty or absurd paths.
+    for (int i = 0; i < qMin(archive.fileCount(), 500); ++i) {
+        QVERIFY(!archive.entries()[i].fullPath.isEmpty());
+        QVERIFY(archive.entries()[i].size > 0);
+    }
+}
+
+void TestBsaArchive::testStarfieldBtdxExtractsNif()
+{
+    if (!starfieldInstalled()) QSKIP("Starfield not found");
+
+    BsaArchive archive;
+    QVERIFY(archive.open(QString::fromLatin1(kStarfieldData)
+                         + QLatin1String(kStarfieldArchive)));
+
+    int checked = 0;
+    for (int i = 0; i < archive.fileCount() && checked < 5; ++i) {
+        const BsaFileEntry& entry = archive.entries()[i];
+        if (!entry.fullPath.endsWith(".nif", Qt::CaseInsensitive)) continue;
+        QByteArray data;
+        QVERIFY2(archive.readData(static_cast<quint32>(i), data),
+                 qPrintable(entry.fullPath));
+        // A NIF always starts with its version line; anything else means the
+        // payload was mis-sliced or mis-decompressed.
+        QVERIFY2(data.startsWith("Gamebryo"),
+                 qPrintable(entry.fullPath + QStringLiteral(": starts with '")
+                            + QString::fromLatin1(data.left(12)) + QStringLiteral("'")));
+        QVERIFY(data.size() > 100);
+        ++checked;
+    }
+    QVERIFY(checked > 0);
 }
 
 void TestBsaArchive::testExtractFuzRoundTrip()

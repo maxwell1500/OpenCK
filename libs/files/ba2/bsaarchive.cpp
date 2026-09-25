@@ -353,6 +353,20 @@ quint64 readU64(QDataStream& ds)
     return v;
 }
 
+// Starfield name table entry: u16 length + path bytes.
+QString readU16LenString(QDataStream& ds, bool& ok)
+{
+    ok = false;
+    const quint16 len = readU16(ds);
+    if (ds.status() != QDataStream::Ok || len == 0 || len > 1024)
+        return QString();
+    QByteArray bytes(len, 0);
+    if (ds.readRawData(bytes.data(), len) != len)
+        return QString();
+    ok = true;
+    return QString::fromLatin1(bytes);
+}
+
 QString readLenPrefixed(QDataStream& ds, bool& ok, qint64* encodedLength = nullptr)
 {
     if (encodedLength)
@@ -449,6 +463,137 @@ BsaArchive::~BsaArchive()
     }
 }
 
+// Starfield 'BTDX' general (GNRL) archives. Layout, verified against the
+// shipped archives and matching the community format notes:
+//
+//   header (32 bytes, or 36 for the LZ4 texture variant)
+//     magic "BTDX", version u32, type "GNRL",
+//     file count u32, name table offset u64, unknown u64 (1; v3 adds a u32
+//     compression method)
+//   file count declarations of 36 bytes each
+//     file hash u32, extension char[4], directory hash u32,
+//     0 u8, 1 u8, 0x0010 u16, data offset u64,
+//     packed length u32 (0 = stored), unpacked length u32, 0xBAADF00D u32
+//   the file data
+//   the name table: file count x (u16 length + path bytes)
+//
+// Version 2 compresses with zlib, version 3 with a raw LZ4 block. Starfield
+// writes paths with forward slashes.
+bool BsaArchive::readBtdx()
+{
+    const auto fail = [this]() {
+        mEntries.clear();
+        return false;
+    };
+
+    QDataStream ds(mFile);
+    ds.setByteOrder(QDataStream::LittleEndian);
+    if (!mFile->seek(4))
+        return fail();
+
+    mVersion = readU32(ds);
+    QByteArray type(4, 0);
+    ds.readRawData(type.data(), 4);
+    const quint32 fileCount = readU32(ds);
+    const quint64 nameTableOffset = readU64(ds);
+    // Starfield appends a trailing u64 to the classic 24-byte header, plus a
+    // u32 compression method on the v3 (LZ4) variant. Declarations start after
+    // it, so the tail must be consumed even when its value is unused.
+    readU64(ds);
+    if (mVersion >= 3) readU32(ds);
+    if (ds.status() != QDataStream::Ok)
+        return fail();
+    mBtdx = true;
+    mBtdxLz4 = (mVersion >= 3);
+
+    if (type != QByteArrayLiteral("GNRL")) {
+        LOG_ERROR(QString("BsaArchive: BTDX type '%1' is not supported (only GNRL)")
+                      .arg(QString::fromLatin1(type)));
+        return fail();
+    }
+    if (fileCount == 0 || fileCount > 20'000'000u
+        || nameTableOffset > static_cast<quint64>(mFileSize)) {
+        LOG_ERROR(QString("BsaArchive: implausible BTDX header: files=%1 namesAt=%2 size=%3")
+                      .arg(fileCount).arg(nameTableOffset).arg(mFileSize));
+        return fail();
+    }
+
+    struct Declaration {
+        quint64 offset = 0;
+        quint32 packed = 0;
+        quint32 unpacked = 0;
+        QString extension;
+    };
+    QVector<Declaration> declarations;
+    declarations.reserve(static_cast<int>(fileCount));
+    for (quint32 i = 0; i < fileCount; ++i) {
+        Declaration decl;
+        const quint32 fileHash = readU32(ds);
+        QByteArray extension(4, 0);
+        ds.readRawData(extension.data(), 4);
+        const quint32 dirHash = readU32(ds);
+        char flags[2] = {0, 0};
+        ds.readRawData(flags, 2);   // 0, 1
+        readU16(ds);                // declaration header size
+        decl.offset = readU64(ds);
+        decl.packed = readU32(ds);
+        decl.unpacked = readU32(ds);
+        const quint32 sentinel = readU32(ds);
+        if (ds.status() != QDataStream::Ok)
+            return fail();
+        if (sentinel != 0xBAADF00Du) {
+            LOG_ERROR(QString("BsaArchive: BTDX declaration %1 missing 0xBAADF00D marker (got 0x%2)")
+                          .arg(i).arg(sentinel, 8, 16, QChar('0')));
+            return fail();
+        }
+        if (decl.offset > static_cast<quint64>(mFileSize)
+            || (decl.packed ? decl.packed : decl.unpacked) > mFileSize - static_cast<qint64>(decl.offset)) {
+            LOG_ERROR(QString("BsaArchive: BTDX declaration %1 points outside the archive")
+                          .arg(i));
+            return fail();
+        }
+        // The extension is stored without a NUL; the full path comes from the
+        // name table, so this is only a fallback for archives without one.
+        decl.extension = QString::fromLatin1(extension).trimmed();
+        Q_UNUSED(fileHash);
+        Q_UNUSED(dirHash);
+        declarations.append(decl);
+    }
+
+    if (!mFile->seek(static_cast<qint64>(nameTableOffset)))
+        return fail();
+    ds.device()->seek(static_cast<qint64>(nameTableOffset));
+    for (int i = 0; i < declarations.size(); ++i) {
+        bool ok = true;
+        const QString path = readU16LenString(ds, ok);
+        if (!ok) {
+            LOG_ERROR(QString("BsaArchive: BTDX name table entry %1 is unreadable").arg(i));
+            return fail();
+        }
+        Declaration& decl = declarations[i];
+        BsaFileEntry entry;
+        entry.fileName = path.section(QLatin1Char('/'), -1);
+        entry.folderName = path.contains(QLatin1Char('/'))
+            ? path.left(path.lastIndexOf(QLatin1Char('/')))
+            : QString();
+        entry.fullPath = path;
+        entry.offset = decl.offset;
+        entry.size = decl.unpacked;
+        entry.packedSize = decl.packed;
+        // A zero packed length means the file is stored uncompressed.
+        entry.compressed = decl.packed != 0;
+        if (entry.fileName.isEmpty())
+            entry.fileName = decl.extension;
+        mEntries.append(entry);
+    }
+
+    LOG_INFO(QString("BsaArchive: BTDX v%1 %2 files, %3 compression, name table at %4")
+                 .arg(mVersion).arg(mEntries.size())
+                 .arg(mBtdxLz4 ? QStringLiteral("LZ4") : QStringLiteral("zlib"))
+                 .arg(nameTableOffset));
+    return !mEntries.isEmpty();
+}
+
 bool BsaArchive::open(const QString& path)
 {
     mEntries.clear();
@@ -523,21 +668,12 @@ bool BsaArchive::open(const QString& path)
         return !mEntries.isEmpty();
     }
 
-    // Starfield marks its archives 'BTDX' and uses a different container
-    // layout (GNLF/GNRL type tag, 0xBAADF00D block headers, names inline in
-    // the record stream) rather than the v1 folder/file tables. It is
-    // recognised so callers get a specific reason instead of a bad-magic
-    // error, but reading it is not implemented: guessing at the layout would
-    // risk silently returning wrong bytes for game assets.
-    //
-    // The version field is not a monotonic series across the whole family
-    // (Skyrim SE is 0x69 while Starfield's is 2), so the magic is the only
-    // reliable discriminator.
-    if (magic == MAGIC_BTDX) {
-        LOG_ERROR(QString("BsaArchive: Starfield 'BTDX' archives are not supported yet (%1)")
-                      .arg(path));
-        return fail();
-    }
+    // Starfield archives use the 'BTDX' container: a 32-byte header, a table
+    // of fixed 36-byte file declarations, the file data, and a trailing name
+    // table. The version is not comparable with the classic family's (Starfield
+    // is 2 while Skyrim SE is 0x69), so the magic is the discriminator.
+    if (magic == MAGIC_BTDX)
+        return readBtdx() ? true : fail();
 
     mVersion = readU32(ds);
     const quint32 foldersOffset = readU32(ds);
@@ -709,6 +845,52 @@ bool BsaArchive::readData(quint32 index, QByteArray& out) const
     return entry.compressed ? readCompressed(index, out) : readUncompressed(index, out);
 }
 
+bool BsaArchive::readBtdxCompressed(quint32 index, QByteArray& out) const
+{
+    const BsaFileEntry& entry = mEntries[index];
+    const quint32 packedSize = entry.packedSize;
+    const quint32 unpackedSize = entry.size;
+    if (packedSize == 0 || static_cast<qint64>(entry.offset) + packedSize > mFileSize) {
+        LOG_ERROR(QString("BsaArchive: BTDX payload out of range for %1").arg(entry.fullPath));
+        return false;
+    }
+    if (!mFile->seek(static_cast<qint64>(entry.offset)))
+        return false;
+    QByteArray packed(packedSize, '\0');
+    if (mFile->read(packed.data(), packedSize) != packedSize)
+        return false;
+
+    if (unpackedSize == 0) {
+        out.clear();
+        return false;
+    }
+    out.resize(unpackedSize);
+
+    if (mBtdxLz4) {
+        // Raw LZ4 block, no frame header and no length prefix.
+        const int written = lz4DecompressBlock(packed.constData(), out.data(), out.size());
+        if (written != static_cast<int>(unpackedSize)) {
+            LOG_ERROR(QString("BsaArchive: BTDX LZ4 decode wrote %1 of %2 bytes for %3")
+                          .arg(written).arg(unpackedSize).arg(entry.fullPath));
+            out.clear();
+            return false;
+        }
+        return true;
+    }
+
+    uLongf destLen = unpackedSize;
+    const int ret = uncompress(reinterpret_cast<Bytef*>(out.data()), &destLen,
+                               reinterpret_cast<const Bytef*>(packed.constData()),
+                               static_cast<uLong>(packedSize));
+    if (ret != Z_OK || destLen != unpackedSize) {
+        LOG_ERROR(QString("BsaArchive: BTDX zlib decode failed for %1 (%2)")
+                      .arg(entry.fullPath).arg(ret));
+        out.clear();
+        return false;
+    }
+    return true;
+}
+
 bool BsaArchive::readUncompressed(quint32 index, QByteArray& out) const
 {
     const BsaFileEntry& entry = mEntries[index];
@@ -729,6 +911,13 @@ bool BsaArchive::readUncompressed(quint32 index, QByteArray& out) const
 bool BsaArchive::readCompressed(quint32 index, QByteArray& out) const
 {
     const BsaFileEntry& entry = mEntries[index];
+
+    // Starfield: the entry carries the unpacked size, the packed size sits
+    // alongside it, and the codec depends on the archive version (v2 zlib,
+    // v3 a raw LZ4 block with no frame header).
+    if (mBtdx)
+        return readBtdxCompressed(index, out);
+
     const quint32 packedSize = entry.rawSize();
     if (packedSize < 4) {
         LOG_ERROR(QString("BsaArchive: compressed entry too small: %1").arg(entry.fullPath));

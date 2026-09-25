@@ -1672,10 +1672,9 @@ unverified and are worth recording precisely rather than as a single "needs
 testing" line:
 
 - `NiKeyframeData` (1.6+) is confirmed only against its own encoder, not
-  against a shipped animated NIF. No animated Starfield NIF is reachable yet:
-  the 260 loose Starfield NIFs under `Content/` are unanimated props, and the
-  animated ones live in `Starfield - Meshes0*.ba2`, which `BsaArchive` cannot
-  open. See the Starfield BA2 note below.
+  against a shipped animated NIF. It does not appear in any Starfield NIF, so
+  there is currently no sample of it on this machine; see the Starfield notes
+  below.
 - 218 of the 260 loose Starfield NIFs are rejected. They are third-party
   "Blender Mesh Plugin" exports, not Bethesda or Creation Kit output: the
   header parses correctly through the group table, but the exporter emits a
@@ -1687,22 +1686,16 @@ testing" line:
   and Oblivion would add more of the same format. What is missing is a
   consistent model, not data.
 
-**Starfield BA2 (blocks the `NiKeyframeData` validation).** `BsaArchive`
-recognises Starfield's `BTDX` magic and now reports it by name instead of
-failing with a bad-magic error, but reading it is not implemented. Measured
-off `Starfield - LODMeshes.ba2`, the container differs from the v1 layout far
-more than the version number suggests: magic `BTDX`, version 2, then a
-four-character type tag (`GNRF` for general, `GNRL` for localization) where
-v1 stores archive flags, then counts, and a record stream that carries folder
-and file names inline rather than in trailing name tables. Records are
-introduced by the block magic `0xBAADF00D`. The v1-style table walk produces
-nonsense on these files (folder/file counts of 11.5M from a 13 MB archive), so
-a reader has to be derived from the real bytes rather than adapted. A partial
-implementation was written and then deliberately removed: it parsed the header
-plausibly but had no sound basis for mapping a file to its bytes, and shipping
-a guessed reader for game assets risks returning wrong data silently. This is
-the same standard applied to the unconfirmed keyframe layouts — decline rather
-than guess.
+**Starfield BA2 — done, and it changed the animation target.** `BsaArchive`
+now reads the Starfield `BTDX` container. Layout (verified against the shipped
+archives): a 32-byte header (magic, version, `GNRL` tag, file count u32, name
+table offset u64, trailing u64; 36 bytes with an extra u32 on the v3 variant),
+then `fileCount` fixed 36-byte declarations (file hash u32, 4-byte extension,
+directory hash u32, flags, offset u64, packed u32, unpacked u32, the
+`0xBAADF00D` marker), then the data, then a name table of `u16` length + path
+per file. Version 2 is zlib and version 3 a raw LZ4 block; Starfield writes
+paths with forward slashes. `test_bsaarchive` covers opening the archive and
+extracting NIFs back.
 
 **The BA2 version field is not a monotonic series.** The Starfield container
 is "version 2" while Skyrim SE is `0x69` (105) and Skyrim LE is `0x68`, so
@@ -1711,6 +1704,34 @@ every Skyrim archive. `BTDX` is the only reliable discriminator. This was
 mistaken during this work and broke `test_bsawrite`, `test_xwmadecoder`,
 `test_assetresolver`, `test_archivebrowser` and `test_nifblockfile` until the
 existing suite caught it.
+
+**Starfield NIFs contain no keyframe data at all.** With BTDX reading in
+place, `test_nifblockfile` scans the shipped Starfield mesh and face archives
+and tallies every block type. Across 4,000 mesh NIFs the only blocks present
+are geometry and skinning ones: `BSGeometry`, `BSLightingShaderProperty`,
+`BSSkin::Instance`/`BoneData`, `SkinAttach`, `BSFaceGenNiNode`,
+`BSWeakReferenceNode`, `NiNode` and extra-data blocks. There is not a single
+`NiKeyframeController` or `NiKeyframeData` block. The NIF container itself
+round-trips these files byte for byte, so this is not a parsing failure —
+Starfield simply moved animation out of the NIF, consistent with its Havok
+based animation assets.
+
+Consequences worth acting on:
+
+- The NIF keyframe write-back in `NifAnimationWriter` cannot serve Starfield
+  as it stands. Its `NiKeyframeData` codec is still unvalidated against real
+  data, and for Starfield the correct target is the HKX animation asset, not
+  the NIF. HKX parsing is the real Starfield animation task and is not
+  started.
+- Starfield mesh archives open with many weak-reference stub NIFs (a single
+  `BSWeakReferenceNode` pointing at real geometry), so anything sampling these
+  archives must skip stubs or it will conclude the wrong thing — as an earlier
+  sample of this work did.
+- `NiTransformData` (Skyrim 1.5 / Oblivion) remains the only NIF-resident
+  keyframe format reachable here, and it is still refused for writing until
+  its encoding is confirmed. That fit needs more samples of that same
+  generation, not other games: Skyrim SE 1.5 is installed and supplied 4,533
+  such blocks, and Oblivion would add more of the same format.
 
 ### Beyond §9 — local CK/tool compatibility gaps
 
