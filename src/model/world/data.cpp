@@ -1434,6 +1434,18 @@ const QVector<Data::PluginRecordRef>& Data::childrenOfCell(quint32 cellFormId) c
     return it == m_cellChildren.constEnd() ? empty : it.value();
 }
 
+void Data::configureNewFile(GameFormat::Game game, const QVector<MasterData>& masters,
+                            const QString& author, quint32 nextObjectId)
+{
+    m_currentGame = game;
+    m_fallbackHeader.blank();
+    m_fallbackHeader.version = 1.0f;
+    m_fallbackHeader.nextObjectID = nextObjectId;
+    m_fallbackHeader.author = author;
+    m_fallbackHeader.masters = masters;
+    mNextLocalId = qMax<quint32>(nextObjectId, 0x800u);
+}
+
 int Data::preload(const QString& filename, bool base_)
 {
     LOG_INFO(QString("Data::preload: filename='%1' base=%2 length=%3")

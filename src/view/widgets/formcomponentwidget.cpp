@@ -3,6 +3,8 @@
 #include "../../libs/components/tier1_components.hpp"
 #include "../../libs/components/tier2_components.hpp"
 #include "../../libs/components/tier3_components.hpp"
+#include "../../model/world/data.hpp"
+#include "../../view/window/formideditorwidget.hpp"
 
 #include <QCheckBox>
 #include <QColorDialog>
@@ -25,7 +27,25 @@ namespace openck {
 
 namespace {
 
-QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
+QVector<FormPickerEntry> formPickerEntries(Data* data)
+{
+    QVector<FormPickerEntry> entries;
+    if (!data) return entries;
+    for (const auto& typed : data->allCollectionsWithTypes())
+    {
+        if (!typed.collection) continue;
+        const QString typeName = CkId(typed.type).getTypeName();
+        for (int i = 0; i < typed.collection->count(); ++i)
+        {
+            const quint32 formId = typed.collection->getFormId(i);
+            if (formId != 0)
+                entries.append({formId, typed.collection->getEditorId(i), typeName});
+        }
+    }
+    return entries;
+}
+
+QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent, Data* data)
 {
     if (!prop) return nullptr;
 
@@ -38,29 +58,21 @@ QWidget* makeEditorWidget(EditorProperty* prop, QWidget* parent)
         });
         return cb;
     }
-if (auto* ip = dynamic_cast<IntEditorProperty*>(prop))
+    if (auto* ip = dynamic_cast<IntegerEditorProperty*>(prop))
     {
         auto* sb = new QSpinBox(parent);
         const qint64 lo = qMax<qint64>(ip->minimum(), static_cast<qint64>(INT_MIN));
         const qint64 hi = qMin<qint64>(ip->maximum(), static_cast<qint64>(INT_MAX));
         sb->setRange(static_cast<int>(lo), static_cast<int>(hi));
-        sb->setValue(ip->value().toInt());
+        const qint64 current = ip->isUnsigned()
+            ? static_cast<qint64>(qMin<quint64>(ip->value().toULongLong(), static_cast<quint64>(INT_MAX)))
+            : qBound(lo, ip->value().toLongLong(), hi);
+        sb->setValue(static_cast<int>(qBound(lo, current, hi)));
         QObject::connect(sb, qOverload<int>(&QSpinBox::valueChanged), parent,
             [ip](int v) { ip->setValue(v); });
         return sb;
     }
-    if (auto* up = dynamic_cast<UIntEditorProperty*>(prop))
-    {
-        auto* sb = new QSpinBox(parent);
-        const quint64 lo = qMin<quint64>(up->minimum(), static_cast<quint64>(INT_MAX));
-        const quint64 hi = qMin<quint64>(up->maximum(), static_cast<quint64>(INT_MAX));
-        sb->setRange(static_cast<int>(lo), static_cast<int>(hi));
-        sb->setValue(static_cast<int>(qMin<quint64>(up->value().toULongLong(),
-                                                    static_cast<quint64>(INT_MAX))));
-        QObject::connect(sb, qOverload<int>(&QSpinBox::valueChanged), parent,
-            [up](int v) { up->setValue(v); });
-        return sb;
-    }
+
     if (auto* fp = dynamic_cast<FloatEditorProperty*>(prop))
     {
         auto* sb = new QDoubleSpinBox(parent);
@@ -74,6 +86,14 @@ if (auto* ip = dynamic_cast<IntEditorProperty*>(prop))
     }
     if (auto* fep = dynamic_cast<FormEditorProperty*>(prop))
     {
+        if (data)
+        {
+            auto* picker = new FormPickerWidget(formPickerEntries(data), fep->value().toUInt(), parent);
+            picker->setMaximumHeight(180);
+            QObject::connect(picker->findChild<QTableWidget*>(), &QTableWidget::itemSelectionChanged,
+                parent, [picker, fep] { fep->setValue(picker->value()); });
+            return picker;
+        }
         auto* le = new QLineEdit(parent);
         le->setPlaceholderText(QStringLiteral("0x00000000"));
         le->setText(QString::number(fep->value().toUInt(), 16));
@@ -192,6 +212,23 @@ if (auto* ip = dynamic_cast<IntEditorProperty*>(prop))
             [en, cb](int i) { en->setValue(cb->itemData(i).toUInt()); });
         return cb;
     }
+    if (auto* en = dynamic_cast<UInt8EnumEditorProperty*>(prop))
+    {
+        auto* cb = new QComboBox(parent);
+        int selectIdx = -1;
+        const quint32 currentVal = en->value().toUInt();
+        for (int i = 0; i < static_cast<int>(en->entries().size()); ++i)
+        {
+            const auto& entry = en->entries()[static_cast<size_t>(i)];
+            cb->addItem(entry.label, entry.value);
+            if (entry.value == currentVal) selectIdx = i;
+        }
+        if (selectIdx >= 0) cb->setCurrentIndex(selectIdx);
+        QObject::connect(cb, qOverload<int>(&QComboBox::currentIndexChanged), parent,
+            [en, cb](int i) { en->setValue(cb->itemData(i).toUInt()); });
+        return cb;
+    }
+
     if (dynamic_cast<ColorEditorProperty*>(prop))
     {
         auto* btn = new QPushButton(parent);
@@ -341,9 +378,10 @@ if (auto* ip = dynamic_cast<IntEditorProperty*>(prop))
 
 } // namespace
 
-FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent)
+FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent, Data* data)
     : QWidget(parent)
     , m_component(component)
+    , m_data(data)
 {
     if (!m_component) return;
 
@@ -362,7 +400,7 @@ FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent)
 
     for (auto& prop : m_properties)
     {
-        QWidget* editor = makeEditorWidget(prop.get(), this);
+        QWidget* editor = makeEditorWidget(prop.get(), this, m_data);
         if (!editor) continue;
         m_layout->addRow(prop->name() + QStringLiteral(":"), editor);
     }

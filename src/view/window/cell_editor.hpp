@@ -5,10 +5,14 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QCheckBox>
+#include <QVector>
+
+#include "../../../libs/files/esm/cellreferencedata.hpp"
 
 class Data;
 class NifViewportWidget;
 struct CellRecord;
+struct FormPickerEntry;
 
 class CellEditor : public QDialog
 {
@@ -25,6 +29,9 @@ private:
     bool validate();
     void setupUI();
     void loadFromCell();
+    QVector<CellRefEntry> loadReferences() const;
+    QVector<FormPickerEntry> loadFormEntries() const;
+    bool applyReferenceChanges();
     NifViewportWidget* findViewport() const;
 
     Data* mData;
@@ -36,6 +43,9 @@ private:
     QSpinBox* mCellYSpin;
     QSpinBox* mOwnerSpin;
     QSpinBox* mLockLevelSpin;
+    QVector<CellRefEntry> mOriginalReferences;
+    QVector<CellRefEntry> mEditedReferences;
+    bool mReferencesEdited = false;
 };
 
 #endif // CELL_EDITOR_HPP

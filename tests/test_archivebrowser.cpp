@@ -1,5 +1,7 @@
 #include <QTest>
 #include <QTemporaryFile>
+#include <QTemporaryDir>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QListWidget>
@@ -24,6 +26,7 @@ private slots:
     void testOpenBsaAndList();
     void testVoiceFilter();
     void testSearch();
+    void testSafeExtractionPaths();
     void testWritePcmWav();
 };
 
@@ -123,6 +126,21 @@ void TestArchiveBrowser::testSearch()
         QVERIFY2(text.contains(QStringLiteral("femalekhajiit"), Qt::CaseInsensitive),
                  qPrintable(text));
     }
+}
+
+void TestArchiveBrowser::testSafeExtractionPaths()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString root = dir.path();
+    QString output;
+    QVERIFY(ArchiveBrowserDialog::isSafeExtractionPath(root, "textures/a.dds", &output));
+    QVERIFY(output.startsWith(QDir(root).absolutePath(), Qt::CaseInsensitive));
+    QVERIFY(!ArchiveBrowserDialog::isSafeExtractionPath(root, "../escape.txt"));
+    QVERIFY(!ArchiveBrowserDialog::isSafeExtractionPath(root, "textures/../../escape.txt"));
+    QVERIFY(!ArchiveBrowserDialog::isSafeExtractionPath(root, "C:/escape.txt"));
+    QVERIFY(!ArchiveBrowserDialog::isSafeExtractionPath(root, "//server/share/file.txt"));
+    QVERIFY(!ArchiveBrowserDialog::isSafeExtractionPath(root, "\\server\\share\\file.txt"));
 }
 
 void TestArchiveBrowser::testWritePcmWav()

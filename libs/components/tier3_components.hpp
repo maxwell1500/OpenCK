@@ -791,20 +791,20 @@ public:
         std::vector<std::unique_ptr<EditorProperty>> out;
         out.push_back(std::make_unique<UIntEditorProperty>(
             QStringLiteral("Flags"), &flags));
-        out.push_back(std::make_unique<IntEditorProperty>(
-            QStringLiteral("Base Spell"), reinterpret_cast<qint32*>(&baseSpell)));
-        out.push_back(std::make_unique<IntEditorProperty>(
-            QStringLiteral("Fatigue"), reinterpret_cast<qint32*>(&fatigue)));
-        out.push_back(std::make_unique<IntEditorProperty>(
-            QStringLiteral("Barter Gold"), reinterpret_cast<qint32*>(&barterGold)));
-        out.push_back(std::make_unique<IntEditorProperty>(
-            QStringLiteral("Level"), reinterpret_cast<qint32*>(&level)));
-        out.push_back(std::make_unique<IntEditorProperty>(
-            QStringLiteral("Calc Min"), reinterpret_cast<qint32*>(&calcMin)));
-        out.push_back(std::make_unique<IntEditorProperty>(
-            QStringLiteral("Calc Max"), reinterpret_cast<qint32*>(&calcMax)));
-        out.push_back(std::make_unique<IntEditorProperty>(
-            QStringLiteral("Speed Mult"), reinterpret_cast<qint32*>(&speedMult)));
+        out.push_back(std::make_unique<UInt16EditorProperty>(
+            QStringLiteral("Base Spell"), &baseSpell));
+        out.push_back(std::make_unique<UInt16EditorProperty>(
+            QStringLiteral("Fatigue"), &fatigue));
+        out.push_back(std::make_unique<UInt16EditorProperty>(
+            QStringLiteral("Barter Gold"), &barterGold));
+        out.push_back(std::make_unique<Int16EditorProperty>(
+            QStringLiteral("Level"), &level));
+        out.push_back(std::make_unique<UInt16EditorProperty>(
+            QStringLiteral("Calc Min"), &calcMin));
+        out.push_back(std::make_unique<UInt16EditorProperty>(
+            QStringLiteral("Calc Max"), &calcMax));
+        out.push_back(std::make_unique<UInt16EditorProperty>(
+            QStringLiteral("Speed Mult"), &speedMult));
         return out;
     }
 
@@ -1084,22 +1084,22 @@ public:
     std::vector<std::unique_ptr<EditorProperty>> createEditorProperties() override
     {
         std::vector<std::unique_ptr<EditorProperty>> out;
-        out.push_back(std::make_unique<EnumEditorProperty>(QStringLiteral("Aggression"), reinterpret_cast<quint32*>(&aggression),
-            std::vector<EnumEditorProperty::Entry>{
+        out.push_back(std::make_unique<UInt8EnumEditorProperty>(QStringLiteral("Aggression"), &aggression,
+            std::vector<UInt8EnumEditorProperty::Entry>{
                 {"Unaggressive", 0}, {"Aggressive", 1}, {"Very Aggressive", 2},
                 {"Frenzied", 3}, {"Defensive", 4}, {"Cowardly", 5}}));
-        out.push_back(std::make_unique<EnumEditorProperty>(QStringLiteral("Confidence"), reinterpret_cast<quint32*>(&confidence),
-            std::vector<EnumEditorProperty::Entry>{
+        out.push_back(std::make_unique<UInt8EnumEditorProperty>(QStringLiteral("Confidence"), &confidence,
+            std::vector<UInt8EnumEditorProperty::Entry>{
                 {"Cowardly", 0}, {"Cautious", 1}, {"Average", 2},
                 {"Brave", 3}, {"Foolhardy", 4}, {"Berserk", 5}}));
-        out.push_back(std::make_unique<EnumEditorProperty>(QStringLiteral("Morality"), reinterpret_cast<quint32*>(&morality),
-            std::vector<EnumEditorProperty::Entry>{
+        out.push_back(std::make_unique<UInt8EnumEditorProperty>(QStringLiteral("Morality"), &morality,
+            std::vector<UInt8EnumEditorProperty::Entry>{
                 {"Any", 0}, {"Low", 1}, {"Standard", 2},
                 {"High", 3}, {"None", 4}}));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Energy"), reinterpret_cast<qint32*>(&energy), 0, 255));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood"), reinterpret_cast<qint32*>(&mood), -32768, 32767));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Mood Speed"), reinterpret_cast<qint32*>(&moodSpeed), 0, 255));
-        out.push_back(std::make_unique<IntEditorProperty>(QStringLiteral("Disposition"), reinterpret_cast<qint32*>(&disposition), 0, 255));
+        out.push_back(std::make_unique<UInt8EditorProperty>(QStringLiteral("Energy"), &energy));
+        out.push_back(std::make_unique<Int16EditorProperty>(QStringLiteral("Mood"), &mood));
+        out.push_back(std::make_unique<UInt8EditorProperty>(QStringLiteral("Mood Speed"), &moodSpeed));
+        out.push_back(std::make_unique<UInt8EditorProperty>(QStringLiteral("Disposition"), &disposition));
         return out;
     }
 

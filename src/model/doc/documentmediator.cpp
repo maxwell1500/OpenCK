@@ -65,10 +65,19 @@ void DocumentMediator::addDocument(const QStringList& files, const QString& save
     insertDocument(document);
 }
 
-Document* DocumentMediator::makeDocument(const QStringList& files, const QString& savePath, bool isNew)
+void DocumentMediator::addDocument(const QStringList& files, const QString& savePath, bool isNew,
+                                   const NewPluginOptions& options)
+{
+    LOG_INFO(QString("Adding configured document: %1 files, isNew=%2")
+        .arg(files.size()).arg(isNew ? "true" : "false"));
+    insertDocument(makeDocument(files, savePath, isNew, options));
+}
+
+Document* DocumentMediator::makeDocument(const QStringList& files, const QString& savePath, bool isNew,
+                                         const NewPluginOptions& options)
 {
     LOG_DEBUG(QString("Creating document with %1 files").arg(files.size()));
-    Document* doc = new Document(files, savePath, isNew);
+    Document* doc = new Document(files, savePath, isNew, options);
 
     return doc;
 }

@@ -79,6 +79,15 @@ void RefrRecord::save(ESMWriter& esm) const
         comp->scriptIds = scriptIds;
     }
 
+    if (loadOrder.isEmpty())
+    {
+        if (!editorId.isEmpty())
+            esm.writeSubZString('EDID', editorId);
+        if (comp)
+            comp->save(esm);
+        return;
+    }
+
     // Placed references usually carry no EDID; writing an empty one emits
     // a 1-byte NUL subrecord that breaks payload-identical round-trips.
     // Subrecords replay in load order; values introduced after load (or

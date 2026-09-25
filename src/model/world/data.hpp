@@ -282,6 +282,9 @@ public:
     /// (basename + master list + HEDR flags).
     GameFormat::Game currentGame() const { return m_currentGame; }
 
+    void configureNewFile(GameFormat::Game game, const QVector<MasterData>& masters,
+                          const QString& author, quint32 nextObjectId);
+
     /// \brief True if this record type is a known, game-specific record of
     /// the detected game (recognized even when not yet implemented).
     bool isGameSpecificRecord(NAME type) const
@@ -363,7 +366,33 @@ public:
     /// emit the cell-children GRUPs instead of a flat reference list.
     void setRefrParentCell(quint32 refrFormId, quint32 cellFormId)
     {
-        m_recordParentCell[refrFormId] = cellFormId;
+        if (cellFormId == 0)
+        {
+            m_recordParentCell.remove(refrFormId);
+            for (int i = 0; i < m_pluginOrder.size(); ++i)
+            {
+                if (m_pluginOrder[i].type == NAME('REFR') && m_pluginOrder[i].formId == refrFormId)
+                {
+                    m_pluginOrder.removeAt(i);
+                    break;
+                }
+            }
+        }
+        else
+        {
+            m_recordParentCell[refrFormId] = cellFormId;
+            bool present = false;
+            for (const PluginRecordRef& ref : m_pluginOrder)
+            {
+                if (ref.type == NAME('REFR') && ref.formId == refrFormId)
+                {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present)
+                m_pluginOrder.append({ NAME('REFR'), refrFormId });
+        }
         m_childIndexDirty = true;
     }
 
@@ -401,9 +430,13 @@ public:
         const quint32 old = m_infoParentDial.value(infoFormId, 0);
         if (old != 0 && old != dialFormId)
             removeInfoChild(old, infoFormId);
-        m_infoParentDial[infoFormId] = dialFormId;
-        if (dialFormId != 0)
+        if (dialFormId == 0)
+            m_infoParentDial.remove(infoFormId);
+        else
+        {
+            m_infoParentDial[infoFormId] = dialFormId;
             appendInfoChild(dialFormId, infoFormId, infoIndex);
+        }
     }
 
     /// \brief Flat load order of the edited plugin's own records, recorded

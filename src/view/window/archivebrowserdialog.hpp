@@ -25,6 +25,9 @@ public:
                                   QWidget* parent = nullptr);
     ~ArchiveBrowserDialog() override;
 
+    static bool isSafeExtractionPath(const QString& root, const QString& entryPath,
+                                     QString* outputPath = nullptr);
+
 private slots:
     void browseArchive();
     void onQuickOpenChanged(int index);

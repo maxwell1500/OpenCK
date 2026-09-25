@@ -20,6 +20,7 @@
 
 #include "../../libs/files/nifanim/nifanimation.hpp"
 #include "../../libs/files/nif/nifparser.hpp"
+#include "../../libs/files/nifanim/nifanimationwriter.hpp"
 #include "../../model/tools/movekeyframecommand.hpp"
 #include "../../model/tools/addkeyframecommand.hpp"
 #include "../../model/tools/removekeyframecommand.hpp"
@@ -48,6 +49,18 @@ void quaternionToEuler(float w, float x, float y, float z,
     float siny = 2.0f * (w * z + x * y);
     float cosy = 1.0f - 2.0f * (y * y + z * z);
     rz = std::atan2(siny, cosy) * radToDeg;
+}
+
+void eulerToQuaternion(float rx, float ry, float rz, float& qw, float& qx,
+                        float& qy, float& qz)
+{
+    const float cr = std::cos(rx * 0.5f), sr = std::sin(rx * 0.5f);
+    const float cp = std::cos(ry * 0.5f), sp = std::sin(ry * 0.5f);
+    const float cy = std::cos(rz * 0.5f), sy = std::sin(rz * 0.5f);
+    qw = cr * cp * cy + sr * sp * sy;
+    qx = sr * cp * cy - cr * sp * sy;
+    qy = cr * sp * cy + sr * cp * sy;
+    qz = cr * cp * sy - sr * sp * cy;
 }
 
 void collectNodeAnimations(const Nif::Node* node,
@@ -186,18 +199,23 @@ AnimationEditor::AnimationEditor(QWidget* parent)
     stopBtn->setObjectName("stopBtn");
     auto* exportBtn = new QPushButton(tr("Export"));
     auto* importBtn = new QPushButton(tr("Import"));
+    auto* saveNifBtn = new QPushButton(tr("Save NIF"));
+    saveNifBtn->setObjectName("saveNifBtn");
+    saveNifBtn->setEnabled(false);
 
     transportLayout->addWidget(playBtn);
     transportLayout->addWidget(stopBtn);
     transportLayout->addStretch();
     transportLayout->addWidget(exportBtn);
     transportLayout->addWidget(importBtn);
+    transportLayout->addWidget(saveNifBtn);
     centerLayout->addLayout(transportLayout);
 
     connect(playBtn, &QPushButton::clicked, this, &AnimationEditor::playAnimation);
     connect(stopBtn, &QPushButton::clicked, this, &AnimationEditor::stopAnimation);
     connect(exportBtn, &QPushButton::clicked, this, &AnimationEditor::onExportAnimation);
     connect(importBtn, &QPushButton::clicked, this, &AnimationEditor::onImportAnimation);
+    connect(saveNifBtn, &QPushButton::clicked, this, &AnimationEditor::onSaveNif);
 
     // Marker toolbar
     auto* markerGroup = new QGroupBox(tr("Markers"));
@@ -381,7 +399,10 @@ void AnimationEditor::loadAnimation(const QString& path)
     mTimeline->setClip(nullptr);
 
     mAnimation = loadAnimationFromNif(path);
+    mSourceNifPath = mAnimation ? path : QString();
     if (mAnimation) {
+        if (auto* saveNifBtn = findChild<QPushButton*>("saveNifBtn"))
+            saveNifBtn->setEnabled(true);
         setWindowTitle(tr("Animation Editor - %1").arg(mAnimation->name));
 
         for (int i = 0; i < mAnimation->clips.size(); ++i) {
@@ -400,6 +421,8 @@ void AnimationEditor::loadAnimation(const QString& path)
                      .arg(mAnimation->clipCount())
                      .arg(mAnimation->totalKeyframeCount()));
     } else {
+        if (auto* saveNifBtn = findChild<QPushButton*>("saveNifBtn"))
+            saveNifBtn->setEnabled(false);
         QMessageBox::information(this, tr("No Animation"),
                                  tr("No animation data found in this NIF file."));
     }
@@ -832,6 +855,9 @@ void AnimationEditor::onImportAnimation()
 
     delete mAnimation;
     mAnimation = anim;
+    mSourceNifPath.clear();
+    if (auto* saveNifBtn = findChild<QPushButton*>("saveNifBtn"))
+        saveNifBtn->setEnabled(false);
     mSelectedClip = -1;
     mClipList->clear();
     mUndoStack->clear();
@@ -850,6 +876,53 @@ void AnimationEditor::onImportAnimation()
     }
 
     LOG_INFO(QString("Animation imported from %1").arg(path));
+}
+
+void AnimationEditor::onSaveNif()
+{
+    if (!mAnimation || mSourceNifPath.isEmpty()) {
+        QMessageBox::warning(this, tr("Save NIF"), tr("Load a NIF animation before saving."));
+        return;
+    }
+
+    int saved = 0;
+    int failed = 0;
+    for (const auto& clip : mAnimation->clips) {
+        for (const auto& channel : clip.channels) {
+            QVector<Nif::TransformKeyframe> keyframes;
+            keyframes.reserve(channel.keyframes.size());
+            for (const auto& keyframe : channel.keyframes) {
+                Nif::TransformKeyframe output;
+                output.time = keyframe.time;
+                output.translation = {keyframe.tx, keyframe.ty, keyframe.tz};
+                output.scale = {keyframe.sx, keyframe.sy, keyframe.sz};
+                if (keyframe.hasQuat) {
+                    output.rotation = {keyframe.time, keyframe.qw, keyframe.qx,
+                        keyframe.qy, keyframe.qz};
+                } else {
+                    float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
+                    eulerToQuaternion(keyframe.rx, keyframe.ry, keyframe.rz,
+                        qw, qx, qy, qz);
+                    output.rotation = {keyframe.time, qw, qx, qy, qz};
+                }
+                keyframes.append(output);
+            }
+            const QString clipName = channel.type == QStringLiteral("NiKeyframeData")
+                ? QString() : channel.type;
+            if (NifAnimationWriter::writeKeyframesToNif(mSourceNifPath,
+                    channel.boneName, keyframes, clipName))
+                ++saved;
+            else
+                ++failed;
+        }
+    }
+
+    if (failed == 0)
+        QMessageBox::information(this, tr("Save NIF"),
+            tr("Saved %1 animation channel(s) to the source NIF.").arg(saved));
+    else
+        QMessageBox::warning(this, tr("Save NIF"),
+            tr("Saved %1 channel(s); %2 could not be written.").arg(saved).arg(failed));
 }
 
 void AnimationEditor::onAddMarker()

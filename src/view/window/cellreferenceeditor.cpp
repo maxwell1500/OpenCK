@@ -1,7 +1,5 @@
 #include "cellreferenceeditor.hpp"
 
-#include "CellRecord.hpp"
-
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTableWidget>
@@ -13,16 +11,16 @@
 #include <QCheckBox>
 #include <QLineEdit>
 #include <QLabel>
-#include <QDataStream>
 
 static const quint32 REF_DISABLED = 0x01;
 static const quint32 REF_HIDDEN   = 0x02;
 
-static const NAME REFR_NAME = 'REFR';
-
-CellReferenceEditor::CellReferenceEditor(CellRecord* cell, QWidget* parent)
+CellReferenceEditor::CellReferenceEditor(const QVector<CellRefEntry>& references,
+                                         const QVector<FormPickerEntry>& formEntries,
+                                         QWidget* parent)
     : QDialog(parent)
-    , mCell(cell)
+    , mReferences(references)
+    , mFormEntries(formEntries)
     , mTable(nullptr)
     , mAddBtn(nullptr)
     , mRemoveBtn(nullptr)
@@ -30,7 +28,7 @@ CellReferenceEditor::CellReferenceEditor(CellRecord* cell, QWidget* parent)
     , mCancelBtn(nullptr)
 {
     setupUI();
-    loadFromCell(*cell);
+    populateTable();
 }
 
 void CellReferenceEditor::setupUI()
@@ -76,44 +74,6 @@ void CellReferenceEditor::setupUI()
     connect(mCancelBtn, &QPushButton::clicked, this, &QDialog::reject);
 }
 
-void CellReferenceEditor::loadFromCell(const CellRecord& cell)
-{
-    mReferences.clear();
-
-    for (const auto& raw : cell.rawSubRecords)
-    {
-        if (raw.name == REFR_NAME && raw.data.size() >= 40)
-        {
-            CellRefEntry ref;
-            QDataStream stream(raw.data);
-            stream.setByteOrder(QDataStream::LittleEndian);
-
-            quint32 formId, baseObj;
-            float px, py, pz;
-            float rx, ry, rz;
-            float sc;
-            quint32 fl;
-
-            stream >> formId >> baseObj >> px >> py >> pz >> rx >> ry >> rz >> sc >> fl;
-
-            ref.formId = formId;
-            ref.baseObject = baseObj;
-            ref.posX = px;
-            ref.posY = py;
-            ref.posZ = pz;
-            ref.rotX = rx;
-            ref.rotY = ry;
-            ref.rotZ = rz;
-            ref.scale = sc;
-            ref.flags = fl;
-
-            mReferences.append(ref);
-        }
-    }
-
-    populateTable();
-}
-
 void CellReferenceEditor::populateTable()
 {
     mTable->setRowCount(mReferences.size());
@@ -133,7 +93,9 @@ void CellReferenceEditor::setRowFromReference(int row, const CellRefEntry& ref)
     };
 
     mTable->setItem(row, 0, createReadOnlyItem(QString::number(ref.formId)));
-    mTable->setItem(row, 1, createReadOnlyItem(QString::number(ref.baseObject)));
+    auto* basePicker = new FormPickerWidget(mFormEntries, ref.baseObject, this);
+    basePicker->setMaximumHeight(180);
+    mTable->setCellWidget(row, 1, basePicker);
 
     auto* posXSpin = new QDoubleSpinBox();
     posXSpin->setRange(-100000.0, 100000.0);
@@ -200,7 +162,11 @@ CellRefEntry CellReferenceEditor::getReferenceFromRow(int row) const
         ref.formId = formIdItem->text().toUInt(&ok);
         if (!ok) ref.formId = 0;
     }
-    if (baseObjItem) {
+    if (auto* picker = dynamic_cast<FormPickerWidget*>(mTable->cellWidget(row, 1)))
+    {
+        ref.baseObject = picker->value();
+    }
+    else if (baseObjItem) {
         bool ok = false;
         ref.baseObject = baseObjItem->text().toUInt(&ok);
         if (!ok) ref.baseObject = 0;

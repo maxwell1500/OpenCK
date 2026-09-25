@@ -8,12 +8,18 @@
 #include "logger.hpp"
 #include <QHeaderView>
 #include <QMap>
+#include <QComboBox>
+#include <QHash>
+#include <QSet>
+#include <QStringList>
+#include <algorithm>
 
 #include "../../../libs/files/esm/npcrecord.hpp"
 #include "../../../libs/files/esm/weaprecord.hpp"
 #include "../../../libs/files/esm/armorrecord.hpp"
 #include "../../../libs/files/esm/spellrecord.hpp"
 #include "../../../libs/files/esm/questrecord.hpp"
+
 
 FormIdEditorWidget::FormIdEditorWidget(Data* data, QWidget* parent)
     : QWidget(parent)

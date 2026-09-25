@@ -16,6 +16,15 @@ class ESMReader;
 class ESMWriter;
 class IRecordCollection;
 
+struct NewPluginOptions
+{
+    GameFormat::Game game = GameFormat::Game::Unknown;
+    QVector<MasterData> masters;
+    QString author;
+    quint32 nextObjectId = 0x800;
+    bool lightMaster = false;
+};
+
 // Lookup tables built once per save so the ordered replay, the cell-children
 // passthrough and the grouped fallback all agree on which record lives where.
 struct SaveIndex
@@ -30,7 +39,8 @@ class Document : public QObject
     Q_OBJECT
 
 public:
-    Document(const QStringList& contentFiles, const QString& savePath, bool isNew);
+    Document(const QStringList& contentFiles, const QString& savePath, bool isNew,
+             const NewPluginOptions& options = NewPluginOptions());
     ~Document();
 
     void save(const QString& savePath);

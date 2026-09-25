@@ -76,7 +76,8 @@ public:
     // Create a new BA2 archive from a list of files. Returns true on success.
     // archiveType: "GNRL" for general files, "DX10" for textures.
     bool create(const QStringList& filePaths, const QString& outputPath,
-                bool compress = true, const QString& archiveType = "GNRL");
+                bool compress = true, const QString& archiveType = "GNRL",
+                const QString& sourceRoot = QString());
 
 private:
     bool openBtdx(const QString& path);
@@ -89,7 +90,8 @@ private:
     bool extractTexture(quint32 index, const QString& outputPath) const;
     static bool decompressChunk(const uchar* data, quint32 packedSize, quint32 unpackedSize,
                                 QByteArray& out, bool lz4);
-    bool createDx10(const QStringList& filePaths, const QString& outputPath, bool compress);
+    bool createDx10(const QStringList& filePaths, const QString& outputPath, bool compress,
+                    const QString& sourceRoot = QString());
 
     QString mName;
     QVector<Ba2FileEntry> mEntries;

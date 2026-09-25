@@ -9,6 +9,11 @@
 #include "../../libs/files/esm/inforecord.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/addrecordcommand.hpp"
+#include "../../model/tools/deleterecordcommandbase.hpp"
+#include "../../model/tools/macrocommand.hpp"
+#include "../../model/tools/setinfoparentdialcommand.hpp"
+#include "../../model/world/idtable.hpp"
 #include "../../model/tools/undostack.hpp"
 
 #include "logger.hpp"
@@ -119,10 +124,12 @@ void DialogueEditorWidget::saveDialogue()
         return;
     }
 
-    DialRecord& dial = dialCollection.getRecord(dialIndex).get();
+    DialRecord original = dialCollection.getRecord(dialIndex).get();
+    DialRecord edited = original;
+    edited.topicName = topicEdit->text();
 
     {
-        auto results = ColumnValidator::validateDial(dial, mData);
+        auto results = ColumnValidator::validateDial(edited, mData);
         QStringList errorMessages;
         for (const auto& r : results) {
             if (r.severity == ColumnValidator::Severity::Error) {
@@ -135,8 +142,20 @@ void DialogueEditorWidget::saveDialogue()
         }
     }
     
-    dial.topicName = topicEdit->text();
-    
+    if (mData->getUndoStack())
+    {
+        auto* command = new EditRecordCommand<DialRecord>(&dialCollection, dialIndex,
+            original, edited, QStringLiteral("Edit dialogue: %1").arg(currentDialId));
+        if (command->hasChanged())
+            mData->getUndoStack()->push(command);
+        else
+            delete command;
+    }
+    else
+    {
+        dialCollection.getRecord(dialIndex).setModified(edited);
+    }
+
     LOG_INFO(QString("Dialogue '%1' saved successfully").arg(currentDialId));
 }
 
@@ -226,30 +245,33 @@ void DialogueEditorWidget::onAddInfo()
     const quint32 newFormId = mData->createNewRecord(CkId::Type_Info_, editorId);
 
     InfoRecord newInfo;
+    newInfo.blank();
+    newInfo.initComponents();
     newInfo.editorId = editorId;
     newInfo.formId = newFormId;
     newInfo.responseText = QStringLiteral("New dialogue response");
     newInfo.flags = 0;
 
     auto& infoCollection = mData->getInfoCollection();
-    infoCollection.add(newInfo);
-
     DialRecord originalDial = dialCollection.getRecord(dialIdx).get();
     DialRecord editedDial = originalDial;
     editedDial.responseIds.append(newFormId);
     editedDial.hasInam = true;
-    if (mData->getUndoStack())
-    {
-        EditRecordCommand<DialRecord>* cmd = new EditRecordCommand<DialRecord>(&dialCollection, dialIdx, originalDial, editedDial,
-            "Add Info to DIAL: " + currentDialId);
-        cmd && cmd->hasChanged() ? mData->getUndoStack()->push(cmd) : delete cmd;
-    }
-    else
-    {
-        dialCollection.getRecord(dialIdx).setModified(editedDial);
-    }
 
-    mData->setInfoParentDial(newFormId, editedDial.formId);
+    auto* table = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Info_));
+    if (!table || !mData->getUndoStack())
+    {
+        QMessageBox::warning(this, tr("Add Info"), tr("The response could not be created."));
+        return;
+    }
+    auto* macro = mData->createMacroCommand(QStringLiteral("Add dialogue response"));
+    Record<InfoRecord> record(State_ModifiedOnly, nullptr, &newInfo);
+    macro->addCommand(new AddRecordCommand(table, &infoCollection,
+        infoCollection.getAppendIndex(editorId, CkId::Type_Info_), record));
+    macro->addCommand(new SetInfoParentDialCommand(mData, newFormId, 0, originalDial.formId));
+    macro->addCommand(new EditRecordCommand<DialRecord>(&dialCollection, dialIdx,
+        originalDial, editedDial, QStringLiteral("Add Info to DIAL: %1").arg(currentDialId)));
+    mData->getUndoStack()->push(macro);
     populateTree();
 
     LOG_INFO(QString("Added new info '%1' (0x%2) under DIAL '%3'")
@@ -267,16 +289,24 @@ void DialogueEditorWidget::onRemoveInfo()
 
     int rowIndex = treeWidget->indexOfTopLevelItem(item);
     if (rowIndex < 0) return;
-    
+
     QString editorId = item->text(0);
-    
     auto& infoCollection = mData->getInfoCollection();
     int infoIndex = infoCollection.searchId(editorId);
-    
-    if (infoIndex >= 0)
-    {
-        infoCollection.removeRows(infoIndex, 1);
-        populateTree();
-        LOG_INFO(QString("Removed info record: %1").arg(editorId));
-    }
+    int dialIndex = mData->getDialCollection().searchId(currentDialId);
+    if (infoIndex < 0 || dialIndex < 0 || !mData->getUndoStack()) return;
+
+    auto& dialCollection = mData->getDialCollection();
+    DialRecord originalDial = dialCollection.getRecord(dialIndex).get();
+    DialRecord editedDial = originalDial;
+    editedDial.responseIds.removeAll(infoCollection.getRecord(infoIndex).get().formId);
+    auto* macro = mData->createMacroCommand(QStringLiteral("Remove dialogue response"));
+    macro->addCommand(new DeleteRecordCommandBase(&infoCollection, infoIndex));
+    macro->addCommand(new SetInfoParentDialCommand(mData,
+        infoCollection.getRecord(infoIndex).get().formId, originalDial.formId, 0));
+    macro->addCommand(new EditRecordCommand<DialRecord>(&dialCollection, dialIndex,
+        originalDial, editedDial, QStringLiteral("Remove Info from DIAL: %1").arg(currentDialId)));
+    mData->getUndoStack()->push(macro);
+    populateTree();
+    LOG_INFO(QString("Removed info record: %1").arg(editorId));
 }

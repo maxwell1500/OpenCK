@@ -7,8 +7,9 @@
 
 namespace openck {
 
-EditorPropertyGrid::EditorPropertyGrid(QWidget* parent)
+EditorPropertyGrid::EditorPropertyGrid(QWidget* parent, Data* data)
     : QWidget(parent)
+    , m_data(data)
 {
     m_layout = new QVBoxLayout(this);
     m_layout->setContentsMargins(0, 0, 0, 0);
@@ -37,7 +38,7 @@ void EditorPropertyGrid::setComponents(const std::vector<Component*>& components
     for (Component* c : components)
     {
         if (!c) continue;
-        auto* section = new FormComponentWidget(c, this);
+        auto* section = new FormComponentWidget(c, this, m_data);
         m_layout->insertWidget(insertAt++, section);
         m_sections.push_back(section);
     }

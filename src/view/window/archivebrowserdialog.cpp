@@ -29,6 +29,46 @@
 #  pragma comment(lib, "winmm.lib")
 #endif
 
+namespace {
+
+bool safeArchiveOutputPath(const QString& root, const QString& entryPath, QString& outputPath)
+{
+    const QString normalized = QDir::fromNativeSeparators(entryPath).trimmed();
+    if (normalized.isEmpty() || normalized.startsWith('/') || normalized.startsWith('\\')
+        || normalized.contains(':') || QDir::isAbsolutePath(normalized))
+        return false;
+
+    const QStringList parts = normalized.split('/', Qt::SkipEmptyParts);
+    if (parts.isEmpty()) return false;
+    for (const QString& part : parts)
+        if (part == QStringLiteral("..")) return false;
+
+    const QString cleanRelative = QDir::cleanPath(normalized).replace('\\', '/');
+    if (cleanRelative.isEmpty() || cleanRelative == QStringLiteral(".")
+        || cleanRelative == QStringLiteral("..")
+        || cleanRelative.startsWith(QStringLiteral("../")))
+        return false;
+
+    const QString cleanRoot = QDir::cleanPath(QDir(root).absolutePath()).replace('\\', '/');
+    const QString candidate = QDir::cleanPath(cleanRoot + '/' + cleanRelative).replace('\\', '/');
+    if (candidate != cleanRoot
+        && !candidate.startsWith(cleanRoot + '/', Qt::CaseInsensitive))
+        return false;
+    outputPath = candidate;
+    return true;
+}
+
+}
+
+bool ArchiveBrowserDialog::isSafeExtractionPath(const QString& root, const QString& entryPath,
+                                                QString* outputPath)
+{
+    QString result;
+    if (!safeArchiveOutputPath(root, entryPath, result)) return false;
+    if (outputPath) *outputPath = result;
+    return true;
+}
+
 ArchiveBrowserDialog::ArchiveBrowserDialog(const QString& dataDirectory, QWidget* parent)
     : QDialog(parent)
     , mDataDirectory(dataDirectory)
@@ -523,7 +563,19 @@ void ArchiveBrowserDialog::extractAll()
     int failed = 0;
     for (const int index : mVisible)
     {
-        const QString outPath = dir + QStringLiteral("/") + entryPath(index);
+        QString outPath;
+        if (!isSafeExtractionPath(dir, entryPath(index), &outPath))
+        {
+            ++failed;
+            LOG_WARNING(QString("Archive Browser: rejected unsafe extraction path: %1")
+                .arg(entryPath(index)));
+            continue;
+        }
+        if (!QDir().mkpath(QFileInfo(outPath).absolutePath()))
+        {
+            ++failed;
+            continue;
+        }
         bool success = false;
         if (mKind == Kind::Bsa)
             success = mBsa->extract(static_cast<quint32>(index), outPath);

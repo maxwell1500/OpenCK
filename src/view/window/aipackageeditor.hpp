@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QLabel>
+#include <functional>
 
 class Data;
 struct PackageRecord;
@@ -16,7 +17,8 @@ class AIPackageEditor : public QDialog
     Q_OBJECT
 
 public:
-    AIPackageEditor(Data* data, QWidget* parent = nullptr);
+    AIPackageEditor(Data* data, std::function<bool()> saveCallback = {},
+                    QWidget* parent = nullptr);
     ~AIPackageEditor();
 
 private slots:
@@ -33,6 +35,7 @@ private:
     void showPackageDetails(const PackageRecord* pack);
 
     Data* mData;
+    std::function<bool()> mSaveCallback;
     QTreeWidget* mTree;
     QTextEdit* mDetailEdit;
     QPushButton* mAddPackageButton;

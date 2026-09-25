@@ -1,5 +1,5 @@
 #include <QTest>
-#include <QTemporaryFile>
+#include <QTemporaryDir>
 #include <QFileInfo>
 #include <QFile>
 
@@ -150,11 +150,10 @@ void TestBsaArchive::testExtractFuzRoundTrip()
         QVERIFY(foundGood);
     }
 
-    // Extract to a temp file and confirm byte-identical read-back.
-    QTemporaryFile tmp;
-    QVERIFY(tmp.open());
-    const QString outPath = tmp.fileName();
-    tmp.close();
+    // Extract to a temp dir and confirm byte-identical read-back.
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+    const QString outPath = tmpDir.filePath(QStringLiteral("extracted.fuz"));
 
     QVERIFY(archive.extract(index, outPath));
     QFile check(outPath);

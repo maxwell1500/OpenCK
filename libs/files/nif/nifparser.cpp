@@ -14,6 +14,7 @@
 
 #include "logger.hpp"
 #include "nifrecord.hpp"
+#include "nifblockfile.hpp"
 #include "../ba2/ba2archive.hpp"
 
 namespace Nif {
@@ -481,7 +482,8 @@ static void generateBoundingCollisionShapes(Node* root) {
     root->collisionShapes.append(cs);
 }
 
-static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* nifRootNode, Node* ourRoot)
+static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* nifRootNode,
+                            Node* ourRoot, QMap<quint32, Node*>* refToNodeOut = nullptr)
 {
     // Map from NIF block ref to our Node* for animation linking
     QMap<quint32, Node*> refToNode;
@@ -965,6 +967,8 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
                          .arg(shape.skinWeights.size()));
         }
     }
+
+    if (refToNodeOut) *refToNodeOut = refToNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -1064,11 +1068,27 @@ static bool isAsciiName(const QString& s)
     return true;
 }
 
+static bool parseHeaderVariant(QFile& file, Header& h, bool hasUnknownInt);
+
 bool parseHeader(QFile& file, Header& h)
+{
+    // The Starfield-era header carries an extra u32 after the author string
+    // that Skyrim 1.5 (bsVersion 100) does not have. Reading the wrong
+    // variant desynchronises every later field, so both are tried and the one
+    // that yields a self-consistent block table wins.
+    for (int variant = 0; variant < 2; ++variant) {
+        if (!file.seek(0)) return false;
+        if (parseHeaderVariant(file, h, variant == 1)) return true;
+    }
+    return false;
+}
+
+static bool parseHeaderVariant(QFile& file, Header& h, bool hasUnknownInt)
 {
     QDataStream s(&file);
     s.setByteOrder(QDataStream::LittleEndian);
     Reader r{ s, file.size() };
+    h = Header();
 
     // Magic line, NUL-free, exact version.
     QByteArray magic;
@@ -1089,7 +1109,7 @@ bool parseHeader(QFile& file, Header& h)
     if (h.bsVersion == 0) return false;
 
     r.exportString();                          // Author
-    r.u32();                                   // Unknown Int (BS > 130)
+    if (hasUnknownInt) r.u32();                // Unknown Int (Starfield era)
     r.exportString();                          // Export Script
     r.exportString();                          // Max Filepath
     if (!r.ok) return false;
@@ -1804,6 +1824,7 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
     // so unknown blocks are skipped exactly and known ones parse in place.
     QMap<quint32, NifObject*> blocks;
     QStringList externalMeshes;
+
     auto fail = [&]() {
         qDeleteAll(blocks);
         return false;
@@ -1926,7 +1947,47 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
     parser.setVersion(0x140200);   // display "20.2.0" like the dialect
     parser.setExternalMeshRefs(externalMeshes);
 
-    extractGeometry(blocks, rootNode, ourRoot);
+    QMap<quint32, Node*> refToNode;
+    extractGeometry(blocks, rootNode, ourRoot, &refToNode);
+
+    // Attach keyframe data to the nodes that reference it. The block-level
+    // container is used rather than decoding controller blocks here, because
+    // their field layout differs between game generations and the node ->
+    // controller direction is the only stable one.
+    int attachedControllers = 0;
+    {
+        NifBlockFile blockFile;
+        if (blockFile.load(fileName)) {
+            const QHash<quint32, QString> clipNames = blockFile.clipNamesByController();
+            for (int nodeBlock = 0; nodeBlock < blockFile.count(); ++nodeBlock) {
+                Node* target = refToNode.value(static_cast<quint32>(nodeBlock));
+                if (!target) continue;
+                QString nodeName;
+                quint32 controllerRef = 0xFFFFFFFFu;
+                if (!blockFile.nodeNetInfo(nodeBlock, nodeName, controllerRef)) continue;
+                if (controllerRef == 0xFFFFFFFFu) continue;
+                const int dataBlock = blockFile.keyframeDataBlockFor(static_cast<int>(controllerRef));
+                if (dataBlock < 0) continue;
+
+                Nif::NiKeyframeController anim;
+                anim.targetNode = static_cast<quint32>(nodeBlock);
+                anim.clipName = clipNames.value(controllerRef);
+                const QByteArray& raw = blockFile.block(dataBlock).data;
+                if (!NifBlockFile::decodeKeyframeData(blockFile.block(dataBlock).type, raw,
+                                                       anim.keyframes))
+                    continue;
+                if (anim.keyframes.isEmpty()) continue;
+                target->animations.append(anim);
+                target->hasAnimation = true;
+                ++attachedControllers;
+            }
+        } else {
+            LOG_WARNING("NifBlockFile: could not read the block container; "
+                        "animations are unavailable for this file");
+        }
+    }
+    if (attachedControllers > 0)
+        LOG_INFO(QString("Attached %1 animation controller(s)").arg(attachedControllers));
 
     for (auto it = blocks.begin(); it != blocks.end(); ++it) {
         if (it.value() != rootNode)
@@ -2065,8 +2126,22 @@ bool NifParser::loadFile(const QString& fileName)
     QDataStream stream(&rawData, QIODevice::ReadOnly);
     stream.setByteOrder(QDataStream::LittleEndian);
 
-    if (!parseHeader(stream)) {
+    quint32 version = 0;
+    if (!parseHeader(stream, &version)) {
         return false;
+    }
+
+    if (version >= 0x14020009)
+    {
+        root = nullptr;
+        if (!readNodeTree(stream, root)) {
+            delete root;
+            root = nullptr;
+            return false;
+        }
+        LOG_INFO(QString("Loaded full-format tree with %1 vertices")
+                     .arg(totalVertexCount()));
+        return true;
     }
 
     quint32 numShapes = 0;
@@ -2093,7 +2168,7 @@ bool NifParser::loadFile(const QString& fileName)
     return true;
 }
 
-bool NifParser::parseHeader(QDataStream& stream)
+bool NifParser::parseHeader(QDataStream& stream, quint32* parsedVersion)
 {
     quint32 magic = 0;
     stream >> magic;
@@ -2104,6 +2179,7 @@ bool NifParser::parseHeader(QDataStream& stream)
 
     quint32 version = 0;
     stream >> version;
+    if (parsedVersion) *parsedVersion = version;
     LOG_INFO(QString("NIF version: %1").arg(version));
 
     quint32 fileNameLength = 0;
@@ -2186,21 +2262,25 @@ bool NifParser::save(const QString& fileName) const
     QDataStream stream(&data, QIODevice::WriteOnly);
     stream.setByteOrder(QDataStream::LittleEndian);
 
-    // Check if full format is needed (LOD or billboard nodes present)
     bool needsFullFormat = root->isLODNode || root->isBillboardNode;
     if (!needsFullFormat) {
-        for (const auto* child : root->children) {
-            if (child->isLODNode || child->isBillboardNode) {
+        QStack<const Node*> stack;
+        stack.push(root);
+        while (!stack.isEmpty()) {
+            const Node* node = stack.pop();
+            if (node->isLODNode || node->isBillboardNode || node->hasAnimation) {
                 needsFullFormat = true;
                 break;
             }
+            for (const auto* child : node->children)
+                stack.push(child);
         }
     }
 
     if (needsFullFormat) {
         // Write header with full format version marker
         stream << static_cast<quint32>(0x46494E4E);
-        stream << static_cast<quint32>(0x14020008);
+        stream << static_cast<quint32>(0x14020009);
 
         QByteArray nameBytes = QFileInfo(fileName).fileName().toLatin1();
         stream << static_cast<quint32>(nameBytes.size());
@@ -2280,6 +2360,10 @@ void NifParser::writeShape(QDataStream& stream, const TriShape& shape) const
 
 void NifParser::writeNodeTree(QDataStream& stream, const Node* node) const
 {
+    const QByteArray nameBytes = node->name.toUtf8();
+    stream << static_cast<quint32>(nameBytes.size());
+    stream.writeRawData(nameBytes.constData(), nameBytes.size());
+
     // Node flags
     stream << static_cast<quint8>(node->isLODNode ? 1 : 0);
     stream << static_cast<quint8>(node->isBillboardNode ? 1 : 0);
@@ -2308,6 +2392,140 @@ void NifParser::writeNodeTree(QDataStream& stream, const Node* node) const
     for (const auto* child : node->children) {
         writeNodeTree(stream, child);
     }
+
+    // Animation controllers targeting this node (§9). Keyframes are stored
+    // as flat transform samples so the writer round-trips edited key times.
+    stream << static_cast<quint32>(node->animations.size());
+    for (const auto& anim : node->animations) {
+        stream << static_cast<quint32>(anim.targetNode);
+        const QByteArray clipBytes = anim.clipName.toUtf8();
+        stream << static_cast<quint32>(clipBytes.size());
+        stream.writeRawData(clipBytes.constData(), clipBytes.size());
+        stream << static_cast<quint32>(anim.keyframes.size());
+        for (const auto& keyframe : anim.keyframes) {
+            stream << keyframe.time;
+            stream << keyframe.translation.x << keyframe.translation.y
+                   << keyframe.translation.z;
+            stream << keyframe.rotation.w << keyframe.rotation.x
+                   << keyframe.rotation.y << keyframe.rotation.z;
+            stream << keyframe.scale.x << keyframe.scale.y << keyframe.scale.z;
+        }
+    }
+}
+
+bool NifParser::readNodeTree(QDataStream& stream, Node*& node)
+{
+    auto* created = new Node();
+
+    quint32 nameLength = 0;
+    stream >> nameLength;
+    if (nameLength > 1024) {
+        delete created;
+        return false;
+    }
+    QByteArray nameBytes(static_cast<int>(nameLength), 0);
+    if (nameLength > 0)
+        stream.readRawData(nameBytes.data(), static_cast<int>(nameLength));
+    created->name = QString::fromUtf8(nameBytes);
+
+    quint8 lodFlag = 0;
+    quint8 billboardFlag = 0;
+    stream >> lodFlag >> billboardFlag;
+    created->isLODNode = lodFlag != 0;
+    created->isBillboardNode = billboardFlag != 0;
+
+    if (created->isBillboardNode) {
+        stream >> created->billboardMode;
+    }
+
+    if (created->isLODNode) {
+        quint32 numScreens = 0;
+        stream >> numScreens;
+        if (numScreens > 4096) {
+            delete created;
+            return false;
+        }
+        for (quint32 i = 0; i < numScreens; ++i) {
+            float minScreen = 0.0f;
+            float maxScreen = 0.0f;
+            stream >> minScreen >> maxScreen;
+            created->lodMinScreens.append(minScreen);
+            created->lodMaxScreens.append(maxScreen);
+        }
+    }
+
+    quint32 numShapes = 0;
+    stream >> numShapes;
+    if (numShapes > 100000) {
+        delete created;
+        return false;
+    }
+    for (quint32 s = 0; s < numShapes; ++s) {
+        TriShape shape;
+        if (!readShape(stream, shape)) {
+            delete created;
+            return false;
+        }
+        created->shapes.append(shape);
+    }
+
+    quint32 numChildren = 0;
+    stream >> numChildren;
+    if (numChildren > 100000) {
+        delete created;
+        return false;
+    }
+    for (quint32 c = 0; c < numChildren; ++c) {
+        Node* child = nullptr;
+        if (!readNodeTree(stream, child)) {
+            delete created;
+            return false;
+        }
+        created->children.append(child);
+    }
+
+    quint32 numAnimations = 0;
+    stream >> numAnimations;
+    if (numAnimations > 100000) {
+        delete created;
+        return false;
+    }
+    for (quint32 a = 0; a < numAnimations; ++a) {
+        NiKeyframeController anim;
+        stream >> anim.targetNode;
+        quint32 clipLength = 0;
+        stream >> clipLength;
+        if (clipLength > 1024) {
+            delete created;
+            return false;
+        }
+        QByteArray clipBytes(static_cast<int>(clipLength), 0);
+        if (clipLength > 0)
+            stream.readRawData(clipBytes.data(), static_cast<int>(clipLength));
+        anim.clipName = QString::fromUtf8(clipBytes);
+
+        quint32 numKeyframes = 0;
+        stream >> numKeyframes;
+        if (numKeyframes > 10'000'000) {
+            delete created;
+            return false;
+        }
+        for (quint32 k = 0; k < numKeyframes; ++k) {
+            TransformKeyframe keyframe;
+            stream >> keyframe.time;
+            stream >> keyframe.translation.x >> keyframe.translation.y
+                   >> keyframe.translation.z;
+            stream >> keyframe.rotation.w >> keyframe.rotation.x
+                   >> keyframe.rotation.y >> keyframe.rotation.z;
+            stream >> keyframe.scale.x >> keyframe.scale.y >> keyframe.scale.z;
+            anim.keyframes.append(keyframe);
+        }
+        created->animations.append(anim);
+    }
+    created->hasAnimation = !created->animations.isEmpty();
+
+    node = created;
+    return true;
 }
 
 void NifParser::translateAll(float dx, float dy, float dz)

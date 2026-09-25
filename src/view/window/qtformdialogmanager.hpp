@@ -21,6 +21,7 @@
 #include <functional>
 
 class QWidget;
+class Data;
 
 namespace openck {
 
@@ -43,14 +44,18 @@ public:
 
     /// Opens a dialog for the record, or focuses it if already open.
     void openOrFocus(const QString& formIdKey, FormComponents* components,
-                     QWidget* parent = nullptr);
+                     QWidget* parent = nullptr,
+                     std::function<void(const FormComponents&)> commit = {},
+                     Data* data = nullptr);
 
     // Overload that accepts a record type string and optional record
     // pointer. If a factory is registered for that type, the dialog
     // will include a custom widget below the generic component grid.
     void openOrFocus(const QString& formIdKey, const QString& recordType,
                      FormComponents* components, void* recordPtr = nullptr,
-                     QWidget* parent = nullptr);
+                     QWidget* parent = nullptr,
+                     std::function<void(const FormComponents&)> commit = {},
+                     Data* data = nullptr);
 
     /// Registers a factory that builds a custom data widget for a record type.
     void registerFactory(const QString& recordType,

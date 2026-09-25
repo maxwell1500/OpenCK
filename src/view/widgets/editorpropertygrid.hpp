@@ -25,6 +25,7 @@
 class QFormLayout;
 class QLabel;
 class QVBoxLayout;
+class Data;
 
 namespace openck {
 
@@ -35,7 +36,7 @@ class EditorPropertyGrid : public QWidget
     Q_OBJECT
 
 public:
-    explicit EditorPropertyGrid(QWidget* parent = nullptr);
+    explicit EditorPropertyGrid(QWidget* parent = nullptr, Data* data = nullptr);
     ~EditorPropertyGrid() override;
 
     // Replaces the entire grid content with one section per
@@ -67,6 +68,7 @@ public:
 
 private:
     QVBoxLayout* m_layout = nullptr;
+    Data* m_data = nullptr;
     std::vector<FormComponentWidget*> m_sections;
 };
 

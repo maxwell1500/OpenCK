@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QLabel>
+#include <functional>
 
 class Data;
 struct GlobalVariable;
@@ -17,7 +18,8 @@ class WaterEditor : public QDialog
     Q_OBJECT
 
 public:
-    WaterEditor(Data* data, QWidget* parent = nullptr);
+    WaterEditor(Data* data, std::function<bool()> saveCallback = {},
+                 QWidget* parent = nullptr);
     ~WaterEditor();
 
 private slots:
@@ -34,6 +36,7 @@ private:
     void showSettingDetails(const QString& name, const QString& value);
 
     Data* mData;
+    std::function<bool()> mSaveCallback;
     QTreeWidget* mTree;
     QTextEdit* mDetailEdit;
     QPushButton* mAddSettingButton;

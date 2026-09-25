@@ -38,6 +38,7 @@ private slots:
 
     void onExportAnimation();
     void onImportAnimation();
+    void onSaveNif();
 
     void onAddMarker();
     void onRemoveMarker();
@@ -54,6 +55,7 @@ private:
     QLabel* mTimeLabel;
     QLabel* mDurationLabel;
     NifAnimation* mAnimation;
+    QString mSourceNifPath;
     int mSelectedClip;
     bool mPlaying;
     int mCurrentFrame;

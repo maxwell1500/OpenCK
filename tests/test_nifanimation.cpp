@@ -2,10 +2,13 @@
 #include <QTemporaryDir>
 #include <QFile>
 #include <QtMath>
+#include <memory>
 
 #include "../../libs/files/nifanim/nifanimation.hpp"
 #include "../../libs/files/nifanim/nifanimationexporter.hpp"
 #include "../../libs/files/nifanim/nifanimationimporter.hpp"
+#include "../../libs/files/nifanim/nifanimationwriter.hpp"
+#include "../../libs/files/nif/nifparser.hpp"
 #include "model/tools/nifanimationstate.hpp"
 
 class TestNifAnimation : public QObject
@@ -22,6 +25,7 @@ private slots:
     void testSlerpTakesShortPath();
     void testEulerFallbackPreserved();
     void testBlendWithStoredQuats();
+    void testNifKeyframeWriteBack();
 
 private:
     static NifAnimation sampleAnimation();
@@ -256,6 +260,87 @@ void TestNifAnimation::testBlendWithStoredQuats()
     QVERIFY(qAbs(blended[0].qw - plain[0].qw) < 0.0001f);
     QVERIFY(qAbs(blended[0].qy - plain[0].qy) < 0.0001f);
     QVERIFY(qAbs(blended[0].ry - plain[0].ry) < 0.0001f);
+}
+
+void TestNifAnimation::testNifKeyframeWriteBack()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString nifPath = dir.filePath(QStringLiteral("anim.nif"));
+
+    // A minimal full-format tree: one bone with geometry and two keyframes.
+    auto root = std::make_unique<Nif::Node>();
+    root->name = QStringLiteral("Scene Root");
+    auto* bone = new Nif::Node();
+    bone->name = QStringLiteral("Bip01 Head");
+
+    Nif::TriShape shape;
+    shape.name = QStringLiteral("head");
+    shape.vertices.append({1.0f, 2.0f, 3.0f});
+    shape.uvs.append({0.0f, 0.0f});
+    shape.colors.append({1.0f, 1.0f, 1.0f, 1.0f});
+    shape.indices.append(0);
+    bone->shapes.append(shape);
+
+    Nif::NiKeyframeController controller;
+    controller.targetNode = 4;
+    controller.clipName = QStringLiteral("Idle");
+    Nif::TransformKeyframe first;
+    first.time = 0.0f;
+    first.translation = {0.0f, 0.0f, 0.0f};
+    first.rotation = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+    first.scale = {1.0f, 1.0f, 1.0f};
+    Nif::TransformKeyframe second = first;
+    second.time = 1.0f;
+    controller.keyframes = {first, second};
+    bone->animations.append(controller);
+    bone->hasAnimation = true;
+    root->children.append(bone);
+
+    Nif::NifParser source;
+    source.setRoot(root.release());
+    QVERIFY(source.save(nifPath));
+
+    // The editor writes three keyframes (a count the source never had).
+    QVector<Nif::TransformKeyframe> edited;
+    for (int i = 0; i < 3; ++i) {
+        Nif::TransformKeyframe keyframe;
+        keyframe.time = static_cast<float>(i) * 0.25f;
+        keyframe.translation = {static_cast<float>(i), 0.5f, -1.0f};
+        keyframe.rotation = {keyframe.time, 1.0f, 0.0f, 0.0f, 0.0f};
+        keyframe.scale = {1.0f, 1.0f, 1.0f};
+        edited.append(keyframe);
+    }
+    QVERIFY(NifAnimationWriter::writeKeyframesToNif(
+        nifPath, QStringLiteral("Bip01 Head"), edited, QStringLiteral("Idle")));
+
+    // Reload from disk: edited keyframes land, and the rest of the tree stays.
+    Nif::NifParser reloaded;
+    QVERIFY2(reloaded.load(nifPath), qPrintable(nifPath));
+    Nif::Node* newRoot = reloaded.getRoot();
+    QVERIFY(newRoot);
+    QCOMPARE(newRoot->name, QStringLiteral("Scene Root"));
+    QCOMPARE(newRoot->children.size(), 1);
+
+    Nif::Node* newBone = newRoot->children.first();
+    QCOMPARE(newBone->name, QStringLiteral("Bip01 Head"));
+    QCOMPARE(newBone->shapes.size(), 1);
+    QCOMPARE(newBone->shapes.first().vertices.size(), 1);
+    QVERIFY(qAbs(newBone->shapes.first().vertices.first().x - 1.0f) < 0.0001f);
+    QCOMPARE(newBone->animations.size(), 1);
+    QVERIFY(newBone->hasAnimation);
+
+    const Nif::NiKeyframeController& written = newBone->animations.first();
+    QCOMPARE(written.clipName, QStringLiteral("Idle"));
+    QCOMPARE(written.targetNode, 4u);
+    QCOMPARE(written.keyframes.size(), 3);
+    QVERIFY(qAbs(written.keyframes.at(2).time - 0.5f) < 0.0001f);
+    QVERIFY(qAbs(written.keyframes.at(2).translation.x - 2.0f) < 0.0001f);
+    QVERIFY(qAbs(written.keyframes.at(2).translation.z + 1.0f) < 0.0001f);
+
+    // A clip name that does not exist must be reported, not silently applied.
+    QVERIFY(!NifAnimationWriter::writeKeyframesToNif(
+        nifPath, QStringLiteral("Bip01 Head"), edited, QStringLiteral("Missing")));
 }
 
 QTEST_MAIN(TestNifAnimation)

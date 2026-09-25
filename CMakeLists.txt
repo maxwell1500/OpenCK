@@ -580,6 +580,7 @@ set(FILES_SOURCES
     libs/files/data/zipwriter.cpp
     libs/files/data/csvsnippet.cpp
     libs/files/nif/nifparser.cpp
+    libs/files/nif/nifblockfile.cpp
     libs/files/nif/nifskinning.cpp
     libs/files/nif/ddsencoder.cpp
     libs/files/nif/ddsdecoder.cpp
@@ -611,6 +612,7 @@ set(FILES_HEADERS
     libs/files/data/csvsnippet.hpp
     libs/files/log/logger.hpp
     libs/files/nif/nifparser.hpp
+    libs/files/nif/nifblockfile.hpp
     libs/files/nif/nifskinning.hpp
     libs/files/nif/ddsencoder.hpp
     libs/files/nif/ddsdecoder.hpp
@@ -1036,6 +1038,7 @@ src/view/window/referencebatchdialog.cpp
     src/view/widgets/quickfilterbar.cpp
     src/view/widgets/editorpropertygrid.cpp
     src/view/widgets/formcomponentwidget.cpp
+    src/view/widgets/formpickerwidget.cpp
     src/view/window/qtformdialog.cpp
     src/view/window/qtformdialogmanager.cpp
     src/view/window/windowlayout.cpp
@@ -1157,6 +1160,7 @@ set(VIEW_HEADERS
     src/view/widgets/quickfilterbar.hpp
     src/view/widgets/editorpropertygrid.hpp
     src/view/widgets/formcomponentwidget.hpp
+    src/view/widgets/formpickerwidget.hpp
     src/view/window/qtformdialog.hpp
     src/view/window/qtformdialogmanager.hpp
     src/view/window/windowlayout.hpp

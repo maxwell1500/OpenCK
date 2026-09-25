@@ -10,5 +10,6 @@ class NifAnimationWriter
 public:
     static bool writeKeyframesToNif(const QString& nifPath,
                                      const QString& nodeName,
-                                     const QVector<Nif::TransformKeyframe>& keyframes);
+                                     const QVector<Nif::TransformKeyframe>& keyframes,
+                                     const QString& clipName = QString());
 };

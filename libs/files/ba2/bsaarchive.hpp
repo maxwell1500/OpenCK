@@ -10,7 +10,7 @@ struct BsaFileEntry {
     QString fullPath;          // folder\file.fuz
     QString folderName;
     QString fileName;
-    quint32 size = 0;          // on-disk size (bit 30 = compressed)
+    quint32 size = 0;          // on-disk size (bit 30 = per-file compression override)
     quint32 offset = 0;        // absolute file offset of data
     quint64 nameHash = 0;
     bool compressed = false;
@@ -25,7 +25,8 @@ struct BsaFileEntry {
 ///   28-byte header: FoldersOffset, Flags, FolderCount, FileCount,
 ///                   FolderNamesLength, FileNamesLength, FileFlags
 ///   at FoldersOffset: folder records (24 bytes SSE / 16 bytes older):
-///     Hash u64, FileCount u32, [Unk u32], Offset (i64 SSE / u32 older)
+///     Hash u64, FileCount u32, Offset u32, with SSE padding fields around
+///     the offset
 ///   then per folder: name (u8 len + bytes) + FileCount file records
 ///     (16 bytes each: Hash u64, Size u32, Offset u32)
 ///   then all file names (null-terminated).
@@ -60,10 +61,11 @@ public:
     bool readData(quint32 index, QByteArray& out) const;
 
     // Create a new Skyrim SE (v0x69) BSA archive from a list of files.
-    // Files are stored uncompressed with folder/file name tables, matching
-    // the format Bethesda's archive tools and the game read. Returns true
-    // on success.
-    bool create(const QStringList& filePaths, const QString& outputPath);
+    // Files use the folder/file name tables and can optionally be stored as
+    // LZ4 frame-compressed entries. Returns true on success.
+    bool create(const QStringList& filePaths, const QString& outputPath,
+                bool compress = false, const QString& sourceRoot = QString(),
+                quint32 version = 0x69);
 
     // Compute the 64-bit name hash Bethesda stores in TES4-family BSA file
     // records for a file's stem + extension. Exposed for validation.

@@ -6,6 +6,9 @@
 #include <QLineEdit>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QTableWidget>
+#include <QComboBox>
+#include <algorithm>
 
 #include "../../src/view/window/npcrecorddatawidget.hpp"
 #include "../../src/view/window/racedatawidget.hpp"
@@ -16,6 +19,7 @@
 #include "../../src/view/window/classdatawidget.hpp"
 #include "../../src/view/window/dialdatawidget.hpp"
 #include "../../src/view/window/infodatawidget.hpp"
+#include "../../src/view/window/formideditorwidget.hpp"
 
 #include "../../libs/files/esm/npcrecord.hpp"
 #include "../../libs/files/esm/racerecord.hpp"
@@ -52,6 +56,7 @@ private slots:
     void testDialDataWidgetValid();
     void testInfoDataWidgetNull();
     void testInfoDataWidgetValid();
+    void testFormPickerWidget();
 };
 
 template <typename WidgetT>
@@ -279,6 +284,31 @@ void TestEditorWidgets::testInfoDataWidgetValid()
     QVERIFY(widgetHasLayout<InfoDataWidget>(w.get()));
     auto groupBoxes = w->findChildren<QGroupBox*>();
     QVERIFY(groupBoxes.size() >= 2);
+}
+
+void TestEditorWidgets::testFormPickerWidget()
+{
+    QVector<FormPickerEntry> entries{
+        {0x100, QStringLiteral("Alpha"), QStringLiteral("NPC_")},
+        {0x200, QStringLiteral("Beta"), QStringLiteral("WEAP")},
+        {0x200, QStringLiteral("BetaDuplicate"), QStringLiteral("ARMO")}};
+    FormPickerWidget picker(entries, 0x100);
+    auto* table = picker.findChild<QTableWidget*>();
+    auto* search = picker.findChild<QLineEdit*>();
+    auto* type = picker.findChild<QComboBox*>();
+    QVERIFY(table && search && type);
+    QCOMPARE(table->rowCount(), 3);
+    search->setText(QStringLiteral("Beta"));
+    QCOMPARE(table->rowCount(), 2);
+    type->setCurrentIndex(1);
+    QCOMPARE(table->rowCount(), 1);
+    QCOMPARE(table->item(0, 0)->text(), QStringLiteral("BetaDuplicate"));
+    picker.setValue(0x200);
+    QCOMPARE(picker.value(), quint32(0x200));
+    const auto labels = picker.findChildren<QLabel*>();
+    QVERIFY(std::any_of(labels.cbegin(), labels.cend(), [](const QLabel* label) {
+        return label->text().contains(QStringLiteral("Duplicate"));
+    }));
 }
 
 #include "test_editor_widgets.moc"

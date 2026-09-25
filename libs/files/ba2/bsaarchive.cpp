@@ -1,9 +1,13 @@
 #include "bsaarchive.hpp"
 
 #include <QFile>
+#include <QSaveFile>
 #include <QFileInfo>
 #include <QDir>
 #include <QDataStream>
+
+#include <algorithm>
+#include <limits>
 
 #include "../log/logger.hpp"
 #include <zlib.h>
@@ -11,6 +15,7 @@
 namespace {
 
 constexpr quint32 MAGIC_BSA = 0x00415342;          // 'BSA\0'
+constexpr quint32 MAGIC_BTDX = 0x58445442;         // 'BTDX' (Starfield)
 constexpr quint32 MAGIC_TES3 = 0x00000100;         // '\0\1\0\0'
 constexpr quint32 FLAG_PATHNAMES = 0x0001;
 constexpr quint32 FLAG_FILENAMES = 0x0002;
@@ -159,6 +164,174 @@ int lz4DecompressFrame(const QByteArray& src, char* dst, int dstCapacity)
     return op;
 }
 
+quint32 loadLe32(const char* data)
+{
+    return static_cast<quint8>(data[0])
+        | (static_cast<quint32>(static_cast<quint8>(data[1])) << 8)
+        | (static_cast<quint32>(static_cast<quint8>(data[2])) << 16)
+        | (static_cast<quint32>(static_cast<quint8>(data[3])) << 24);
+}
+
+void appendLe16(QByteArray& output, quint16 value)
+{
+    output.append(static_cast<char>(value & 0xFFu));
+    output.append(static_cast<char>((value >> 8) & 0xFFu));
+}
+
+void appendLe32(QByteArray& output, quint32 value)
+{
+    output.append(static_cast<char>(value & 0xFFu));
+    output.append(static_cast<char>((value >> 8) & 0xFFu));
+    output.append(static_cast<char>((value >> 16) & 0xFFu));
+    output.append(static_cast<char>((value >> 24) & 0xFFu));
+}
+
+void appendLe64(QByteArray& output, quint64 value)
+{
+    for (int i = 0; i < 8; ++i)
+        output.append(static_cast<char>((value >> (i * 8)) & 0xFFu));
+}
+
+quint32 rotl32(quint32 value, int shift)
+{
+    return (value << shift) | (value >> (32 - shift));
+}
+
+quint32 xxhash32(const QByteArray& data)
+{
+    constexpr quint32 prime1 = 2654435761u;
+    constexpr quint32 prime2 = 2246822519u;
+    constexpr quint32 prime3 = 3266489917u;
+    constexpr quint32 prime4 = 668265263u;
+    constexpr quint32 prime5 = 374761393u;
+    const auto* bytes = reinterpret_cast<const quint8*>(data.constData());
+    const int size = data.size();
+    int offset = 0;
+    quint32 hash;
+    if (size >= 16) {
+        quint32 v1 = prime1 + prime2;
+        quint32 v2 = prime2;
+        quint32 v3 = 0;
+        quint32 v4 = static_cast<quint32>(0) - prime1;
+        const int limit = size - 16;
+        while (offset <= limit) {
+            v1 = rotl32(v1 + loadLe32(reinterpret_cast<const char*>(bytes + offset)) * prime2, 13) * prime1;
+            v2 = rotl32(v2 + loadLe32(reinterpret_cast<const char*>(bytes + offset + 4)) * prime2, 13) * prime1;
+            v3 = rotl32(v3 + loadLe32(reinterpret_cast<const char*>(bytes + offset + 8)) * prime2, 13) * prime1;
+            v4 = rotl32(v4 + loadLe32(reinterpret_cast<const char*>(bytes + offset + 12)) * prime2, 13) * prime1;
+            offset += 16;
+        }
+        hash = rotl32(v1, 1) + rotl32(v2, 7) + rotl32(v3, 12) + rotl32(v4, 18);
+    } else {
+        hash = prime5;
+    }
+    hash += static_cast<quint32>(size);
+    while (offset + 4 <= size) {
+        hash = rotl32(hash + loadLe32(reinterpret_cast<const char*>(bytes + offset)) * prime3, 17) * prime4;
+        offset += 4;
+    }
+    while (offset < size) {
+        hash = rotl32(hash + static_cast<quint32>(bytes[offset]) * prime5, 11) * prime1;
+        ++offset;
+    }
+    hash ^= hash >> 15;
+    hash *= prime2;
+    hash ^= hash >> 13;
+    hash *= prime3;
+    hash ^= hash >> 16;
+    return hash;
+}
+
+void appendLz4Length(QByteArray& output, quint32 length)
+{
+    if (length <= 15)
+        return;
+    quint32 remaining = length - 15;
+    while (remaining >= 255) {
+        output.append(static_cast<char>(255));
+        remaining -= 255;
+    }
+    output.append(static_cast<char>(remaining));
+}
+
+QByteArray lz4CompressBlock(const QByteArray& source)
+{
+    QByteArray output;
+    output.reserve(source.size() + source.size() / 255 + 16);
+    QVector<int> hashTable(1 << 16, -1);
+    const auto* data = reinterpret_cast<const quint8*>(source.constData());
+    const int size = source.size();
+    int anchor = 0;
+    int position = 0;
+
+    while (position + 4 <= size) {
+        const quint32 value = loadLe32(reinterpret_cast<const char*>(data + position));
+        const int hash = static_cast<int>((value * 2654435761u) >> 16);
+        const int candidate = hashTable.at(hash);
+        hashTable[hash] = position;
+        if (candidate < 0 || position - candidate > 65535 || position == candidate
+            || loadLe32(reinterpret_cast<const char*>(data + candidate)) != value) {
+            ++position;
+            continue;
+        }
+
+        const quint32 literalLength = static_cast<quint32>(position - anchor);
+        int matchLength = 4;
+        while (position + matchLength < size
+            && data[candidate + matchLength] == data[position + matchLength]) {
+            ++matchLength;
+        }
+
+        const quint32 encodedMatchLength = static_cast<quint32>(matchLength - 4);
+        quint8 token = static_cast<quint8>((qMin(literalLength, 15u) << 4)
+            | qMin(encodedMatchLength, 15u));
+        output.append(static_cast<char>(token));
+        appendLz4Length(output, literalLength);
+        if (literalLength > 0)
+            output.append(reinterpret_cast<const char*>(data + anchor), literalLength);
+        appendLe16(output, static_cast<quint16>(position - candidate));
+        appendLz4Length(output, encodedMatchLength);
+        position += matchLength;
+        anchor = position;
+    }
+
+    if (anchor < size) {
+        const quint32 literalLength = static_cast<quint32>(size - anchor);
+        output.append(static_cast<char>(qMin(literalLength, 15u) << 4));
+        appendLz4Length(output, literalLength);
+        output.append(reinterpret_cast<const char*>(data + anchor), literalLength);
+    }
+    return output;
+}
+
+QByteArray lz4CompressFrame(const QByteArray& source)
+{
+    QByteArray frame;
+    appendLe32(frame, 0x184D2204u);
+    const quint8 flags = 0x68;
+    const quint8 blockDescriptor = 0x40;
+    frame.append(static_cast<char>(flags));
+    frame.append(static_cast<char>(blockDescriptor));
+    const QByteArray header = frame.mid(4, 2);
+    frame.append(static_cast<char>((xxhash32(header) >> 8) & 0xFFu));
+    appendLe64(frame, static_cast<quint64>(source.size()));
+
+    constexpr int blockSize = 1 << 16;
+    for (int offset = 0; offset < source.size(); offset += blockSize) {
+        const QByteArray block = source.mid(offset, blockSize);
+        const QByteArray compressed = lz4CompressBlock(block);
+        if (compressed.size() < block.size()) {
+            appendLe32(frame, static_cast<quint32>(compressed.size()));
+            frame.append(compressed);
+        } else {
+            appendLe32(frame, static_cast<quint32>(block.size()));
+            frame.append(block);
+        }
+    }
+    appendLe32(frame, 0);
+    return frame;
+}
+
 quint16 readU16(QDataStream& ds)
 {
     quint16 v = 0;
@@ -180,32 +353,88 @@ quint64 readU64(QDataStream& ds)
     return v;
 }
 
-QString readLenPrefixed(QDataStream& ds, bool& ok)
+QString readLenPrefixed(QDataStream& ds, bool& ok, qint64* encodedLength = nullptr)
 {
+    if (encodedLength)
+        *encodedLength = 0;
+
     quint8 len = 0;
-    ds.readRawData(reinterpret_cast<char*>(&len), 1);
+    if (ds.readRawData(reinterpret_cast<char*>(&len), 1) != 1 || len == 0) {
+        ok = false;
+        return QString();
+    }
+
     QByteArray raw(len, '\0');
-    qint64 got = ds.readRawData(raw.data(), len);
-    if (got != len) { ok = false; return QString(); }
-    // The length prefix counts the null terminator as well.
-    if (!raw.isEmpty() && raw.at(raw.size() - 1) == '\0')
-        raw.chop(1);
+    const qint64 got = ds.readRawData(raw.data(), len);
+    if (got != len || raw.at(raw.size() - 1) != '\0') {
+        ok = false;
+        return QString();
+    }
+    if (encodedLength)
+        *encodedLength = len;
+    raw.chop(1);
     return QString::fromUtf8(raw);
 }
 
-QString readNullTerminated(QDataStream& ds, bool& ok)
+QString readNullTerminated(QDataStream& ds, bool& ok, qint64* encodedLength = nullptr)
 {
     QByteArray raw;
     char c = 0;
     while (true) {
         if (ds.readRawData(&c, 1) != 1) { ok = false; return QString(); }
+        if (encodedLength)
+            ++*encodedLength;
         if (c == '\0') break;
         raw.append(c);
     }
     return QString::fromUtf8(raw);
 }
 
+bool writeU8(QFile& file, quint8 value)
+{
+    return file.write(reinterpret_cast<const char*>(&value), 1) == 1;
+}
+
+bool writeU32(QFile& file, quint32 value)
+{
+    const char bytes[4] = {
+        static_cast<char>(value & 0xFFu),
+        static_cast<char>((value >> 8) & 0xFFu),
+        static_cast<char>((value >> 16) & 0xFFu),
+        static_cast<char>((value >> 24) & 0xFFu)
+    };
+    return file.write(bytes, sizeof(bytes)) == sizeof(bytes);
+}
+
+bool writeU64(QFile& file, quint64 value)
+{
+    const char bytes[8] = {
+        static_cast<char>(value & 0xFFu),
+        static_cast<char>((value >> 8) & 0xFFu),
+        static_cast<char>((value >> 16) & 0xFFu),
+        static_cast<char>((value >> 24) & 0xFFu),
+        static_cast<char>((value >> 32) & 0xFFu),
+        static_cast<char>((value >> 40) & 0xFFu),
+        static_cast<char>((value >> 48) & 0xFFu),
+        static_cast<char>((value >> 56) & 0xFFu)
+    };
+    return file.write(bytes, sizeof(bytes));
+}
+
+QByteArray zlibCompress(const QByteArray& source)
+{
+    uLongf destinationSize = compressBound(static_cast<uLong>(source.size()));
+    QByteArray output(static_cast<int>(destinationSize), '\0');
+    const int result = compress2(reinterpret_cast<Bytef*>(output.data()), &destinationSize,
+        reinterpret_cast<const Bytef*>(source.constData()), static_cast<uLong>(source.size()),
+        Z_BEST_SPEED);
+    if (result != Z_OK) return {};
+    output.resize(static_cast<int>(destinationSize));
+    return output;
+}
+
 } // namespace
+
 
 BsaArchive::BsaArchive()
 {
@@ -233,16 +462,20 @@ bool BsaArchive::open(const QString& path)
         return false;
     }
     mFileSize = mFile->size();
+    const auto fail = [this]() {
+        mFile->close();
+        delete mFile;
+        mFile = nullptr;
+        mFileSize = 0;
+        return false;
+    };
     QDataStream ds(mFile);
     ds.setByteOrder(QDataStream::LittleEndian);
 
     quint32 magic = readU32(ds);
-    if (magic != MAGIC_BSA && magic != MAGIC_TES3) {
-        LOG_ERROR(QString("BsaArchive: invalid magic 0x%1 (expected 'BSA\\0' or TES3)").arg(magic, 8, 16, QChar('0')));
-        mFile->close();
-        delete mFile;
-        mFile = nullptr;
-        return false;
+    if (magic != MAGIC_BSA && magic != MAGIC_BTDX && magic != MAGIC_TES3) {
+        LOG_ERROR(QString("BsaArchive: invalid magic 0x%1 (expected 'BSA\\0', 'BTDX' or TES3)").arg(magic, 8, 16, QChar('0')));
+        return fail();
     }
 
     if (magic == MAGIC_TES3)
@@ -290,69 +523,160 @@ bool BsaArchive::open(const QString& path)
         return !mEntries.isEmpty();
     }
 
-    mVersion = readU32(ds);
+    // Starfield marks its archives 'BTDX' and uses a different container
+    // layout (GNLF/GNRL type tag, 0xBAADF00D block headers, names inline in
+    // the record stream) rather than the v1 folder/file tables. It is
+    // recognised so callers get a specific reason instead of a bad-magic
+    // error, but reading it is not implemented: guessing at the layout would
+    // risk silently returning wrong bytes for game assets.
+    //
+    // The version field is not a monotonic series across the whole family
+    // (Skyrim SE is 0x69 while Starfield's is 2), so the magic is the only
+    // reliable discriminator.
+    if (magic == MAGIC_BTDX) {
+        LOG_ERROR(QString("BsaArchive: Starfield 'BTDX' archives are not supported yet (%1)")
+                      .arg(path));
+        return fail();
+    }
 
-    // 28-byte header: FoldersOffset, Flags, FolderCount, FileCount,
-    // FolderNamesLength, FileNamesLength, FileFlags
+    mVersion = readU32(ds);
     const quint32 foldersOffset = readU32(ds);
     mFlags = readU32(ds);
     const quint32 folderCount = readU32(ds);
     const quint32 fileCount = readU32(ds);
-    readU32(ds); // folder names length
-    readU32(ds); // file names length
-    readU32(ds); // file flags
+    const quint32 folderNamesLength = readU32(ds);
+    const quint32 fileNamesLength = readU32(ds);
+    readU32(ds); // file flags + padding
 
     LOG_DEBUG(QString("BsaArchive: version=%1 foldersOffset=%2 flags=0x%3 folders=%4 files=%5")
         .arg(mVersion).arg(foldersOffset).arg(mFlags, 8, 16, QChar('0')).arg(folderCount).arg(fileCount));
 
     const bool isSse = (mVersion == 0x69);
+    const quint32 folderRecordSize = isSse ? 24 : 16;
+    const quint64 folderBlocksStart = static_cast<quint64>(foldersOffset)
+        + static_cast<quint64>(folderCount) * folderRecordSize;
+    if (ds.status() != QDataStream::Ok
+        || foldersOffset < 36
+        || folderCount > static_cast<quint32>(std::numeric_limits<int>::max())
+        || fileCount > static_cast<quint32>(std::numeric_limits<int>::max())
+        || folderBlocksStart > mFileSize) {
+        return fail();
+    }
 
     struct Folder {
         QString name;
         quint32 fileCount = 0;
+        quint64 blockOffset = 0;
         QVector<BsaFileEntry> files;
     };
     QVector<Folder> folders;
-    folders.reserve(folderCount);
+    folders.reserve(static_cast<int>(folderCount));
 
-    // All folder records first: Hash u64, FileCount u32, [Unk u32], Offset.
-    ds.device()->seek(foldersOffset);
+    if (!ds.device()->seek(foldersOffset))
+        return fail();
+
     for (quint32 i = 0; i < folderCount; ++i) {
         Folder folder;
-        readU64(ds); // folder name hash
+        readU64(ds);
         folder.fileCount = readU32(ds);
+        quint32 storedOffset = 0;
         if (isSse) {
-            readU32(ds); // unk
-            readU64(ds); // offset (i64)
+            readU32(ds);
+            storedOffset = readU32(ds);
+            readU32(ds);
         } else {
-            readU32(ds); // offset (u32)
+            storedOffset = readU32(ds);
+        }
+        if (storedOffset < fileNamesLength) {
+            return fail();
+        }
+        folder.blockOffset = static_cast<quint64>(storedOffset) - fileNamesLength;
+        if (folder.blockOffset < folderBlocksStart || folder.blockOffset >= mFileSize) {
+            return fail();
         }
         folders.append(folder);
     }
+    if (ds.status() != QDataStream::Ok)
+        return fail();
 
-    // Then per folder: name (u8 len + bytes), then that folder's file records
-    // (16 bytes each: Hash u64, Size u32, Offset u32). Matches xEdit.
-    for (int i = 0; i < folders.size(); ++i) {
-        bool ok = true;
-        folders[i].name = readLenPrefixed(ds, ok);
-        folders[i].files.reserve(static_cast<int>(folders[i].fileCount));
-        for (quint32 j = 0; j < folders[i].fileCount; ++j) {
+    quint64 totalFileCount = 0;
+    quint64 totalFolderNameLength = 0;
+    quint64 folderBlocksEnd = folderBlocksStart;
+    for (Folder& folder : folders) {
+        if (folder.fileCount > static_cast<quint32>(std::numeric_limits<int>::max()))
+            return fail();
+        if (!ds.device()->seek(static_cast<qint64>(folder.blockOffset)))
+            return fail();
+
+        qint64 encodedNameLength = 0;
+        if (mFlags & FLAG_PATHNAMES) {
+            bool ok = true;
+            folder.name = readLenPrefixed(ds, ok, &encodedNameLength);
+            if (!ok)
+                return fail();
+            totalFolderNameLength += static_cast<quint64>(encodedNameLength);
+        }
+
+        const quint64 blockSize = (mFlags & FLAG_PATHNAMES ? 1 : 0)
+            + static_cast<quint64>(encodedNameLength)
+            + static_cast<quint64>(folder.fileCount) * 16;
+        if (folder.blockOffset + blockSize > mFileSize) {
+            LOG_DEBUG(QString("BSA folder block exceeds file: block=%1 size=%2 fileSize=%3")
+                .arg(folder.blockOffset).arg(blockSize).arg(mFileSize));
+            return fail();
+        }
+        folderBlocksEnd = std::max(folderBlocksEnd, folder.blockOffset + blockSize);
+
+        folder.files.reserve(static_cast<int>(folder.fileCount));
+        for (quint32 j = 0; j < folder.fileCount; ++j) {
             BsaFileEntry entry;
             entry.nameHash = readU64(ds);
             entry.size = readU32(ds);
             entry.offset = readU32(ds);
             entry.compressed = false;
-            folders[i].files.append(entry);
+            if (static_cast<qint64>(entry.offset) + (entry.size & 0x3FFFFFFFu) > mFileSize) {
+                LOG_DEBUG(QString("BSA file payload out of range: offset=%1 size=%2 fileSize=%3")
+                    .arg(entry.offset).arg(entry.size & 0x3FFFFFFFu).arg(mFileSize));
+                return fail();
+            }
+            folder.files.append(entry);
         }
+        if (ds.status() != QDataStream::Ok)
+            return fail();
+        totalFileCount += folder.fileCount;
+    }
+    if (totalFileCount != fileCount || totalFolderNameLength != folderNamesLength) {
+        LOG_DEBUG(QString("BSA table counts mismatch: files=%1 headerFiles=%2 folderNames=%3 headerFolderNames=%4")
+            .arg(totalFileCount).arg(fileCount).arg(totalFolderNameLength).arg(folderNamesLength));
+        return fail();
     }
 
-    // Then all file names (null-terminated).
-    for (int i = 0; i < folders.size(); ++i) {
-        for (int j = 0; j < folders[i].files.size(); ++j) {
-            bool ok = true;
-            folders[i].files[j].fileName = readNullTerminated(ds, ok);
-            if (!ok) break;
+    const quint64 fileNamesOffset = folderBlocksEnd;
+    if (fileNamesOffset + fileNamesLength > mFileSize)
+        return fail();
+    for (const Folder& folder : folders) {
+        for (const BsaFileEntry& file : folder.files) {
+            if (file.offset < fileNamesOffset + fileNamesLength)
+                return fail();
         }
+    }
+    if (!ds.device()->seek(static_cast<qint64>(fileNamesOffset)))
+        return fail();
+    qint64 fileNameBytes = 0;
+    if (mFlags & FLAG_FILENAMES) {
+        for (Folder& folder : folders) {
+            for (BsaFileEntry& file : folder.files) {
+                bool ok = true;
+                file.fileName = readNullTerminated(ds, ok, &fileNameBytes);
+                if (!ok)
+                    return fail();
+            }
+        }
+    }
+    if (ds.status() != QDataStream::Ok || fileNameBytes != fileNamesLength) {
+        LOG_DEBUG(QString("BSA file-name table mismatch: read=%1 header=%2 status=%3")
+            .arg(fileNameBytes).arg(fileNamesLength).arg(static_cast<int>(ds.status())));
+        return fail();
     }
 
     // Flatten into the entries list, computing full paths and compression.
@@ -477,13 +801,18 @@ bool BsaArchive::extract(quint32 index, const QString& outputPath) const
         return false;
     }
 
-    QFile outFile(outputPath);
+    QSaveFile outFile(outputPath);
     if (!outFile.open(QIODevice::WriteOnly)) {
         LOG_ERROR(QString("BsaArchive: cannot write to %1").arg(outputPath));
         return false;
     }
-    outFile.write(data);
-    outFile.close();
+    const qint64 written = outFile.write(data);
+    const bool committed = written == data.size() && outFile.commit();
+    if (!committed) {
+        LOG_ERROR(QString("BsaArchive: cannot commit output %1 (%2)")
+                      .arg(outputPath, outFile.errorString()));
+        return false;
+    }
     return true;
 }
 
@@ -543,12 +872,18 @@ quint64 BsaArchive::hashName(const QString& stem, const QString& extension)
     return bsaGenerateHash(stem, extension);
 }
 
-bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath)
+bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath, bool compress,
+                        const QString& sourceRoot, quint32 version)
 {
     if (filePaths.isEmpty()) {
         LOG_ERROR("BSA create: no files to archive");
         return false;
     }
+    if (version != 0x67 && version != 0x68 && version != 0x69) {
+        LOG_ERROR(QString("BSA create: unsupported target version 0x%1").arg(version, 8, 16, QChar('0')));
+        return false;
+    }
+    const bool isSse = version == 0x69;
 
     QFile outFile(outputPath);
     if (!outFile.open(QIODevice::WriteOnly)) {
@@ -557,22 +892,28 @@ bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath)
     }
 
     QFileInfo outInfo(outputPath);
-    const QString baseDir = outInfo.absolutePath();
+    const QString baseDir = sourceRoot.isEmpty()
+        ? outInfo.absolutePath() : QFileInfo(sourceRoot).absoluteFilePath();
 
     struct InputFile {
         QString fullPath; // lowercased, backslash separators
         QByteArray data;
+        QByteArray diskData;
+        QByteArray encodedName;
         quint64 nameHash = 0;
+        quint32 dataOffset = 0;
+        bool compressed = false;
     };
     QVector<InputFile> inputs;
 
     for (const QString& filePath : filePaths) {
         QFileInfo fi(filePath);
-        QString relPath = fi.fileName();
         const QString absPath = fi.absoluteFilePath();
-        if (absPath.startsWith(baseDir, Qt::CaseInsensitive)) {
-            relPath = absPath.mid(baseDir.length() + 1).replace('\\', '/');
-        }
+        QString relPath = QDir(baseDir).relativeFilePath(absPath);
+        relPath = QDir::cleanPath(relPath).replace('\\', '/');
+        if (relPath.isEmpty() || relPath == ".."
+            || relPath.startsWith("../") || QDir::isAbsolutePath(relPath))
+            relPath = fi.fileName();
 
         QFile inFile(filePath);
         if (!inFile.open(QIODevice::ReadOnly)) {
@@ -583,6 +924,25 @@ bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath)
         input.fullPath = relPath.toLower().replace('/', '\\');
         input.data = inFile.readAll();
         inFile.close();
+        if (compress && !input.data.isEmpty()) {
+            QByteArray packed;
+            if (isSse) {
+                const QByteArray frame = lz4CompressFrame(input.data);
+                appendLe32(packed, static_cast<quint32>(input.data.size()));
+                packed.append(frame);
+            } else {
+                const QByteArray compressed = zlibCompress(input.data);
+                if (compressed.isEmpty()) continue;
+                appendLe32(packed, static_cast<quint32>(input.data.size()));
+                packed.append(compressed);
+            }
+            if (packed.size() < input.data.size()) {
+                input.diskData = packed;
+                input.compressed = true;
+            }
+        }
+        if (input.diskData.isEmpty())
+            input.diskData = input.data;
         if (input.data.isEmpty()) {
             LOG_WARNING(QString("BSA create: skipping empty file: %1").arg(filePath));
             continue;
@@ -596,6 +956,7 @@ bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath)
         const QString stem = dot > 0 ? fileName.left(dot) : fileName;
         const QString ext = dot > 0 ? fileName.mid(dot) : QString();
         input.nameHash = bsaGenerateHash(stem, ext);
+        input.encodedName = fileName.toUtf8();
 
         // Folder hash uses the folder path with a trailing backslash.
         inputs.append(input);
@@ -610,6 +971,9 @@ bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath)
     // Group files by folder, preserving order.
     struct FolderGroup {
         QString name;
+        QByteArray encodedName;
+        quint64 folderHash = 0;
+        quint64 blockOffset = 0;
         QVector<InputFile> files;
     };
     QVector<FolderGroup> folders;
@@ -628,90 +992,154 @@ bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath)
         }
     }
 
-    // Sizes for the header.
-    const quint32 folderCount = static_cast<quint32>(folders.size());
-    quint32 fileCount = 0;
-    quint32 folderNamesLength = 0;
-    quint32 fileNamesLength = 0;
+    for (FolderGroup& g : folders) {
+        g.encodedName = g.name.toUtf8();
+        g.folderHash = bsaGenerateHash(g.name + QLatin1String("\\"));
+    }
+    std::sort(folders.begin(), folders.end(), [](const FolderGroup& lhs, const FolderGroup& rhs) {
+        return lhs.folderHash < rhs.folderHash;
+    });
+    for (FolderGroup& g : folders) {
+        std::sort(g.files.begin(), g.files.end(), [](const InputFile& lhs, const InputFile& rhs) {
+            return lhs.nameHash < rhs.nameHash;
+        });
+    }
+
     for (const FolderGroup& g : folders) {
-        fileCount += static_cast<quint32>(g.files.size());
-        folderNamesLength += 1 + static_cast<quint32>(g.name.size()); // len byte + name
-        for (const InputFile& f : g.files) {
-            const int slash = f.fullPath.lastIndexOf('\\');
-            fileNamesLength += 1 + static_cast<quint32>(f.fullPath.mid(slash + 1).size()); // name + NUL
+        if (g.encodedName.size() > 254) {
+            LOG_ERROR("BSA create: folder name exceeds 255-byte length prefix");
+            outFile.close();
+            outFile.remove();
+            return false;
         }
     }
 
-    constexpr quint32 HEADER_SIZE = 36;                 // magic + version + 28 bytes
-    constexpr quint32 SSE_FOLDER_RECORD = 24;
-    constexpr quint32 FILE_RECORD = 16;
-
-    // Layout: header, folder records, then per folder: name + file records,
-    // then all file names, then data.
-    quint64 foldersOffset = HEADER_SIZE;
-    quint64 dataOffset = HEADER_SIZE
-                       + static_cast<quint64>(folderCount) * SSE_FOLDER_RECORD;
-    for (const FolderGroup& g : folders)
-        dataOffset += 1 + static_cast<quint64>(g.name.size())
-                    + static_cast<quint64>(g.files.size()) * FILE_RECORD;
-    dataOffset += fileNamesLength;
-
-    // Flags: FolderNames (0x1) | FileNames (0x2). Uncompressed (no 0x4).
-    constexpr quint32 BSA_FLAGS = 0x3;
-
-    // Header.
-    outFile.write("BSA\x00", 4);
-    quint32 version = 0x69; // SSE
-    outFile.write(reinterpret_cast<const char*>(&version), 4);
-    outFile.write(reinterpret_cast<const char*>(&foldersOffset), 4);
-    outFile.write(reinterpret_cast<const char*>(&BSA_FLAGS), 4);
-    outFile.write(reinterpret_cast<const char*>(&folderCount), 4);
-    outFile.write(reinterpret_cast<const char*>(&fileCount), 4);
-    outFile.write(reinterpret_cast<const char*>(&folderNamesLength), 4);
-    outFile.write(reinterpret_cast<const char*>(&fileNamesLength), 4);
-    quint32 fileFlags = 0;
-    outFile.write(reinterpret_cast<const char*>(&fileFlags), 4);
-
-    // Folder records (SSE: hash u64, count u32, unk u32, offset i64).
+    quint64 fileCount64 = 0;
+    quint64 folderNamesLength64 = 0;
+    quint64 fileNamesLength64 = 0;
     for (const FolderGroup& g : folders) {
-        const quint64 folderHash = bsaGenerateHash(g.name + QLatin1String("\\"));
-        outFile.write(reinterpret_cast<const char*>(&folderHash), 8);
-        const quint32 count = static_cast<quint32>(g.files.size());
-        outFile.write(reinterpret_cast<const char*>(&count), 4);
-        const quint32 unk = 0;
-        outFile.write(reinterpret_cast<const char*>(&unk), 4);
-        outFile.write(reinterpret_cast<const char*>(&dataOffset), 8); // placeholder
-    }
-
-    // Per folder: name (u8 len + bytes) then file records.
-    for (const FolderGroup& g : folders) {
-        const quint8 nameLen = static_cast<quint8>(g.name.size());
-        outFile.write(reinterpret_cast<const char*>(&nameLen), 1);
-        outFile.write(g.name.toUtf8().constData(), g.name.size());
-        for (const InputFile& f : g.files) {
-            outFile.write(reinterpret_cast<const char*>(&f.nameHash), 8);
-            const quint32 size = static_cast<quint32>(f.data.size());
-            outFile.write(reinterpret_cast<const char*>(&size), 4);
-            const quint32 off = static_cast<quint32>(dataOffset);
-            outFile.write(reinterpret_cast<const char*>(&off), 4);
-            dataOffset += size;
-        }
-    }
-
-    // File names (null-terminated).
-    for (const FolderGroup& g : folders) {
-        for (const InputFile& f : g.files) {
-            const int slash = f.fullPath.lastIndexOf('\\');
-            const QByteArray name = f.fullPath.mid(slash + 1).toUtf8();
-            outFile.write(name.constData(), name.size());
-            outFile.write("\x00", 1);
-        }
-    }
-
-    // Data.
-    for (const FolderGroup& g : folders) {
+        fileCount64 += static_cast<quint64>(g.files.size());
+        folderNamesLength64 += g.encodedName.size() + 1;
         for (const InputFile& f : g.files)
-            outFile.write(f.data);
+            fileNamesLength64 += f.encodedName.size() + 1;
+    }
+    if (fileCount64 > std::numeric_limits<quint32>::max()
+        || folderNamesLength64 > std::numeric_limits<quint32>::max()
+        || fileNamesLength64 > std::numeric_limits<quint32>::max()) {
+        LOG_ERROR("BSA create: archive tables exceed 32-bit limits");
+        outFile.close();
+        outFile.remove();
+        return false;
+    }
+
+    const quint32 folderCount = static_cast<quint32>(folders.size());
+    const quint32 fileCount = static_cast<quint32>(fileCount64);
+    const quint32 folderNamesLength = static_cast<quint32>(folderNamesLength64);
+    const quint32 fileNamesLength = static_cast<quint32>(fileNamesLength64);
+
+    constexpr quint32 HEADER_SIZE = 36;
+    const quint32 folderRecordSize = isSse ? 24u : 16u;
+    constexpr quint32 FILE_RECORD = 16;
+    const quint32 BSA_FLAGS = FLAG_PATHNAMES | FLAG_FILENAMES
+        | (compress ? FLAG_COMPRESS : 0);
+
+    quint64 blockCursor = HEADER_SIZE
+        + static_cast<quint64>(folderCount) * folderRecordSize;
+    for (FolderGroup& g : folders) {
+        g.blockOffset = blockCursor;
+        blockCursor += 2 + static_cast<quint64>(g.encodedName.size())
+            + static_cast<quint64>(g.files.size()) * FILE_RECORD;
+    }
+    const quint64 dataStart = blockCursor + fileNamesLength;
+    if (dataStart > std::numeric_limits<quint32>::max()) {
+        LOG_ERROR("BSA create: data start exceeds 32-bit file offset range");
+        outFile.close();
+        outFile.remove();
+        return false;
+    }
+    quint64 payloadCursor = dataStart;
+    for (FolderGroup& g : folders) {
+        for (InputFile& f : g.files) {
+            if (f.diskData.size() > static_cast<int>(0x3FFFFFFFu)
+                || payloadCursor > std::numeric_limits<quint32>::max()
+                || static_cast<quint64>(f.diskData.size()) > std::numeric_limits<quint32>::max() - payloadCursor) {
+                LOG_ERROR("BSA create: payload exceeds 32-bit file offset range");
+                outFile.close();
+                outFile.remove();
+                return false;
+            }
+            f.dataOffset = static_cast<quint32>(payloadCursor);
+            payloadCursor += static_cast<quint64>(f.diskData.size());
+        }
+    }
+
+    const auto writeFailed = [&outFile]() {
+        outFile.close();
+        outFile.remove();
+        return false;
+    };
+
+    if (outFile.write("BSA\x00", 4) != 4
+        || !writeU32(outFile, version)
+        || !writeU32(outFile, HEADER_SIZE)
+        || !writeU32(outFile, BSA_FLAGS)
+        || !writeU32(outFile, folderCount)
+        || !writeU32(outFile, fileCount)
+        || !writeU32(outFile, folderNamesLength)
+        || !writeU32(outFile, fileNamesLength)
+        || !writeU32(outFile, 0)) {
+        return writeFailed();
+    }
+
+    for (const FolderGroup& g : folders) {
+        const quint64 storedOffset = g.blockOffset + fileNamesLength;
+        if (!writeU64(outFile, g.folderHash)
+            || !writeU32(outFile, static_cast<quint32>(g.files.size())))
+            return writeFailed();
+        if (isSse)
+        {
+            if (!writeU32(outFile, 0)
+                || !writeU32(outFile, static_cast<quint32>(storedOffset))
+                || !writeU32(outFile, 0))
+                return writeFailed();
+        }
+        else if (!writeU32(outFile, static_cast<quint32>(storedOffset)))
+        {
+            return writeFailed();
+        }
+    }
+
+    for (const FolderGroup& g : folders) {
+        if (!writeU8(outFile, static_cast<quint8>(g.encodedName.size() + 1))
+            || outFile.write(g.encodedName.constData(), g.encodedName.size()) != g.encodedName.size()
+            || !writeU8(outFile, 0)) {
+            return writeFailed();
+        }
+        for (const InputFile& f : g.files) {
+            const quint32 size = static_cast<quint32>(f.diskData.size())
+                | (compress && !f.compressed ? FILE_SIZE_COMPRESS : 0);
+            if (!writeU64(outFile, f.nameHash)
+                || !writeU32(outFile, size)
+                || !writeU32(outFile, f.dataOffset)) {
+                return writeFailed();
+            }
+        }
+    }
+
+    for (const FolderGroup& g : folders) {
+        for (const InputFile& f : g.files) {
+            if (outFile.write(f.encodedName.constData(), f.encodedName.size()) != f.encodedName.size()
+                || !writeU8(outFile, 0)) {
+                return writeFailed();
+            }
+        }
+    }
+
+    for (const FolderGroup& g : folders) {
+        for (const InputFile& f : g.files) {
+            if (outFile.write(f.diskData.constData(), f.diskData.size()) != f.diskData.size())
+                return writeFailed();
+        }
     }
 
     outFile.close();

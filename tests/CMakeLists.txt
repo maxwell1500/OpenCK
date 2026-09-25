@@ -196,7 +196,7 @@ target_link_libraries(test_compressedrecord PRIVATE openck_esm Qt6::Test Qt6::Zl
 target_include_directories(test_compressedrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_compressedrecord)
 
-# Starfield ESM direct test (needs a real Starfield.esm — skips via CTest gate).
+# Starfield ESM direct test (needs a real Starfield.esm â€” skips via CTest gate).
 add_executable(test_starfieldesm test_starfieldesm.cpp)
 target_link_libraries(test_starfieldesm PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_starfieldesm PRIVATE ${TEST_INCLUDE_DIRS})
@@ -292,7 +292,7 @@ target_include_directories(test_meshprobe PRIVATE ${TEST_INCLUDE_DIRS})
 # Always exits 0 (reports "open failed" when the archive is absent).
 openck_add_test(test_meshprobe)
 
-# Diagnostic: find/extract files in a BA2 by path substring (§8.3: resolve
+# Diagnostic: find/extract files in a BA2 by path substring (Â§8.3: resolve
 # the external .mesh paths shipped BSGeometry blocks carry).
 # Not registered with CTest (needs a real game install).
 add_executable(test_meshresolve test_meshresolve.cpp)
@@ -304,10 +304,10 @@ target_include_directories(test_meshresolve PRIVATE ${TEST_INCLUDE_DIRS})
 add_executable(test_subrecord_diff test_subrecord_diff.cpp)
 target_link_libraries(test_subrecord_diff PRIVATE openck_esm Qt6::Core)
 target_include_directories(test_subrecord_diff PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default — needs a real Starfield install.
+# Not registered with CTest by default â€” needs a real Starfield install.
 
-# Full-scale untouched round-trip gate (REMAINING.md §1.2). Standalone CLI,
-# driven by tools/nightly-roundtrip.ps1 — far too slow for CTest.
+# Full-scale untouched round-trip gate (REMAINING.md Â§1.2). Standalone CLI,
+# driven by tools/nightly-roundtrip.ps1 â€” far too slow for CTest.
 add_executable(test_fullscale_roundtrip test_fullscale_roundtrip.cpp)
 target_link_libraries(test_fullscale_roundtrip PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_fullscale_roundtrip PRIVATE ${TEST_INCLUDE_DIRS})
@@ -403,8 +403,9 @@ add_executable(test_qtformdialog test_qtformdialog.cpp
     ${CMAKE_SOURCE_DIR}/src/view/window/qtformdialogmanager.cpp
     ${CMAKE_SOURCE_DIR}/src/view/widgets/editorpropertygrid.cpp
     ${CMAKE_SOURCE_DIR}/src/view/widgets/formcomponentwidget.cpp
+    ${CMAKE_SOURCE_DIR}/src/view/widgets/formpickerwidget.cpp
 )
-target_link_libraries(test_qtformdialog PRIVATE openck_esm Qt6::Test Qt6::Widgets)
+target_link_libraries(test_qtformdialog PRIVATE openck_model openck_esm test_stubs Qt6::Test Qt6::Widgets)
 target_include_directories(test_qtformdialog PRIVATE
     ${TEST_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/src
@@ -413,6 +414,12 @@ target_include_directories(test_qtformdialog PRIVATE
     ${CMAKE_SOURCE_DIR}/src/view/window
 )
 openck_add_test(test_qtformdialog)
+
+# Bethesda NIF container: locks the block header layout against shipped files.
+add_executable(test_nifblockfile test_nifblockfile.cpp)
+target_link_libraries(test_nifblockfile PRIVATE openck_files Qt6::Test)
+target_include_directories(test_nifblockfile PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_nifblockfile)
 
 # Tier 3 component tests
 add_executable(test_tier3_components test_tier3_components.cpp)
@@ -937,7 +944,7 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     test_mastermanagement test_materialpropertygraph test_materialruletemplate
     test_meshlodconfig test_meshprobe test_missingrecords test_modmanager
     test_multigame test_navmeshtoolkit
-    test_navmrecord test_nifanimation test_nifintegration test_nifpyfilewrapper test_nifskinning test_nodegraph
+    test_navmrecord     test_nifanimation test_nifblockfile test_nifintegration test_nifpyfilewrapper test_nifskinning test_nodegraph
     test_obscript test_obscriptbinder test_obscriptcompiler test_obscriptparser
     test_obscripttypechecker
     test_objectwindow test_objectwindowfilter test_opallist test_packagerecord

@@ -17,6 +17,7 @@
 
 class QFormLayout;
 class QLabel;
+class Data;
 
 namespace openck {
 
@@ -25,7 +26,8 @@ class FormComponentWidget : public QWidget
     Q_OBJECT
 
 public:
-    explicit FormComponentWidget(Component* component, QWidget* parent = nullptr);
+    explicit FormComponentWidget(Component* component, QWidget* parent = nullptr,
+                                 Data* data = nullptr);
     ~FormComponentWidget() override;
 
     Component* component() const { return m_component; }
@@ -50,6 +52,7 @@ public:
 
 private:
     Component* m_component;
+    Data* m_data;
     std::vector<std::unique_ptr<EditorProperty>> m_properties;
     QFormLayout* m_layout = nullptr;
 };

@@ -204,12 +204,26 @@ void TestTier3Components::testTESActorBaseData()
     QCOMPARE(b.speedMult, quint16(100));
     QVERIFY(b.isEqualTo(&a));
 
+    auto actorProperties = a.createEditorProperties();
+    for (const auto& property : actorProperties)
+    {
+        if (property->name() == QStringLiteral("Base Spell")) property->setValue(1000);
+        if (property->name() == QStringLiteral("Level")) property->setValue(-123);
+    }
+    QCOMPARE(a.baseSpell, quint16(1000));
+    QCOMPARE(a.fatigue, quint16(200));
+    QCOMPARE(a.barterGold, quint16(50));
+    QCOMPARE(a.level, qint16(-123));
+    QCOMPARE(a.calcMin, quint16(1));
+    QCOMPARE(a.calcMax, quint16(99));
+    QCOMPARE(a.speedMult, quint16(100));
+
     TESActorBaseData_Component c;
     c.level = 5;
     QVERIFY(!c.isEqualTo(&a));
 
     c.mergeWith(&a);
-    QCOMPARE(c.level, qint16(10));
+    QCOMPARE(c.level, qint16(-123));
 
     TESActorBaseData_Component f;
     QVERIFY(f.canHandle(NAME('ACBS')));
@@ -277,12 +291,28 @@ void TestTier3Components::testTESAIForm()
     QCOMPARE(b.aggressionLevel, quint8(1));
     QVERIFY(b.isEqualTo(&a));
 
+    auto aiProperties = a.createEditorProperties();
+    for (const auto& property : aiProperties)
+    {
+        if (property->name() == QStringLiteral("Aggression")) property->setValue(5);
+        if (property->name() == QStringLiteral("Energy")) property->setValue(200);
+        if (property->name() == QStringLiteral("Mood")) property->setValue(-300);
+        if (property->name() == QStringLiteral("Disposition")) property->setValue(220);
+    }
+    QCOMPARE(a.aggression, quint8(5));
+    QCOMPARE(a.confidence, quint8(4));
+    QCOMPARE(a.energy, quint8(200));
+    QCOMPARE(a.morality, quint8(2));
+    QCOMPARE(a.mood, qint16(-300));
+    QCOMPARE(a.moodSpeed, quint8(10));
+    QCOMPARE(a.disposition, quint8(220));
+
     TESAIForm_Component c;
     c.aggression = 1;
     QVERIFY(!c.isEqualTo(&a));
 
     c.mergeWith(&a);
-    QCOMPARE(c.aggression, quint8(3));
+    QCOMPARE(c.aggression, quint8(5));
 
     TESAIForm_Component f;
     QVERIFY(f.canHandle(NAME('AIDT')));

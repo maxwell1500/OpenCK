@@ -23,6 +23,7 @@
 #include <QFormLayout>
 #include <QSplitter>
 #include <QFile>
+#include <utility>
 
 namespace {
 
@@ -78,9 +79,11 @@ void initializeSettingValue(GameSetting& setting, const QString& raw)
 
 } // namespace
 
-WeatherLightEditor::WeatherLightEditor(Data* data, QWidget* parent)
+WeatherLightEditor::WeatherLightEditor(Data* data, std::function<bool()> saveCallback,
+                                       QWidget* parent)
     : QDialog(parent),
       mData(data),
+      mSaveCallback(std::move(saveCallback)),
       mTree(nullptr),
       mDetailEdit(nullptr),
       mAddSettingButton(nullptr),
@@ -402,67 +405,10 @@ void WeatherLightEditor::onDeleteSetting()
 
 void WeatherLightEditor::onSave()
 {
-    QString filePath = QFileDialog::getSaveFileName(this, "Save Lighting & Weather", "",
-        "ESM Files (*.esm);;All Files (*)");
-
-    if (filePath.isEmpty()) return;
-
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        QMessageBox::critical(this, "Error", "Failed to open file for writing.");
+    if (!mSaveCallback || !mSaveCallback())
+    {
+        QMessageBox::warning(this, tr("Save"), tr("The active document could not be saved."));
         return;
     }
-
-    ESMWriter writer;
-    writer.setVersion(1.0f);
-    writer.save(file);
-
-    int weatherCount = 0;
-    int lightingCount = 0;
-
-    auto& gmstCollection = mData->getGameSettings();
-    auto gmstRecords = gmstCollection.getRecords();
-
-    for (const auto& record : gmstRecords) {
-        if (record.state == State_Erased) continue;
-
-        const GameSetting& gmst = record.get();
-        QString name = gmst.editorId;
-
-        bool isWeather = name.contains("weather", Qt::CaseInsensitive) ||
-                        name.contains("rain", Qt::CaseInsensitive) ||
-                        name.contains("snow", Qt::CaseInsensitive) ||
-                        name.contains("fog", Qt::CaseInsensitive) ||
-                        name.contains("cloud", Qt::CaseInsensitive);
-
-        bool isLighting = name.contains("light", Qt::CaseInsensitive) ||
-                         name.contains("shadow", Qt::CaseInsensitive) ||
-                         name.contains("ambient", Qt::CaseInsensitive) ||
-                         name.contains("dynamic", Qt::CaseInsensitive);
-
-        if (isWeather || isLighting) {
-            writer.startRecord('GMST');
-            gmst.save(writer);
-            writer.endRecord();
-
-            if (isWeather) weatherCount++;
-            if (isLighting) lightingCount++;
-        }
-    }
-
-    file.close();
-
-    LOG_INFO(QString("Saved %1 weather, %2 lighting GMST records to %3")
-        .arg(weatherCount).arg(lightingCount).arg(filePath));
-
-    QMessageBox::information(this, "Saved",
-        QString("Lighting & weather settings saved.\n\n"
-                "Weather GMST records: %1\n"
-                "Lighting GMST records: %2\n"
-                "Total: %3\n\n"
-                "File: %4")
-            .arg(weatherCount)
-            .arg(lightingCount)
-            .arg(weatherCount + lightingCount)
-            .arg(filePath));
+    mStatusLabel->setText(tr("Active document saved."));
 }

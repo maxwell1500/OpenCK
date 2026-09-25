@@ -113,10 +113,18 @@ private:
     bool* m_storage;
 };
 
+class IntegerEditorProperty : public EditorProperty
+{
+public:
+    virtual qint64 minimum() const = 0;
+    virtual qint64 maximum() const = 0;
+    virtual bool isUnsigned() const = 0;
+};
+
 /// Signed 32-bit integer property editor bound to a qint32 field. Any
 /// caller-supplied value is clamped to [minimum, maximum] so an out-of-range
 /// edit can never reach the record / file.
-class IntEditorProperty : public EditorProperty
+class IntEditorProperty : public IntegerEditorProperty
 {
 public:
     IntEditorProperty(QString name, qint32* storage,
@@ -135,8 +143,9 @@ public:
         }
     }
 
-    qint64 minimum() const { return m_min; }
-    qint64 maximum() const { return m_max; }
+    qint64 minimum() const override { return m_min; }
+    qint64 maximum() const override { return m_max; }
+    bool isUnsigned() const override { return false; }
 
 private:
     QString m_name;
@@ -147,7 +156,7 @@ private:
 
 /// Unsigned 32-bit integer property editor bound to a quint32 field, clamped
 /// to [minimum, maximum] on write.
-class UIntEditorProperty : public EditorProperty
+class UIntEditorProperty : public IntegerEditorProperty
 {
 public:
     UIntEditorProperty(QString name, quint32* storage,
@@ -166,14 +175,131 @@ public:
         }
     }
 
-    quint64 minimum() const { return m_min; }
-    quint64 maximum() const { return m_max; }
+    qint64 minimum() const override { return static_cast<qint64>(m_min); }
+    qint64 maximum() const override { return static_cast<qint64>(m_max); }
+    bool isUnsigned() const override { return true; }
 
 private:
     QString m_name;
     quint32* m_storage;
     quint64 m_min;
     quint64 m_max;
+};
+
+class Int8EditorProperty : public IntegerEditorProperty
+{
+public:
+    Int8EditorProperty(QString name, qint8* storage, qint64 minimum = -128, qint64 maximum = 127)
+        : m_name(std::move(name)), m_storage(storage), m_min(minimum), m_max(maximum) {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override { return m_storage ? QVariant(static_cast<int>(*m_storage)) : QVariant(); }
+    void setValue(const QVariant& v) override
+    {
+        if (m_storage) *m_storage = static_cast<qint8>(qBound(m_min, v.toLongLong(), m_max));
+    }
+    qint64 minimum() const override { return m_min; }
+    qint64 maximum() const override { return m_max; }
+    bool isUnsigned() const override { return false; }
+
+private:
+    QString m_name;
+    qint8* m_storage;
+    qint64 m_min;
+    qint64 m_max;
+};
+
+class Int16EditorProperty : public IntegerEditorProperty
+{
+public:
+    Int16EditorProperty(QString name, qint16* storage, qint64 minimum = -32768, qint64 maximum = 32767)
+        : m_name(std::move(name)), m_storage(storage), m_min(minimum), m_max(maximum) {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override { return m_storage ? QVariant(static_cast<int>(*m_storage)) : QVariant(); }
+    void setValue(const QVariant& v) override
+    {
+        if (m_storage) *m_storage = static_cast<qint16>(qBound(m_min, v.toLongLong(), m_max));
+    }
+    qint64 minimum() const override { return m_min; }
+    qint64 maximum() const override { return m_max; }
+    bool isUnsigned() const override { return false; }
+
+private:
+    QString m_name;
+    qint16* m_storage;
+    qint64 m_min;
+    qint64 m_max;
+};
+
+class UInt8EditorProperty : public IntegerEditorProperty
+{
+public:
+    UInt8EditorProperty(QString name, quint8* storage, quint64 minimum = 0, quint64 maximum = 255)
+        : m_name(std::move(name)), m_storage(storage), m_min(minimum), m_max(maximum) {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override { return m_storage ? QVariant(static_cast<uint>(*m_storage)) : QVariant(); }
+    void setValue(const QVariant& v) override
+    {
+        if (m_storage) *m_storage = static_cast<quint8>(qBound(m_min, v.toULongLong(), m_max));
+    }
+    qint64 minimum() const override { return static_cast<qint64>(m_min); }
+    qint64 maximum() const override { return static_cast<qint64>(m_max); }
+    bool isUnsigned() const override { return true; }
+
+private:
+    QString m_name;
+    quint8* m_storage;
+    quint64 m_min;
+    quint64 m_max;
+};
+
+class UInt16EditorProperty : public IntegerEditorProperty
+{
+public:
+    UInt16EditorProperty(QString name, quint16* storage, quint64 minimum = 0, quint64 maximum = 65535)
+        : m_name(std::move(name)), m_storage(storage), m_min(minimum), m_max(maximum) {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override { return m_storage ? QVariant(static_cast<uint>(*m_storage)) : QVariant(); }
+    void setValue(const QVariant& v) override
+    {
+        if (m_storage) *m_storage = static_cast<quint16>(qBound(m_min, v.toULongLong(), m_max));
+    }
+    qint64 minimum() const override { return static_cast<qint64>(m_min); }
+    qint64 maximum() const override { return static_cast<qint64>(m_max); }
+    bool isUnsigned() const override { return true; }
+
+private:
+    QString m_name;
+    quint16* m_storage;
+    quint64 m_min;
+    quint64 m_max;
+};
+
+class UInt8EnumEditorProperty : public EditorProperty
+{
+public:
+    struct Entry { QString label; quint32 value; };
+
+    UInt8EnumEditorProperty(QString name, quint8* storage, std::vector<Entry> entries)
+        : m_name(std::move(name)), m_storage(storage), m_entries(std::move(entries))
+    {}
+
+    QString name() const override { return m_name; }
+    QVariant value() const override { return m_storage ? QVariant(static_cast<uint>(*m_storage)) : QVariant(0u); }
+    void setValue(const QVariant& v) override
+    {
+        if (m_storage) *m_storage = static_cast<quint8>(qBound<quint64>(0, v.toULongLong(), 255));
+    }
+
+    const std::vector<Entry>& entries() const { return m_entries; }
+
+private:
+    QString m_name;
+    quint8* m_storage;
+    std::vector<Entry> m_entries;
 };
 
 /// Single-precision float property editor bound to a float field, clamped to

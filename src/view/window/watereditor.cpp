@@ -21,6 +21,7 @@
 #include <QHBoxLayout>
 #include <QSplitter>
 #include <QFile>
+#include <utility>
 
 namespace {
 
@@ -54,9 +55,11 @@ void applySettingValue(T& setting, const QString& newValue)
 
 } // namespace
 
-WaterEditor::WaterEditor(Data* data, QWidget* parent)
+WaterEditor::WaterEditor(Data* data, std::function<bool()> saveCallback,
+                         QWidget* parent)
     : QDialog(parent),
       mData(data),
+      mSaveCallback(std::move(saveCallback)),
       mTree(nullptr),
       mDetailEdit(nullptr),
       mAddSettingButton(nullptr),
@@ -406,95 +409,10 @@ void WaterEditor::onDeleteSetting()
 
 void WaterEditor::onSave()
 {
-    QString filePath = QFileDialog::getSaveFileName(this, "Save Water Settings", "",
-        "ESM Files (*.esm);;All Files (*)");
-
-    if (filePath.isEmpty()) return;
-
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        QMessageBox::critical(this, "Error", "Failed to open file for writing.");
+    if (!mSaveCallback || !mSaveCallback())
+    {
+        QMessageBox::warning(this, tr("Save"), tr("The active document could not be saved."));
         return;
     }
-
-    ESMWriter writer;
-    writer.setVersion(1.0f);
-    writer.save(file);
-
-    int globCount = 0;
-    int gmstCount = 0;
-
-    // Save Global Variables
-    auto& globCollection = mData->getGlobCollection();
-    auto globRecords = globCollection.getRecords();
-
-    for (const auto& record : globRecords) {
-        if (record.state == State_Erased) continue;
-
-        const GlobalVariable& glob = record.get();
-        QString name = glob.editorId;
-
-        bool isWater = name.contains("water", Qt::CaseInsensitive) ||
-                       name.contains("ocean", Qt::CaseInsensitive) ||
-                       name.contains("lake", Qt::CaseInsensitive) ||
-                       name.contains("river", Qt::CaseInsensitive) ||
-                       name.contains("sea", Qt::CaseInsensitive);
-
-        if (isWater) {
-            auto results = ColumnValidator::validateGlobal(glob, mData);
-            for (const auto& r : results) {
-                if (r.severity == ColumnValidator::Severity::Error) {
-                    QMessageBox::warning(this, tr("Validation Error"),
-                        QString("%1: %2").arg(r.field, r.message));
-                    file.close();
-                    return;
-                }
-            }
-            writer.startRecord('GLOB');
-            glob.save(writer);
-            writer.endRecord();
-            globCount++;
-        }
-    }
-
-    // Save Game Settings
-    auto& gmstCollection = mData->getGameSettings();
-    auto gmstRecords = gmstCollection.getRecords();
-
-    for (const auto& record : gmstRecords) {
-        if (record.state == State_Erased) continue;
-
-        const GameSetting& gmst = record.get();
-        QString name = gmst.editorId;
-
-        bool isWater = name.contains("water", Qt::CaseInsensitive) ||
-                       name.contains("ocean", Qt::CaseInsensitive) ||
-                       name.contains("lake", Qt::CaseInsensitive) ||
-                       name.contains("river", Qt::CaseInsensitive) ||
-                       name.contains("sea", Qt::CaseInsensitive);
-
-        if (isWater) {
-            writer.startRecord('GMST');
-            gmst.save(writer);
-            writer.endRecord();
-            gmstCount++;
-        }
-    }
-
-    file.close();
-
-    int totalCount = globCount + gmstCount;
-    LOG_INFO(QString("Saved %1 GLOB, %2 GMST water settings to %3")
-        .arg(globCount).arg(gmstCount).arg(filePath));
-
-    QMessageBox::information(this, "Saved",
-        QString("Water settings saved.\n\n"
-                "Global Variables: %1\n"
-                "Game Settings: %2\n"
-                "Total: %3\n\n"
-                "File: %4")
-            .arg(globCount)
-            .arg(gmstCount)
-            .arg(totalCount)
-            .arg(filePath));
+    mStatusLabel->setText(tr("Active document saved."));
 }

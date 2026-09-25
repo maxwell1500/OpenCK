@@ -27,9 +27,12 @@
 #include <QString>
 
 #include <vector>
+#include <functional>
 
 class QFormLayout;
 class QVBoxLayout;
+class Data;
+
 class QPushButton;
 class QTabWidget;
 class QWidget;
@@ -43,11 +46,14 @@ class QtFormDialog : public QDialog
 
 public:
     QtFormDialog(const QString& formIdKey, FormComponents* components,
-                 QWidget* parent = nullptr);
+                  QWidget* parent = nullptr,
+                  std::function<void(const FormComponents&)> commit = {},
+                  Data* data = nullptr);
     ~QtFormDialog() override;
 
     QString formIdKey() const { return m_formIdKey; }
-    FormComponents* components() const { return m_components; }
+    FormComponents* components() const { return m_sourceComponents; }
+    FormComponents* workingComponents() const { return m_components; }
 
     /// Sets an optional custom widget shown below the component property grid.
     void setCustomWidget(QWidget* widget);
@@ -57,8 +63,14 @@ private slots:
     void onOk();
 
 private:
+    bool commitChanges();
+
     QString m_formIdKey;
-    FormComponents* m_components;
+    FormComponents* m_sourceComponents = nullptr;
+    FormComponents m_workingComponents;
+    FormComponents* m_components = nullptr;
+    Data* m_data = nullptr;
+    std::function<void(const FormComponents&)> m_commit;
     QVBoxLayout* m_layout = nullptr;
     QTabWidget* m_tabs = nullptr;
     EditorPropertyGrid* m_basicGrid = nullptr;

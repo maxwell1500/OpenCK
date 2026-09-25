@@ -8,6 +8,7 @@
 #include <QLineEdit>
 #include <QLabel>
 #include <QGroupBox>
+#include <functional>
 
 class Data;
 struct GameSetting;
@@ -18,7 +19,8 @@ class WeatherLightEditor : public QDialog
     Q_OBJECT
 
 public:
-    WeatherLightEditor(Data* data, QWidget* parent = nullptr);
+    WeatherLightEditor(Data* data, std::function<bool()> saveCallback = {},
+                        QWidget* parent = nullptr);
     ~WeatherLightEditor();
 
 private slots:
@@ -35,6 +37,7 @@ private:
     void showSettingDetails(const QString& name, const QString& value);
 
     Data* mData;
+    std::function<bool()> mSaveCallback;
     QTreeWidget* mTree;
     QTextEdit* mDetailEdit;
     QPushButton* mAddSettingButton;

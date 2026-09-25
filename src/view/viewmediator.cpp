@@ -2,6 +2,130 @@
 
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QComboBox>
+#include <QFileInfo>
+#include <QFormLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QPushButton>
+#include <QSpinBox>
+#include <QVBoxLayout>
+
+namespace {
+
+class NewPluginDialog : public QDialog
+{
+public:
+    NewPluginDialog(const QString& filePath, const QString& dataPath, QWidget* parent)
+        : QDialog(parent)
+    {
+        setWindowTitle(QStringLiteral("New Plugin"));
+        setMinimumWidth(560);
+
+        auto* layout = new QVBoxLayout(this);
+        auto* form = new QFormLayout();
+        auto* fileLabel = new QLabel(filePath, this);
+        fileLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        form->addRow(QStringLiteral("File:"), fileLabel);
+
+        mGame = new QComboBox(this);
+        mGame->addItem(QStringLiteral("Morrowind"), int(GameFormat::Game::Morrowind));
+        mGame->addItem(QStringLiteral("Oblivion"), int(GameFormat::Game::Oblivion));
+        mGame->addItem(QStringLiteral("Skyrim"), int(GameFormat::Game::Skyrim));
+        mGame->addItem(QStringLiteral("Fallout 4"), int(GameFormat::Game::Fallout4));
+        mGame->addItem(QStringLiteral("Starfield"), int(GameFormat::Game::Starfield));
+        mGame->setCurrentIndex(4);
+        form->addRow(QStringLiteral("Game:"), mGame);
+
+        mFileType = new QComboBox(this);
+        mFileType->addItem(QStringLiteral("Plugin (.esp)"), false);
+        mFileType->addItem(QStringLiteral("Light master (.esl)"), true);
+        form->addRow(QStringLiteral("Type:"), mFileType);
+
+        mAuthor = new QLineEdit(this);
+        mAuthor->setPlaceholderText(QStringLiteral("Optional author name"));
+        form->addRow(QStringLiteral("Author:"), mAuthor);
+
+        mNextId = new QSpinBox(this);
+        mNextId->setRange(0x800, 0xFFFFF);
+        mNextId->setValue(0x800);
+        form->addRow(QStringLiteral("Next local FormID:"), mNextId);
+        layout->addLayout(form);
+
+        auto* masterTitle = new QLabel(QStringLiteral("Active master order"), this);
+        layout->addWidget(masterTitle);
+        mMasters = new QListWidget(this);
+        mMasters->setMinimumHeight(150);
+        layout->addWidget(mMasters);
+
+        auto* masterButtons = new QHBoxLayout();
+        auto* addMaster = new QPushButton(QStringLiteral("Add..."), this);
+        auto* removeMaster = new QPushButton(QStringLiteral("Remove"), this);
+        auto* moveUp = new QPushButton(QStringLiteral("Up"), this);
+        auto* moveDown = new QPushButton(QStringLiteral("Down"), this);
+        masterButtons->addWidget(addMaster);
+        masterButtons->addWidget(removeMaster);
+        masterButtons->addStretch();
+        masterButtons->addWidget(moveUp);
+        masterButtons->addWidget(moveDown);
+        layout->addLayout(masterButtons);
+
+        connect(addMaster, &QPushButton::clicked, this, [this, dataPath] {
+            const QString path = QFileDialog::getOpenFileName(this,
+                QStringLiteral("Select active master"), dataPath,
+                QStringLiteral("Bethesda master files (*.esm *.esl *.esp);;All files (*)"));
+            if (path.isEmpty()) return;
+            mMasters->addItem(QFileInfo(path).fileName());
+        });
+        connect(removeMaster, &QPushButton::clicked, this, [this] {
+            delete mMasters->takeItem(mMasters->currentRow());
+        });
+        connect(moveUp, &QPushButton::clicked, this, [this] {
+            const int row = mMasters->currentRow();
+            if (row <= 0) return;
+            QListWidgetItem* item = mMasters->takeItem(row);
+            mMasters->insertItem(row - 1, item);
+            mMasters->setCurrentRow(row - 1);
+        });
+        connect(moveDown, &QPushButton::clicked, this, [this] {
+            const int row = mMasters->currentRow();
+            if (row < 0 || row >= mMasters->count() - 1) return;
+            QListWidgetItem* item = mMasters->takeItem(row);
+            mMasters->insertItem(row + 1, item);
+            mMasters->setCurrentRow(row + 1);
+        });
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+        layout->addWidget(buttons);
+        connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
+        connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    }
+
+    NewPluginOptions options() const
+    {
+        NewPluginOptions result;
+        result.game = static_cast<GameFormat::Game>(mGame->currentData().toInt());
+        result.author = mAuthor->text().trimmed();
+        result.nextObjectId = static_cast<quint32>(mNextId->value());
+        result.lightMaster = mFileType->currentData().toBool();
+        for (int i = 0; i < mMasters->count(); ++i)
+            result.masters.append(MasterData(mMasters->item(i)->text()));
+        return result;
+    }
+
+private:
+    QComboBox* mGame = nullptr;
+    QComboBox* mFileType = nullptr;
+    QLineEdit* mAuthor = nullptr;
+    QSpinBox* mNextId = nullptr;
+    QListWidget* mMasters = nullptr;
+};
+
+}
 
 ViewMediator::ViewMediator(DocumentMediator& docMed) : 
     docMed(docMed)
@@ -34,6 +158,7 @@ ViewMediator::ViewMediator(DocumentMediator& docMed) :
         Document* current = this->docMed.getCurrentDocument();
         if (current)
         {
+            w->setDocument(current);
             w->setData(&current->getData());
         }
     });
@@ -112,13 +237,16 @@ void ViewMediator::showNewPluginDialog()
     saveDialog.setModal(true);
     saveDialog.setDirectory(dataPath);
 
-    QString fileName = saveDialog.getSaveFileName(
-        nullptr, "New Plugin File", "", "Elder Scrolls Plugin files (*.esp)");
-    
-    if (!fileName.isEmpty())
-    {
-        emit addDocument(QStringList(), fileName, true);
-    }
+    const QString fileName = saveDialog.getSaveFileName(
+        nullptr, tr("New Plugin File"), QString(),
+        tr("Bethesda plugin files (*.esp *.esl);;All files (*)"));
+    if (fileName.isEmpty()) return;
+
+    NewPluginDialog dialog(fileName, dataPath, w.get());
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    docMed.clearFiles();
+    docMed.addDocument(QStringList(), fileName, true, dialog.options());
 }
 
 void ViewMediator::showSaveAsDialog()
@@ -142,6 +270,8 @@ void ViewMediator::closeCurrentPlugin()
     if (current)
     {
         docMed.removeDocument(current);
+        w->setDocument(nullptr);
+        w->setData(nullptr);
     }
     else
     {

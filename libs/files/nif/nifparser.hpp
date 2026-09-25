@@ -290,9 +290,11 @@ public:
 
 private:
     bool loadFile(const QString& fileName);
-    bool parseHeader(QDataStream& stream);    bool writeHeader(QDataStream& stream, const QString& fileName) const;
+    bool parseHeader(QDataStream& stream, quint32* parsedVersion = nullptr);
+    bool writeHeader(QDataStream& stream, const QString& fileName) const;
     void writeShape(QDataStream& stream, const TriShape& shape) const;
     void writeNodeTree(QDataStream& stream, const Node* node) const;
+    bool readNodeTree(QDataStream& stream, Node*& node);
     bool readShape(QDataStream& stream, TriShape& shape);
 
     Node* root = nullptr;

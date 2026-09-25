@@ -447,8 +447,21 @@ AssetValidator::ValidationReport AssetValidator::validateMasters(const Data& dat
     {
         report.issues.append({ValidationIssue::Info, "Master",
             "No content files loaded.", "", ""});
-        return report;
     }
+
+    const Header& header = data.getReaderHeader();
+    const QDir dataDirectory(data.getPaths().dataDir.absolutePath());
+    for (const MasterData& master : header.masters)
+    {
+        if (!master.name.isEmpty() && !QFileInfo(dataDirectory, master.name).exists())
+        {
+            report.issues.append({ValidationIssue::Error, "Master",
+                QString("Declared master is missing: %1").arg(master.name), "", master.name});
+        }
+    }
+
+    if (contentFiles.isEmpty())
+        return report;
 
     // Build set of available master file names (lowercase for case-insensitive comparison)
     QSet<QString> availableMasters;
@@ -536,7 +549,12 @@ AssetValidator::ValidationReport AssetValidator::validateFormIds(const Data& dat
             QString editorId = rec.editorId;
 
             if (formId == 0)
+            {
+                report.issues.append({ValidationIssue::Warning, "FormID",
+                    QString("Record has no FormID: %1 (%2)").arg(editorId, typeName),
+                    editorId, ""});
                 continue;
+            }
 
             auto it = formIdMap.find(formId);
             if (it != formIdMap.end())
@@ -586,9 +604,85 @@ AssetValidator::ValidationReport AssetValidator::validateFormIds(const Data& dat
     return report;
 }
 
-// ============================================================================
-// validateOrphanedRecords
-// ============================================================================
+AssetValidator::ValidationReport AssetValidator::validateReferences(const Data& data)
+{
+    ValidationReport report;
+    QSet<quint32> known;
+    for (const auto& typed : data.allCollectionsWithTypes())
+    {
+        if (!typed.collection) continue;
+        for (int i = 0; i < typed.collection->count(); ++i)
+        {
+            const quint32 id = typed.collection->getFormId(i);
+            if (id != 0) known.insert(id);
+        }
+    }
+
+    auto check = [&known, &report](quint32 id, const QString& editorId,
+        const QString& typeName, const QString& field) {
+        if (id != 0 && !known.contains(id))
+        {
+            report.issues.append({ValidationIssue::Error, "Reference",
+                QString("%1 references missing FormID 0x%2 in %3")
+                    .arg(typeName, QString::number(id, 16), field),
+                editorId, ""});
+        }
+    };
+
+    const auto& npcs = data.getNpcCollection();
+    for (int i = 0; i < npcs.size(); ++i)
+    {
+        const auto& record = npcs.getRecord(i).get();
+        check(record.race, record.editorId, QStringLiteral("NPC"), QStringLiteral("Race"));
+        check(record.class_, record.editorId, QStringLiteral("NPC"), QStringLiteral("Class"));
+        check(record.faction, record.editorId, QStringLiteral("NPC"), QStringLiteral("Faction"));
+        for (quint32 id : record.spells) check(id, record.editorId, QStringLiteral("NPC"), QStringLiteral("Spells"));
+        for (quint32 id : record.inventoryItems) check(id, record.editorId, QStringLiteral("NPC"), QStringLiteral("Inventory"));
+    }
+
+    const auto& weapons = data.getWeaponCollection();
+    for (int i = 0; i < weapons.size(); ++i)
+    {
+        const auto& record = weapons.getRecord(i).get();
+        check(record.enchantment, record.editorId, QStringLiteral("Weapon"), QStringLiteral("Enchantment"));
+    }
+    const auto& spells = data.getSpellCollection();
+    for (int i = 0; i < spells.size(); ++i)
+    {
+        const auto& record = spells.getRecord(i).get();
+        for (quint32 id : record.effects) check(id, record.editorId, QStringLiteral("Spell"), QStringLiteral("Effects"));
+    }
+    const auto& cells = data.getCellCollection();
+    for (int i = 0; i < cells.size(); ++i)
+    {
+        const auto& record = cells.getRecord(i).get();
+        check(record.owner, record.editorId, QStringLiteral("Cell"), QStringLiteral("Owner"));
+    }
+    const auto& refs = data.getRefrCollection();
+    for (int i = 0; i < refs.size(); ++i)
+    {
+        const auto& record = refs.getRecord(i).get();
+        check(record.baseId, record.editorId, QStringLiteral("Reference"), QStringLiteral("Base Object"));
+        check(record.owner, record.editorId, QStringLiteral("Reference"), QStringLiteral("Owner"));
+    }
+    const auto& dials = data.getDialCollection();
+    for (int i = 0; i < dials.size(); ++i)
+    {
+        const auto& record = dials.getRecord(i).get();
+        for (quint32 id : record.responseIds)
+            check(id, record.editorId, QStringLiteral("Dialogue"), QStringLiteral("Responses"));
+    }
+    const auto& infos = data.getInfoCollection();
+    for (int i = 0; i < infos.size(); ++i)
+    {
+        const auto& record = infos.getRecord(i).get();
+        check(record.targetId, record.editorId, QStringLiteral("Info"), QStringLiteral("Target"));
+        for (quint32 id : record.scriptIds)
+            check(id, record.editorId, QStringLiteral("Info"), QStringLiteral("Scripts"));
+    }
+    return report;
+}
+
 
 AssetValidator::ValidationReport AssetValidator::validateOrphanedRecords(const Data& data)
 {
@@ -713,7 +807,9 @@ AssetValidator::ValidationReport AssetValidator::validateAll(const Data& data, c
     // 2. Validate formID conflicts
     reports.append(validateFormIds(data));
 
-    // 3. Validate orphaned records
+    reports.append(validateReferences(data));
+
+    // 4. Validate orphaned records
     reports.append(validateOrphanedRecords(data));
 
     // 4. Validate NIF files referenced by stat records

@@ -12,7 +12,8 @@ Editor::Editor(int argc, char *argv[])
 
     docMed.reset(new DocumentMediator());
     connect(this, &Editor::clearFilesSignal, docMed.get(), &DocumentMediator::clearFiles);
-    connect(this, &Editor::addDocumentSignal, docMed.get(), &DocumentMediator::addDocument);
+    connect(this, &Editor::addDocumentSignal, docMed.get(),
+        QOverload<const QStringList&, const QString&, bool>::of(&DocumentMediator::addDocument));
     connect(this, &Editor::saveDocumentSignal, docMed.get(), &DocumentMediator::saveFile);
 
     viewMed.reset(new ViewMediator(*docMed.get()));

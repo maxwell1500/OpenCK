@@ -8,6 +8,9 @@
 #include "../../model/tools/questvalidator.hpp"
 #include "../../model/tools/coveragevalidator.hpp"
 #include "../../model/tools/undostack.hpp"
+#include "../../model/tools/addrecordcommand.hpp"
+#include "../../model/tools/blankrecordfactory.hpp"
+#include "../../model/world/idtable.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/world/data.hpp"
 #include "../../model/tools/gitrepository.hpp"
@@ -17,6 +20,7 @@
 #include "../../model/tools/formidcompactor.hpp"
 #include "../../model/tools/bnetclient.hpp"
 #include "../../model/doc/messages.hpp"
+#include "../../model/doc/document.hpp"
 #include "filepaths.hpp"
 #include "searchdialog.hpp"
 #include "loadorderdialog.hpp"
@@ -52,6 +56,7 @@
 #include "papyrusdebugger.hpp"
 #include "papyruscompiler.hpp"
 #include "../../../libs/files/ba2/ba2archive.hpp"
+#include "../../../libs/files/ba2/bsaarchive.hpp"
 #include "loadorderoptimizerdialog.hpp"
 #include "externaltoolsdialog.hpp"
 #include "logger.hpp"
@@ -81,6 +86,7 @@
 #include <QInputDialog>
 #include <QFileInfo>
 #include <QDir>
+#include <QDirIterator>
 
 #include <QCoreApplication>
 #include <QMenu>
@@ -225,6 +231,18 @@ MainWindow::~MainWindow()
     {
         delete ui;
     }
+}
+
+void MainWindow::setDocument(Document* document)
+{
+    mDocument = document;
+}
+
+bool MainWindow::saveActiveDocument()
+{
+    if (!mDocument || mDocument->getSavePath().isEmpty()) return false;
+    mDocument->save(mDocument->getSavePath());
+    return true;
 }
 
 void MainWindow::setData(Data* data)
@@ -1246,7 +1264,7 @@ void MainWindow::on_actionAIPackages_triggered()
 {
     if (mData)
     {
-        AIPackageEditor editor(mData, this);
+        AIPackageEditor editor(mData, [this] { return saveActiveDocument(); }, this);
         editor.exec();
     }
     else
@@ -1261,7 +1279,7 @@ void MainWindow::on_actionWeatherLight_triggered()
 {
     if (mData)
     {
-        WeatherLightEditor editor(mData, this);
+        WeatherLightEditor editor(mData, [this] { return saveActiveDocument(); }, this);
         editor.exec();
     }
     else
@@ -1291,7 +1309,7 @@ void MainWindow::on_actionWater_triggered()
 {
     if (mData)
     {
-        WaterEditor editor(mData, this);
+        WaterEditor editor(mData, [this] { return saveActiveDocument(); }, this);
         editor.exec();
     }
     else
@@ -2381,54 +2399,33 @@ void MainWindow::createAndOpenRecord(CkId::Type type, const QString& recordTypeN
         QMessageBox::information(this, actionName, tr("Open a plugin file first."));
         return;
     }
+    if (!BlankRecordFactory::supports(type))
+    {
+        QMessageBox::information(this, actionName,
+            tr("Creating %1 records is not supported yet.").arg(recordTypeName));
+        return;
+    }
 
     bool ok = false;
-    QString editorId = QInputDialog::getText(this, actionName,
+    const QString editorId = QInputDialog::getText(this, actionName,
         tr("Editor ID for the new %1 record:").arg(recordTypeName),
-        QLineEdit::Normal, "new", &ok);
+        QLineEdit::Normal, "new", &ok).trimmed();
     if (!ok || editorId.isEmpty())
         return;
 
-    bool added = false;
+    BaseCollection* collection = mData->getCollectionByType(type);
+    if (!collection || collection->searchId(editorId) >= 0)
+    {
+        QMessageBox::warning(this, actionName,
+            tr("A %1 record with Editor ID '%2' already exists.")
+                .arg(recordTypeName).arg(editorId));
+        return;
+    }
+
+    quint32 formId = 0;
     try
     {
-        switch (type)
-        {
-        case CkId::Type_Npc_:
-        {
-            NpcRecord rec;
-            rec.editorId = editorId;
-            rec.formId = mData->createNewRecord(type, editorId);
-            added = mData->addNpc(rec);
-            break;
-        }
-        case CkId::Type_Race_:
-        {
-            RaceRecord rec;
-            rec.editorId = editorId;
-            rec.formId = mData->createNewRecord(type, editorId);
-            added = mData->addRace(rec);
-            break;
-        }
-        case CkId::Type_Class_:
-        {
-            ClassRecord rec;
-            rec.editorId = editorId;
-            rec.formId = mData->createNewRecord(type, editorId);
-            added = mData->addClass(rec);
-            break;
-        }
-        case CkId::Type_Fact_:
-        {
-            FactRecord rec;
-            rec.editorId = editorId;
-            rec.formId = mData->createNewRecord(type, editorId);
-            added = mData->addFact(rec);
-            break;
-        }
-        default:
-            return;
-        }
+        formId = mData->createNewRecord(type, editorId);
     }
     catch (const std::exception& e)
     {
@@ -2437,46 +2434,49 @@ void MainWindow::createAndOpenRecord(CkId::Type type, const QString& recordTypeN
         return;
     }
 
-    if (!added)
+    auto record = BlankRecordFactory::create(type, editorId, formId);
+    auto* table = qobject_cast<IdTable*>(mData->getTableModel(type));
+    if (!record || !table || !mData->getUndoStack())
     {
-        QMessageBox::warning(this, actionName,
-            tr("A %1 record with Editor ID '%2' already exists.")
-                .arg(recordTypeName).arg(editorId));
+        QMessageBox::warning(this, actionName, tr("The record could not be created."));
         return;
     }
 
-    BaseCollection* coll = mData->getCollectionByType(type);
-    const int idx = coll ? coll->searchId(editorId) : -1;
-    if (!coll || idx < 0)
+    const int appendIndex = collection->getAppendIndex(editorId, type);
+    mData->getUndoStack()->push(new AddRecordCommand(table, collection, appendIndex, *record,
+        QString("Add %1: %2").arg(recordTypeName, editorId)));
+
+    const int index = collection->searchId(editorId);
+    if (index < 0)
         return;
 
-    openck::FormComponents* comps = nullptr;
-    void* recPtr = nullptr;
+    openck::FormComponents* components = nullptr;
+    void* recordPtr = nullptr;
     switch (type)
     {
     case CkId::Type_Npc_:
-        comps = &static_cast<IdCollection<NpcRecord>&>(*coll).getRecord(idx).get().components;
-        recPtr = &static_cast<IdCollection<NpcRecord>&>(*coll).getRecord(idx).get();
+        components = &static_cast<IdCollection<NpcRecord>&>(*collection).getRecord(index).get().components;
+        recordPtr = &static_cast<IdCollection<NpcRecord>&>(*collection).getRecord(index).get();
         break;
     case CkId::Type_Race_:
-        comps = &static_cast<IdCollection<RaceRecord>&>(*coll).getRecord(idx).get().components;
-        recPtr = &static_cast<IdCollection<RaceRecord>&>(*coll).getRecord(idx).get();
+        components = &static_cast<IdCollection<RaceRecord>&>(*collection).getRecord(index).get().components;
+        recordPtr = &static_cast<IdCollection<RaceRecord>&>(*collection).getRecord(index).get();
         break;
     case CkId::Type_Class_:
-        comps = &static_cast<IdCollection<ClassRecord>&>(*coll).getRecord(idx).get().components;
-        recPtr = &static_cast<IdCollection<ClassRecord>&>(*coll).getRecord(idx).get();
+        components = &static_cast<IdCollection<ClassRecord>&>(*collection).getRecord(index).get().components;
+        recordPtr = &static_cast<IdCollection<ClassRecord>&>(*collection).getRecord(index).get();
         break;
     case CkId::Type_Fact_:
-        comps = &static_cast<IdCollection<FactRecord>&>(*coll).getRecord(idx).get().components;
-        recPtr = &static_cast<IdCollection<FactRecord>&>(*coll).getRecord(idx).get();
+        components = &static_cast<IdCollection<FactRecord>&>(*collection).getRecord(index).get().components;
+        recordPtr = &static_cast<IdCollection<FactRecord>&>(*collection).getRecord(index).get();
         break;
     default:
         return;
     }
 
-    QString formIdKey = QStringLiteral("0x%1").arg(coll->getFormId(idx), 8, 16, QChar('0'));
+    const QString formIdKey = QStringLiteral("0x%1").arg(collection->getFormId(index), 8, 16, QChar('0'));
     openck::QtFormDialogManager::instance().openOrFocus(
-        formIdKey, recordTypeName, comps, recPtr, this);
+        formIdKey, recordTypeName, components, recordPtr, this, {}, mData);
     LOG_INFO(QString("%1 record '%2' created and opened").arg(recordTypeName).arg(editorId));
 }
 
@@ -2513,35 +2513,59 @@ void MainWindow::on_actionCreateArchive_triggered()
         dataDir.isEmpty() ? QString() : dataDir);
     if (outputDir.isEmpty()) return;
 
-    QDir dir(outputDir);
     QStringList filters;
     filters << "*.nif" << "*.dds" << "*.png" << "*.jpg" << "*.wav" << "*.ogg" << "*.fuz"
             << "*.txt" << "*.json" << "*.psc" << "*.pex" << "*.xml" << "*.hkx" << "*.tri"
             << "*.btr" << "*.byt";
-    QStringList files = dir.entryList(filters, QDir::Files | QDir::NoDotAndDotDot);
+    QStringList files;
+    QDirIterator fileIterator(outputDir, filters,
+        QDir::Files | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (fileIterator.hasNext()) {
+        files.append(QDir(outputDir).relativeFilePath(fileIterator.next()));
+    }
 
     if (files.isEmpty()) {
-        QStringList allFiles = dir.entryList(QDir::Files | QDir::NoDotAndDotDot);
-        if (allFiles.isEmpty()) {
+        QDirIterator allFileIterator(outputDir, QDir::Files | QDir::NoDotAndDotDot,
+            QDirIterator::Subdirectories);
+        while (allFileIterator.hasNext()) {
+            files.append(QDir(outputDir).relativeFilePath(allFileIterator.next()));
+        }
+        if (files.isEmpty()) {
             QMessageBox::information(this, "Create Archive", "No files found in the selected directory.");
             return;
         }
-        files = allFiles;
     }
 
     QStringList fullPaths;
     for (const QString& f : files) {
-        fullPaths.append(dir.absoluteFilePath(f));
+        fullPaths.append(QDir(outputDir).absoluteFilePath(f));
     }
 
-    QString defaultName = QDir(outputDir).dirName() + " - OpenCK.ba2";
-    QString outputPath = QFileDialog::getSaveFileName(this, "Save Archive As",
+    const QString format = QInputDialog::getItem(this, "Create Archive", "Archive format",
+        QStringList{ "BA2 (Starfield archive)", "BSA (Skyrim SE archive)" }, 0, false);
+    if (format.isEmpty()) return;
+    const bool createBsa = format.startsWith("BSA");
+    const QString extension = createBsa ? ".bsa" : ".ba2";
+    const QString defaultName = QDir(outputDir).dirName() + " - OpenCK" + extension;
+    const QString outputPath = QFileDialog::getSaveFileName(this, "Save Archive As",
         QFileInfo(outputDir).dir().absoluteFilePath(defaultName),
-        "BA2 Archive (*.ba2)");
+        createBsa ? "BSA Archive (*.bsa)" : "BA2 Archive (*.ba2)");
     if (outputPath.isEmpty()) return;
 
-    bool compress = QMessageBox::question(this, "Create Archive",
+    const bool compress = QMessageBox::question(this, "Create Archive",
         "Compress files in archive?", QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
+
+    if (createBsa) {
+        BsaArchive archive;
+        if (archive.create(fullPaths, outputPath, compress, outputDir)) {
+            QMessageBox::information(this, "Create Archive",
+                QString("Archive created successfully.\n\nFiles: %1\nPath: %2\nType: BSA")
+                    .arg(fullPaths.size()).arg(outputPath));
+        } else {
+            QMessageBox::warning(this, "Create Archive", "Failed to create BSA archive. Check the log for details.");
+        }
+        return;
+    }
 
     QString archiveType = "GNRL";
     if (outputPath.contains("texture", Qt::CaseInsensitive) || outputPath.contains("mesh", Qt::CaseInsensitive)) {
@@ -2549,7 +2573,7 @@ void MainWindow::on_actionCreateArchive_triggered()
     }
 
     Ba2Archive archive;
-    if (archive.create(fullPaths, outputPath, compress, archiveType)) {
+    if (archive.create(fullPaths, outputPath, compress, archiveType, outputDir)) {
         QMessageBox::information(this, "Create Archive",
             QString("Archive created successfully.\n\nFiles: %1\nPath: %2\nType: %3")
                 .arg(fullPaths.size()).arg(outputPath).arg(archiveType));

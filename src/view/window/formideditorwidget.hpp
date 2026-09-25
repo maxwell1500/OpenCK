@@ -8,6 +8,11 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QTableWidget>
+#include <QVector>
+
+#include "../widgets/formpickerwidget.hpp"
+
+class QComboBox;
 
 class Data;
 

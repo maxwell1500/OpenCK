@@ -5,6 +5,8 @@
 #include "../../model/world/idcollection.hpp"
 #include "../../model/world/ckid.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/addrecordcommand.hpp"
+#include "../../model/world/idtable.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../model/tools/columnvalidator.hpp"
 #include "logger.hpp"
@@ -20,10 +22,13 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QSplitter>
+#include <utility>
 
-AIPackageEditor::AIPackageEditor(Data* data, QWidget* parent)
+AIPackageEditor::AIPackageEditor(Data* data, std::function<bool()> saveCallback,
+                                 QWidget* parent)
     : QDialog(parent),
       mData(data),
+      mSaveCallback(std::move(saveCallback)),
       mTree(nullptr),
       mDetailEdit(nullptr),
       mAddPackageButton(nullptr),
@@ -195,19 +200,40 @@ void AIPackageEditor::onAddPackage()
     if (!ok || editorId.isEmpty()) return;
 
     PackageRecord newPack;
+    newPack.blank();
+    newPack.initComponents();
     newPack.editorId = editorId;
-    newPack.formId = 0; // Will be assigned by Data class
-    newPack.flags = 0;
-    newPack.packageType = 0;
-    newPack.targetType = 0;
-
-    if (mData->addPack(newPack)) {
-        LOG_INFO(QString("Added package '%1'").arg(editorId));
-        mStatusLabel->setText(QString("Added package '%1'").arg(editorId));
-        refreshTree();
-    } else {
-        QMessageBox::critical(this, "Error", "Failed to add package.");
+    try
+    {
+        newPack.formId = mData->createNewRecord(CkId::Type_Pack_, editorId);
     }
+    catch (const std::exception& e)
+    {
+        QMessageBox::warning(this, tr("Add Package"),
+            tr("Could not allocate a form ID: %1").arg(QString::fromUtf8(e.what())));
+        return;
+    }
+
+    auto& collection = mData->getPackCollection();
+    if (collection.searchId(editorId) >= 0)
+    {
+        QMessageBox::warning(this, tr("Add Package"),
+            tr("A package named '%1' already exists.").arg(editorId));
+        return;
+    }
+    auto* table = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Pack_));
+    if (!table || !mData->getUndoStack())
+    {
+        QMessageBox::critical(this, tr("Add Package"), tr("The package could not be created."));
+        return;
+    }
+    Record<PackageRecord> record(State_ModifiedOnly, nullptr, &newPack);
+    mData->getUndoStack()->push(new AddRecordCommand(table, &collection,
+        collection.getAppendIndex(editorId, CkId::Type_Pack_), record,
+        QStringLiteral("Add package: %1").arg(editorId)));
+    LOG_INFO(QString("Added package '%1'").arg(editorId));
+    mStatusLabel->setText(QString("Added package '%1'").arg(editorId));
+    refreshTree();
 }
 
 void AIPackageEditor::onEditPackage()
@@ -260,69 +286,10 @@ void AIPackageEditor::onDeletePackage()
 
 void AIPackageEditor::onSave()
 {
-    QString filePath = QFileDialog::getSaveFileName(this, "Save AI Packages", "",
-        "ESM Files (*.esm);;All Files (*)");
-
-    if (filePath.isEmpty()) return;
-
-    ESMWriter writer;
-    QFile saveFile(filePath);
-    if (!saveFile.open(QIODevice::WriteOnly))
+    if (!mSaveCallback || !mSaveCallback())
     {
-        QMessageBox::critical(this, "Error", QString("Cannot open file: %1").arg(filePath));
+        QMessageBox::warning(this, tr("Save"), tr("The active document could not be saved."));
         return;
     }
-
-    const auto& metaData = mData->getMetaData().getRecords();
-    for (const auto& record : metaData)
-    {
-        writer.addMaster(record.get().editorId);
-    }
-
-    writer.setVersion(1.0f);
-
-    int totalPackages = 0;
-    int totalTargets = 0;
-    int totalParameters = 0;
-
-    const auto& packRecords = mData->getPackCollection().getRecords();
-    for (const auto& record : packRecords)
-    {
-        if (record.state == State_Modified || record.state == State_ModifiedOnly)
-        {
-            auto results = ColumnValidator::validatePackage(record.get(), mData);
-            for (const auto& r : results) {
-                if (r.severity == ColumnValidator::Severity::Error) {
-                    QMessageBox::warning(this, tr("Validation Error"),
-                        QString("%1: %2").arg(r.field, r.message));
-                    saveFile.close();
-                    return;
-                }
-            }
-            RecHeader recHeader;
-            recHeader.id = record.get().formId;
-            writer.startRecord('PACK', recHeader);
-            record.get().save(writer);
-            writer.endRecord();
-            totalPackages++;
-            totalTargets += record.get().targetIds.size();
-            totalParameters += record.get().parameters.size();
-        }
-    }
-
-    writer.close();
-    saveFile.close();
-
-    LOG_INFO(QString("Saved AI packages to %1").arg(filePath));
-    LOG_INFO(QString("Packages: %1, Targets: %2, Parameters: %3")
-        .arg(totalPackages).arg(totalTargets).arg(totalParameters));
-
-    QMessageBox::information(this, "Saved",
-        QString("AI packages data exported.\n\n"
-                "Packages: %1\n"
-                "Targets: %2\n"
-                "Parameters: %3")
-            .arg(totalPackages)
-            .arg(totalTargets)
-            .arg(totalParameters));
+    mStatusLabel->setText(tr("Active document saved."));
 }

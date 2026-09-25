@@ -36,6 +36,7 @@ class BashedPatchDialog;
 class CellViewPanel;
 class InspectorWidget;
 class WarningsDockWidget;
+class Document;
 struct CellRecord;
 
 namespace Ui {
@@ -53,6 +54,8 @@ public:
 
     /// Sets the active Data model backing the editor windows.
     void setData(Data* data);
+    void setDocument(Document* document);
+    bool saveActiveDocument();
     /// Updates the status bar with a transient message.
     void updateStatus(const QString& message);
     void updateRecordCount(int count);
@@ -177,6 +180,7 @@ void setupPrimitivePreviewMenu();
 
     Ui::mainwindow *ui;
     Data* mData;
+    Document* mDocument = nullptr;
     UndoStack* mUndoStack;
     QAction* mUndoAction;
     QAction* mRedoAction;

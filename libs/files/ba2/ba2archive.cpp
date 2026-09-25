@@ -1,6 +1,7 @@
 #include "ba2archive.hpp"
 
 #include <QFile>
+#include <QSaveFile>
 #include <QDataStream>
 #include <QFileInfo>
 #include <QDir>
@@ -601,14 +602,15 @@ bool Ba2Archive::extract(quint32 index, const QString& outputPath) const
         return false;
     }
 
-    QFile outFile(outputPath);
+    QSaveFile outFile(outputPath);
     if (!outFile.open(QIODevice::WriteOnly)) {
         LOG_ERROR(QString("BA2 extract: cannot write to %1").arg(outputPath));
         return false;
     }
-
-    outFile.write(data);
-    outFile.close();
+    if (outFile.write(data) != data.size() || !outFile.commit()) {
+        LOG_ERROR(QString("BA2 extract: cannot commit output %1").arg(outputPath));
+        return false;
+    }
     LOG_INFO(QString("Extracted: %1 -> %2").arg(mEntries[index].relativePath).arg(outputPath));
     return true;
 }
@@ -704,21 +706,24 @@ bool Ba2Archive::extractTexture(quint32 index, const QString& outputPath) const
         return false;
     }
 
-    QFile outFile(outputPath);
+    QSaveFile outFile(outputPath);
     if (!outFile.open(QIODevice::WriteOnly))
     {
         LOG_ERROR(QString("BA2 texture extract: cannot write to %1").arg(outputPath));
         return false;
     }
-    outFile.write(dds);
-    outFile.close();
+    if (outFile.write(dds) != dds.size() || !outFile.commit())
+    {
+        LOG_ERROR(QString("BA2 texture extract: cannot commit output %1").arg(outputPath));
+        return false;
+    }
     LOG_INFO(QString("Extracted texture: %1 -> %2 (%3 bytes)")
         .arg(entry.relativePath).arg(outputPath).arg(dds.size()));
     return true;
 }
 
 bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
-                         bool compress, const QString& archiveType)
+                        bool compress, const QString& archiveType, const QString& sourceRoot)
 {
     if (filePaths.isEmpty()) {
         LOG_ERROR("BA2 create: no files to archive");
@@ -726,7 +731,7 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
     }
 
     if (archiveType.toUpper() == "DX10")
-        return createDx10(filePaths, outputPath, compress);
+        return createDx10(filePaths, outputPath, compress, sourceRoot);
 
     QFile outFile(outputPath);
     if (!outFile.open(QIODevice::WriteOnly)) {
@@ -738,7 +743,8 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
     out.setByteOrder(QDataStream::LittleEndian);
 
     QFileInfo outInfo(outputPath);
-    QString baseDir = outInfo.absolutePath();
+    const QString baseDir = sourceRoot.isEmpty()
+        ? outInfo.absolutePath() : QFileInfo(sourceRoot).absoluteFilePath();
 
     struct InputFile {
         QString relativePath; // forward-slash, lowercased for CRC
@@ -903,7 +909,8 @@ bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
     return true;
 }
 
-bool Ba2Archive::createDx10(const QStringList& filePaths, const QString& outputPath, bool compress)
+bool Ba2Archive::createDx10(const QStringList& filePaths, const QString& outputPath, bool compress,
+                            const QString& sourceRoot)
 {
     struct InputTexture {
         QString relativePath;
@@ -913,15 +920,18 @@ bool Ba2Archive::createDx10(const QStringList& filePaths, const QString& outputP
     QVector<InputTexture> inputs;
 
     QFileInfo outInfo(outputPath);
-    const QString baseDir = outInfo.absolutePath();
+    const QString baseDir = sourceRoot.isEmpty()
+        ? outInfo.absolutePath() : QFileInfo(sourceRoot).absoluteFilePath();
 
     for (const QString& filePath : filePaths)
     {
         QFileInfo fi(filePath);
-        QString relPath = fi.fileName();
         const QString absPath = fi.absoluteFilePath();
-        if (absPath.startsWith(baseDir, Qt::CaseInsensitive))
-            relPath = absPath.mid(baseDir.length() + 1).replace('\\', '/');
+        QString relPath = QDir(baseDir).relativeFilePath(absPath);
+        relPath = QDir::cleanPath(relPath).replace('\\', '/');
+        if (relPath.isEmpty() || relPath == ".."
+            || relPath.startsWith("../") || QDir::isAbsolutePath(relPath))
+            relPath = fi.fileName();
 
         QFile inFile(filePath);
         if (!inFile.open(QIODevice::ReadOnly))

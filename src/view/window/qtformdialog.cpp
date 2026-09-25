@@ -6,6 +6,7 @@
 #include <QScrollArea>
 #include <QTabWidget>
 #include <QVBoxLayout>
+#include <utility>
 
 #include "../widgets/formcomponentwidget.hpp"
 
@@ -34,10 +35,16 @@ bool isKeywordComponent(const QString& className)
 } // namespace
 
 QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
-                           QWidget* parent)
+                           QWidget* parent,
+                           std::function<void(const FormComponents&)> commit,
+                           Data* data)
     : QDialog(parent)
     , m_formIdKey(formIdKey)
-    , m_components(components)
+    , m_sourceComponents(components)
+    , m_workingComponents(components ? *components : FormComponents())
+    , m_components(&m_workingComponents)
+    , m_data(data)
+    , m_commit(std::move(commit))
 {
     setWindowTitle(QStringLiteral("Form — %1").arg(formIdKey));
     resize(640, 480);
@@ -72,7 +79,7 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
 
         auto* scroll = new QScrollArea(tab);
         scroll->setWidgetResizable(true);
-        auto* grid = new EditorPropertyGrid(scroll);
+        auto* grid = new EditorPropertyGrid(scroll, m_data);
         scroll->setWidget(grid);
         tabLayout->addWidget(scroll, 1);
 
@@ -133,6 +140,18 @@ void QtFormDialog::onApply()
     if (m_basicGrid) m_basicGrid->apply();
     if (m_componentsGrid) m_componentsGrid->apply();
     if (m_keywordsGrid) m_keywordsGrid->apply();
+    commitChanges();
+}
+
+bool QtFormDialog::commitChanges()
+{
+    if (!m_sourceComponents || m_workingComponents == *m_sourceComponents)
+        return false;
+    if (m_commit)
+        m_commit(m_workingComponents);
+    else
+        *m_sourceComponents = m_workingComponents;
+    return true;
 }
 
 void QtFormDialog::onOk()

@@ -9,6 +9,7 @@
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/tools/addrecordcommand.hpp"
+#include "../../model/tools/blankrecordfactory.hpp"
 #include "../../model/world/idtable.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../view/messageboxhelper.hpp"
@@ -131,9 +132,42 @@
 #include <QMenu>
 #include <QAction>
 #include <QMessageBox>
+#include <utility>
 #include <QInputDialog>
 #include <QSettings>
 #include <QFileDialog>
+
+namespace {
+
+template <typename RecordType>
+void openTransactionalForm(Data* data, const QString& formIdKey,
+    const QString& recordType, const Collection<RecordType>& collection,
+    int index, RecordType& record, QWidget* parent)
+{
+    auto commit = [data, &collection, index, recordType](
+        const openck::FormComponents& edited) {
+        auto* mutableCollection = const_cast<Collection<RecordType>*>(
+            static_cast<const Collection<RecordType>*>(&collection));
+        RecordType originalState = mutableCollection->getRecord(index).get();
+        RecordType editedState = originalState;
+        editedState.components = edited;
+        if (data->getUndoStack()) {
+            auto* command = new EditRecordCommand<RecordType>(
+                mutableCollection, index, originalState, editedState,
+                QStringLiteral("Edit %1").arg(recordType));
+            if (command->hasChanged())
+                data->getUndoStack()->push(command);
+            else
+                delete command;
+        } else {
+            mutableCollection->getRecord(index).setModified(editedState);
+        }
+    };
+    openck::QtFormDialogManager::instance().openOrFocus(
+        formIdKey, recordType, &record.components, &record, parent, std::move(commit), data);
+}
+
+}
 
 ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
     : QDockWidget(parent),
@@ -502,7 +536,7 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
         CkId::Type type = categoryId >= 0
             ? static_cast<CkId::Type>(mModel->getCategoryType(categoryId))
             : CkId::Type_None;
-        if (type == CkId::Type_Glob_ || type == CkId::Type_Gmst)
+        if (BlankRecordFactory::supports(type))
         {
             QAction* addAction = mContextMenu->addAction("Add Record...");
             connect(addAction, &QAction::triggered, this, &ObjectWindowDialog::addRecordInSelectedCategory);
@@ -524,7 +558,7 @@ void ObjectWindowDialog::updateAddButton(const QModelIndex& index)
         if (categoryId >= 0)
         {
             CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
-            enabled = (type == CkId::Type_Glob_ || type == CkId::Type_Gmst);
+            enabled = BlankRecordFactory::supports(type);
         }
     }
     if (mAddButton)
@@ -627,6 +661,48 @@ void ObjectWindowDialog::addRecordInSelectedCategory()
         return;
     }
 
+    if (BlankRecordFactory::supports(type))
+    {
+        bool ok = false;
+        const QString editorId = QInputDialog::getText(this, tr("Add Record"),
+            tr("Editor ID for the new record:"), QLineEdit::Normal, "new", &ok).trimmed();
+        if (!ok || editorId.isEmpty()) return;
+
+        BaseCollection* collection = mData->getCollectionByType(type);
+        if (!collection || collection->searchId(editorId) >= 0)
+        {
+            QMessageBox::warning(this, tr("Add Record"),
+                tr("A record with Editor ID '%1' already exists.").arg(editorId));
+            return;
+        }
+
+        quint32 formId = 0;
+        try
+        {
+            formId = mData->createNewRecord(type, editorId);
+        }
+        catch (const std::exception& e)
+        {
+            QMessageBox::warning(this, tr("Add Record"),
+                tr("Could not allocate a form ID: %1").arg(QString::fromUtf8(e.what())));
+            return;
+        }
+
+        auto record = BlankRecordFactory::create(type, editorId, formId);
+        auto* table = qobject_cast<IdTable*>(mData->getTableModel(type));
+        if (!record || !table || !mData->getUndoStack())
+        {
+            QMessageBox::warning(this, tr("Add Record"), tr("The record could not be created."));
+            return;
+        }
+        mData->getUndoStack()->push(new AddRecordCommand(table, collection,
+            collection->getAppendIndex(editorId, type), *record,
+            QString("Add record: %1").arg(editorId)));
+        LOG_INFO(QString("Added record '%1' with FormID 0x%2")
+            .arg(editorId).arg(formId, 8, 16, QChar('0')));
+        return;
+    }
+
     QMessageBox::information(this, "Add Record",
         "Adding records of this type from the Object Window is not supported yet.");
 }
@@ -660,7 +736,7 @@ void ObjectWindowDialog::editSelected()
                     const NAME code = Data::recordNameForType(type);
                     const QString recordType = QStringLiteral("T3:") + nameToQString(code);
                     openck::QtFormDialogManager::instance().openOrFocus(
-                        formIdKey, recordType, comps, recPtr, this);
+                        formIdKey, recordType, comps, recPtr, this, {}, mData);
                     return;
                 }
             }
@@ -708,8 +784,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             NpcRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("NPC_"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("NPC_"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -721,8 +797,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             CreatureRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("CREA"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("CREA"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -734,7 +810,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             WeaponRecord& weap = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(weap.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &weap.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, weap, this);
         }
         break;
     }
@@ -746,7 +823,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ArmorRecord& armor = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(armor.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &armor.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, armor, this);
         }
         break;
     }
@@ -758,7 +836,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             SpellRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -770,8 +849,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             QuestRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("QUST"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("QUST"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -806,7 +885,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             TreeRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -818,7 +898,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             StatRecord& stat = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(stat.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &stat.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, stat, this);
         }
         break;
     }
@@ -830,7 +911,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ActiRecord& acti = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(acti.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &acti.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, acti, this);
         }
         break;
     }
@@ -842,7 +924,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             MiscRecord& misc = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(misc.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &misc.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, misc, this);
         }
         break;
     }
@@ -854,7 +937,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             AlchRecord& alch = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(alch.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &alch.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, alch, this);
         }
         break;
     }
@@ -866,7 +950,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             IngrRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -878,7 +963,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             BookRecord& book = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(book.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &book.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, book, this);
         }
         break;
     }
@@ -890,7 +976,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             EnchRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -902,7 +989,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ContRecord& cont = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(cont.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &cont.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, cont, this);
         }
         break;
     }
@@ -914,8 +1002,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             RaceRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("RACE"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("RACE"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -927,7 +1015,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             PerkRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -939,7 +1028,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             MagicRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -951,8 +1041,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             PackageRecord& pack = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(pack.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("PACK"), &pack.components, &pack, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("PACK"),
+                collection, recordIndex, pack, this);
         }
         break;
     }
@@ -987,8 +1077,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ClassRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("CLAS"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("CLAS"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1000,7 +1090,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             CellRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -1012,8 +1103,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             WorldspaceRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("WRLD"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("WRLD"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1025,8 +1116,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             LocationRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("LCTN"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("LCTN"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1038,8 +1129,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             PndRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("PNDT"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("PNDT"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1051,8 +1142,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             RefrRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("REFR"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("REFR"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1064,8 +1155,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             DialRecord& dial = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(dial.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("DIAL"), &dial.components, &dial, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("DIAL"),
+                collection, recordIndex, dial, this);
         }
         break;
     }
@@ -1077,8 +1168,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             InfoRecord& info = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(info.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("INFO"), &info.components, &info, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("INFO"),
+                collection, recordIndex, info, this);
         }
         break;
     }
@@ -1090,8 +1181,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             FactRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("FACT"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("FACT"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1103,8 +1194,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             RegionRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("REGN"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("REGN"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1116,8 +1207,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             HazdRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("HAZD"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("HAZD"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1129,8 +1220,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             SounRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("SOUN"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("SOUN"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1142,8 +1233,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             WthrRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("WTHR"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("WTHR"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1219,8 +1310,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             EfshRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("EFSH"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("EFSH"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1232,8 +1323,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ImgsRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("IMGS"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("IMGS"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1245,8 +1336,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ScenRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(
-                formIdKey, QStringLiteral("SCEN"), &rec.components, &rec, this);
+            openTransactionalForm(mData, formIdKey, QStringLiteral("SCEN"),
+                collection, recordIndex, rec, this);
         }
         break;
     }
@@ -1258,7 +1349,8 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             MaterialRecord& rec = record.get();
             QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
-            openck::QtFormDialogManager::instance().openOrFocus(formIdKey, &rec.components, this);
+            openTransactionalForm(mData, formIdKey, QString(), collection,
+                recordIndex, rec, this);
         }
         break;
     }
@@ -1279,7 +1371,7 @@ void ObjectWindowDialog::editSelected()
                         : QStringLiteral("%1|%2").arg(editorId, QStringLiteral("0"));
                     const QString recordType = nameToQString(Data::recordNameForType(type));
                     openck::QtFormDialogManager::instance().openOrFocus(
-                        formIdKey, recordType, comps, recPtr, this);
+                        formIdKey, recordType, comps, recPtr, this, {}, mData);
                     break;
                 }
             }
@@ -2429,6 +2521,17 @@ void ObjectWindowDialog::pasteRecord()
         return;
 
     bool created = false;
+    quint32 newFormId = 0;
+    try
+    {
+        newFormId = mData->createNewRecord(type, newId);
+    }
+    catch (const std::exception& e)
+    {
+        QMessageBox::warning(this, tr("Paste Record"),
+            tr("Could not allocate a form ID: %1").arg(QString::fromUtf8(e.what())));
+        return;
+    }
 
     switch (type)
     {
@@ -2437,7 +2540,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getNpcCollection();
         NpcRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("fullName"))
             newRecord.fullName = clipData.fields["fullName"].toString();
         if (clipData.fields.contains("level"))
@@ -2471,7 +2574,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getWeaponCollection();
         WeaponRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("damage"))
             newRecord.damage = static_cast<float>(clipData.fields["damage"].toDouble());
         if (clipData.fields.contains("speed"))
@@ -2497,7 +2600,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getArmorCollection();
         ArmorRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("armorRating"))
             newRecord.armorRating = static_cast<quint32>(clipData.fields["armorRating"].toInt());
         if (clipData.fields.contains("weight"))
@@ -2519,7 +2622,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getSpellCollection();
         SpellRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("cost"))
             newRecord.cost = static_cast<quint32>(clipData.fields["cost"].toInt());
         if (clipData.fields.contains("castingSound"))
@@ -2537,7 +2640,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getQuestCollection();
         QuestRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("questName"))
             newRecord.questName = clipData.fields["questName"].toString();
         if (clipData.fields.contains("questDesc"))
@@ -2559,6 +2662,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getGlobCollection();
         GlobalVariable newRecord;
         newRecord.editorId = newId;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("value"))
             newRecord.value.setFloat(static_cast<float>(clipData.fields["value"].toDouble()));
         collection.add(newRecord);
@@ -2571,7 +2675,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getTreeCollection();
         TreeRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("modelPath"))
             newRecord.modelPath = clipData.fields["modelPath"].toString();
         newRecord.rawSubRecords.clear();
@@ -2585,7 +2689,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getStatCollection();
         StatRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("modelPath"))
             newRecord.modelPath = clipData.fields["modelPath"].toString();
         newRecord.rawSubRecords.clear();
@@ -2599,7 +2703,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getActiCollection();
         ActiRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("iconPath"))
             newRecord.iconPath = clipData.fields["iconPath"].toString();
         if (clipData.fields.contains("modelPath"))
@@ -2615,7 +2719,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getMiscCollection();
         MiscRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("iconPath"))
             newRecord.iconPath = clipData.fields["iconPath"].toString();
         if (clipData.fields.contains("modelPath"))
@@ -2635,7 +2739,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getAlchCollection();
         AlchRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("iconPath"))
             newRecord.iconPath = clipData.fields["iconPath"].toString();
         if (clipData.fields.contains("modelPath"))
@@ -2655,7 +2759,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getIngrCollection();
         IngrRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("iconPath"))
             newRecord.iconPath = clipData.fields["iconPath"].toString();
         if (clipData.fields.contains("modelPath"))
@@ -2675,7 +2779,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getBookCollection();
         BookRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("iconPath"))
             newRecord.iconPath = clipData.fields["iconPath"].toString();
         if (clipData.fields.contains("modelPath"))
@@ -2695,7 +2799,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getEnchCollection();
         EnchRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("name"))
             newRecord.name = clipData.fields["name"].toString();
         if (clipData.fields.contains("costLimit"))
@@ -2715,7 +2819,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getContCollection();
         ContRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("iconPath"))
             newRecord.iconPath = clipData.fields["iconPath"].toString();
         if (clipData.fields.contains("modelPath"))
@@ -2739,7 +2843,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getRaceCollection();
         RaceRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("raceFlags"))
             newRecord.raceFlags = static_cast<quint32>(clipData.fields["raceFlags"].toInt());
         newRecord.rawSubRecords.clear();
@@ -2753,7 +2857,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getPerkCollection();
         PerkRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("description"))
             newRecord.description = clipData.fields["description"].toString();
         if (clipData.fields.contains("requirements"))
@@ -2771,7 +2875,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getMagicCollection();
         MagicRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("schools"))
             newRecord.schools = static_cast<quint32>(clipData.fields["schools"].toInt());
         if (clipData.fields.contains("damageType"))
@@ -2793,7 +2897,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getPackCollection();
         PackageRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("packageType"))
             newRecord.packageType = static_cast<quint32>(clipData.fields["packageType"].toInt());
         if (clipData.fields.contains("targetType"))
@@ -2809,6 +2913,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getLcrtCollection();
         LocationRefType newRecord;
         newRecord.editorId = newId;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("color"))
             newRecord.color = static_cast<uint32_t>(clipData.fields["color"].toInt());
         collection.add(newRecord);
@@ -2821,7 +2926,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getClassCollection();
         ClassRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("className"))
             newRecord.className = clipData.fields["className"].toString();
         if (clipData.fields.contains("description"))
@@ -2841,7 +2946,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getCellCollection();
         CellRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("cellName"))
             newRecord.cellName = clipData.fields["cellName"].toString();
         if (clipData.fields.contains("cellX"))
@@ -2865,7 +2970,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getWorldspaceCollection();
         WorldspaceRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("waterType"))
             newRecord.waterType = static_cast<quint32>(clipData.fields["waterType"].toInt());
         newRecord.rawSubRecords.clear();
@@ -2881,7 +2986,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getLocationCollection();
         LocationRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("locationName"))
             newRecord.locationName = clipData.fields["locationName"].toString();
         if (clipData.fields.contains("parentId"))
@@ -2905,7 +3010,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getPlanetCollection();
         PndRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("starSystem"))
             newRecord.starSystem = clipData.fields["starSystem"].toString();
         if (clipData.fields.contains("temperature"))
@@ -2929,7 +3034,7 @@ void ObjectWindowDialog::pasteRecord()
     {
         auto& collection = mData->getRefrCollection();
         RefrRecord newRecord;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("baseId"))
             newRecord.baseId = static_cast<quint32>(clipData.fields["baseId"].toInt());
         if (clipData.fields.contains("posX"))
@@ -2965,7 +3070,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getDialCollection();
         DialRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("topicName"))
             newRecord.topicName = clipData.fields["topicName"].toString();
         
@@ -2981,7 +3086,7 @@ void ObjectWindowDialog::pasteRecord()
         auto& collection = mData->getInfoCollection();
         InfoRecord newRecord;
         newRecord.editorId = newId;
-        newRecord.formId = 0;
+        newRecord.formId = newFormId;
         if (clipData.fields.contains("responseText"))
             newRecord.responseText = clipData.fields["responseText"].toString();
         

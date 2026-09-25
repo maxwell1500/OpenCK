@@ -34,6 +34,7 @@ public:
     static ValidationReport validateMasters(const Data& data);
     static ValidationReport validateFormIds(const Data& data);
     static ValidationReport validateOrphanedRecords(const Data& data);
+    static ValidationReport validateReferences(const Data& data);
 
 private:
     static ValidationReport mergeReports(const QVector<ValidationReport>& reports);

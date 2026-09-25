@@ -1,6 +1,9 @@
 #include <QtTest>
 
 #include "../../src/model/tools/columnvalidator.hpp"
+#include "../../src/model/tools/assetvalidator.hpp"
+#include "../../src/model/world/data.hpp"
+#include "../../libs/files/filepaths.hpp"
 #include "../../libs/files/esm/npcrecord.hpp"
 #include "../../libs/files/esm/weaprecord.hpp"
 #include "../../libs/files/esm/spellrecord.hpp"
@@ -20,6 +23,7 @@ private slots:
     void testValidateSpell_EmptyEditorId();
     void testValidateArmor_EmptyEditorId();
     void testValidateQuest_ValidRecord();
+    void testDataReferenceValidation();
 };
 
 void TestColumnValidator::testValidateNpc_EmptyEditorId()
@@ -185,6 +189,29 @@ void TestColumnValidator::testValidateQuest_ValidRecord()
         }
     }
     QVERIFY(!hasError);
+}
+
+void TestColumnValidator::testDataReferenceValidation()
+{
+    Data data(QStringList(), FilePaths(QStringLiteral("OpenCKValidationTest")));
+    NpcRecord npc;
+    npc.editorId = QStringLiteral("MissingRace");
+    npc.formId = 0x800;
+    npc.race = 0xABC;
+    data.getNpcCollection().add(npc);
+
+    const auto report = AssetValidator::validateReferences(data);
+    bool found = false;
+    for (const auto& issue : report.issues)
+    {
+        if (issue.category == QStringLiteral("Reference")
+            && issue.message.contains(QStringLiteral("0xabc"), Qt::CaseInsensitive))
+        {
+            found = true;
+            break;
+        }
+    }
+    QVERIFY(found);
 }
 
 QTEST_MAIN(TestColumnValidator)

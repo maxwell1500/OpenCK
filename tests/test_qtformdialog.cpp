@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QList>
 #include <QSet>
 #include <QStringList>
@@ -92,6 +93,49 @@ int main(int argc, char** argv)
             }
         }
         CHECK(dialog.windowTitle().contains(QStringLiteral("0x00012345")));
+    }
+
+    {
+        FormComponents components;
+        auto* name = components.add<TESFullName_Component>();
+        name->fullName = QStringLiteral("Original");
+        bool committed = false;
+        FormComponents committedComponents;
+        QtFormDialog dialog(QStringLiteral("0x000TRANSACTION"), &components, nullptr,
+            [&committed, &committedComponents](const FormComponents& edited) {
+                committed = true;
+                committedComponents = edited;
+            });
+        auto* edit = dialog.findChild<QLineEdit*>();
+        CHECK(edit != nullptr);
+        if (edit) {
+            edit->setText(QStringLiteral("Edited"));
+            QMetaObject::invokeMethod(edit, "editingFinished", Qt::DirectConnection);
+        }
+        QMetaObject::invokeMethod(&dialog, "onOk", Qt::DirectConnection);
+        CHECK(committed);
+        CHECK(static_cast<TESFullName_Component*>(committedComponents.findByName(
+            QStringLiteral("TESFullName")))->fullName == QStringLiteral("Edited"));
+        CHECK(static_cast<TESFullName_Component*>(components.findByName(
+            QStringLiteral("TESFullName")))->fullName == QStringLiteral("Original"));
+    }
+
+    {
+        FormComponents components;
+        auto* name = components.add<TESFullName_Component>();
+        name->fullName = QStringLiteral("Keep");
+        bool committed = false;
+        QtFormDialog dialog(QStringLiteral("0x000CANCEL"), &components, nullptr,
+            [&committed](const FormComponents&) { committed = true; });
+        auto* edit = dialog.findChild<QLineEdit*>();
+        if (edit) {
+            edit->setText(QStringLiteral("Discard"));
+            QMetaObject::invokeMethod(edit, "editingFinished", Qt::DirectConnection);
+        }
+        dialog.reject();
+        CHECK(!committed);
+        CHECK(static_cast<TESFullName_Component*>(components.findByName(
+            QStringLiteral("TESFullName")))->fullName == QStringLiteral("Keep"));
     }
 
     // -----------------------------------------------------------------

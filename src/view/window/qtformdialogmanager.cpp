@@ -2,6 +2,7 @@
 #include "qtformdialog.hpp"
 
 #include <QWidget>
+#include <utility>
 
 namespace openck {
 
@@ -32,16 +33,20 @@ bool QtFormDialogManager::hasFactory(const QString& recordType) const
 
 void QtFormDialogManager::openOrFocus(const QString& formIdKey,
                                        FormComponents* components,
-                                       QWidget* parent)
+                                       QWidget* parent,
+                                       std::function<void(const FormComponents&)> commit,
+                                       Data* data)
 {
-    openOrFocus(formIdKey, QString(), components, nullptr, parent);
+    openOrFocus(formIdKey, QString(), components, nullptr, parent, std::move(commit), data);
 }
 
 void QtFormDialogManager::openOrFocus(const QString& formIdKey,
                                        const QString& recordType,
                                        FormComponents* components,
                                        void* recordPtr,
-                                       QWidget* parent)
+                                       QWidget* parent,
+                                       std::function<void(const FormComponents&)> commit,
+                                       Data* data)
 {
     if (!components) return;
 
@@ -56,13 +61,13 @@ void QtFormDialogManager::openOrFocus(const QString& formIdKey,
         return;
     }
 
-    auto* dlg = new QtFormDialog(formIdKey, components, parent);
+    auto* dlg = new QtFormDialog(formIdKey, components, parent, std::move(commit), data);
     dlg->setModal(false);
 
     auto factoryIt = m_factories.find(recordType);
     if (factoryIt != m_factories.end() && factoryIt.value())
     {
-        QWidget* customWidget = factoryIt.value()(components, recordPtr, dlg);
+        QWidget* customWidget = factoryIt.value()(dlg->workingComponents(), recordPtr, dlg);
         if (customWidget)
             dlg->setCustomWidget(customWidget);
     }

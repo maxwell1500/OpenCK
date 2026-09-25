@@ -151,6 +151,14 @@ EarlyPageHeap g_earlyPageHeap;
 #include "../../libs/files/esm/Dialrecord.hpp"
 #include "../../libs/files/esm/Inforecord.hpp"
 #include "../../libs/files/esm/pgrerecord.hpp"
+#include "../../libs/files/esm/refrecord.hpp"
+#include "../../src/model/world/idtable.hpp"
+#include "../../src/model/tools/addrecordcommand.hpp"
+#include "../../src/model/tools/blankrecordfactory.hpp"
+#include "../../src/model/tools/deleterecordcommandbase.hpp"
+#include "../../src/model/tools/macrocommand.hpp"
+#include "../../src/model/tools/setrefrparentcellcommand.hpp"
+#include "../../src/model/tools/undostack.hpp"
 #include "../../libs/files/esm/subrecordsnapshot.hpp"
 #include <cstring>
 #include <QTextStream>
@@ -173,9 +181,11 @@ private slots:
     void testRealSeydaNeenDocument();
     void testSaveRoundTripGRUP();
     void testFormIdAllocation();
+    void testConfiguredNewPlugin();
     void testSaveRoundTripSubrecordIdentical();
     void testSyntheticMultiTypeRoundTrip();
     void testSyntheticCellChildrenAndOpaque();
+    void testCellReferenceAddUndoRedoAndRoundTrip();
     void testSyntheticDialInfoReverseIndex();
     void testSyntheticRefrXownWidth();
     void testMasterRecordSaveStateMachine();
@@ -704,6 +714,60 @@ void TestLoaderSinglePass::testFormIdAllocation()
     qDebug() << "allocated form id" << QString::number(a, 16);
 }
 
+void TestLoaderSinglePass::testConfiguredNewPlugin()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.filePath("configured.esl");
+
+    NewPluginOptions options;
+    options.game = GameFormat::Game::Starfield;
+    options.masters = { MasterData(QStringLiteral("Starfield.esm")),
+        MasterData(QStringLiteral("Skyrim.esm")) };
+    options.author = QStringLiteral("OpenCK Test");
+    options.nextObjectId = 0x900;
+    options.lightMaster = true;
+
+    Document document(QStringList(), path, true, options);
+    QCOMPARE(document.getData().currentGame(), GameFormat::Game::Starfield);
+    QCOMPARE(document.fileFlags() & quint32(FileFlag::LightMaster), quint32(FileFlag::LightMaster));
+    QCOMPARE(document.getData().getReaderHeader().masters.size(), 2);
+    QCOMPARE(document.getData().getReaderHeader().masters[0].name, QStringLiteral("Starfield.esm"));
+
+    const quint32 formId = document.getData().createNewRecord(CkId::Type_Npc_, QStringLiteral("NewNpc"));
+    QCOMPARE(formId, quint32(0x900));
+    auto record = BlankRecordFactory::create(CkId::Type_Npc_, QStringLiteral("NewNpc"), formId);
+    auto& collection = document.getData().getNpcCollection();
+    auto* table = qobject_cast<IdTable*>(document.getData().getTableModel(CkId::Type_Npc_));
+    QVERIFY(record && table);
+    document.getData().getUndoStack()->push(new AddRecordCommand(table, &collection,
+        collection.getAppendIndex(QStringLiteral("NewNpc"), CkId::Type_Npc_), *record));
+    QCOMPARE(collection.size(), 1);
+    document.getData().getUndoStack()->undo();
+    QCOMPARE(collection.size(), 0);
+    document.getData().getUndoStack()->redo();
+    QCOMPARE(collection.size(), 1);
+
+    document.save(path);
+    QVERIFY(QFileInfo::exists(path));
+    ESMReader reader(path);
+    reader.open();
+    QCOMPARE(reader.getHeader().masters.size(), 2);
+    QCOMPARE(reader.getHeader().masters[0].name, QStringLiteral("Starfield.esm"));
+    QCOMPARE(reader.getHeader().author, QStringLiteral("OpenCK Test"));
+    QCOMPARE(reader.getHeader().nextObjectID, quint32(0x900));
+    QVERIFY(reader.getHeader().recHeader.flags.test(FileFlag::LightMaster));
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    Document* loaded = mediator.makeDocument(QStringList{ QStringLiteral("configured.esl") }, path, false);
+    const_cast<FilePaths&>(loaded->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(loaded);
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+    QCOMPARE(loaded->getData().currentGame(), GameFormat::Game::Starfield);
+    QCOMPARE(loaded->getData().getNpcCollection().size(), 1);
+}
+
 // Synthetic multi-type round-trip: write a plugin with one record of each
 // major type, load it, save untouched, and verify the subrecord payloads
 // are identical. Always runs (no real-data dependency).
@@ -941,6 +1005,155 @@ void TestLoaderSinglePass::testSyntheticCellChildrenAndOpaque()
         qPrintable(QStringLiteral("cell-children round-trip is not payload-identical (%1 differ)")
             .arg(diffs.size())));
     qDebug() << "synthetic cell children + opaque round-trip OK" << src.size() << "records";
+}
+
+void TestLoaderSinglePass::testCellReferenceAddUndoRedoAndRoundTrip()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString pluginPath = tmp.filePath("synth_refr.esp");
+    const quint32 cellId = 0x901;
+    const quint32 existingRefId = 0x902;
+
+    {
+        QFile file(pluginPath);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        ESMWriter writer;
+        writer.setAuthor("Synthetic Cell Reference Test");
+        writer.save(file);
+
+        writer.startGrup('CELL', 0);
+        RecHeader cellHeader;
+        cellHeader.id = cellId;
+        writer.startRecord('CELL', cellHeader);
+        writer.writeSubZString('EDID', QStringLiteral("SynthRefCell"));
+        writer.startSubRecord('DATA');
+        writer.writeType<quint8>(0);
+        writer.writeType<quint8>(0);
+        writer.writeType<quint8>(0);
+        writer.writeType<quint8>(0);
+        writer.endSubRecord();
+        writer.endRecord();
+
+        writer.startGrup(cellId & 0xFFFFFF, 6);
+        RefrRecord existing;
+        existing.blank();
+        existing.initComponents();
+        existing.formId = existingRefId;
+        existing.editorId = QStringLiteral("SynthExistingRef");
+        existing.baseId = 0x123;
+        existing.posX = 1.0f;
+        existing.posY = 2.0f;
+        existing.posZ = 3.0f;
+        existing.scale = 1.0f;
+        RecHeader refHeader;
+        refHeader.id = existingRefId;
+        writer.startRecord('REFR', refHeader);
+        existing.save(writer);
+        writer.endRecord();
+        writer.endGrup();
+        writer.endGrup();
+        writer.close();
+    }
+
+    DocumentMediator mediator;
+    QSignalSpy stopped(&mediator, &DocumentMediator::loadingStopped);
+    Document* doc = mediator.makeDocument(
+        QStringList{ QStringLiteral("synth_refr.esp") }, pluginPath, false);
+    const_cast<FilePaths&>(doc->getData().getPaths()).dataDir.setPath(tmp.path());
+    mediator.insertDocument(doc);
+    QTRY_COMPARE_WITH_TIMEOUT(stopped.count(), 1, 15000);
+
+    Data& data = doc->getData();
+    QCOMPARE(data.childrenOfCell(cellId).size(), 1);
+    QCOMPARE(data.parentCellOfRefr(existingRefId), cellId);
+
+    const quint32 addedId = data.createNewRecord(CkId::Type_Refr_, QStringLiteral("SynthAddedRef"));
+    QVERIFY(addedId != 0);
+    RefrRecord added;
+    added.blank();
+    added.initComponents();
+    added.formId = addedId;
+    added.editorId = QStringLiteral("SynthAddedRef");
+    added.baseId = 0x456;
+    added.posX = 4.0f;
+    added.posY = 5.0f;
+    added.posZ = 6.0f;
+    added.scale = 1.0f;
+
+    auto& collection = data.getRefrCollection();
+    auto* table = qobject_cast<IdTable*>(data.getTableModel(CkId::Type_Refr_));
+    QVERIFY(table);
+    auto* macro = data.createMacroCommand(QStringLiteral("Add cell reference"));
+    Record<RefrRecord> record(State_ModifiedOnly, nullptr, &added);
+    macro->addCommand(new AddRecordCommand(table, &collection,
+        collection.getAppendIndex(added.editorId, CkId::Type_Refr_), record));
+    macro->addCommand(new SetRefrParentCellCommand(&data, addedId, 0, cellId));
+    data.getUndoStack()->push(macro);
+
+    QCOMPARE(data.childrenOfCell(cellId).size(), 2);
+    QCOMPARE(data.parentCellOfRefr(addedId), cellId);
+
+    QTemporaryDir out;
+    const QString savedPath = out.filePath("synth_refr_saved.esp");
+    doc->save(savedPath);
+    QVERIFY(QFileInfo::exists(savedPath));
+
+    DocumentMediator reloadMediator;
+    QSignalSpy reloadStopped(&reloadMediator, &DocumentMediator::loadingStopped);
+    Document* reloaded = reloadMediator.makeDocument(
+        QStringList{ QStringLiteral("synth_refr_saved.esp") }, savedPath, false);
+    const_cast<FilePaths&>(reloaded->getData().getPaths()).dataDir.setPath(out.path());
+    reloadMediator.insertDocument(reloaded);
+    QTRY_COMPARE_WITH_TIMEOUT(reloadStopped.count(), 1, 15000);
+    const Data& reloadedData = reloaded->getData();
+    QCOMPARE(reloadedData.childrenOfCell(cellId).size(), 2);
+    QCOMPARE(reloadedData.parentCellOfRefr(addedId), cellId);
+    int reloadedIndex = -1;
+    const auto& reloadedRefs = reloadedData.getRefrCollection();
+    for (int i = 0; i < reloadedRefs.size(); ++i)
+    {
+        if (reloadedRefs.getFormId(i) == addedId)
+            reloadedIndex = i;
+    }
+    QVERIFY(reloadedIndex >= 0);
+    QCOMPARE(reloadedRefs.getRecord(reloadedIndex).get().baseId, quint32(0x456));
+
+    data.getUndoStack()->undo();
+    QCOMPARE(data.childrenOfCell(cellId).size(), 1);
+    QCOMPARE(data.parentCellOfRefr(addedId), 0u);
+    data.getUndoStack()->redo();
+    QCOMPARE(data.childrenOfCell(cellId).size(), 2);
+    QCOMPARE(data.parentCellOfRefr(addedId), cellId);
+
+    int existingIndex = -1;
+    for (int i = 0; i < collection.size(); ++i)
+    {
+        if (collection.getFormId(i) == existingRefId)
+            existingIndex = i;
+    }
+    QVERIFY(existingIndex >= 0);
+    auto* removeMacro = data.createMacroCommand(QStringLiteral("Remove cell reference"));
+    removeMacro->addCommand(new DeleteRecordCommandBase(&collection, existingIndex));
+    removeMacro->addCommand(new SetRefrParentCellCommand(&data, existingRefId, cellId, 0));
+    data.getUndoStack()->push(removeMacro);
+    QCOMPARE(data.childrenOfCell(cellId).size(), 1);
+    QCOMPARE(data.parentCellOfRefr(existingRefId), 0u);
+
+    QTemporaryDir removedOut;
+    const QString removedPath = removedOut.filePath("synth_refr_removed.esp");
+    doc->save(removedPath);
+    DocumentMediator removedMediator;
+    QSignalSpy removedStopped(&removedMediator, &DocumentMediator::loadingStopped);
+    Document* removedDoc = removedMediator.makeDocument(
+        QStringList{ QStringLiteral("synth_refr_removed.esp") }, removedPath, false);
+    const_cast<FilePaths&>(removedDoc->getData().getPaths()).dataDir.setPath(removedOut.path());
+    removedMediator.insertDocument(removedDoc);
+    QTRY_COMPARE_WITH_TIMEOUT(removedStopped.count(), 1, 15000);
+    const Data& removedData = removedDoc->getData();
+    QCOMPARE(removedData.childrenOfCell(cellId).size(), 1);
+    QCOMPARE(removedData.parentCellOfRefr(existingRefId), 0u);
+    QCOMPARE(removedData.parentCellOfRefr(addedId), cellId);
 }
 
 // DIAL/INFO reverse index: INFOs physically following a DIAL are attributed

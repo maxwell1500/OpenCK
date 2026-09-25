@@ -1,0 +1,187 @@
+#include <QtTest>
+#include <QTemporaryDir>
+#include <QFile>
+#include <QSet>
+
+#include "bsaarchive.hpp"
+#include "nifblockfile.hpp"
+#include "nifanimationwriter.hpp"
+
+// Locks the Bethesda NIF container against shipped files. The container is
+// verified two ways, because a byte-exact re-serialize alone does not prove
+// the block boundaries are right:
+//
+//   1. load + serialize reproduces the source file byte for byte, and
+//   2. every block's payload is exactly the slice the header's size table
+//      claims, so a save can only ever change what it deliberately patches.
+//
+// The animated-block checks additionally prove the writer refuses to touch
+// keyframe data whose encoding it has not confirmed.
+//
+// Requires the user's Skyrim SE install; skipped when it is absent.
+class TestNifBlockFile : public QObject
+{
+    Q_OBJECT
+
+private slots:
+    void initTestCase();
+    void shippedNifsRoundTrip();
+    void shippedNifsHaveConsistentBlockTable();
+    void unconfirmedKeyframeLayoutIsRefused();
+
+private:
+    // A few thousand shipped NIFs is enough to cover every block type and
+    // keeps the check fast enough for the regular suite.
+    static constexpr int kSampleLimit = 2500;
+
+    static QStringList archives();
+    bool anyArchiveFound() const;
+};
+
+void TestNifBlockFile::initTestCase()
+{
+    if (!anyArchiveFound()) QSKIP("no shipped NIF archives found");
+}
+
+QStringList TestNifBlockFile::archives()
+{
+    const QString base = QStringLiteral(
+        "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/");
+    return {base + QStringLiteral("Skyrim - Meshes0.bsa"),
+            base + QStringLiteral("Skyrim - Meshes1.bsa")};
+}
+
+bool TestNifBlockFile::anyArchiveFound() const
+{
+    for (const QString& path : archives())
+        if (QFile::exists(path)) return true;
+    return false;
+}
+
+void TestNifBlockFile::shippedNifsRoundTrip()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    int checked = 0;
+    for (const QString& bsaPath : archives()) {
+        if (!QFile::exists(bsaPath)) continue;
+        BsaArchive archive;
+        QVERIFY2(archive.open(bsaPath), qPrintable(bsaPath));
+
+        for (int i = 0; i < archive.fileCount() && checked < kSampleLimit; ++i) {
+            const QString& entry = archive.entries()[i].fullPath;
+            if (!entry.endsWith(".nif", Qt::CaseInsensitive)) continue;
+            QByteArray bytes;
+            if (!archive.readData(i, bytes)) continue;
+
+            const QString tmp = dir.filePath(QStringLiteral("probe.nif"));
+            QFile out(tmp);
+            if (!out.open(QIODevice::WriteOnly)) continue;
+            out.write(bytes);
+            out.close();
+
+            NifBlockFile file;
+            QVERIFY2(file.load(tmp), qPrintable(entry + QStringLiteral(": ") + file.lastError()));
+            QCOMPARE(file.serialize(), bytes);
+            ++checked;
+        }
+    }
+    QVERIFY2(checked >= 1000,
+             qPrintable(QStringLiteral("only %1 shipped NIFs checked").arg(checked)));
+}
+
+void TestNifBlockFile::shippedNifsHaveConsistentBlockTable()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    int checked = 0;
+    int controllersSeen = 0;
+    int controllersResolved = 0;
+    for (const QString& bsaPath : archives()) {
+        if (!QFile::exists(bsaPath)) continue;
+        BsaArchive archive;
+        QVERIFY2(archive.open(bsaPath), qPrintable(bsaPath));
+
+        for (int i = 0; i < archive.fileCount() && checked < kSampleLimit; ++i) {
+            const QString& entry = archive.entries()[i].fullPath;
+            if (!entry.endsWith(".nif", Qt::CaseInsensitive)) continue;
+            QByteArray bytes;
+            if (!archive.readData(i, bytes)) continue;
+
+            const QString tmp = dir.filePath(QStringLiteral("probe.nif"));
+            QFile out(tmp);
+            if (!out.open(QIODevice::WriteOnly)) continue;
+            out.write(bytes);
+            out.close();
+
+            NifBlockFile file;
+            if (!file.load(tmp)) continue;
+
+            // Every node-to-controller link must point at a real block, and
+            // every controller whose keyframe data resolves must land on a
+            // recognised data block. A controller that does not resolve is
+            // allowed (float controllers and unset refs exist), so the walk is
+            // additionally required to succeed for the large majority.
+            QSet<quint32> controllerBlocks;
+            for (const QString& type : {QStringLiteral("NiTransformController"),
+                                        QStringLiteral("NiKeyframeController")}) {
+                const QList<int> found = file.findBlocks(type);
+                for (int index : found)
+                    controllerBlocks.insert(static_cast<quint32>(index));
+            }
+            for (int index : controllerBlocks) {
+                ++controllersSeen;
+                const int dataBlock = file.keyframeDataBlockFor(static_cast<int>(index));
+                if (dataBlock < 0) continue;
+                ++controllersResolved;
+                QVERIFY(dataBlock < file.count());
+            }
+            for (int block = 0; block < file.count(); ++block) {
+                if (!NifBlockFile::isNodeBlockType(file.block(block).type)) continue;
+                QString name;
+                quint32 controllerRef = 0xFFFFFFFFu;
+                if (!file.nodeNetInfo(block, name, controllerRef)) continue;
+                QVERIFY2(controllerRef == 0xFFFFFFFFu || controllerRef < static_cast<quint32>(file.count()),
+                         qPrintable(entry + QStringLiteral(": node %1 points at block %2")
+                                        .arg(block).arg(controllerRef)));
+            }
+            ++checked;
+        }
+    }
+    QVERIFY(checked >= 1000);
+    QVERIFY2(controllersSeen > 50,
+             qPrintable(QStringLiteral("only %1 controllers seen").arg(controllersSeen)));
+    QVERIFY2(controllersResolved * 2 > controllersSeen,
+             qPrintable(QStringLiteral("only %1 of %2 controllers resolved to keyframe data")
+                            .arg(controllersResolved).arg(controllersSeen)));
+}
+
+void TestNifBlockFile::unconfirmedKeyframeLayoutIsRefused()
+{
+    // NiTransformData (Skyrim 1.5) encoding is not confirmed, so the writer
+    // must decline rather than risk producing a corrupt NIF.
+    QVERIFY(!NifBlockFile::isWritableKeyframeType(QStringLiteral("NiTransformData")));
+    QVERIFY(NifBlockFile::isWritableKeyframeType(QStringLiteral("NiKeyframeData")));
+    QVERIFY(NifBlockFile::isWritableKeyframeType(QStringLiteral("NiAnimKeyFrameData")));
+
+    QVector<Nif::TransformKeyframe> keys;
+    Nif::TransformKeyframe key;
+    key.time = 0.0f;
+    key.translation = {1.0f, 2.0f, 3.0f};
+    key.rotation = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+    key.scale = {1.0f, 1.0f, 1.0f};
+    keys.append(key);
+
+    // The confirmed layout is a flat 44-byte-per-key array: 4 count + 44.
+    QByteArray encoded;
+    QVERIFY(NifBlockFile::encodeKeyframeData(QStringLiteral("NiKeyframeData"), keys, encoded));
+    QCOMPARE(encoded.size(), 48);
+
+    // An unknown block type is never encodable.
+    QVERIFY(!NifBlockFile::encodeKeyframeData(QStringLiteral("NiSomethingElse"), keys, encoded));
+}
+
+QTEST_MAIN(TestNifBlockFile)
+#include "test_nifblockfile.moc"

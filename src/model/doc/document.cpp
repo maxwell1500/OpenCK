@@ -15,7 +15,8 @@
 #include <cstdio>
 #include <cstring>
 
-Document::Document(const QStringList& contentFiles, const QString& savePath, bool isNew) :
+Document::Document(const QStringList& contentFiles, const QString& savePath, bool isNew,
+                   const NewPluginOptions& options) :
     paths(FilePaths(QCoreApplication::applicationName())),
     contentFiles(contentFiles),
     savePath(savePath),
@@ -31,10 +32,11 @@ Document::Document(const QStringList& contentFiles, const QString& savePath, boo
     if (newFile)
     {
         LOG_DEBUG("Creating new document");
-        if (contentFiles.size() == 1)
-        {
-            createNew();
-        }
+        createNew();
+        data->configureNewFile(options.game, options.masters, options.author,
+            options.nextObjectId);
+        mFileFlags = options.lightMaster ? static_cast<quint32>(FileFlag::LightMaster)
+            : static_cast<quint32>(FileFlag::None);
     }
     else
     {
@@ -630,8 +632,8 @@ void Document::createNew()
 {
     newFile = true;
     base = false;
-    contentFiles.clear();
-    data = std::make_unique<Data>(contentFiles, paths);
+    if (!data)
+        data = std::make_unique<Data>(contentFiles, paths);
     LOG_INFO("New empty plugin created");
 }
 
