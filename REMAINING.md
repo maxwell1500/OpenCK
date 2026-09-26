@@ -1727,14 +1727,42 @@ which `REMAINING.md` §8 already places outside the current scope. Both are
 substantially larger than the NIF work. Until one of them is parsed, the NIF
 keyframe write-back in `NifAnimationWriter` cannot serve Starfield.
 
-**Starfield `DX10` texture archives are still unread.** BTDX reading currently
-covers `GNRL` only. The 30 texture archives (`Starfield - Textures01..11`,
-`LODTextures01/02`, `GeneratedTextures`, and the per-quest `*- Textures.ba2`)
-fail to open: they use the `DX10` type tag with a 24-byte declaration that
-carries mipmap counts and per-chunk records instead of the single offset/size
-pair. Their data is raw DDS without the 128-byte header, so a reader also has
-to rebuild that header. This is a clean, well-specified extension of the
-existing BTDX reader and the obvious next piece of archive work.
+**Starfield `DX10` texture archives: the container is now mapped, the payload
+is not.** BTDX reading covers `GNRL` only, so the 30 texture archives
+(`Starfield - Textures01..11`, `LODTextures01/02`, `GeneratedTextures`, and the
+per-quest `*- Textures.ba2`) still fail to open. The `DX10` header turned out to
+be the *same* 36 bytes as `GNRL` (magic, version, type, file count, name table
+offset, a u64 of 1, and a u32 compression method); only the declaration area
+differs. Measured against `Starfield - Textures11.ba2` (1,327 files, LZ4):
+
+- The declaration area is a flat run of **sentinel-terminated records of exactly
+  two sizes**, 48 and 24, every one ending in `0xBAADF00D`. Walking them yields
+  exactly 1,327 records of 48 bytes — precisely the file count — plus 2,786
+  records of 24 bytes, totalling 130,560 bytes with no slack. A 48-byte record
+  starts a file; the 24-byte records after it belong to that file.
+- The 48-byte file record: `hash u32`, extension `char[4]` (`"dds\0"`, so it is
+  NUL-terminated unlike `GNRL`), `dirHash u32`, then `u8 0`, `u8 3`, and
+  `u16 24` — that 24 being the size of the DDS header that is *not* stored. Then
+  `+24` is the **absolute file offset** of the file's first chunk, `+28` is 0,
+  `+38` is **bits per texel** (16 on `_normal.dds`, 8 on the rest — BC7-family
+  and BC5-family), and `+36` is the **base mip size in bytes** (1,048,576 for a
+  1024x1024 16bpp texture, 524,288 for 8bpp, i.e. the 1-byte-per-texel BCn
+  rule). Cross-checked: each file's `+24` equals the previous file's last chunk
+  `off + f8`, so the chunks tile the data region contiguously and in order.
+- The 24-byte chunk record: `offset u32`, `0 u32`, `packed size u32`,
+  `uncompressed size u32`, `u16 first mip`, `u16 last mip`, sentinel. `packed
+  size` is confirmed because `off + f8` lands exactly on the next chunk's `off`.
+  Every texture has two chunks, mip 1 and mips 2..10.
+
+So the parts still unknown are narrow and nameable: **mip 0 is in no chunk**, the
+`+32 u32` field is neither an offset nor a size in the data region (it varies
+2,933 to 831,281 against chunk totals of ~1.7 KB to ~105 KB), and the `+20` field
+(packing as `u8 0x0B`/`0x8B`, `u8 0x4B`/`0x43`, `u16 0x0800`; the first byte
+matches the 11-mip count for a 1024x1024 texture) has not been mapped to a DDS
+format code. Until mip 0's location and the format code are pinned down, a
+reader cannot emit a valid `.dds`, which is the point of the whole exercise. The
+obvious next step is to locate mip 0 and decode `+32`; the structural work above
+is already done and does not need redoing.
 
 **Starfield mesh archives open with many weak-reference stub NIFs** (a single
 `BSWeakReferenceNode` pointing at real geometry), so anything sampling these
