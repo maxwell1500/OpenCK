@@ -1539,6 +1539,12 @@ discovered as a `FormDataWidget` (a silent failure to derive from the interface
 would otherwise make a widget stop being applied). Its hex parsing is pinned
 separately. Checked with a negative control to confirm the assertions bite.
 
+One maintenance hazard left in place: `QtFormDialogManager::openOrFocus()` still
+has the legacy overload that takes a live `recordPtr`, which is exactly the trap
+this series existed to close. It is kept for dialogs with no record to edit, is
+commented as a footgun in the header, and nothing in production calls it. It
+should be deleted once no caller needs it.
+
 ### Series 2 — Width-correct component property bindings
 
 **Priority: P0 memory safety.** `IntEditorProperty` and `EnumEditorProperty`
