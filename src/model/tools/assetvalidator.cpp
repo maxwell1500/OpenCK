@@ -1038,7 +1038,22 @@ AssetValidator::ValidationReport AssetValidator::validateAll(const Data& data, c
     // 6. Asset paths that escape the data tree
     reports.append(validateAssetPaths(data));
 
-    // 4. Validate NIF files referenced by stat records
+    // The remaining rules resolve assets on disk. Without a usable data
+    // directory AssetResolver scans from an invalid root, which walks an
+    // enormous tree for minutes and then overruns the stack, so stop here and
+    // report the data-side rules only.
+    if (dataDir.isEmpty() || !QFileInfo(dataDir).isDir())
+    {
+        ValidationReport r;
+        r.issues.append({ValidationIssue::Warning, "Validation",
+            QStringLiteral("No data directory available; asset existence and "
+                "content checks were skipped"),
+            QString(), dataDir});
+        reports.append(r);
+        return mergeReports(reports);
+    }
+
+    // 7. Validate NIF files referenced by stat records
     AssetResolver resolver(dataDir);
     const auto& statCollection = data.getStatCollection();
     for (int i = 0; i < statCollection.size(); i++)

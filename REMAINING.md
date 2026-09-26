@@ -1731,10 +1731,12 @@ can block, warn, or ignore.
 Diagnostics now name the record in the message text as well as in `recordId`,
 because the navigable report shows the message first.
 
-**Note on `validateAll()`:** it walks the data directory, so it must be given a
-real path. Passing an empty one sends it scanning from an invalid root — a test
-that did this ran for five minutes and then overran the stack. It should
-validate its `dataDir` argument and bail early rather than rely on callers.
+**`validateAll()` needed a data-directory guard, now added.** It walks the data
+directory, so passing it an empty or non-existent path sent `AssetResolver`
+scanning from an invalid root: a test doing that ran for five minutes and then
+overran the stack. It now stops after the data-side rules and reports a warning
+that asset existence and content checks were skipped. Two tests assert the call
+returns in under five seconds for both an empty and a missing directory.
 
 `test_assetvalidatorrelationships` builds small synthetic plugin graphs and pins
 each rule: clean and empty paths accepted, backslash and forward-slash parent

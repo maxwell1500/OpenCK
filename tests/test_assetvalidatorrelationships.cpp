@@ -326,6 +326,45 @@ private slots:
         QVERIFY(!AssetValidator::shouldBlockSave(one, 1));
     }
 
+    // Passing an invalid data directory used to send the asset scan from an
+    // invalid root: five minutes of walking, then a stack overrun. It must now
+    // bail out immediately with a warning instead.
+    void validateAllWithoutADataDirectoryReturnsPromptly()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+
+        QElapsedTimer timer;
+        timer.start();
+        const ValidationReport report = AssetValidator::validateAll(data, QString());
+        const qint64 elapsed = timer.elapsed();
+
+        QVERIFY2(elapsed < 5000,
+            qPrintable(QStringLiteral("took %1 ms").arg(elapsed)));
+        QVERIFY(hasIssue(report, QStringLiteral("Validation"),
+            QStringLiteral("No data directory")));
+    }
+
+    // A data directory that does not exist must be treated the same way.
+    void validateAllWithAMissingDataDirectoryReturnsPromptly()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString missing = dir.path() + QStringLiteral("/does-not-exist");
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+
+        QElapsedTimer timer;
+        timer.start();
+        const ValidationReport report = AssetValidator::validateAll(data, missing);
+        const qint64 elapsed = timer.elapsed();
+
+        QVERIFY2(elapsed < 5000,
+            qPrintable(QStringLiteral("took %1 ms").arg(elapsed)));
+        QVERIFY(hasIssue(report, QStringLiteral("Validation"),
+            QStringLiteral("No data directory")));
+    }
+
     void validateAllRunsTheNewRules()
     {
         // validateAll() walks the data directory, so it needs a real one. An
