@@ -181,6 +181,9 @@ void setupPrimitivePreviewMenu();
     Ui::mainwindow *ui;
     Data* mData;
     Document* mDocument = nullptr;
+    /// When set, saving asks for confirmation if validation reports an error.
+    bool mValidateBeforeSave = false;
+    QAction* mValidateBeforeSaveAction = nullptr;
     UndoStack* mUndoStack;
     QAction* mUndoAction;
     QAction* mRedoAction;

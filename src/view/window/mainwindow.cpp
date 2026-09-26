@@ -242,6 +242,30 @@ void MainWindow::setDocument(Document* document)
 bool MainWindow::saveActiveDocument()
 {
     if (!mDocument || mDocument->getSavePath().isEmpty()) return false;
+
+    // Optional pre-save policy. Off by default: the real CK does not block a
+    // save on validation, and a hard block on a rule this project has not
+    // finished verifying would be worse than the problem it prevents. When it is
+    // on, the user is asked rather than silently refused, and the navigable
+    // report is one click away.
+    if (mValidateBeforeSave && mData)
+    {
+        const QString dataDir = mData->getPaths().dataDir.absolutePath();
+        const AssetValidator::ValidationReport report =
+            AssetValidator::validateAll(*mData, dataDir);
+        if (AssetValidator::shouldBlockSave(report))
+        {
+            const QMessageBox::StandardButton answer = QMessageBox::warning(
+                this, tr("Save Anyway?"),
+                tr("Validation found %1 error(s) in this plugin.\n\n"
+                   "Saving anyway may produce a plugin the game cannot load.")
+                    .arg(report.errors()),
+                QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Save);
+            if (answer != QMessageBox::Save)
+                return false;
+        }
+    }
+
     mDocument->save(mDocument->getSavePath());
     return true;
 }
@@ -252,6 +276,10 @@ void MainWindow::setData(Data* data)
     if (mData)
     {
         mUndoStack = mData->getUndoStack();
+        // Pre-save validation is opt-in and remembered, so a user who wants a
+        // clean save does not re-enable it every session.
+        mValidateBeforeSave = QSettings()
+            .value(QStringLiteral("ValidateBeforeSave/Enabled"), false).toBool();
         updateUndoRedoActions();
         updateStatus("Data loaded");
         
@@ -502,6 +530,20 @@ void MainWindow::setupEditMenu()
     connect(assetValidationAction, &QAction::triggered, this, &MainWindow::on_actionAssetValidation_triggered);
     ui->menuTools->addSeparator();
     ui->menuTools->addAction(assetValidationAction);
+
+    // Pre-save validation is a policy choice, so it gets a visible toggle next
+    // to the report it depends on rather than living only in a settings file.
+    mValidateBeforeSaveAction = new QAction(tr("Validate Before Saving"), this);
+    mValidateBeforeSaveAction->setCheckable(true);
+    mValidateBeforeSaveAction->setChecked(mValidateBeforeSave);
+    mValidateBeforeSaveAction->setToolTip(
+        tr("Ask for confirmation before saving a plugin that validation reports errors in"));
+    connect(mValidateBeforeSaveAction, &QAction::triggered, this,
+        [this](bool checked) {
+            mValidateBeforeSave = checked;
+            QSettings().setValue(QStringLiteral("ValidateBeforeSave/Enabled"), checked);
+        });
+    ui->menuTools->addAction(mValidateBeforeSaveAction);
 
     // Add Asset Dependency Scanner action to Tools menu
     QAction* assetDepScanAction = new QAction(tr("Check Asset Dependencies..."), this);

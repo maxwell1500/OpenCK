@@ -1774,7 +1774,12 @@ added and wired into `validateAll()`:
 
 `shouldBlockSave()` is the pre-save policy hook: it answers whether a report
 contains an error, with an overload taking an allowed-error count so a caller
-can block, warn, or ignore.
+can block, warn, or ignore. It is now wired into `MainWindow::saveActiveDocument()`
+behind a **Tools > Validate Before Saving** toggle, so it is reachable and
+remembered rather than an unused function. It is **off by default**: the real CK
+does not block a save on validation, and a hard block on rules this project has
+not finished verifying would be worse than the problem it prevents. When on, the
+user is asked rather than silently refused.
 
 Diagnostics now name the record in the message text as well as in `recordId`,
 because the navigable report shows the message first.
