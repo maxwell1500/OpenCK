@@ -1,9 +1,11 @@
 #include "formcomponentsresolver.hpp"
 
 #include "../../../libs/components/formcomponents.hpp"
+#include "../../view/window/recordeditsession.hpp"
 
 #include "../world/basecollection.hpp"
 #include "../world/collection.hpp"
+
 
 #include "../../../libs/files/esm/actirecord.hpp"
 #include "../../../libs/files/esm/actorvalueinforecord.hpp"
@@ -222,6 +224,21 @@ bool tryResolveComponents(BaseCollection* coll, int recordIndex,
     return true;
 }
 
+template <typename T>
+bool tryResolveEditSession(BaseCollection* coll, int recordIndex,
+                           UndoStack* undoStack, const QString& description,
+                           std::unique_ptr<openck::RecordEditSession>& session)
+{
+    auto* typed = dynamic_cast<Collection<T>*>(coll);
+    if (!typed)
+        return false;
+    if (recordIndex < 0 || recordIndex >= typed->size())
+        return false;
+    session = std::make_unique<openck::TypedRecordEditSession<T>>(
+        typed, recordIndex, undoStack, description);
+    return true;
+}
+
 #define FOR_EACH_COMPONENT_RECORD_TYPE(MACRO) \
     MACRO(AactRecord) \
     MACRO(AamdRecord) \
@@ -431,6 +448,17 @@ bool resolveComponents(BaseCollection* coll, int recordIndex,
     if (tryResolveComponents<recType>(coll, recordIndex, components, recordPtr)) return true;
     FOR_EACH_COMPONENT_RECORD_TYPE(RESOLVE_RECORD_TYPE)
 #undef RESOLVE_RECORD_TYPE
+    return false;
+}
+
+bool resolveEditSession(BaseCollection* coll, int recordIndex,
+                        UndoStack* undoStack, const QString& description,
+                        std::unique_ptr<openck::RecordEditSession>& session)
+{
+#define RESOLVE_SESSION_TYPE(recType) \
+    if (tryResolveEditSession<recType>(coll, recordIndex, undoStack, description, session)) return true;
+    FOR_EACH_COMPONENT_RECORD_TYPE(RESOLVE_SESSION_TYPE)
+#undef RESOLVE_SESSION_TYPE
 #undef FOR_EACH_COMPONENT_RECORD_TYPE
     return false;
 }

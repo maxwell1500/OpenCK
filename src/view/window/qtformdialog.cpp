@@ -2,6 +2,7 @@
 
 #include <QDialogButtonBox>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QTabWidget>
@@ -37,15 +38,26 @@ bool isKeywordComponent(const QString& className)
 QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
                            QWidget* parent,
                            std::function<void(const FormComponents&)> commit,
-                           Data* data)
+                           Data* data,
+                           std::unique_ptr<RecordEditSession> session)
     : QDialog(parent)
     , m_formIdKey(formIdKey)
     , m_sourceComponents(components)
-    , m_workingComponents(components ? *components : FormComponents())
-    , m_components(&m_workingComponents)
     , m_data(data)
     , m_commit(std::move(commit))
+    , m_session(std::move(session))
 {
+    if (m_session)
+    {
+        // The session owns the working copy, so the grid and any custom data
+        // widget edit the same record and commit() sees both sets of changes.
+        m_components = m_session->workingComponents();
+    }
+    else
+    {
+        m_ownedWorkingComponents = components ? *components : FormComponents();
+        m_components = &m_ownedWorkingComponents;
+    }
     setWindowTitle(QStringLiteral("Form — %1").arg(formIdKey));
     resize(640, 480);
     setModal(false);
@@ -116,7 +128,7 @@ QtFormDialog::QtFormDialog(const QString& formIdKey, FormComponents* components,
 
     connect(applyBtn, &QPushButton::clicked, this, &QtFormDialog::onApply);
     connect(okBtn, &QPushButton::clicked, this, &QtFormDialog::onOk);
-    connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+    connect(cancelBtn, &QPushButton::clicked, this, &QtFormDialog::reject);
 }
 
 QtFormDialog::~QtFormDialog() = default;
@@ -129,9 +141,12 @@ void QtFormDialog::setCustomWidget(QWidget* widget)
         m_customWidget->deleteLater();
     }
     m_customWidget = widget;
+    m_customSession = widget ? dynamic_cast<FormDataWidget*>(widget) : nullptr;
     if (widget)
     {
         m_dataTabLayout->addWidget(widget);
+        if (m_customSession)
+            m_customSession->loadSession();
     }
 }
 
@@ -140,17 +155,36 @@ void QtFormDialog::onApply()
     if (m_basicGrid) m_basicGrid->apply();
     if (m_componentsGrid) m_componentsGrid->apply();
     if (m_keywordsGrid) m_keywordsGrid->apply();
+    if (m_customSession)
+    {
+        QString error;
+        if (!m_customSession->validateSession(&error))
+        {
+            QMessageBox::warning(this, tr("Invalid Edit"),
+                error.isEmpty() ? tr("This record cannot be saved as entered.")
+                                : error);
+            return;
+        }
+        m_customSession->applySession();
+    }
     commitChanges();
 }
 
 bool QtFormDialog::commitChanges()
 {
-    if (!m_sourceComponents || m_workingComponents == *m_sourceComponents)
+    if (m_session)
+    {
+        // The session already holds the pre-edit copy, so it can decide
+        // whether anything changed and push a single undo command for both
+        // the grid and the custom widget.
+        return m_session->commit();
+    }
+    if (!m_sourceComponents || m_ownedWorkingComponents == *m_sourceComponents)
         return false;
     if (m_commit)
-        m_commit(m_workingComponents);
+        m_commit(m_ownedWorkingComponents);
     else
-        *m_sourceComponents = m_workingComponents;
+        *m_sourceComponents = m_ownedWorkingComponents;
     return true;
 }
 
@@ -160,6 +194,15 @@ void QtFormDialog::onOk()
     // untouched, which is not a failure — OK must still close the dialog.
     onApply();
     accept();
+}
+
+void QtFormDialog::reject()
+{
+    // Cancelling throws away the working copy, so a custom widget can edit its
+    // record freely without any risk of the edit surviving.
+    if (m_session)
+        m_session->discard();
+    QDialog::reject();
 }
 
 } // namespace openck

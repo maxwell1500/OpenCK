@@ -65,6 +65,7 @@
 #include "cellsdialog.hpp"
 #include "objectwindowdialog.hpp"
 #include "qtformdialogmanager.hpp"
+#include "../../model/tools/formcomponentsresolver.hpp"
 #include "exportdialog.hpp"
 #include "batchexportdialog.hpp"
 #include "exporttemplatesdialog.hpp"
@@ -2450,33 +2451,17 @@ void MainWindow::createAndOpenRecord(CkId::Type type, const QString& recordTypeN
     if (index < 0)
         return;
 
-    openck::FormComponents* components = nullptr;
-    void* recordPtr = nullptr;
-    switch (type)
-    {
-    case CkId::Type_Npc_:
-        components = &static_cast<IdCollection<NpcRecord>&>(*collection).getRecord(index).get().components;
-        recordPtr = &static_cast<IdCollection<NpcRecord>&>(*collection).getRecord(index).get();
-        break;
-    case CkId::Type_Race_:
-        components = &static_cast<IdCollection<RaceRecord>&>(*collection).getRecord(index).get().components;
-        recordPtr = &static_cast<IdCollection<RaceRecord>&>(*collection).getRecord(index).get();
-        break;
-    case CkId::Type_Class_:
-        components = &static_cast<IdCollection<ClassRecord>&>(*collection).getRecord(index).get().components;
-        recordPtr = &static_cast<IdCollection<ClassRecord>&>(*collection).getRecord(index).get();
-        break;
-    case CkId::Type_Fact_:
-        components = &static_cast<IdCollection<FactRecord>&>(*collection).getRecord(index).get().components;
-        recordPtr = &static_cast<IdCollection<FactRecord>&>(*collection).getRecord(index).get();
-        break;
-    default:
+    // Open the new record through a session so the dialog edits a working copy
+    // and the first commit lands on the undo stack, instead of writing straight
+    // into the record that AddRecordCommand just created.
+    std::unique_ptr<openck::RecordEditSession> session;
+    if (!resolveEditSession(collection, index, mData->getUndoStack(),
+                            QStringLiteral("Edit %1").arg(recordTypeName), session))
         return;
-    }
 
     const QString formIdKey = QStringLiteral("0x%1").arg(collection->getFormId(index), 8, 16, QChar('0'));
     openck::QtFormDialogManager::instance().openOrFocus(
-        formIdKey, recordTypeName, components, recordPtr, this, {}, mData);
+        formIdKey, recordTypeName, std::move(session), this, mData);
     LOG_INFO(QString("%1 record '%2' created and opened").arg(recordTypeName).arg(editorId));
 }
 

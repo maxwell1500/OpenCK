@@ -20,12 +20,15 @@
 // duplicate — same behavior as the real CK.
 
 #include "../widgets/editorpropertygrid.hpp"
-#include "../libs/components/component.hpp"
-#include "../libs/components/formcomponents.hpp"
+#include "../widgets/formdatawidget.hpp"
+#include "../../libs/components/component.hpp"
+#include "../../libs/components/formcomponents.hpp"
+#include "recordeditsession.hpp"
 
 #include <QDialog>
 #include <QString>
 
+#include <memory>
 #include <vector>
 #include <functional>
 
@@ -48,15 +51,23 @@ public:
     QtFormDialog(const QString& formIdKey, FormComponents* components,
                   QWidget* parent = nullptr,
                   std::function<void(const FormComponents&)> commit = {},
-                  Data* data = nullptr);
+                  Data* data = nullptr,
+                  std::unique_ptr<RecordEditSession> session = nullptr);
     ~QtFormDialog() override;
 
     QString formIdKey() const { return m_formIdKey; }
     FormComponents* components() const { return m_sourceComponents; }
     FormComponents* workingComponents() const { return m_components; }
 
+    /// The session this dialog edits through, if it was given one.
+    RecordEditSession* session() const { return m_session.get(); }
+
     /// Sets an optional custom widget shown below the component property grid.
     void setCustomWidget(QWidget* widget);
+
+    /// Overridden to discard the working copy, so closing the window discards
+    /// the edit exactly as Cancel does.
+    void reject() override;
 
 private slots:
     void onApply();
@@ -67,10 +78,11 @@ private:
 
     QString m_formIdKey;
     FormComponents* m_sourceComponents = nullptr;
-    FormComponents m_workingComponents;
+    FormComponents m_ownedWorkingComponents;
     FormComponents* m_components = nullptr;
     Data* m_data = nullptr;
     std::function<void(const FormComponents&)> m_commit;
+    std::unique_ptr<RecordEditSession> m_session;
     QVBoxLayout* m_layout = nullptr;
     QTabWidget* m_tabs = nullptr;
     EditorPropertyGrid* m_basicGrid = nullptr;
@@ -79,6 +91,7 @@ private:
     QWidget* m_dataTab = nullptr;
     QVBoxLayout* m_dataTabLayout = nullptr;
     QWidget* m_customWidget = nullptr;
+    FormDataWidget* m_customSession = nullptr;
 };
 
 } // namespace openck

@@ -8,7 +8,6 @@
 #include "../../model/world/collection.hpp"
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
-#include "../../model/tools/editcomponentscommand.hpp"
 #include "../../model/tools/addrecordcommand.hpp"
 #include "../../model/tools/blankrecordfactory.hpp"
 #include "../../model/world/idtable.hpp"
@@ -145,27 +144,17 @@ void openTransactionalForm(Data* data, const QString& formIdKey,
     const QString& recordType, const Collection<RecordType>& collection,
     int index, RecordType& record, QWidget* parent)
 {
-    auto commit = [data, &collection, index, recordType](
-        const openck::FormComponents& edited) {
-        auto* mutableCollection = const_cast<Collection<RecordType>*>(
-            static_cast<const Collection<RecordType>*>(&collection));
-        RecordType originalState = mutableCollection->getRecord(index).get();
-        RecordType editedState = originalState;
-        editedState.components = edited;
-        if (data->getUndoStack()) {
-            auto* command = new EditRecordCommand<RecordType>(
-                mutableCollection, index, originalState, editedState,
-                QStringLiteral("Edit %1").arg(recordType));
-            if (command->hasChanged())
-                data->getUndoStack()->push(command);
-            else
-                delete command;
-        } else {
-            mutableCollection->getRecord(index).setModified(editedState);
-        }
-    };
+    Q_UNUSED(record);
+    auto* mutableCollection = const_cast<Collection<RecordType>*>(&collection);
+    // A session owns a working copy of the whole record. The dialog's property
+    // grid and any registered custom data widget both edit that copy, so
+    // nothing reaches the live record until OK pushes one undo command for the
+    // lot, and Cancel throws it away.
+    auto session = std::make_unique<openck::TypedRecordEditSession<RecordType>>(
+        mutableCollection, index, data ? data->getUndoStack() : nullptr,
+        QStringLiteral("Edit %1").arg(recordType));
     openck::QtFormDialogManager::instance().openOrFocus(
-        formIdKey, recordType, &record.components, &record, parent, std::move(commit), data);
+        formIdKey, recordType, std::move(session), parent, data);
 }
 
 }
@@ -726,41 +715,23 @@ void ObjectWindowDialog::editSelected()
             BaseCollection* coll = mData->getCollectionByType(type);
             if (coll && recordIndex >= 0 && recordIndex < coll->size())
             {
-                openck::FormComponents* comps = nullptr;
-                void* recPtr = nullptr;
-                if (resolveComponents(coll, recordIndex, comps, recPtr) && comps)
+                const NAME code = Data::recordNameForType(type);
+                const QString recordType = QStringLiteral("T3:") + nameToQString(code);
+                // The Morrowind route only holds a BaseCollection, so it cannot
+                // name the record type. resolveEditSession() uses the same
+                // record-type list as resolveComponents() to build a typed
+                // session anyway, which keeps the edit on the undo stack and
+                // gives the dialog a working copy instead of the live record.
+                std::unique_ptr<openck::RecordEditSession> session;
+                if (resolveEditSession(coll, recordIndex, mData->getUndoStack(),
+                                       QStringLiteral("Edit %1").arg(recordType), session))
                 {
                     quint32 formId = coll->getFormId(recordIndex);
                     QString formIdKey = formId != 0
                         ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
                         : QStringLiteral("%1|%2").arg(editorId, QStringLiteral("0"));
-                    const NAME code = Data::recordNameForType(type);
-                    const QString recordType = QStringLiteral("T3:") + nameToQString(code);
-                    // The Morrowind route only holds a BaseCollection, so it
-                    // cannot use the typed EditRecordCommand. Route the commit
-                    // through the type-erased command so the edit still lands
-                    // on the undo stack; without this the dialog's fallback
-                    // wrote straight into the live record's components.
-                    auto commit = [this, coll, recordIndex, recordType](
-                        const openck::FormComponents& edited) {
-                        auto* cmd = new EditComponentsCommand(
-                            coll, recordIndex, edited,
-                            QStringLiteral("Edit %1").arg(recordType));
-                        if (!cmd->captureBefore())
-                        {
-                            delete cmd;
-                            return;
-                        }
-                        if (mData->getUndoStack())
-                            mData->getUndoStack()->push(cmd);
-                        else
-                        {
-                            cmd->execute();
-                            delete cmd;
-                        }
-                    };
                     openck::QtFormDialogManager::instance().openOrFocus(
-                        formIdKey, recordType, comps, recPtr, this, std::move(commit), mData);
+                        formIdKey, recordType, std::move(session), this, mData);
                     return;
                 }
             }
@@ -1385,17 +1356,17 @@ void ObjectWindowDialog::editSelected()
             BaseCollection* coll = mData->getCollectionByType(type);
             if (coll && recordIndex >= 0 && recordIndex < coll->size())
             {
-                openck::FormComponents* comps = nullptr;
-                void* recPtr = nullptr;
-                if (resolveComponents(coll, recordIndex, comps, recPtr) && comps)
+                const QString recordType = nameToQString(Data::recordNameForType(type));
+                std::unique_ptr<openck::RecordEditSession> session;
+                if (resolveEditSession(coll, recordIndex, mData->getUndoStack(),
+                                       QStringLiteral("Edit %1").arg(recordType), session))
                 {
                     quint32 formId = coll->getFormId(recordIndex);
                     QString formIdKey = formId != 0
                         ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
                         : QStringLiteral("%1|%2").arg(editorId, QStringLiteral("0"));
-                    const QString recordType = nameToQString(Data::recordNameForType(type));
                     openck::QtFormDialogManager::instance().openOrFocus(
-                        formIdKey, recordType, comps, recPtr, this, {}, mData);
+                        formIdKey, recordType, std::move(session), this, mData);
                     break;
                 }
             }

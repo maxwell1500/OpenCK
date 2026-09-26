@@ -580,18 +580,18 @@ void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
             BaseCollection* coll = mData->getCollectionByType(result.type);
             if (coll && result.recordIndex >= 0 && result.recordIndex < coll->size())
             {
-                openck::FormComponents* comps = nullptr;
-                void* recPtr = nullptr;
-                if (resolveComponents(coll, result.recordIndex, comps, recPtr) && comps)
+                const NAME code = Data::recordNameForType(result.type);
+                const QString recordType = QStringLiteral("T3:") + nameToQString(code);
+                std::unique_ptr<openck::RecordEditSession> session;
+                if (resolveEditSession(coll, result.recordIndex, mData->getUndoStack(),
+                                       QStringLiteral("Edit %1").arg(recordType), session))
                 {
                     quint32 formId = coll->getFormId(result.recordIndex);
                     QString formIdKey = formId != 0
                         ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
                         : result.editorId;
-                    const NAME code = Data::recordNameForType(result.type);
-                    const QString recordType = QStringLiteral("T3:") + nameToQString(code);
                     openck::QtFormDialogManager::instance().openOrFocus(
-                        formIdKey, recordType, comps, recPtr, this);
+                        formIdKey, recordType, std::move(session), this, mData);
                 }
             }
         }
@@ -1284,17 +1284,17 @@ void SearchDialog::openRecordEditor(const SearchAlgorithm::SearchResult& result)
             BaseCollection* coll = mData->getCollectionByType(result.type);
             if (coll && result.recordIndex >= 0 && result.recordIndex < coll->size())
             {
-                openck::FormComponents* comps = nullptr;
-                void* recPtr = nullptr;
-                if (resolveComponents(coll, result.recordIndex, comps, recPtr) && comps)
+                const QString recordType = nameToQString(Data::recordNameForType(result.type));
+                std::unique_ptr<openck::RecordEditSession> session;
+                if (resolveEditSession(coll, result.recordIndex, mData->getUndoStack(),
+                                       QStringLiteral("Edit %1").arg(recordType), session))
                 {
                     quint32 formId = coll->getFormId(result.recordIndex);
                     QString formIdKey = formId != 0
                         ? QStringLiteral("0x%1").arg(formId, 8, 16, QChar('0'))
                         : result.editorId;
-                    const QString recordType = nameToQString(Data::recordNameForType(result.type));
                     openck::QtFormDialogManager::instance().openOrFocus(
-                        formIdKey, recordType, comps, recPtr, this);
+                        formIdKey, recordType, std::move(session), this, mData);
                     break;
                 }
             }

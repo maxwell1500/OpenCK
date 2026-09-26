@@ -79,6 +79,48 @@ void QtFormDialogManager::openOrFocus(const QString& formIdKey,
     dlg->activateWindow();
 }
 
+void QtFormDialogManager::openOrFocus(const QString& formIdKey,
+                                       const QString& recordType,
+                                       std::unique_ptr<RecordEditSession> session,
+                                       QWidget* parent,
+                                       Data* data)
+{
+    if (!session) return;
+    auto it = m_dialogs.find(formIdKey);
+    if (it != m_dialogs.end() && it.value())
+    {
+        QtFormDialog* dlg = it.value();
+        dlg->raise();
+        dlg->activateWindow();
+        dlg->show();
+        dlg->setFocus();
+        return;
+    }
+
+    FormComponents* components = session->workingComponents();
+    auto* recordPtr = session->workingRecord();
+    auto* dlg = new QtFormDialog(formIdKey, components, parent,
+                                 std::function<void(const FormComponents&)>(),
+                                 data, std::move(session));
+    dlg->setModal(false);
+
+    auto factoryIt = m_factories.find(recordType);
+    if (factoryIt != m_factories.end() && factoryIt.value())
+    {
+        // The factory gets the working copy, so a widget that writes to
+        // recordPtr edits the session rather than the base record.
+        QWidget* customWidget = factoryIt.value()(dlg->workingComponents(), recordPtr, dlg);
+        if (customWidget)
+            dlg->setCustomWidget(customWidget);
+    }
+
+    m_dialogs.insert(formIdKey, dlg);
+    connect(dlg, &QObject::destroyed, this, &QtFormDialogManager::onDialogDestroyed);
+    dlg->show();
+    dlg->raise();
+    dlg->activateWindow();
+}
+
 void QtFormDialogManager::closeAll()
 {
     const auto all = m_dialogs.values();

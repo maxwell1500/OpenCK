@@ -13,12 +13,14 @@
 
 #include "../libs/components/component.hpp"
 #include "../libs/components/formcomponents.hpp"
+#include "recordeditsession.hpp"
 
 #include <QHash>
 #include <QObject>
 #include <QString>
 
 #include <functional>
+#include <memory>
 
 class QWidget;
 class Data;
@@ -32,6 +34,10 @@ class QtFormDialog;
 // in the QtFormDialog. The factory receives the record's components,
 // an opaque pointer to the record struct itself (cast by the widget),
 // and the parent widget for the dialog.
+//
+// The record pointer is the session's working copy, never the live record, so
+// a widget may edit it freely; the dialog discards it on Cancel and commits it
+// through the undo stack on OK.
 using FormDataWidgetFactory = std::function<QWidget*(FormComponents*, void* recordPtr, QWidget*)>;
 
 /// Singleton registry of open QtFormDialogs, deduplicating by form ID.
@@ -51,10 +57,22 @@ public:
     // Overload that accepts a record type string and optional record
     // pointer. If a factory is registered for that type, the dialog
     // will include a custom widget below the generic component grid.
+    //
+    // Legacy: recordPtr is the LIVE record, so a custom widget that writes to
+    // it mutates the base record with no undo entry. Prefer the session
+    // overload below. Kept for dialogs with no record to edit.
     void openOrFocus(const QString& formIdKey, const QString& recordType,
                      FormComponents* components, void* recordPtr = nullptr,
                      QWidget* parent = nullptr,
                      std::function<void(const FormComponents&)> commit = {},
+                     Data* data = nullptr);
+
+    /// Preferred overload: the caller builds a typed RecordEditSession, and
+    /// the dialog takes its working record and components from it. Ownership
+    /// passes to the dialog, which commits on OK and discards on Cancel.
+    void openOrFocus(const QString& formIdKey, const QString& recordType,
+                     std::unique_ptr<RecordEditSession> session,
+                     QWidget* parent = nullptr,
                      Data* data = nullptr);
 
     /// Registers a factory that builds a custom data widget for a record type.

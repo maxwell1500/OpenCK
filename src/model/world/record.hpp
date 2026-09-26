@@ -29,20 +29,14 @@ public:
     virtual std::unique_ptr<BaseRecord> modifiedCopy() const = 0;
     virtual void assign(const BaseRecord& record) = 0;
 
-    /// The components of the currently active record, or nullptr when the
-    /// record type has none. Lets generic code (the Object Window's
-    /// type-erased edit route) snapshot and restore a record's components
-    /// without knowing the concrete record struct.
-    virtual openck::FormComponents* activeComponents() { return nullptr; }
-    virtual const openck::FormComponents* activeComponents() const { return nullptr; }
-
     bool isModified() const;
     bool isErased() const;
     bool isDeleted() const;
 };
 
 /// Detects record structs that embed a `components` member, so that
-/// Record<T> only exposes activeComponents() for the types that have one.
+/// TypedRecordEditSession only offers working components for the types that
+/// have one.
 template <typename T, typename = void>
 struct HasFormComponents : std::false_type {};
 
@@ -64,22 +58,6 @@ public:
     std::unique_ptr<BaseRecord> clone() const override;
     std::unique_ptr<BaseRecord> modifiedCopy() const override;
     void assign(const BaseRecord& record) override;
-
-    openck::FormComponents* activeComponents() override
-    {
-        if constexpr (HasFormComponents<ESXRecord>::value)
-            return &get().components;
-        else
-            return nullptr;
-    }
-
-    const openck::FormComponents* activeComponents() const override
-    {
-        if constexpr (HasFormComponents<ESXRecord>::value)
-            return &get().components;
-        else
-            return nullptr;
-    }
 
     void setModified(const ESXRecord& modified);
     void merge();

@@ -1481,34 +1481,48 @@ undo stack.
 Replace this with a working-copy edit session: clone the record/components,
 bind the dialog to the copy, validate and compare on OK, push
 `EditRecordCommand` only after a successful commit, and discard on Cancel or
-close. **Status 2026-09-25 — core generic path done, Morrowind route done.**
-`QtFormDialog` now edits a cloned `FormComponents` working set, commits through
-a typed callback, and discards on Cancel. `ObjectWindowDialog` routes
-component-backed record cases through `EditRecordCommand`; `test_qtformdialog`
-covers OK commit and Cancel rollback.
+close. **Status 2026-09-26 — the full-record session is done; read-only widget
+gaps remain.**
 
-The Morrowind branch of `editSelected()` could not use that path: it only holds
-a `BaseCollection`, not a typed collection, so it passed an *empty* commit
-callback and the dialog fell back to writing the working set straight into the
-live record's `components` — an edit that was never undoable and left no trace
-in the document's modified state. Fixed by giving the record hierarchy a
-type-erased way to reach a record's components: `BaseRecord::activeComponents()`
-returns `nullptr` by default and `Record<T>` implements it under a
-`HasFormComponents<T>` trait, so record types without components are unaffected.
-`EditComponentsCommand` then snapshots via `BaseCollection::cloneRecordAt()` and
-writes back through `replace()`, which is undoable for any component-based type
-without a per-type template. `test_editcomponentscommand` pins that nothing is
-written before `execute()`, that the pre-edit record state is untouched while an
-edit is merely pending, and that undo/redo round-trips.
+`RecordEditSession` (`src/view/window/recordeditsession.hpp`) owns a working copy
+of the whole record. The dialog's property grid and any custom data widget edit
+*that* copy, so only `commit()` writes the live record and it always goes through
+the document's undo stack; `discard()` drops the copy, and `QtFormDialog::reject()`
+calls it so both Cancel and closing the window discard. Because the copy is a
+whole record rather than just its components, a widget writing plain fields is
+covered for free — no per-widget snapshot logic. `HasFormComponents<T>` gates
+which types expose working components. Custom data widgets may implement
+`FormDataWidget` (`src/view/widgets/formdatawidget.hpp`) for `loadSession()`,
+`validateSession()` and `applySession()`; a failing `validateSession()` blocks
+the commit and shows the reason.
 
-**Still open:** the registered custom data widgets are handed the *live* record
-pointer (`QtFormDialogManager` passes `recordPtr` from the factory, alongside the
-cloned working components), so a widget that writes fields outside `components`
-still mutates the base record with no undo and no validate step. They also have
-no `load`/`validate`/`apply` hooks, and the type-erased default resolver is still
-not a full session. Roughly 22 factories are registered, so this is the bulk of
-the remaining Series 1 work and wants a snapshot/revert contract per factory
-rather than 22 individual patches.
+Every edit route now builds a session, so no production path hands a dialog the
+live record: the 40-odd `openTransactionalForm<T>()` call sites, the Morrowind
+branch and the generic non-Morrowind branch of `ObjectWindowDialog::editSelected()`,
+the Object Window's post-create dialog in `MainWindow`, and both Search dialog
+routes. The Morrowind and fallback branches only hold a `BaseCollection`, so
+`resolveEditSession()` builds the typed session for them from the same
+record-type list `resolveComponents()` uses. `test_recordeditsession` pins that a
+pending edit touches neither components nor plain fields nor the record's state,
+that discard leaves everything alone, that commit writes both kinds of change as
+one undo entry, and that commit is idempotent.
+
+This supersedes the previous revision's `EditComponentsCommand` and
+`BaseRecord::activeComponents()`, which existed only to give the Morrowind route
+a type-erased path; the session is strictly stronger, so both were removed rather
+than left as dead code.
+
+**Still open — and it is a usability bug, not a corruption one:** of the 16
+`*DataWidget` implementations, only `InfoDataWidget`, `QuestDataWidget` and
+`WorldspaceDataWidget` ever wrote back to the record; the other 13 read the
+record into `QLineEdit`/`QSpinBox` controls and never wrote it, so their edits
+are silently discarded. They are now safe (they are editing the working copy,
+and Cancel works), but their changes still do not reach the record. Giving them
+`applySession()` is the remaining Series 1 work: mostly mechanical, one widget at
+a time, and each needs a test that the control value survives into the record.
+The legacy `openOrFocus()` overload that takes a live `recordPtr` is kept for
+dialogs with no record to edit and is documented as a footgun; nothing in
+production uses it.
 
 ### Series 2 — Width-correct component property bindings
 
