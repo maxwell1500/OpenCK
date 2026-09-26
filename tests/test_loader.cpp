@@ -736,8 +736,8 @@ void TestLoaderSinglePass::testConfiguredNewPlugin()
 
     const quint32 formId = document.getData().createNewRecord(CkId::Type_Npc_, QStringLiteral("NewNpc"));
     QCOMPARE(formId, quint32(0x900));
-    auto record = BlankRecordFactory::create(CkId::Type_Npc_, QStringLiteral("NewNpc"), formId);
     auto& collection = document.getData().getNpcCollection();
+    auto record = BlankRecordFactory::create(&collection, QStringLiteral("NewNpc"), formId);
     auto* table = qobject_cast<IdTable*>(document.getData().getTableModel(CkId::Type_Npc_));
     QVERIFY(record && table);
     document.getData().getUndoStack()->push(new AddRecordCommand(table, &collection,

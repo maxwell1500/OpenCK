@@ -527,7 +527,7 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
         CkId::Type type = categoryId >= 0
             ? static_cast<CkId::Type>(mModel->getCategoryType(categoryId))
             : CkId::Type_None;
-        if (BlankRecordFactory::supports(type))
+        if (BlankRecordFactory::supports(mData->getCollectionByType(type)))
         {
             QAction* addAction = mContextMenu->addAction("Add Record...");
             connect(addAction, &QAction::triggered, this, &ObjectWindowDialog::addRecordInSelectedCategory);
@@ -549,7 +549,7 @@ void ObjectWindowDialog::updateAddButton(const QModelIndex& index)
         if (categoryId >= 0)
         {
             CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
-            enabled = BlankRecordFactory::supports(type);
+            enabled = BlankRecordFactory::supports(mData->getCollectionByType(type));
         }
     }
     if (mAddButton)
@@ -652,7 +652,8 @@ void ObjectWindowDialog::addRecordInSelectedCategory()
         return;
     }
 
-    if (BlankRecordFactory::supports(type))
+    BaseCollection* blankCollection = mData->getCollectionByType(type);
+    if (BlankRecordFactory::supports(blankCollection))
     {
         bool ok = false;
         const QString editorId = QInputDialog::getText(this, tr("Add Record"),
@@ -679,7 +680,7 @@ void ObjectWindowDialog::addRecordInSelectedCategory()
             return;
         }
 
-        auto record = BlankRecordFactory::create(type, editorId, formId);
+        auto record = BlankRecordFactory::create(blankCollection, editorId, formId);
         auto* table = qobject_cast<IdTable*>(mData->getTableModel(type));
         if (!record || !table || !mData->getUndoStack())
         {

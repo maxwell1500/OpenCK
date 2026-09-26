@@ -132,6 +132,11 @@ target_include_directories(test_recorddatawidgets PRIVATE
 )
 openck_add_test(test_recorddatawidgets)
 # Generic paste: duplicates the whole record through the undo stack.
+# Blank record factory: breadth across the shared record-type list.
+add_executable(test_blankrecordfactory test_blankrecordfactory.cpp)
+target_link_libraries(test_blankrecordfactory PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_blankrecordfactory PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_blankrecordfactory)
 add_executable(test_recordpaste test_recordpaste.cpp
   ${CMAKE_SOURCE_DIR}/src/model/tools/recordpaste.cpp
 )

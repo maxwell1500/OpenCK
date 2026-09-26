@@ -760,6 +760,7 @@ set(MODEL_SOURCES
     src/model/tools/formidcompactor.cpp
     src/model/tools/formcomponentsresolver.cpp
  src/model/tools/recordpaste.cpp
+ src/model/tools/blankrecordfactory.cpp
     src/model/tools/bnetclient.cpp
     src/model/tools/objectwindowfilter.cpp
     src/model/tools/assetdependencyscanner.cpp

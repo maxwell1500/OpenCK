@@ -1594,7 +1594,30 @@ author, and next local FormID. Add a table-driven blank-record factory for
 Object Window categories with defaults and required components, and route all
 creation through `AddRecordCommand` with valid ID allocation. Synthetic tests
 must cover header masters, game detection, local IDs, save/reload, and undo.
-**Status 2026-09-26 — paste done; factory breadth remains.**
+**Status 2026-09-26 — done.** The new-plugin flow collects game, active master
+order, plugin/light type, author, and next local FormID; configured headers save
+and reload correctly. `BlankRecordFactory` plus `AddRecordCommand` now covers
+every record type in the shared list rather than a hand-written switch naming
+six, so Add Record is available across the Object Window instead of only for
+GLOB, GMST, NPC_, RACE, CLAS and FACT.
+
+The factory dispatches by `dynamic_cast` over `componentrecordtypes.hpp` rather
+than a `switch` on `CkId::Type`, which is the same hand-maintained-table shape
+that made Paste lossy: a new record type had to be remembered in a second place
+and every other category reported "not supported yet". Two compile-time traits
+decide eligibility, so a type that cannot be blanked is skipped at compile time
+instead of breaking the build, and `initComponents()` is optional because global
+variables and game settings sit outside the component architecture. The
+implementation moved from the header into a .cpp because the record-type list
+needs every record header in scope.
+
+`test_blankrecordfactory` covers the original six plus thirteen more types
+(WEAP, ARMO, SPEL, ALCH, INGR, AMMO, BOOK, ACTI, QUST, DIAL, SOUN, WTHR, PACK),
+that a blank record is `State_ModifiedOnly` and correctly stamped, that two
+blanks of the same type are independent, that a component-based blank carries a
+usable component set rather than an empty form grid, and that it survives
+`AddRecordCommand` and undo.
+
 
 Paste is now a single generic path. `ObjectWindowDialog::pasteRecord()` used to
 run about thirty hand-written per-type branches that rebuilt a record field by
@@ -1624,9 +1647,6 @@ what is pasted, and deleting it makes paste fail with a message. The real CK's
 clipboard holds a snapshot. Making the clipboard carry a deep copy would need a
 type-erased snapshot in the static clipboard, which is straightforward but was
 not needed for the undo fix.
-
-**Still open:** broadening `BlankRecordFactory` beyond GLOB, GMST, NPC_, RACE,
-CLAS and FACT to every Object Window category.
 
 ### Series 5 — Record-specific tabs and real form pickers
 

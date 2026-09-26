@@ -2400,7 +2400,8 @@ void MainWindow::createAndOpenRecord(CkId::Type type, const QString& recordTypeN
         QMessageBox::information(this, actionName, tr("Open a plugin file first."));
         return;
     }
-    if (!BlankRecordFactory::supports(type))
+    BaseCollection* blankCollection = mData->getCollectionByType(type);
+    if (!BlankRecordFactory::supports(blankCollection))
     {
         QMessageBox::information(this, actionName,
             tr("Creating %1 records is not supported yet.").arg(recordTypeName));
@@ -2435,7 +2436,7 @@ void MainWindow::createAndOpenRecord(CkId::Type type, const QString& recordTypeN
         return;
     }
 
-    auto record = BlankRecordFactory::create(type, editorId, formId);
+    auto record = BlankRecordFactory::create(blankCollection, editorId, formId);
     auto* table = qobject_cast<IdTable*>(mData->getTableModel(type));
     if (!record || !table || !mData->getUndoStack())
     {

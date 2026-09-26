@@ -1,71 +1,32 @@
 #ifndef BLANKRECORDFACTORY_H
 #define BLANKRECORDFACTORY_H
 
-#include "../world/ckid.hpp"
-#include "../world/record.hpp"
-#include "../../../libs/files/esm/glob.hpp"
-#include "../../../libs/files/esm/gmst.hpp"
-#include "../../../libs/files/esm/npcrecord.hpp"
-#include "../../../libs/files/esm/racerecord.hpp"
-#include "../../../libs/files/esm/classrecord.hpp"
-#include "../../../libs/files/esm/factrecord.hpp"
+#include <QString>
 
 #include <memory>
-#include <type_traits>
 
+class BaseCollection;
+class BaseRecord;
+
+/// Creates a blank record of a collection's type, ready for AddRecordCommand.
+///
+/// Dispatch is by dynamic_cast over the shared record-type list rather than a
+/// hand-written switch, so a type becomes creatable the moment it is in that
+/// list and cannot be forgotten here. The implementation lives in a .cpp
+/// because the record-type list needs every record header in scope.
+///
+/// Game settings and global variables sit outside the component architecture
+/// and are handled explicitly.
 class BlankRecordFactory
 {
 public:
-    static bool supports(CkId::Type type)
-    {
-        switch (type)
-        {
-        case CkId::Type_Glob_:
-        case CkId::Type_Gmst:
-        case CkId::Type_Npc_:
-        case CkId::Type_Race_:
-        case CkId::Type_Class_:
-        case CkId::Type_Fact_:
-            return true;
-        default:
-            return false;
-        }
-    }
+    /// True when a blank record of this collection's type can be created.
+    static bool supports(BaseCollection* collection);
 
-    static std::unique_ptr<BaseRecord> create(CkId::Type type,
-        const QString& editorId, quint32 formId)
-    {
-        switch (type)
-        {
-        case CkId::Type_Glob_: return make<GlobalVariable>(editorId, formId);
-        case CkId::Type_Gmst: return make<GameSetting>(editorId, formId);
-        case CkId::Type_Npc_: return make<NpcRecord>(editorId, formId);
-        case CkId::Type_Race_: return make<RaceRecord>(editorId, formId);
-        case CkId::Type_Class_: return make<ClassRecord>(editorId, formId);
-        case CkId::Type_Fact_: return make<FactRecord>(editorId, formId);
-        default: return nullptr;
-        }
-    }
-
-private:
-    template<typename T, typename = void>
-    struct HasInitComponents : std::false_type {};
-
-    template<typename T>
-    struct HasInitComponents<T, std::void_t<decltype(std::declval<T&>().initComponents())>>
-        : std::true_type {};
-
-    template<typename T>
-    static std::unique_ptr<BaseRecord> make(const QString& editorId, quint32 formId)
-    {
-        T record;
-        record.blank();
-        record.editorId = editorId;
-        record.formId = formId;
-        if constexpr (HasInitComponents<T>::value)
-            record.initComponents();
-        return std::make_unique<Record<T>>(State_ModifiedOnly, nullptr, &record);
-    }
+    /// Builds a blank record stamped with the given editor ID and FormID, or
+    /// returns nullptr when the type is not creatable.
+    static std::unique_ptr<BaseRecord> create(BaseCollection* collection,
+        const QString& editorId, quint32 formId);
 };
 
 #endif // BLANKRECORDFACTORY_H
