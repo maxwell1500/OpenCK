@@ -1683,9 +1683,37 @@ second registration wins while the discarded factory is never called.
 tests (`test_scenetimeline`, `test_scenephasemodel`) — they are working,
 tested components awaiting a persisted scene editor, not dead code.
 
-**Still open:** a persisted SCEN editor, and table models for the container,
-keyword and spell vectors that some components expose without consistently
-committing them.
+**Still open:** a persisted SCEN editor.
+
+**The container, keyword and spell tables now commit their vectors.** All three
+rendered their vector and mutated it only on Add and Remove: typing a new Form ID
+into a cell changed nothing at all, and Add inserted a null FormID with count 1
+— which every reference check skips, because 0 means "unset". They are now two
+small table classes (`FormIdVectorTable` and `ContainerItemsTable`) that write
+cell edits straight back, validate the cell through `parseFormId`, normalise
+what is displayed, and mark a rejected cell with a tooltip and a red background
+instead of popping a modal dialog per keystroke. Add selects the new row and
+opens it for editing rather than leaving a silent null reference.
+
+Writing the container version surfaced a second, worse bug: it captured its
+refresh flag and its refresh lambda **by reference from constructor locals**, so
+every later cell edit read freed stack memory — the flag was observed holding
+values like 56 and 144, and no edit ever reached the record. That is why both are
+now QObject-derived classes whose state outlives the constructor. The same class
+of bug was latent in the old Add/Remove handlers, which also captured by
+reference; it simply had never been exercised because nothing connected
+`itemChanged`. A related fix was needed too: the count handler originally called
+`refreshTable()`, which deletes every item including the one whose signal was
+still being delivered, so Qt touched freed memory as the emission unwound; the
+cell is now normalised in place.
+
+`test_formidvectortables` drives all of this the way a user does — set a cell,
+click Add, click Remove — and checks the component vector actually changes, that
+an unparseable Form ID and a bad count are both rejected with the previous value
+intact, that untouched rows are unaffected, and that the container's count column
+commits at all. It reports through `fprintf` rather than `qWarning` because
+linking the view library installs the application's log handler, which swallows
+Qt messages.
 
 ### Series 6 — Archive orchestration, older BSA targets, and extraction safety
 

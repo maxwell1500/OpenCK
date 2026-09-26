@@ -108,6 +108,20 @@ openck_add_test(test_columnvalidator)
 # EditRecordCommand tests
 # Record edit session: every record dialog edits a working copy, not the base record.
 # Per-record custom data widgets: edits must reach the record via the session.
+# FormID vector tables: cell edits must reach the component vector.
+add_executable(test_formidvectortables test_formidvectortables.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/widgets/formcomponentwidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/widgets/formpickerwidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/formideditorwidget.cpp
+)
+target_link_libraries(test_formidvectortables PRIVATE openck_model openck_esm test_stubs Qt6::Test Qt6::Widgets)
+target_include_directories(test_formidvectortables PRIVATE
+    ${TEST_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/view/widgets
+    ${CMAKE_SOURCE_DIR}/src/view/window
+)
+openck_add_test(test_formidvectortables)
 add_executable(test_recorddatawidgets test_recorddatawidgets.cpp
   ${CMAKE_SOURCE_DIR}/src/view/window/celldatawidget.cpp
   ${CMAKE_SOURCE_DIR}/src/view/window/classdatawidget.cpp

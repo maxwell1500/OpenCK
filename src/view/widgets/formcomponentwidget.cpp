@@ -5,6 +5,7 @@
 #include "../../libs/components/tier3_components.hpp"
 #include "../../model/world/data.hpp"
 #include "../../view/window/formideditorwidget.hpp"
+#include "recordfieldparse.hpp"
 
 #include <QCheckBox>
 #include <QColorDialog>
@@ -16,6 +17,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QTableWidget>
@@ -26,6 +28,248 @@
 namespace openck {
 
 namespace {
+
+/// A table over a QVector<quint32> of FormIDs that writes cell edits back into
+/// the vector.
+///
+/// The keyword, spell and container tables each used to render their vector and
+/// mutate it only on Add and Remove. Typing a new Form ID into a cell therefore
+/// changed nothing at all, and Add inserted a null FormID that every
+/// reference check skips because 0 means "unset". This helper writes edits
+/// back, and rejects a cell that is not a FormID instead of storing zero.
+class FormIdVectorTable : public QTableWidget
+{
+public:
+    FormIdVectorTable(QVector<quint32>& values, QWidget* parent, const QString& label)
+        : QTableWidget(parent), m_values(values), m_label(label)
+    {
+        setColumnCount(1);
+        setHorizontalHeaderLabels({QStringLiteral("Form ID")});
+        horizontalHeader()->setStretchLastSection(true);
+        setSelectionBehavior(QAbstractItemView::SelectRows);
+        setObjectName(QStringLiteral("formIdVectorTable"));
+
+        // Guard so filling the table does not look like user edits and write
+        // half-populated rows back into the vector.
+        m_refreshing = true;
+        setRowCount(values.size());
+        for (int r = 0; r < values.size(); ++r)
+            setItem(r, 0, makeCell(values[r]));
+        m_refreshing = false;
+
+        connect(this, &QTableWidget::itemChanged, this, &FormIdVectorTable::onItemChanged);
+    }
+
+    void refresh()
+    {
+        m_refreshing = true;
+        setRowCount(m_values.size());
+        for (int r = 0; r < m_values.size(); ++r)
+            setItem(r, 0, makeCell(m_values[r]));
+        m_refreshing = false;
+    }
+
+    void addRow()
+    {
+        m_values.append(0);
+        refresh();
+        // Select the new row and start editing it, so the user is not left with
+        // a silent null reference they have to notice on their own.
+        setCurrentCell(m_values.size() - 1, 0);
+        editItem(item(m_values.size() - 1, 0));
+    }
+
+    void removeCurrentRow()
+    {
+        const int row = currentRow();
+        if (row >= 0 && row < m_values.size())
+        {
+            m_values.removeAt(row);
+            refresh();
+        }
+    }
+
+private:
+    static QTableWidgetItem* makeCell(quint32 value)
+    {
+        auto* cell = new QTableWidgetItem(formatFormId(value));
+        cell->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsEditable);
+        return cell;
+    }
+
+    void onItemChanged(QTableWidgetItem* item)
+    {
+        if (m_refreshing || !item)
+            return;
+        const int row = item->row();
+        if (row < 0 || row >= m_values.size())
+            return;
+        quint32 parsed = 0;
+        if (!parseFormId(item->text(), parsed))
+        {
+            // Mark the row and put the old value back rather than popping a
+            // modal dialog: a dialog per typo is both annoying and impossible
+            // to drive in a test.
+            markInvalid(item, tr("\"%1\" is not a valid FormID.").arg(item->text()));
+            return;
+        }
+        m_values[row] = parsed;
+        // Normalise what is displayed so the vector and the table agree.
+        m_refreshing = true;
+        item->setText(formatFormId(parsed));
+        clearInvalid(item);
+        m_refreshing = false;
+    }
+
+    static void markInvalid(QTableWidgetItem* item, const QString& reason)
+    {
+        item->setToolTip(reason);
+        item->setBackground(QColor(QColor::fromString(
+            QStringLiteral("#f8d7da"))));
+    }
+
+    static void clearInvalid(QTableWidgetItem* item)
+    {
+        item->setToolTip(QString());
+        item->setBackground(QBrush());
+    }
+
+    QVector<quint32>& m_values;
+    QString m_label;
+    bool m_refreshing = false;
+};
+
+/// The container variant: a Form ID plus a count.
+///
+/// This is a class rather than inline lambdas for the same reason as
+/// FormIdVectorTable: the previous inline version captured its refresh flag and
+/// its refresh function *by reference from constructor locals*, so every later
+/// cell edit read freed stack memory and silently did nothing. Members of a
+/// QObject that outlives the constructor cannot have that problem.
+class ContainerItemsTable : public QTableWidget
+{
+public:
+    ContainerItemsTable(QVector<tescomponents::TypedFormValuePair>& items, QWidget* parent)
+        : QTableWidget(parent), m_items(items)
+    {
+        setColumnCount(2);
+        setHorizontalHeaderLabels({QStringLiteral("Form ID"), QStringLiteral("Count")});
+        horizontalHeader()->setStretchLastSection(true);
+        setSelectionBehavior(QAbstractItemView::SelectRows);
+        setObjectName(QStringLiteral("containerItemsTable"));
+
+        refresh();
+        connect(this, &QTableWidget::itemChanged, this, &ContainerItemsTable::onItemChanged);
+    }
+
+    void refresh()
+    {
+        m_refreshing = true;
+        setRowCount(m_items.size());
+        for (int r = 0; r < m_items.size(); ++r)
+        {
+            setItem(r, 0, new QTableWidgetItem(formatFormId(m_items[r].formId)));
+            auto* countItem = new QTableWidgetItem(
+                QString::number(m_items[r].count));
+            countItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            setItem(r, 1, countItem);
+        }
+        m_refreshing = false;
+    }
+
+    void addRow()
+    {
+        m_items.append({0, 1});
+        refresh();
+        setCurrentCell(m_items.size() - 1, 0);
+        editItem(item(m_items.size() - 1, 0));
+    }
+
+    void removeCurrentRow()
+    {
+        const int row = currentRow();
+        if (row >= 0 && row < m_items.size())
+        {
+            m_items.removeAt(row);
+            refresh();
+        }
+    }
+
+private:
+    void onItemChanged(QTableWidgetItem* cell)
+    {
+        if (m_refreshing || !cell)
+            return;
+        const int row = cell->row();
+        if (row < 0 || row >= m_items.size())
+            return;
+
+        if (cell->column() == 0)
+        {
+            quint32 parsed = 0;
+            if (!parseFormId(cell->text(), parsed))
+            {
+                markInvalid(cell, tr("\"%1\" is not a valid FormID.").arg(cell->text()));
+                return;
+            }
+            m_items[row].formId = parsed;
+            m_refreshing = true;
+            cell->setText(formatFormId(parsed));
+            clearInvalid(cell);
+            m_refreshing = false;
+        }
+        else if (cell->column() == 1)
+        {
+            bool ok = false;
+            const int count = cell->text().toInt(&ok);
+            if (!ok || count < 0)
+            {
+                markInvalid(cell, tr("\"%1\" is not a valid item count.").arg(cell->text()));
+                return;
+            }
+            m_items[row].count = static_cast<qint32>(count);
+            // Normalise the cell in place. Calling refresh() here would delete
+            // the very QTableWidgetItem whose signal is still being delivered,
+            // and Qt would then touch freed memory as the emission unwound.
+            m_refreshing = true;
+            cell->setText(QString::number(count));
+            clearInvalid(cell);
+            m_refreshing = false;
+        }
+    }
+
+    static void markInvalid(QTableWidgetItem* cell, const QString& reason)
+    {
+        cell->setToolTip(reason);
+        cell->setBackground(QColor(QColor::fromString(QStringLiteral("#f8d7da"))));
+    }
+
+    static void clearInvalid(QTableWidgetItem* cell)
+    {
+        cell->setToolTip(QString());
+        cell->setBackground(QBrush());
+    }
+
+    QVector<tescomponents::TypedFormValuePair>& m_items;
+    bool m_refreshing = false;
+};
+
+/// Adds the Add / Remove buttons that every one of these tables needs.
+template <typename TableType>
+static void addRowButtons(QFormLayout* form, TableType* table,
+    const QString& addLabel, const QString& rowLabel)
+{
+    auto* buttons = new QHBoxLayout();
+    auto* addBtn = new QPushButton(addLabel, table);
+    QObject::connect(addBtn, &QPushButton::clicked, table, [table]() { table->addRow(); });
+    auto* rmBtn = new QPushButton(QStringLiteral("Remove"), table);
+    QObject::connect(rmBtn, &QPushButton::clicked, table, [table]() { table->removeCurrentRow(); });
+    buttons->addWidget(addBtn);
+    buttons->addWidget(rmBtn);
+    buttons->addStretch();
+    form->addRow(rowLabel, table);
+    form->addRow(QString(), buttons);
+}
 
 QVector<FormPickerEntry> formPickerEntries(Data* data)
 {
@@ -405,135 +649,37 @@ FormComponentWidget::FormComponentWidget(Component* component, QWidget* parent, 
         m_layout->addRow(prop->name() + QStringLiteral(":"), editor);
     }
 
-    // Container items: render as a table if the component is
-    // TESContainer_Component (which returns no EditorProperties
-    // and relies on this custom rendering instead).
+    // Container items: a Form ID plus a count, so it gets its own table class
+    // rather than the plain FormID one. It used to share the same defect — cell
+    // edits were dropped and Add inserted a null FormID with count 1 — and it
+    // additionally captured its refresh state by reference from a constructor
+    // local, so the itemChanged handler read freed stack memory.
     if (m_component->className() == QStringLiteral("TESContainer"))
     {
         auto* container = static_cast<tescomponents::TESContainer_Component*>(m_component);
-        auto* table = new QTableWidget(this);
-        table->setColumnCount(2);
-        table->setHorizontalHeaderLabels({QStringLiteral("Form ID"), QStringLiteral("Count")});
-        table->horizontalHeader()->setStretchLastSection(true);
-        table->setSelectionBehavior(QAbstractItemView::SelectRows);
-        auto refreshTable = [this, table, container]() {
-            table->setRowCount(0);
-            for (const auto& item : container->items)
-            {
-                int r = table->rowCount();
-                table->insertRow(r);
-                table->setItem(r, 0, new QTableWidgetItem(
-                    QStringLiteral("0x%1").arg(item.formId, 8, 16, QChar('0'))));
-                auto* ci = new QTableWidgetItem();
-                ci->setData(Qt::DisplayRole, item.count);
-                table->setItem(r, 1, ci);
-            }
-        };
-        refreshTable();
-        auto* addBtn = new QPushButton(QStringLiteral("Add Item"), this);
-        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table, container, refreshTable]() {
-            container->items.append({0, 1});
-            refreshTable();
-        });
-        auto* rmBtn = new QPushButton(QStringLiteral("Remove"), this);
-        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table, container, refreshTable]() {
-            int row = table->currentRow();
-            if (row >= 0 && row < container->items.size())
-            {
-                container->items.removeAt(row);
-                refreshTable();
-            }
-        });
-        auto* btnLayout = new QHBoxLayout();
-        btnLayout->addWidget(addBtn);
-        btnLayout->addWidget(rmBtn);
-        btnLayout->addStretch();
-        m_layout->addRow(QStringLiteral("Items:"), table);
-        m_layout->addRow(QString(), btnLayout);
+        auto* table = new ContainerItemsTable(container->items, this);
+        addRowButtons(m_layout, table, QStringLiteral("Add Item"),
+            QStringLiteral("Items:"));
     }
 
-    // Keyword form: render as a table for BGSKeywordForm_Component.
+    // Keyword, spell and container vectors. These share one helper so that cell
+    // edits are written back and a null FormID cannot be introduced.
     if (m_component->className() == QStringLiteral("BGSKeywordForm"))
     {
         auto* kw = static_cast<tescomponents::BGSKeywordForm_Component*>(m_component);
-        auto* table = new QTableWidget(this);
-        table->setColumnCount(1);
-        table->setHorizontalHeaderLabels({QStringLiteral("Keyword Form ID")});
-        table->horizontalHeader()->setStretchLastSection(true);
-        table->setSelectionBehavior(QAbstractItemView::SelectRows);
-        auto refreshTable = [this, table, kw]() {
-            table->setRowCount(0);
-            for (quint32 id : kw->keywords)
-            {
-                int r = table->rowCount();
-                table->insertRow(r);
-                table->setItem(r, 0, new QTableWidgetItem(
-                    QStringLiteral("0x%1").arg(id, 8, 16, QChar('0'))));
-            }
-        };
-        refreshTable();
-        auto* addBtn = new QPushButton(QStringLiteral("Add Keyword"), this);
-        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table, kw, refreshTable]() {
-            kw->keywords.append(0);
-            refreshTable();
-        });
-        auto* rmBtn = new QPushButton(QStringLiteral("Remove"), this);
-        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table, kw, refreshTable]() {
-            int row = table->currentRow();
-            if (row >= 0 && row < kw->keywords.size())
-            {
-                kw->keywords.removeAt(row);
-                refreshTable();
-            }
-        });
-        auto* btnLayout = new QHBoxLayout();
-        btnLayout->addWidget(addBtn);
-        btnLayout->addWidget(rmBtn);
-        btnLayout->addStretch();
-        m_layout->addRow(QStringLiteral("Keywords:"), table);
-        m_layout->addRow(QString(), btnLayout);
+        auto* table = new FormIdVectorTable(kw->keywords, this,
+            QStringLiteral("Add Keyword"));
+        addRowButtons(m_layout, table, QStringLiteral("Add Keyword"),
+            QStringLiteral("Keywords:"));
     }
 
-    // Spell list: render as a table for TESSpellList_Component.
     if (m_component->className() == QStringLiteral("TESSpellList"))
     {
         auto* sl = static_cast<tescomponents::TESSpellList_Component*>(m_component);
-        auto* table = new QTableWidget(this);
-        table->setColumnCount(1);
-        table->setHorizontalHeaderLabels({QStringLiteral("Spell Form ID")});
-        table->horizontalHeader()->setStretchLastSection(true);
-        table->setSelectionBehavior(QAbstractItemView::SelectRows);
-        auto refreshTable = [this, table, sl]() {
-            table->setRowCount(0);
-            for (quint32 id : sl->spells)
-            {
-                int r = table->rowCount();
-                table->insertRow(r);
-                table->setItem(r, 0, new QTableWidgetItem(
-                    QStringLiteral("0x%1").arg(id, 8, 16, QChar('0'))));
-            }
-        };
-        refreshTable();
-        auto* addBtn = new QPushButton(QStringLiteral("Add Spell"), this);
-        QObject::connect(addBtn, &QPushButton::clicked, this, [this, table, sl, refreshTable]() {
-            sl->spells.append(0);
-            refreshTable();
-        });
-        auto* rmBtn = new QPushButton(QStringLiteral("Remove"), this);
-        QObject::connect(rmBtn, &QPushButton::clicked, this, [this, table, sl, refreshTable]() {
-            int row = table->currentRow();
-            if (row >= 0 && row < sl->spells.size())
-            {
-                sl->spells.removeAt(row);
-                refreshTable();
-            }
-        });
-        auto* btnLayout = new QHBoxLayout();
-        btnLayout->addWidget(addBtn);
-        btnLayout->addWidget(rmBtn);
-        btnLayout->addStretch();
-        m_layout->addRow(QStringLiteral("Spells:"), table);
-        m_layout->addRow(QString(), btnLayout);
+        auto* table = new FormIdVectorTable(sl->spells, this,
+            QStringLiteral("Add Spell"));
+        addRowButtons(m_layout, table, QStringLiteral("Add Spell"),
+            QStringLiteral("Spells:"));
     }
 
     if (m_component->className() == QStringLiteral("TESBipedModel"))
