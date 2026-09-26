@@ -261,6 +261,41 @@ int main(int argc, char** argv)
     }
 
     // -----------------------------------------------------------------
+    // T4b_RegisterFactoryReplacesAndWarns
+    // Registering the same record type twice used to discard the first
+    // factory silently, which is how a dead SCEN editor stayed registered
+    // in source while a read-only view replaced it at runtime. The second
+    // registration must win, and doing it must be visible in the log.
+    // -----------------------------------------------------------------
+    {
+        mgr.closeAll();
+
+        static int firstCalls = 0;
+        static int secondCalls = 0;
+        firstCalls = 0;
+        secondCalls = 0;
+
+        mgr.registerFactory(QStringLiteral("DUP"),
+            [](FormComponents*, void*, QWidget* parent) -> QWidget* {
+                ++firstCalls;
+                return new QLabel(QStringLiteral("first"), parent);
+            });
+        mgr.registerFactory(QStringLiteral("DUP"),
+            [](FormComponents*, void*, QWidget* parent) -> QWidget* {
+                ++secondCalls;
+                return new QLabel(QStringLiteral("second"), parent);
+            });
+
+        // Only the replacement is reachable; the discarded factory is not called.
+        FormComponents components;
+        mgr.openOrFocus(QStringLiteral("0x000D0001"), QStringLiteral("DUP"), &components);
+        CHECK(mgr.openCount() == 1);
+        CHECK(secondCalls == 1);
+        CHECK(firstCalls == 0);
+        mgr.closeAll();
+    }
+
+    // -----------------------------------------------------------------
     // T5_OpenOrFocusWithFactoryCreatesDialogAndDedups
     // openOrFocus with a registered record type should still create a
     // dialog and dedup on the formIdKey. The factory is invoked

@@ -1,5 +1,6 @@
 #include "qtformdialogmanager.hpp"
 #include "qtformdialog.hpp"
+#include "../../../libs/files/log/logger.hpp"
 
 #include <QWidget>
 #include <utility>
@@ -22,8 +23,18 @@ QtFormDialogManager::~QtFormDialogManager() = default;
 void QtFormDialogManager::registerFactory(const QString& recordType,
                                            FormDataWidgetFactory factory)
 {
-    if (factory)
-        m_factories[recordType] = std::move(factory);
+    if (!factory)
+        return;
+    // Replacing a factory silently loses the previous one, which is how a dead
+    // editor ended up registered for SCEN: two registrations, the second
+    // overwrote the first, and nothing said so.
+    if (m_factories.contains(recordType))
+    {
+        LOG_WARNING(QString("QtFormDialogManager: replacing the existing custom "
+            "data widget factory for '%1'; the previous one is discarded")
+            .arg(recordType));
+    }
+    m_factories[recordType] = std::move(factory);
 }
 
 bool QtFormDialogManager::hasFactory(const QString& recordType) const

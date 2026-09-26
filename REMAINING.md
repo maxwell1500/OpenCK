@@ -1660,12 +1660,32 @@ Build a `FormPickerWidget` backed by a form index with type filtering, search,
 duplicate detection, and navigation. Give every custom widget load/validate/
 apply behavior and table models with undoable commits. Remove the overwritten
 SCEN registration or implement a persisted editor. Add offscreen Qt tests for
-each widget and picker workflow. **Status 2026-09-25 — picker core done.**
-`FormPickerWidget` now provides indexed search, type filtering, duplicate
-FormID detection, previous/next navigation, and is used by component FormID
-properties and CELL reference base-object editing. Existing custom record
-widgets still need full load/validate/apply transactions and persisted table
-models.
+each widget and picker workflow. **Status 2026-09-26 — widgets done; the
+overwritten SCEN registration removed.**
+
+`FormPickerWidget` provides indexed search, type filtering, duplicate FormID
+detection, previous/next navigation, and is used by component FormID properties
+and CELL reference base-object editing. The twelve read-only record widgets now
+have full load/validate/apply sessions (see Series 1).
+
+SCEN had two registrations, and because `registerFactory()` assigned into a hash
+the second silently discarded the first. The survivor was a `RawSubrecordWidget`
+showing the raw PHDA subrecords, so the source contained a `SceneTimelineWidget`
+that could never be reached — and that widget only ever edited a
+`QVector<ScenePhase>` it allocated itself, never reading the record or writing
+back, so wiring it up as-is would have looked editable and discarded every
+change. The dead registration is removed and SCEN now has one deliberate
+read-only view. `registerFactory()` also logs a warning when it replaces an
+existing factory, so this cannot fail quietly again, and a test pins that the
+second registration wins while the discarded factory is never called.
+
+`SceneTimelineWidget` and `ScenePhaseModel` are left in place with their own
+tests (`test_scenetimeline`, `test_scenephasemodel`) — they are working,
+tested components awaiting a persisted scene editor, not dead code.
+
+**Still open:** a persisted SCEN editor, and table models for the container,
+keyword and spell vectors that some components expose without consistently
+committing them.
 
 ### Series 6 — Archive orchestration, older BSA targets, and extraction safety
 

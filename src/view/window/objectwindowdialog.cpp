@@ -258,19 +258,6 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
                 return new LocationDataWidget(recPtr, comps, parent);
             });
         QtFormDialogManager::instance().registerFactory(
-            QStringLiteral("SCEN"),
-            [](FormComponents* comps, void* recPtr, QWidget* parent) -> QWidget* {
-                Q_UNUSED(comps);
-                // Scene timeline: phases live in the record's raw PHDA
-                // subrecords until validated against real data, so expose a
-                // phase list owned by the widget (edit-in-memory for now).
-                auto* phases = new QVector<ScenePhase>();
-                Q_UNUSED(recPtr);
-                auto* w = new SceneTimelineWidget(phases, parent);
-                w->setOwnedPhases(phases);
-                return w;
-            });
-        QtFormDialogManager::instance().registerFactory(
             QStringLiteral("EFSH"),
             [](FormComponents*, void* recPtr, QWidget* parent) -> QWidget* {
                 auto* w = new RawSubrecordWidget(parent);
@@ -286,6 +273,14 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
                     w->setSubrecords(rec->rawSubRecords);
                 return w;
             });
+        // SCEN is deliberately registered only once, as a read-only view of the
+        // raw PHDA subrecords. It previously had a second, later registration
+        // for a timeline widget that overwrote this one, and that widget only
+        // ever edited a vector it owned itself — the phases were never read
+        // from or written back to the record, so it looked editable and silently
+        // discarded every change. registerFactory() now logs a warning on
+        // replacement so that failure cannot happen quietly again. A persisted
+        // scene editor is still to be written.
         QtFormDialogManager::instance().registerFactory(
             QStringLiteral("SCEN"),
             [](FormComponents*, void* recPtr, QWidget* parent) -> QWidget* {
