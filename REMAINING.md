@@ -1672,9 +1672,9 @@ unverified and are worth recording precisely rather than as a single "needs
 testing" line:
 
 - `NiKeyframeData` (1.6+) is confirmed only against its own encoder, not
-  against a shipped animated NIF. It does not appear in any Starfield NIF, so
-  there is currently no sample of it on this machine; see the Starfield notes
-  below.
+  against a shipped animated NIF. It does not appear in any Starfield NIF, and
+  Starfield ships no HKX, so there is currently no sample of it on this
+  machine; see the Starfield notes below.
 - 218 of the 260 loose Starfield NIFs are rejected. They are third-party
   "Blender Mesh Plugin" exports, not Bethesda or Creation Kit output: the
   header parses correctly through the group table, but the exporter emits a
@@ -1705,33 +1705,62 @@ mistaken during this work and broke `test_bsawrite`, `test_xwmadecoder`,
 `test_assetresolver`, `test_archivebrowser` and `test_nifblockfile` until the
 existing suite caught it.
 
-**Starfield NIFs contain no keyframe data at all.** With BTDX reading in
-place, `test_nifblockfile` scans the shipped Starfield mesh and face archives
-and tallies every block type. Across 4,000 mesh NIFs the only blocks present
-are geometry and skinning ones: `BSGeometry`, `BSLightingShaderProperty`,
+**Starfield keeps no HKX, and animation is not in the NIF either.** With BTDX
+reading in place, every one of the 76 readable Starfield archives was tallied
+by file extension: 1,472,873 entries in total, comprising `.mesh` (685,586),
+`.wem` audio (328,603), `.ffxanim` (279,323) and `.nif` (110,124). There is
+not a single `.hkx`. An earlier note in this section named HKX as the Starfield
+animation target; that was wrong — it was an assumption, not an observation,
+and the archive census disproves it.
+
+A block-type census of 4,000 shipped Starfield mesh and face NIFs backs this
+up: the only blocks present are geometry and skinning ones (`BSGeometry`,
 `BSSkin::Instance`/`BoneData`, `SkinAttach`, `BSFaceGenNiNode`,
-`BSWeakReferenceNode`, `NiNode` and extra-data blocks. There is not a single
-`NiKeyframeController` or `NiKeyframeData` block. The NIF container itself
-round-trips these files byte for byte, so this is not a parsing failure —
-Starfield simply moved animation out of the NIF, consistent with its Havok
-based animation assets.
+`BSWeakReferenceNode`, `NiNode`, shader/extra data). No `NiKeyframeController`,
+no `NiKeyframeData`. The NIF container round-trips these files byte for byte,
+so this is not a parsing failure.
 
-Consequences worth acting on:
+Where Starfield animation actually lives is therefore still open, and the
+candidates are Starfield's own `.mesh` binary format (whose `BsMeshData`
+fragment OpenCK already decodes for geometry) and `.ffxanim` FaceFX animation,
+which `REMAINING.md` §8 already places outside the current scope. Both are
+substantially larger than the NIF work. Until one of them is parsed, the NIF
+keyframe write-back in `NifAnimationWriter` cannot serve Starfield.
 
-- The NIF keyframe write-back in `NifAnimationWriter` cannot serve Starfield
-  as it stands. Its `NiKeyframeData` codec is still unvalidated against real
-  data, and for Starfield the correct target is the HKX animation asset, not
-  the NIF. HKX parsing is the real Starfield animation task and is not
-  started.
-- Starfield mesh archives open with many weak-reference stub NIFs (a single
-  `BSWeakReferenceNode` pointing at real geometry), so anything sampling these
-  archives must skip stubs or it will conclude the wrong thing — as an earlier
-  sample of this work did.
-- `NiTransformData` (Skyrim 1.5 / Oblivion) remains the only NIF-resident
-  keyframe format reachable here, and it is still refused for writing until
-  its encoding is confirmed. That fit needs more samples of that same
-  generation, not other games: Skyrim SE 1.5 is installed and supplied 4,533
-  such blocks, and Oblivion would add more of the same format.
+**Starfield `DX10` texture archives are still unread.** BTDX reading currently
+covers `GNRL` only. The 30 texture archives (`Starfield - Textures01..11`,
+`LODTextures01/02`, `GeneratedTextures`, and the per-quest `*- Textures.ba2`)
+fail to open: they use the `DX10` type tag with a 24-byte declaration that
+carries mipmap counts and per-chunk records instead of the single offset/size
+pair. Their data is raw DDS without the 128-byte header, so a reader also has
+to rebuild that header. This is a clean, well-specified extension of the
+existing BTDX reader and the obvious next piece of archive work.
+
+**Starfield mesh archives open with many weak-reference stub NIFs** (a single
+`BSWeakReferenceNode` pointing at real geometry), so anything sampling these
+archives must skip stubs or it will conclude the wrong thing — as an earlier
+sample of this work did.
+
+**`NiTransformData` (Skyrim 1.5 / Oblivion) remains the only NIF-resident
+keyframe format reachable here**, and it is still refused for writing until its
+encoding is confirmed. Hand-decoding samples was not converging, so this is now
+approached as a fit rather than a guess: `test_ntdlayout` pulls every reachable
+`NiTransformData` block and tries all 24 candidate layouts (six channel
+orderings x first-key-carries-time x counts-up-front), keeping only a layout
+that consumes *every* block exactly. A layout that fits some blocks but not all
+is reported and deliberately left unproven. Run it when a Skyrim archive is
+resident. Oblivion would add more samples of the same generation; it is not
+installed on this machine.
+
+**The game folders are on-demand installs, and that makes the archive tests
+flaky.** Individual `.ba2` files flip between resident and evicted between runs
+and even between processes launched back to back — `QFile::exists` and a direct
+`QFile::open` return "cannot find the file" for a path that PowerShell opens
+fine a second later. `test_bsaarchive` now warms each archive (a small read
+forces the rehydration) and retries before failing, which is what keeps the
+suite green while heavy scanning is in progress. Tests that need these files
+should use the same helper rather than assuming the file is present, and must
+skip rather than fail when the game is absent.
 
 ### Beyond §9 — local CK/tool compatibility gaps
 

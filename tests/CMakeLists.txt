@@ -196,7 +196,7 @@ target_link_libraries(test_compressedrecord PRIVATE openck_esm Qt6::Test Qt6::Zl
 target_include_directories(test_compressedrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_compressedrecord)
 
-# Starfield ESM direct test (needs a real Starfield.esm â€” skips via CTest gate).
+# Starfield ESM direct test (needs a real Starfield.esm ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â skips via CTest gate).
 add_executable(test_starfieldesm test_starfieldesm.cpp)
 target_link_libraries(test_starfieldesm PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_starfieldesm PRIVATE ${TEST_INCLUDE_DIRS})
@@ -292,7 +292,7 @@ target_include_directories(test_meshprobe PRIVATE ${TEST_INCLUDE_DIRS})
 # Always exits 0 (reports "open failed" when the archive is absent).
 openck_add_test(test_meshprobe)
 
-# Diagnostic: find/extract files in a BA2 by path substring (Â§8.3: resolve
+# Diagnostic: find/extract files in a BA2 by path substring (Ãƒâ€šÃ‚Â§8.3: resolve
 # the external .mesh paths shipped BSGeometry blocks carry).
 # Not registered with CTest (needs a real game install).
 add_executable(test_meshresolve test_meshresolve.cpp)
@@ -304,10 +304,10 @@ target_include_directories(test_meshresolve PRIVATE ${TEST_INCLUDE_DIRS})
 add_executable(test_subrecord_diff test_subrecord_diff.cpp)
 target_link_libraries(test_subrecord_diff PRIVATE openck_esm Qt6::Core)
 target_include_directories(test_subrecord_diff PRIVATE ${TEST_INCLUDE_DIRS})
-# Not registered with CTest by default â€” needs a real Starfield install.
+# Not registered with CTest by default ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â needs a real Starfield install.
 
-# Full-scale untouched round-trip gate (REMAINING.md Â§1.2). Standalone CLI,
-# driven by tools/nightly-roundtrip.ps1 â€” far too slow for CTest.
+# Full-scale untouched round-trip gate (REMAINING.md Ãƒâ€šÃ‚Â§1.2). Standalone CLI,
+# driven by tools/nightly-roundtrip.ps1 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â far too slow for CTest.
 add_executable(test_fullscale_roundtrip test_fullscale_roundtrip.cpp)
 target_link_libraries(test_fullscale_roundtrip PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_fullscale_roundtrip PRIVATE ${TEST_INCLUDE_DIRS})
@@ -415,6 +415,12 @@ target_include_directories(test_qtformdialog PRIVATE
 )
 openck_add_test(test_qtformdialog)
 
+
+# Fits the Skyrim 1.5 / Oblivion NiTransformData layout against real blocks.
+add_executable(test_ntdlayout test_ntdlayout.cpp)
+target_link_libraries(test_ntdlayout PRIVATE openck_files Qt6::Test)
+target_include_directories(test_ntdlayout PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_ntdlayout)
 # Bethesda NIF container: locks the block header layout against shipped files.
 add_executable(test_nifblockfile test_nifblockfile.cpp)
 target_link_libraries(test_nifblockfile PRIVATE openck_files Qt6::Test)
