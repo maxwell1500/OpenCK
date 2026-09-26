@@ -1,12 +1,13 @@
-#include "formcomponentsresolver.hpp"
-#include "componentrecordtypes.hpp"
+#include "recordpaste.hpp"
 
-#include "../../../libs/components/formcomponents.hpp"
-#include "../../view/window/recordeditsession.hpp"
+#include "addrecordcommand.hpp"
+#include "componentrecordtypes.hpp"
+#include "undostack.hpp"
 
 #include "../world/basecollection.hpp"
 #include "../world/collection.hpp"
-
+#include "../world/idtable.hpp"
+#include "../world/record.hpp"
 
 #include "../../../libs/files/esm/actirecord.hpp"
 #include "../../../libs/files/esm/actorvalueinforecord.hpp"
@@ -208,57 +209,72 @@
 #include "../../../libs/files/esm/wthsrecord.hpp"
 #include "../../../libs/files/esm/wwedrecord.hpp"
 #include "../../../libs/files/esm/zoomrecord.hpp"
-
+namespace openck {
 namespace {
+
 template <typename T>
-bool tryResolveComponents(BaseCollection* coll, int recordIndex,
-                          openck::FormComponents*& components, void*& recordPtr)
+bool tryCopyRecordForPaste(BaseCollection* coll, int recordIndex,
+                           const QString& editorId, quint32 formId,
+                           std::unique_ptr<BaseRecord>& out)
 {
     auto* typed = dynamic_cast<Collection<T>*>(coll);
     if (!typed)
         return false;
     if (recordIndex < 0 || recordIndex >= typed->size())
         return false;
-    auto& record = typed->getRecord(recordIndex).get();
-    components = &record.components;
-    recordPtr = &record;
+    std::unique_ptr<BaseRecord> copy = typed->cloneRecordAt(recordIndex);
+    if (!copy)
+        return false;
+    auto* typedCopy = static_cast<Record<T>*>(copy.get());
+    typedCopy->get().editorId = editorId;
+    typedCopy->get().formId = formId;
+    // The pasted record is new, so it must not inherit the source's flags:
+    // a base record that was never modified becomes modified-only.
+    typedCopy->state = State_ModifiedOnly;
+    out = std::move(copy);
     return true;
 }
 
 template <typename T>
-bool tryResolveEditSession(BaseCollection* coll, int recordIndex,
-                           UndoStack* undoStack, const QString& description,
-                           std::unique_ptr<openck::RecordEditSession>& session)
+bool tryAddRecordCopy(BaseCollection* coll, int recordIndex,
+                      const QString& editorId, quint32 formId,
+                      IdTable* table, UndoStack* stack,
+                      const QString& description)
 {
-    auto* typed = dynamic_cast<Collection<T>*>(coll);
-    if (!typed)
+    std::unique_ptr<BaseRecord> copy;
+    if (!tryCopyRecordForPaste<T>(coll, recordIndex, editorId, formId, copy))
         return false;
-    if (recordIndex < 0 || recordIndex >= typed->size())
+    if (!table || !stack)
         return false;
-    session = std::make_unique<openck::TypedRecordEditSession<T>>(
-        typed, recordIndex, undoStack, description);
+    auto* typed = static_cast<Collection<T>*>(coll);
+    stack->push(new AddRecordCommand(table, coll,
+        typed->getAppendIndex(editorId, CkId::Type_None), *copy, description));
     return true;
 }
 
 } // namespace
 
-bool resolveComponents(BaseCollection* coll, int recordIndex,
-                       openck::FormComponents*& components, void*& recordPtr)
+bool copyRecordForPaste(BaseCollection* coll, int recordIndex,
+                        const QString& editorId, quint32 formId,
+                        std::unique_ptr<BaseRecord>& out)
 {
-#define RESOLVE_RECORD_TYPE(recType) \
-    if (tryResolveComponents<recType>(coll, recordIndex, components, recordPtr)) return true;
-    FOR_EACH_COMPONENT_RECORD_TYPE(RESOLVE_RECORD_TYPE)
-#undef RESOLVE_RECORD_TYPE
+#define PASTE_COPY_TYPE(recType) \
+    if (tryCopyRecordForPaste<recType>(coll, recordIndex, editorId, formId, out)) return true;
+    FOR_EACH_COMPONENT_RECORD_TYPE(PASTE_COPY_TYPE)
+#undef PASTE_COPY_TYPE
     return false;
 }
 
-bool resolveEditSession(BaseCollection* coll, int recordIndex,
-                        UndoStack* undoStack, const QString& description,
-                        std::unique_ptr<openck::RecordEditSession>& session)
+bool addRecordCopyThroughUndo(BaseCollection* coll, int recordIndex,
+                              const QString& editorId, quint32 formId,
+                              IdTable* table, UndoStack* stack,
+                              const QString& description)
 {
-#define RESOLVE_SESSION_TYPE(recType) \
-    if (tryResolveEditSession<recType>(coll, recordIndex, undoStack, description, session)) return true;
-    FOR_EACH_COMPONENT_RECORD_TYPE(RESOLVE_SESSION_TYPE)
-#undef RESOLVE_SESSION_TYPE
+#define PASTE_ADD_TYPE(recType) \
+    if (tryAddRecordCopy<recType>(coll, recordIndex, editorId, formId, table, stack, description)) return true;
+    FOR_EACH_COMPONENT_RECORD_TYPE(PASTE_ADD_TYPE)
+#undef PASTE_ADD_TYPE
     return false;
 }
+
+} // namespace openck

@@ -32,6 +32,10 @@ public:
         int recordType;
         QString editorId;
         quint32 formId;
+        // Where the copied record lives, so Paste can duplicate the whole
+        // record rather than the hand-listed fields below. The collection is
+        // re-resolved from recordType at paste time, so this cannot dangle.
+        int sourceRecordIndex = -1;
         QJsonObject fields;
     };
 

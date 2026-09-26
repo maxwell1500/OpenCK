@@ -1593,13 +1593,40 @@ Add a new-plugin wizard for game, active master order, plugin/light type,
 author, and next local FormID. Add a table-driven blank-record factory for
 Object Window categories with defaults and required components, and route all
 creation through `AddRecordCommand` with valid ID allocation. Synthetic tests
-must cover header masters, game detection, local IDs, save/reload, and undo. **Status
-2026-09-25 — core done.** The new-plugin flow now collects game, active master
-order, plugin/light type, author, and next local FormID; configured headers save
-and reload correctly. `BlankRecordFactory` plus `AddRecordCommand` covers GLOB,
-GMST, NPC_, RACE, CLAS, and FACT creation, and paste paths allocate nonzero IDs.
-The remaining work is routing legacy type-specific paste branches through undo
-commands and broadening the factory to every Object Window category.
+must cover header masters, game detection, local IDs, save/reload, and undo.
+**Status 2026-09-26 — paste done; factory breadth remains.**
+
+Paste is now a single generic path. `ObjectWindowDialog::pasteRecord()` used to
+run about thirty hand-written per-type branches that rebuilt a record field by
+field from a `QJsonObject` clipboard — copying only the fields each branch
+happened to list — and then added it through a type-specific `mData->addXxx()`
+that never entered the undo stack. The branch list could not keep up with the
+record types, and a paste could not be undone. `recordpaste.cpp` now deep-copies
+the source record, stamps the new editor ID and FormID, marks it
+`State_ModifiedOnly` so it does not inherit the source's flags, and pushes
+`AddRecordCommand`. The whole `FormComponents` set travels, which the JSON map
+could not carry, and roughly 550 lines of per-type branches are gone.
+
+The record-type list is now a shared macro (`componentrecordtypes.hpp`) used by
+both the resolver and the paste path, so the two cannot drift apart. The
+clipboard records the source record's index rather than a collection pointer,
+which cannot dangle; the collection is re-resolved from the type at paste time.
+
+`test_recordpaste` covers that every field and the component set travel, that the
+copy is independent of its source, that the copy is marked modified-only, that
+out-of-range indexes are rejected, that the add is undoable and redoable, and
+that it fails cleanly without an undo stack or table model. NPC_, RACE, SOUN and
+WTHR are all exercised.
+
+**Known simplification:** paste copies the record as it stands at paste time
+rather than as it stood at copy time, so editing the source in between changes
+what is pasted, and deleting it makes paste fail with a message. The real CK's
+clipboard holds a snapshot. Making the clipboard carry a deep copy would need a
+type-erased snapshot in the static clipboard, which is straightforward but was
+not needed for the undo fix.
+
+**Still open:** broadening `BlankRecordFactory` beyond GLOB, GMST, NPC_, RACE,
+CLAS and FACT to every Object Window category.
 
 ### Series 5 — Record-specific tabs and real form pickers
 

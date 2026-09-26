@@ -10,6 +10,7 @@
 #include "../../model/tools/editrecordcommand.hpp"
 #include "../../model/tools/addrecordcommand.hpp"
 #include "../../model/tools/blankrecordfactory.hpp"
+#include "../../model/tools/recordpaste.hpp"
 #include "../../model/world/idtable.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../view/messageboxhelper.hpp"
@@ -1994,6 +1995,7 @@ void ObjectWindowDialog::copyRecord()
     ClipboardRecord record;
     record.recordType = static_cast<int>(type);
     record.editorId = editorId;
+    record.sourceRecordIndex = recordIndex;
 
     switch (type)
     {
@@ -2515,7 +2517,24 @@ void ObjectWindowDialog::pasteRecord()
     if (!ok || newId.isEmpty())
         return;
 
-    bool created = false;
+    // Resolve the source from the clipboard's recorded type and index rather
+    // than holding a collection pointer, which could outlive the collection.
+    BaseCollection* source = mData->getCollectionByType(type);
+    if (!source || clipData.sourceRecordIndex < 0
+        || clipData.sourceRecordIndex >= source->size())
+    {
+        QMessageBox::warning(this, tr("Paste Failed"),
+            tr("The copied record is no longer available."));
+        return;
+    }
+
+    if (source->searchId(newId) >= 0)
+    {
+        QMessageBox::warning(this, tr("Paste Failed"),
+            tr("A record with Editor ID '%1' already exists.").arg(newId));
+        return;
+    }
+
     quint32 newFormId = 0;
     try
     {
@@ -2528,596 +2547,32 @@ void ObjectWindowDialog::pasteRecord()
         return;
     }
 
-    switch (type)
+    auto* table = qobject_cast<IdTable*>(mData->getTableModel(type));
+    if (!table || !mData->getUndoStack())
     {
-    case CkId::Type_Npc_:
-    {
-        auto& collection = mData->getNpcCollection();
-        NpcRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("fullName"))
-            newRecord.fullName = clipData.fields["fullName"].toString();
-        if (clipData.fields.contains("level"))
-            newRecord.level = static_cast<quint32>(clipData.fields["level"].toInt());
-        if (clipData.fields.contains("health"))
-            newRecord.health = static_cast<quint32>(clipData.fields["health"].toDouble());
-        if (clipData.fields.contains("magicka"))
-            newRecord.magicka = static_cast<quint32>(clipData.fields["magicka"].toDouble());
-        if (clipData.fields.contains("stamina"))
-            newRecord.stamina = static_cast<quint32>(clipData.fields["stamina"].toDouble());
-        if (clipData.fields.contains("intelligence"))
-            newRecord.intelligence = static_cast<quint32>(clipData.fields["intelligence"].toInt());
-        if (clipData.fields.contains("race"))
-            newRecord.race = static_cast<quint32>(clipData.fields["race"].toInt());
-        if (clipData.fields.contains("sex"))
-            newRecord.sex = static_cast<quint32>(clipData.fields["sex"].toInt());
-        if (clipData.fields.contains("class"))
-            newRecord.class_ = static_cast<quint32>(clipData.fields["class"].toInt());
-        if (clipData.fields.contains("faction"))
-            newRecord.faction = static_cast<quint32>(clipData.fields["faction"].toInt());
-
-        if (mData->addNpc(newRecord))
-        {
-            LOG_INFO(QString("NPC '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Weap_:
-    {
-        auto& collection = mData->getWeaponCollection();
-        WeaponRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("damage"))
-            newRecord.damage = static_cast<float>(clipData.fields["damage"].toDouble());
-        if (clipData.fields.contains("speed"))
-            newRecord.speed = static_cast<float>(clipData.fields["speed"].toDouble());
-        if (clipData.fields.contains("reach"))
-            newRecord.reach = static_cast<float>(clipData.fields["reach"].toDouble());
-        if (clipData.fields.contains("weight"))
-            newRecord.weight = static_cast<float>(clipData.fields["weight"].toDouble());
-        if (clipData.fields.contains("value"))
-            newRecord.value = static_cast<quint32>(clipData.fields["value"].toInt());
-        if (clipData.fields.contains("weaponType"))
-            newRecord.weaponType = static_cast<quint32>(clipData.fields["weaponType"].toInt());
-
-        if (mData->addWeapon(newRecord))
-        {
-            LOG_INFO(QString("Weapon '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Armor_:
-    {
-        auto& collection = mData->getArmorCollection();
-        ArmorRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("armorRating"))
-            newRecord.armorRating = static_cast<quint32>(clipData.fields["armorRating"].toInt());
-        if (clipData.fields.contains("weight"))
-            newRecord.weight = static_cast<float>(clipData.fields["weight"].toDouble());
-        if (clipData.fields.contains("value"))
-            newRecord.value = static_cast<quint32>(clipData.fields["value"].toInt());
-        if (clipData.fields.contains("health"))
-            newRecord.health = static_cast<float>(clipData.fields["health"].toDouble());
-
-        if (mData->addArmor(newRecord))
-        {
-            LOG_INFO(QString("Armor '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Spel_:
-    {
-        auto& collection = mData->getSpellCollection();
-        SpellRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("cost"))
-            newRecord.cost = static_cast<quint32>(clipData.fields["cost"].toInt());
-        if (clipData.fields.contains("castingSound"))
-            newRecord.castingSound = static_cast<quint32>(clipData.fields["castingSound"].toInt());
-
-        if (mData->addSpell(newRecord))
-        {
-            LOG_INFO(QString("Spell '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Quest_:
-    {
-        auto& collection = mData->getQuestCollection();
-        QuestRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("questName"))
-            newRecord.questName = clipData.fields["questName"].toString();
-        if (clipData.fields.contains("questDesc"))
-            newRecord.questDesc = clipData.fields["questDesc"].toString();
-        if (clipData.fields.contains("questType"))
-            newRecord.questType = static_cast<quint32>(clipData.fields["questType"].toInt());
-        if (clipData.fields.contains("dialogueView"))
-            newRecord.dialogueView = clipData.fields["dialogueView"].toString();
-
-        if (mData->addQuest(newRecord))
-        {
-            LOG_INFO(QString("Quest '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Glob_:
-    {
-        auto& collection = mData->getGlobCollection();
-        GlobalVariable newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("value"))
-            newRecord.value.setFloat(static_cast<float>(clipData.fields["value"].toDouble()));
-        collection.add(newRecord);
-        LOG_INFO(QString("Global '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Tree_:
-    {
-        auto& collection = mData->getTreeCollection();
-        TreeRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Tree '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Stat_:
-    {
-        auto& collection = mData->getStatCollection();
-        StatRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Stat '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Acti_:
-    {
-        auto& collection = mData->getActiCollection();
-        ActiRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Acti '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Misc_:
-    {
-        auto& collection = mData->getMiscCollection();
-        MiscRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        if (clipData.fields.contains("weight"))
-            newRecord.weight = static_cast<float>(clipData.fields["weight"].toDouble());
-        if (clipData.fields.contains("value"))
-            newRecord.value = static_cast<quint32>(clipData.fields["value"].toInt());
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Misc '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Alch_:
-    {
-        auto& collection = mData->getAlchCollection();
-        AlchRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        if (clipData.fields.contains("weight"))
-            newRecord.weight = static_cast<float>(clipData.fields["weight"].toDouble());
-        if (clipData.fields.contains("value"))
-            newRecord.value = static_cast<quint32>(clipData.fields["value"].toInt());
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Alch '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Ingr_:
-    {
-        auto& collection = mData->getIngrCollection();
-        IngrRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        if (clipData.fields.contains("weight"))
-            newRecord.weight = static_cast<float>(clipData.fields["weight"].toDouble());
-        if (clipData.fields.contains("value"))
-            newRecord.value = static_cast<quint32>(clipData.fields["value"].toInt());
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Ingr '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Book_:
-    {
-        auto& collection = mData->getBookCollection();
-        BookRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        if (clipData.fields.contains("pageCount"))
-            newRecord.pageCount = clipData.fields["pageCount"].toInt();
-        if (clipData.fields.contains("pages"))
-            newRecord.pages = clipData.fields["pages"].toString();
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Book '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Ench_:
-    {
-        auto& collection = mData->getEnchCollection();
-        EnchRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("name"))
-            newRecord.name = clipData.fields["name"].toString();
-        if (clipData.fields.contains("costLimit"))
-            newRecord.costLimit = static_cast<quint32>(clipData.fields["costLimit"].toInt());
-        if (clipData.fields.contains("charges"))
-            newRecord.charges = static_cast<quint32>(clipData.fields["charges"].toInt());
-        if (clipData.fields.contains("enchantmentData"))
-            newRecord.enchantmentData = static_cast<quint32>(clipData.fields["enchantmentData"].toInt());
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Ench '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Cont_:
-    {
-        auto& collection = mData->getContCollection();
-        ContRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        if (clipData.fields.contains("contents"))
-            newRecord.contents = static_cast<quint32>(clipData.fields["contents"].toInt());
-        if (clipData.fields.contains("inventoryControl"))
-            newRecord.inventoryControl = static_cast<quint32>(clipData.fields["inventoryControl"].toInt());
-        if (clipData.fields.contains("weight"))
-            newRecord.weight = static_cast<float>(clipData.fields["weight"].toDouble());
-        if (clipData.fields.contains("value"))
-            newRecord.value = static_cast<quint32>(clipData.fields["value"].toInt());
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Cont '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Race_:
-    {
-        auto& collection = mData->getRaceCollection();
-        RaceRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("raceFlags"))
-            newRecord.raceFlags = static_cast<quint32>(clipData.fields["raceFlags"].toInt());
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Race '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_PerK_:
-    {
-        auto& collection = mData->getPerkCollection();
-        PerkRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("description"))
-            newRecord.description = clipData.fields["description"].toString();
-        if (clipData.fields.contains("requirements"))
-            newRecord.requirements = clipData.fields["requirements"].toString();
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Perk '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Magic_:
-    {
-        auto& collection = mData->getMagicCollection();
-        MagicRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("schools"))
-            newRecord.schools = static_cast<quint32>(clipData.fields["schools"].toInt());
-        if (clipData.fields.contains("damageType"))
-            newRecord.damageType = static_cast<quint32>(clipData.fields["damageType"].toInt());
-        if (clipData.fields.contains("castingSound"))
-            newRecord.castingSound = static_cast<quint32>(clipData.fields["castingSound"].toInt());
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        if (clipData.fields.contains("modelPath"))
-            newRecord.modelPath = clipData.fields["modelPath"].toString();
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Magic '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Pack_:
-    {
-        auto& collection = mData->getPackCollection();
-        PackageRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("packageType"))
-            newRecord.packageType = static_cast<quint32>(clipData.fields["packageType"].toInt());
-        if (clipData.fields.contains("targetType"))
-            newRecord.targetType = static_cast<quint32>(clipData.fields["targetType"].toInt());
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Package '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Lcrt_:
-    {
-        auto& collection = mData->getLcrtCollection();
-        LocationRefType newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("color"))
-            newRecord.color = static_cast<uint32_t>(clipData.fields["color"].toInt());
-        collection.add(newRecord);
-        LOG_INFO(QString("LocationRef '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Class_:
-    {
-        auto& collection = mData->getClassCollection();
-        ClassRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("className"))
-            newRecord.className = clipData.fields["className"].toString();
-        if (clipData.fields.contains("description"))
-            newRecord.description = clipData.fields["description"].toString();
-        if (clipData.fields.contains("serviceFlags"))
-            newRecord.serviceFlags = static_cast<quint32>(clipData.fields["serviceFlags"].toInt());
-        if (clipData.fields.contains("iconPath"))
-            newRecord.iconPath = clipData.fields["iconPath"].toString();
-        newRecord.rawSubRecords.clear();
-        collection.add(newRecord);
-        LOG_INFO(QString("Class '%1' pasted").arg(newId));
-        created = true;
-        break;
-    }
-    case CkId::Type_Cel_:
-    {
-        auto& collection = mData->getCellCollection();
-        CellRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("cellName"))
-            newRecord.cellName = clipData.fields["cellName"].toString();
-        if (clipData.fields.contains("cellX"))
-            newRecord.cellX = static_cast<qint32>(clipData.fields["cellX"].toInt());
-        if (clipData.fields.contains("cellY"))
-            newRecord.cellY = static_cast<qint32>(clipData.fields["cellY"].toInt());
-        if (clipData.fields.contains("owner"))
-            newRecord.owner = static_cast<quint32>(clipData.fields["owner"].toInt());
-        if (clipData.fields.contains("lockLevel"))
-            newRecord.lockLevel = static_cast<quint32>(clipData.fields["lockLevel"].toInt());
-        newRecord.rawSubRecords.clear();
-        if (mData->addCell(newRecord))
-        {
-            LOG_INFO(QString("Cell '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_WRLD_:
-    {
-        auto& collection = mData->getWorldspaceCollection();
-        WorldspaceRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("waterType"))
-            newRecord.waterType = static_cast<quint32>(clipData.fields["waterType"].toInt());
-        newRecord.rawSubRecords.clear();
-        if (mData->addWorldspace(newRecord))
-        {
-            LOG_INFO(QString("Worldspace '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_LOCT_:
-    {
-        auto& collection = mData->getLocationCollection();
-        LocationRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("locationName"))
-            newRecord.locationName = clipData.fields["locationName"].toString();
-        if (clipData.fields.contains("parentId"))
-            newRecord.parentId = static_cast<quint32>(clipData.fields["parentId"].toInt());
-        if (clipData.fields.contains("x"))
-            newRecord.x = static_cast<quint32>(clipData.fields["x"].toInt());
-        if (clipData.fields.contains("y"))
-            newRecord.y = static_cast<quint32>(clipData.fields["y"].toInt());
-        if (clipData.fields.contains("z"))
-            newRecord.z = static_cast<quint32>(clipData.fields["z"].toInt());
-        newRecord.rawSubRecords.clear();
-        if (mData->addLocation(newRecord))
-        {
-            LOG_INFO(QString("Location '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Plnt_:
-    {
-        auto& collection = mData->getPlanetCollection();
-        PndRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("starSystem"))
-            newRecord.starSystem = clipData.fields["starSystem"].toString();
-        if (clipData.fields.contains("temperature"))
-            newRecord.temperature = clipData.fields["temperature"].toDouble();
-        if (clipData.fields.contains("density"))
-            newRecord.density = clipData.fields["density"].toDouble();
-        if (clipData.fields.contains("phase"))
-            newRecord.phase = clipData.fields["phase"].toDouble();
-        if (clipData.fields.contains("resources"))
-            newRecord.resources = static_cast<quint32>(clipData.fields["resources"].toInt());
-        newRecord.mOrder.clear();
-        newRecord.rawSubRecords.clear();
-        if (mData->addPlanet(newRecord))
-        {
-            LOG_INFO(QString("Planet '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Refr_:
-    {
-        auto& collection = mData->getRefrCollection();
-        RefrRecord newRecord;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("baseId"))
-            newRecord.baseId = static_cast<quint32>(clipData.fields["baseId"].toInt());
-        if (clipData.fields.contains("posX"))
-            newRecord.posX = static_cast<float>(clipData.fields["posX"].toDouble());
-        if (clipData.fields.contains("posY"))
-            newRecord.posY = static_cast<float>(clipData.fields["posY"].toDouble());
-        if (clipData.fields.contains("posZ"))
-            newRecord.posZ = static_cast<float>(clipData.fields["posZ"].toDouble());
-        if (clipData.fields.contains("rotX"))
-            newRecord.rotX = static_cast<float>(clipData.fields["rotX"].toDouble());
-        if (clipData.fields.contains("rotY"))
-            newRecord.rotY = static_cast<float>(clipData.fields["rotY"].toDouble());
-        if (clipData.fields.contains("rotZ"))
-            newRecord.rotZ = static_cast<float>(clipData.fields["rotZ"].toDouble());
-        if (clipData.fields.contains("scale"))
-            newRecord.scale = static_cast<float>(clipData.fields["scale"].toDouble());
-        if (clipData.fields.contains("owner"))
-            newRecord.owner = static_cast<quint32>(clipData.fields["owner"].toInt());
-        if (clipData.fields.contains("lockLevel"))
-            newRecord.lockLevel = static_cast<quint32>(clipData.fields["lockLevel"].toInt());
-        if (clipData.fields.contains("initiallyDisabled"))
-            newRecord.initiallyDisabled = clipData.fields["initiallyDisabled"].toBool();
-        newRecord.rawSubRecords.clear();
-        if (mData->addRef(newRecord))
-        {
-            LOG_INFO(QString("Reference '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Dial_:
-    {
-        auto& collection = mData->getDialCollection();
-        DialRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("topicName"))
-            newRecord.topicName = clipData.fields["topicName"].toString();
-        
-        if (mData->addDial(newRecord))
-        {
-            LOG_INFO(QString("Dialogue '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    case CkId::Type_Info_:
-    {
-        auto& collection = mData->getInfoCollection();
-        InfoRecord newRecord;
-        newRecord.editorId = newId;
-        newRecord.formId = newFormId;
-        if (clipData.fields.contains("responseText"))
-            newRecord.responseText = clipData.fields["responseText"].toString();
-        
-        if (mData->addInfo(newRecord))
-        {
-            LOG_INFO(QString("Dialogue Info '%1' pasted").arg(newId));
-            created = true;
-        }
-        break;
-    }
-    default:
-    {
-        if (mData->cloneRecord(type, clipData.editorId, newId))
-        {
-            LOG_INFO(QString("Generic paste: %1 '%2' -> '%3'")
-                .arg(CkId(type).getTypeName()).arg(clipData.editorId).arg(newId));
-            created = true;
-        }
-        break;
-    }
+        QMessageBox::warning(this, tr("Paste Record"), tr("The record could not be added."));
+        return;
     }
 
-    if (created)
-    {
-
-        QMessageBox::information(this, "Paste",
-            QString("Record '%1' pasted successfully.").arg(newId));
-        mModel->setData(mData);
-    }
-    else
+    // Paste duplicates the whole record, not the handful of fields the
+    // clipboard's JSON map happened to list, and it goes through the undo
+    // stack so Ctrl+Z removes it again.
+    if (!openck::addRecordCopyThroughUndo(source, clipData.sourceRecordIndex,
+                                          newId, newFormId, table, mData->getUndoStack(),
+                                          QString("Paste record: %1").arg(newId)))
     {
         QMessageBox::warning(this, "Paste Failed",
-            QString("Could not paste record as '%1'.\n\nThe ID may already exist.").arg(newId));
+            QString("Could not paste record as '%1'.").arg(newId));
+        return;
     }
-}
 
+    LOG_INFO(QString("Pasted %1 '%2' -> '%3' with FormID 0x%4")
+        .arg(CkId(type).getTypeName()).arg(clipData.editorId).arg(newId)
+        .arg(newFormId, 8, 16, QChar('0')));
+    QMessageBox::information(this, "Paste",
+        QString("Record '%1' pasted successfully.").arg(newId));
+    mModel->setData(mData);
+}
 void ObjectWindowDialog::enableMultiSelect(bool enabled)
 {
     if (enabled)
