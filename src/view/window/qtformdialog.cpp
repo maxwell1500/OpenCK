@@ -156,6 +156,8 @@ bool QtFormDialog::commitChanges()
 
 void QtFormDialog::onOk()
 {
+    // commitChanges() returning false only means the working set was left
+    // untouched, which is not a failure — OK must still close the dialog.
     onApply();
     accept();
 }

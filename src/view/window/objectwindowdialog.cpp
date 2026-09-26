@@ -8,6 +8,7 @@
 #include "../../model/world/collection.hpp"
 #include "../../model/world/idcollection.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/editcomponentscommand.hpp"
 #include "../../model/tools/addrecordcommand.hpp"
 #include "../../model/tools/blankrecordfactory.hpp"
 #include "../../model/world/idtable.hpp"
@@ -735,8 +736,31 @@ void ObjectWindowDialog::editSelected()
                         : QStringLiteral("%1|%2").arg(editorId, QStringLiteral("0"));
                     const NAME code = Data::recordNameForType(type);
                     const QString recordType = QStringLiteral("T3:") + nameToQString(code);
+                    // The Morrowind route only holds a BaseCollection, so it
+                    // cannot use the typed EditRecordCommand. Route the commit
+                    // through the type-erased command so the edit still lands
+                    // on the undo stack; without this the dialog's fallback
+                    // wrote straight into the live record's components.
+                    auto commit = [this, coll, recordIndex, recordType](
+                        const openck::FormComponents& edited) {
+                        auto* cmd = new EditComponentsCommand(
+                            coll, recordIndex, edited,
+                            QStringLiteral("Edit %1").arg(recordType));
+                        if (!cmd->captureBefore())
+                        {
+                            delete cmd;
+                            return;
+                        }
+                        if (mData->getUndoStack())
+                            mData->getUndoStack()->push(cmd);
+                        else
+                        {
+                            cmd->execute();
+                            delete cmd;
+                        }
+                    };
                     openck::QtFormDialogManager::instance().openOrFocus(
-                        formIdKey, recordType, comps, recPtr, this, {}, mData);
+                        formIdKey, recordType, comps, recPtr, this, std::move(commit), mData);
                     return;
                 }
             }

@@ -106,6 +106,11 @@ target_include_directories(test_columnvalidator PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_columnvalidator)
 
 # EditRecordCommand tests
+# Type-erased component edit: the Morrowind Object Window edit route.
+add_executable(test_editcomponentscommand test_editcomponentscommand.cpp)
+target_link_libraries(test_editcomponentscommand PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_editcomponentscommand PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_editcomponentscommand)
 add_executable(test_editrecordcommand test_editrecordcommand.cpp)
 target_link_libraries(test_editrecordcommand PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_editrecordcommand PRIVATE ${TEST_INCLUDE_DIRS})

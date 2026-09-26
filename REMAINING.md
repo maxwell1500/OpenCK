@@ -1481,15 +1481,34 @@ undo stack.
 Replace this with a working-copy edit session: clone the record/components,
 bind the dialog to the copy, validate and compare on OK, push
 `EditRecordCommand` only after a successful commit, and discard on Cancel or
-close. **Status 2026-09-25 — core generic path done.** `QtFormDialog` now edits a
-cloned `FormComponents` working set, commits through a typed callback, and
-discards on Cancel. `ObjectWindowDialog` routes component-backed record cases
-through `EditRecordCommand`; `test_qtformdialog` covers OK commit and Cancel
-rollback. Custom record-specific widgets, the type-erased default resolver,
-and the TES3 early route still need the same full-record session contract.
+close. **Status 2026-09-25 — core generic path done, Morrowind route done.**
+`QtFormDialog` now edits a cloned `FormComponents` working set, commits through
+a typed callback, and discards on Cancel. `ObjectWindowDialog` routes
+component-backed record cases through `EditRecordCommand`; `test_qtformdialog`
+covers OK commit and Cancel rollback.
 
-Acceptance requires synthetic OK/Cancel/undo/redo tests proving base
-records become modified only after commit.
+The Morrowind branch of `editSelected()` could not use that path: it only holds
+a `BaseCollection`, not a typed collection, so it passed an *empty* commit
+callback and the dialog fell back to writing the working set straight into the
+live record's `components` — an edit that was never undoable and left no trace
+in the document's modified state. Fixed by giving the record hierarchy a
+type-erased way to reach a record's components: `BaseRecord::activeComponents()`
+returns `nullptr` by default and `Record<T>` implements it under a
+`HasFormComponents<T>` trait, so record types without components are unaffected.
+`EditComponentsCommand` then snapshots via `BaseCollection::cloneRecordAt()` and
+writes back through `replace()`, which is undoable for any component-based type
+without a per-type template. `test_editcomponentscommand` pins that nothing is
+written before `execute()`, that the pre-edit record state is untouched while an
+edit is merely pending, and that undo/redo round-trips.
+
+**Still open:** the registered custom data widgets are handed the *live* record
+pointer (`QtFormDialogManager` passes `recordPtr` from the factory, alongside the
+cloned working components), so a widget that writes fields outside `components`
+still mutates the base record with no undo and no validate step. They also have
+no `load`/`validate`/`apply` hooks, and the type-erased default resolver is still
+not a full session. Roughly 22 factories are registered, so this is the bulk of
+the remaining Series 1 work and wants a snapshot/revert contract per factory
+rather than 22 individual patches.
 
 ### Series 2 — Width-correct component property bindings
 
