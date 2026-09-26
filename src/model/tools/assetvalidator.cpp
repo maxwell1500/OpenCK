@@ -18,6 +18,9 @@
 #include "../../../libs/files/esm/spellrecord.hpp"
 #include "../../../libs/files/esm/magicrecord.hpp"
 #include "../../../libs/files/esm/questrecord.hpp"
+#include "../../../libs/files/esm/lighrecord.hpp"
+#include "../../../libs/files/esm/wthrrecord.hpp"
+#include "../../../libs/files/esm/sounrecord.hpp"
 #include "../../../libs/files/esm/dialrecord.hpp"
 #include "../../../libs/files/esm/inforecord.hpp"
 #include "../../../libs/files/esm/glob.hpp"
@@ -32,6 +35,7 @@
 #include "../../../libs/files/esm/miscrecord.hpp"
 #include "../../../libs/files/esm/actirecord.hpp"
 #include "../../../libs/files/esm/statrecord.hpp"
+#include "../../../libs/components/tier1_components.hpp"
 #include "../../../libs/files/esm/racerecord.hpp"
 #include "../../../libs/files/esm/classrecord.hpp"
 #include "../../../libs/files/esm/factrecord.hpp"
@@ -797,6 +801,222 @@ AssetValidator::ValidationReport AssetValidator::validateOrphanedRecords(const D
 // validateAll
 // ============================================================================
 
+namespace {
+
+// A record path must stay inside the data tree. Checked textually, without
+// touching the filesystem, because the asset may legitimately live inside an
+// archive rather than loose.
+bool isEscapingAssetPath(const QString& path)
+{
+    if (path.isEmpty())
+        return false;
+    QString normalised = path;
+    normalised.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    // Absolute, drive-qualified or UNC.
+    if (normalised.startsWith(QLatin1Char('/')))
+        return true;
+    if (normalised.size() >= 2 && normalised.at(1) == QLatin1Char(':'))
+        return true;
+    // Any parent-directory hop, including one that only escapes mid-path.
+    const QStringList parts = normalised.split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    return parts.contains(QLatin1String(".."));
+}
+
+} // namespace
+
+bool AssetValidator::isEscapingPath(const QString& path)
+{
+    return isEscapingAssetPath(path);
+}
+
+bool AssetValidator::shouldBlockSave(const ValidationReport& report)
+{
+    return report.errors() > 0;
+}
+
+bool AssetValidator::shouldBlockSave(const ValidationReport& report, int allowedErrors)
+{
+    return report.errors() > allowedErrors;
+}
+
+AssetValidator::ValidationReport AssetValidator::validateRelationships(const Data& data)
+{
+    ValidationReport report;
+
+    QSet<quint32> known;
+    for (const auto& typed : data.allCollectionsWithTypes())
+    {
+        if (!typed.collection) continue;
+        for (int i = 0; i < typed.collection->count(); ++i)
+        {
+            const quint32 id = typed.collection->getFormId(i);
+            if (id != 0) known.insert(id);
+        }
+    }
+
+    auto missing = [&known, &report](quint32 id, const QString& editorId,
+        const QString& typeName, const QString& what) {
+        if (id != 0 && !known.contains(id))
+        {
+            report.issues.append({ValidationIssue::Error, "Relationship",
+                QString("%1 '%2' %3 points at missing FormID 0x%4")
+                    .arg(typeName, editorId, what, QString::number(id, 16)),
+                editorId, ""});
+        }
+    };
+
+    // A placed reference must live in a cell that exists, and its base object
+    // must exist. The parent comes from the load-time index, not the record, so
+    // a reference that was placed in a cell which was later removed is caught
+    // here rather than silently vanishing on save.
+    const auto& refs = data.getRefrCollection();
+    for (int i = 0; i < refs.size(); ++i)
+    {
+        const auto& record = refs.getRecord(i).get();
+        const quint32 parentCell = data.parentCellOfRefr(record.formId);
+        if (parentCell == 0)
+        {
+            report.issues.append({ValidationIssue::Warning, "Relationship",
+                QStringLiteral("Placed reference has no parent cell"),
+                record.editorId, ""});
+        }
+        else
+        {
+            missing(parentCell, record.editorId, QStringLiteral("Placed reference"),
+                QStringLiteral("parent cell"));
+        }
+        missing(record.baseId, record.editorId, QStringLiteral("Placed reference"),
+            QStringLiteral("base object"));
+    }
+
+    const auto& cells = data.getCellCollection();
+    for (int i = 0; i < cells.size(); ++i)
+    {
+        const auto& record = cells.getRecord(i).get();
+        missing(record.owner, record.editorId, QStringLiteral("Cell"), QStringLiteral("owner"));
+    }
+
+    // Quest and dialogue links. A quest stage or objective pointing at nothing
+    // produces a quest that silently never completes.
+    const auto& quests = data.getQuestCollection();
+    for (int i = 0; i < quests.size(); ++i)
+    {
+        const auto& record = quests.getRecord(i).get();
+        for (quint32 id : record.stageIds)
+            missing(id, record.editorId, QStringLiteral("Quest"), QStringLiteral("stage"));
+        for (quint32 id : record.objectiveIds)
+            missing(id, record.editorId, QStringLiteral("Quest"), QStringLiteral("objective"));
+        for (quint32 id : record.aliasIds)
+            missing(id, record.editorId, QStringLiteral("Quest"), QStringLiteral("alias"));
+        for (quint32 id : record.scriptIds)
+            missing(id, record.editorId, QStringLiteral("Quest"), QStringLiteral("script"));
+    }
+
+    const auto& dials = data.getDialCollection();
+    for (int i = 0; i < dials.size(); ++i)
+    {
+        const auto& record = dials.getRecord(i).get();
+        for (quint32 id : record.responseIds)
+            missing(id, record.editorId, QStringLiteral("Dialogue topic"), QStringLiteral("response"));
+    }
+
+    const auto& infos = data.getInfoCollection();
+    for (int i = 0; i < infos.size(); ++i)
+    {
+        const auto& record = infos.getRecord(i).get();
+        missing(record.targetId, record.editorId, QStringLiteral("Dialogue response"),
+            QStringLiteral("target topic"));
+    }
+
+    // A worldspace that claims a cell which does not exist will not render.
+    const auto& worldspaces = data.getWorldspaceCollection();
+    for (int i = 0; i < worldspaces.size(); ++i)
+    {
+        const auto& record = worldspaces.getRecord(i).get();
+        for (quint32 cellId : record.cellIds)
+        {
+            missing(cellId, record.editorId, QStringLiteral("Worldspace"), QStringLiteral("cell"));
+        }
+    }
+
+    return report;
+}
+
+AssetValidator::ValidationReport AssetValidator::validateAssetPaths(const Data& data)
+{
+    ValidationReport report;
+
+    auto check = [&report](const QString& path, const QString& editorId,
+        const QString& typeName, const QString& field) {
+        if (isEscapingAssetPath(path))
+        {
+            report.issues.append({ValidationIssue::Error, "AssetPath",
+                QString("%1 '%2' %3 escapes the data directory: %4")
+                    .arg(typeName, editorId, field, path),
+                editorId, path});
+        }
+    };
+
+    const auto& stats = data.getStatCollection();
+    for (int i = 0; i < stats.size(); ++i)
+    {
+        const auto& record = stats.getRecord(i).get();
+        check(record.modelPath, record.editorId, QStringLiteral("Static"), QStringLiteral("model"));
+    }
+
+    const auto& npcs = data.getNpcCollection();
+    for (int i = 0; i < npcs.size(); ++i)
+    {
+        const auto& record = npcs.getRecord(i).get();
+        // An actor's model and icon live in components, not the record struct,
+        // so they have to be read through the component set.
+        if (const auto* model = static_cast<const tescomponents::TESModel_Component*>(
+                record.components.findByName(QStringLiteral("TESModel"))))
+        {
+            check(model->modelPath, record.editorId, QStringLiteral("Actor"),
+                QStringLiteral("model"));
+        }
+        if (const auto* texture = static_cast<const tescomponents::TESTexture_Component*>(
+                record.components.findByName(QStringLiteral("TESTexture"))))
+        {
+            check(texture->iconPath, record.editorId, QStringLiteral("Actor"),
+                QStringLiteral("icon"));
+        }
+    }
+
+    const auto& weapons = data.getWeaponCollection();
+    for (int i = 0; i < weapons.size(); ++i)
+    {
+        const auto& record = weapons.getRecord(i).get();
+        check(record.modelPath, record.editorId, QStringLiteral("Weapon"), QStringLiteral("model"));
+        check(record.iconPath, record.editorId, QStringLiteral("Weapon"), QStringLiteral("icon"));
+    }
+
+    const auto& sounds = data.getSounCollection();
+    for (int i = 0; i < sounds.size(); ++i)
+    {
+        const auto& record = sounds.getRecord(i).get();
+        check(record.soundFile, record.editorId, QStringLiteral("Sound"), QStringLiteral("file"));
+    }
+
+    const auto& weathers = data.getWthrCollection();
+    for (int i = 0; i < weathers.size(); ++i)
+    {
+        const auto& record = weathers.getRecord(i).get();
+        check(record.sunTexture, record.editorId, QStringLiteral("Weather"), QStringLiteral("sun texture"));
+    }
+
+    const auto& lights = data.getLighCollection();
+    for (int i = 0; i < lights.size(); ++i)
+    {
+        const auto& record = lights.getRecord(i).get();
+        check(record.modelPath, record.editorId, QStringLiteral("Light"), QStringLiteral("model"));
+        check(record.iconPath, record.editorId, QStringLiteral("Light"), QStringLiteral("icon"));
+    }
+
+    return report;
+}
+
 AssetValidator::ValidationReport AssetValidator::validateAll(const Data& data, const QString& dataDir)
 {
     QVector<ValidationReport> reports;
@@ -811,6 +1031,12 @@ AssetValidator::ValidationReport AssetValidator::validateAll(const Data& data, c
 
     // 4. Validate orphaned records
     reports.append(validateOrphanedRecords(data));
+
+    // 5. Structural relationships the per-field reference check cannot see
+    reports.append(validateRelationships(data));
+
+    // 6. Asset paths that escape the data tree
+    reports.append(validateAssetPaths(data));
 
     // 4. Validate NIF files referenced by stat records
     AssetResolver resolver(dataDir);

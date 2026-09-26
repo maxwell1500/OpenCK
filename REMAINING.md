@@ -1704,11 +1704,44 @@ FormIDs, missing masters, invalid relationships, duplicate IDs, missing scripts,
 quest/dialogue links, required components, and escaping asset paths. Add an
 optional pre-save severity policy and remove the obsolete raw-byte validator
 from the active path. Synthetic plugin graphs must prove every diagnostic and
-its source location. **Status 2026-09-25 — core expanded.** `AssetValidator`
-now checks declared master files, zero FormIDs, duplicate IDs, unresolved
-cross-record references, and orphaned records through the Data-level form index;
-the existing navigable report/filter/export dialog remains active. Broader
-relationship-specific rules and save-policy integration remain.
+its source location. **Status 2026-09-26 — relationships, asset paths and the
+save policy are in.**
+
+`AssetValidator::validateReferences()` checks per-field references one record
+type at a time and cannot see structural problems, so two rule families were
+added and wired into `validateAll()`:
+
+- `validateRelationships()` — a placed reference whose parent cell came from the
+  load-time index and does not exist (or is missing entirely, as a warning), a
+  placed reference whose base object does not exist, a cell whose owner does not
+  exist, quest stage/objective/alias/script links, dialogue topic responses,
+  response target topics, and a worldspace claiming a cell that does not exist.
+  The last of these is the kind of error that otherwise only shows up as a
+  worldspace that will not render.
+- `validateAssetPaths()` — asset paths that are absolute, drive-qualified, or
+  contain a `..` hop, checked textually without touching the filesystem since
+  the asset may legitimately live inside an archive. Covers STAT, NPC_, WEAP,
+  SOUN, WTHR and LIGH. An actor's model and icon live in components rather than
+  the record struct, so those are read through the component set.
+
+`shouldBlockSave()` is the pre-save policy hook: it answers whether a report
+contains an error, with an overload taking an allowed-error count so a caller
+can block, warn, or ignore.
+
+Diagnostics now name the record in the message text as well as in `recordId`,
+because the navigable report shows the message first.
+
+**Note on `validateAll()`:** it walks the data directory, so it must be given a
+real path. Passing an empty one sends it scanning from an invalid root — a test
+that did this ran for five minutes and then overran the stack. It should
+validate its `dataDir` argument and bail early rather than rely on callers.
+
+`test_assetvalidatorrelationships` builds small synthetic plugin graphs and pins
+each rule: clean and empty paths accepted, backslash and forward-slash parent
+hops, absolute and drive-qualified paths, actor paths sourced from components, a
+REFR with no parent cell (warning) versus a missing one (error) versus a clean
+one, a cell with a missing owner, four kinds of dangling quest/dialogue link, a
+fully wired graph that must produce nothing, and both save-policy overloads.
 
 ### Series 8 — Replace pseudo-save editors with active-document transactions
 
