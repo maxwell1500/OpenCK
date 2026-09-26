@@ -327,6 +327,11 @@ openck_add_test(test_worldspacerecord)
 
 # BsaArchive (Skyrim SE .bsa) reader.
 # Registered unconditionally: each case QSKIPs when its archive is absent.
+# Per-game BSA target presets: each game must get the version it expects.
+add_executable(test_bsatargets test_bsatargets.cpp)
+target_link_libraries(test_bsatargets PRIVATE openck_files openck_esm test_stubs Qt6::Test)
+target_include_directories(test_bsatargets PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_bsatargets)
 add_executable(test_bsaarchive test_bsaarchive.cpp)
 target_link_libraries(test_bsaarchive PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_bsaarchive PRIVATE ${TEST_INCLUDE_DIRS})

@@ -1730,13 +1730,31 @@ Introduce explicit `sourcePath`/`archivePath` entries or a source root,
 versioned archive targets, and canonical extraction checks that reject absolute,
 drive-qualified, UNC, and `..` paths. Use `QSaveFile` for output replacement.
 Synthetic malicious-path, Unicode-name, duplicate-name, differing-root, and
-v0.67/68/69 fixtures are required. **Status 2026-09-25 — core done.** BSA
-creation now accepts an explicit source root, supports v0x67/v0x68 zlib targets
-alongside v0x69 LZ4, and writes extracted files through `QSaveFile`. Archive
-browser bulk extraction rejects absolute, drive-qualified, UNC, and `..` entry
-paths before joining to the destination. Tests cover source-root preservation,
-older compressed targets, and malicious paths; broader archive UX and game-
-specific target presets remain.
+v0x67/68/69 fixtures are required. **Status 2026-09-26 — game target presets
+done.** BSA creation now accepts an explicit source root, supports v0x67/v0x68
+zlib targets alongside v0x69 LZ4, and writes extracted files through `QSaveFile`.
+Archive browser bulk extraction rejects absolute, drive-qualified, UNC, and `..`
+entry paths before joining to the destination.
+
+The remaining item, game-specific target presets, is now in place as
+`BsaArchive::targetsForGame()` / `defaultVersionForGame()` / `createForGame()`.
+Previously the Create Archive dialog hard-coded a single "BSA (Skyrim SE
+archive)" entry and always wrote 0x69, which is silently the wrong format for a
+Skyrim LE user. The dialog now offers only the formats the active document's game
+uses, and for BSA it offers that game's accepted versions with a readable label.
+Oblivion is 0x67 zlib, Fallout 4 is 0x68 zlib, and Skyrim offers 0x69 LZ4 (the
+default) *and* 0x68 zlib, because the `Game` enum cannot distinguish Skyrim LE
+from SE and the choice has to stay visible rather than being guessed. Morrowind
+(MWSA) and Starfield (BA2) correctly return no BSA target, and `createForGame()`
+refuses them rather than writing a wrong-format archive.
+
+`test_bsatargets` pins the mapping, checks that exactly one target per game claims
+to be the default and that every target is labelled, and — the part that matters —
+writes and reads back a real archive at 0x67, 0x68 and 0x69, confirming each
+carries the version asked for with the payload intact.
+
+**Still open:** broader archive UX.
+
 
 ### Series 7 — Save-time and interactive validation
 

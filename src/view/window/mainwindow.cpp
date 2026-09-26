@@ -2569,28 +2569,69 @@ void MainWindow::on_actionCreateArchive_triggered()
         fullPaths.append(QDir(outputDir).absoluteFilePath(f));
     }
 
-    const QString format = QInputDialog::getItem(this, "Create Archive", "Archive format",
-        QStringList{ "BA2 (Starfield archive)", "BSA (Skyrim SE archive)" }, 0, false);
-    if (format.isEmpty()) return;
+    // Offer only the archive formats the active document's game actually uses,
+    // and for BSA offer that game's accepted versions rather than assuming
+    // Skyrim SE. Morrowind uses MWSA and Starfield uses BA2.
+    const GameFormat::Game game = mData ? mData->currentGame() : GameFormat::Game::Unknown;
+    const QVector<BsaArchiveTarget> bsaTargets = BsaArchive::targetsForGame(game);
+    const bool canBsa = !bsaTargets.isEmpty();
+    const bool canBa2 = (game == GameFormat::Game::Starfield);
+
+    QStringList formats;
+    if (canBa2) formats << tr("BA2 (Starfield archive)");
+    if (canBsa) {
+        if (bsaTargets.size() == 1) {
+            formats << tr("BSA (%1)").arg(bsaTargets.first().label);
+        } else {
+            for (const BsaArchiveTarget& target : bsaTargets)
+                formats << tr("BSA (%1)").arg(target.label);
+        }
+    }
+    if (formats.isEmpty()) {
+        QMessageBox::information(this, tr("Create Archive"),
+            game == GameFormat::Game::Unknown
+                ? tr("Open a plugin first so the archive format can be chosen for its game.")
+                : tr("OpenCK cannot write %1 archives.").arg(GameFormat::gameName(game)));
+        return;
+    }
+
+    bool ok = false;
+    const QString format = QInputDialog::getItem(this, tr("Create Archive"),
+        tr("Archive format"), formats, 0, false, &ok);
+    if (!ok || format.isEmpty()) return;
+
+    int bsaChoice = -1;
+    for (int i = 0; i < formats.size(); ++i)
+        if (formats[i].startsWith("BSA")) { bsaChoice = i; break; }
     const bool createBsa = format.startsWith("BSA");
     const QString extension = createBsa ? ".bsa" : ".ba2";
     const QString defaultName = QDir(outputDir).dirName() + " - OpenCK" + extension;
-    const QString outputPath = QFileDialog::getSaveFileName(this, "Save Archive As",
+    const QString outputPath = QFileDialog::getSaveFileName(this, tr("Save Archive As"),
         QFileInfo(outputDir).dir().absoluteFilePath(defaultName),
         createBsa ? "BSA Archive (*.bsa)" : "BA2 Archive (*.ba2)");
     if (outputPath.isEmpty()) return;
 
-    const bool compress = QMessageBox::question(this, "Create Archive",
-        "Compress files in archive?", QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
+    const bool compress = QMessageBox::question(this, tr("Create Archive"),
+        tr("Compress files in archive?"), QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
 
     if (createBsa) {
+        // Map the chosen label back to its version, so a Skyrim LE user can
+        // pick 0x68 instead of silently getting the SE format.
+        quint32 version = BsaArchive::defaultVersionForGame(game);
+        if (bsaTargets.size() > 1 && bsaChoice >= 0 && bsaChoice < formats.size()) {
+            const QString& chosen = formats[bsaChoice];
+            for (const BsaArchiveTarget& target : bsaTargets)
+                if (chosen.contains(target.label)) { version = target.version; break; }
+        }
         BsaArchive archive;
-        if (archive.create(fullPaths, outputPath, compress, outputDir)) {
-            QMessageBox::information(this, "Create Archive",
-                QString("Archive created successfully.\n\nFiles: %1\nPath: %2\nType: BSA")
-                    .arg(fullPaths.size()).arg(outputPath));
+        if (archive.create(fullPaths, outputPath, compress, outputDir, version)) {
+            QMessageBox::information(this, tr("Create Archive"),
+                tr("Archive created successfully.\n\nFiles: %1\nPath: %2\nVersion: 0x%3")
+                    .arg(fullPaths.size()).arg(outputPath)
+                    .arg(version, 2, 16, QChar('0')));
         } else {
-            QMessageBox::warning(this, "Create Archive", "Failed to create BSA archive. Check the log for details.");
+            QMessageBox::warning(this, tr("Create Archive"),
+                tr("Failed to create BSA archive. Check the log for details."));
         }
         return;
     }

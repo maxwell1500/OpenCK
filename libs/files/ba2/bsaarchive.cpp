@@ -1061,6 +1061,53 @@ quint64 BsaArchive::hashName(const QString& stem, const QString& extension)
     return bsaGenerateHash(stem, extension);
 }
 
+QVector<BsaArchiveTarget> BsaArchive::targetsForGame(GameFormat::Game game)
+{
+    using GameFormat::Game;
+    switch (game)
+    {
+    case Game::Oblivion:
+        return { { 0x67, false, QStringLiteral("Oblivion (0x67, zlib)"), true } };
+    case Game::Fallout4:
+        return { { 0x68, false, QStringLiteral("Fallout 4 (0x68, zlib)"), true } };
+    case Game::Skyrim:
+        // LE writes 0x68, SE and AE write 0x69. The Game enum cannot tell them
+        // apart, so both are offered with 0x69 as the default.
+        return { { 0x69, true, QStringLiteral("Skyrim SE / AE (0x69, LZ4)"), true },
+                 { 0x68, false, QStringLiteral("Skyrim LE (0x68, zlib)"), false } };
+    case Game::Morrowind:
+    case Game::Starfield:
+    case Game::Unknown:
+    default:
+        // Morrowind archives are MWSA and Starfield archives are BA2; neither is
+        // written by this class.
+        return {};
+    }
+}
+
+quint32 BsaArchive::defaultVersionForGame(GameFormat::Game game)
+{
+    const QVector<BsaArchiveTarget> targets = targetsForGame(game);
+    for (const BsaArchiveTarget& target : targets)
+        if (target.isDefault)
+            return target.version;
+    return 0;
+}
+
+bool BsaArchive::createForGame(const QStringList& filePaths,
+                               const QString& outputPath, bool compress,
+                               const QString& sourceRoot, GameFormat::Game game)
+{
+    const quint32 version = defaultVersionForGame(game);
+    if (version == 0)
+    {
+        LOG_ERROR(QString("BsaArchive: game '%1' does not use the BSA format")
+            .arg(GameFormat::gameName(game)));
+        return false;
+    }
+    return create(filePaths, outputPath, compress, sourceRoot, version);
+}
+
 bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath, bool compress,
                         const QString& sourceRoot, quint32 version)
 {
