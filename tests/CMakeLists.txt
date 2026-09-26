@@ -107,6 +107,30 @@ openck_add_test(test_columnvalidator)
 
 # EditRecordCommand tests
 # Record edit session: every record dialog edits a working copy, not the base record.
+# Per-record custom data widgets: edits must reach the record via the session.
+add_executable(test_recorddatawidgets test_recorddatawidgets.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/celldatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/classdatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/dialdatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/factdatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/hazddatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/locationdatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/npcrecorddatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/packdatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/racedatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/regndatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/sounddatawidget.cpp
+  ${CMAKE_SOURCE_DIR}/src/view/window/wthrdatawidget.cpp
+)
+target_link_libraries(test_recorddatawidgets PRIVATE openck_model openck_esm test_stubs Qt6::Test Qt6::Widgets)
+target_include_directories(test_recorddatawidgets PRIVATE
+    ${TEST_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/view
+    ${CMAKE_SOURCE_DIR}/src/view/widgets
+    ${CMAKE_SOURCE_DIR}/src/view/window
+)
+openck_add_test(test_recorddatawidgets)
 add_executable(test_recordeditsession test_recordeditsession.cpp)
 target_link_libraries(test_recordeditsession PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Gui)
 target_include_directories(test_recordeditsession PRIVATE ${TEST_INCLUDE_DIRS})

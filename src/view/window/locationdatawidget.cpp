@@ -6,16 +6,18 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QLineEdit>
+#include <QPlainTextEdit>
 #include <QSpinBox>
 #include <QVBoxLayout>
-#include <QPlainTextEdit>
 
 LocationDataWidget::LocationDataWidget(void* recordPtr,
-                                       openck::FormComponents*,
+                                       openck::FormComponents* components,
                                        QWidget* parent)
     : QWidget(parent)
     , m_recordPtr(recordPtr)
 {
+    Q_UNUSED(components);
+
     auto* mainLayout = new QVBoxLayout(this);
 
     auto* infoGroup = new QGroupBox(QStringLiteral("Location Data"), this);
@@ -30,12 +32,16 @@ LocationDataWidget::LocationDataWidget(void* recordPtr,
     nameEdit->setPlaceholderText(QStringLiteral("Location Name"));
 
     auto* parentSpin = new QSpinBox(infoGroup);
+    parentSpin->setObjectName(QStringLiteral("parentId"));
     parentSpin->setRange(0, INT_MAX);
     auto* xSpin = new QSpinBox(infoGroup);
+    xSpin->setObjectName(QStringLiteral("x"));
     xSpin->setRange(0, INT_MAX);
     auto* ySpin = new QSpinBox(infoGroup);
+    ySpin->setObjectName(QStringLiteral("y"));
     ySpin->setRange(0, INT_MAX);
     auto* zSpin = new QSpinBox(infoGroup);
+    zSpin->setObjectName(QStringLiteral("z"));
     zSpin->setRange(0, INT_MAX);
 
     infoForm->addRow(QStringLiteral("Editor ID:"), editorIdEdit);
@@ -56,16 +62,33 @@ LocationDataWidget::LocationDataWidget(void* recordPtr,
     linksLayout->addWidget(linksView);
     mainLayout->addWidget(linksGroup);
 
-    if (m_recordPtr)
-    {
-        auto* rec = static_cast<LocationRecord*>(m_recordPtr);
-        editorIdEdit->setText(rec->editorId);
-        nameEdit->setText(rec->locationName);
-        parentSpin->setValue(static_cast<int>(rec->parentId));
-        xSpin->setValue(static_cast<int>(rec->x));
-        ySpin->setValue(static_cast<int>(rec->y));
-        zSpin->setValue(static_cast<int>(rec->z));
+    loadSession();
+}
 
+LocationDataWidget::~LocationDataWidget() = default;
+
+void LocationDataWidget::loadSession()
+{
+    if (!m_recordPtr) return;
+    auto* rec = static_cast<LocationRecord*>(m_recordPtr);
+    if (auto* edit = findChild<QLineEdit*>(QStringLiteral("editorId")))
+        edit->setText(rec->editorId);
+    if (auto* edit = findChild<QLineEdit*>(QStringLiteral("name")))
+        edit->setText(rec->locationName);
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("parentId")))
+        spin->setValue(static_cast<int>(rec->parentId));
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("x")))
+        spin->setValue(static_cast<int>(rec->x));
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("y")))
+        spin->setValue(static_cast<int>(rec->y));
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("z")))
+        spin->setValue(static_cast<int>(rec->z));
+
+    // The linked-reference listing is a read-only view of the XNAM groups; it
+    // is never written back, because the group structure is owned by the
+    // component layer.
+    if (auto* view = findChild<QPlainTextEdit*>(QStringLiteral("linkedRefs")))
+    {
         QString text;
         for (const LocationRecord::LinkedRef& group : rec->linkedRefs)
         {
@@ -77,8 +100,31 @@ LocationDataWidget::LocationDataWidget(void* recordPtr,
         }
         if (text.isEmpty())
             text = QStringLiteral("(none)");
-        linksView->setPlainText(text);
+        view->setPlainText(text);
     }
 }
 
-LocationDataWidget::~LocationDataWidget() = default;
+bool LocationDataWidget::validateSession(QString* error)
+{
+    Q_UNUSED(error);
+    return true;
+}
+
+void LocationDataWidget::applySession()
+{
+    if (!m_recordPtr) return;
+    auto* rec = static_cast<LocationRecord*>(m_recordPtr);
+    if (auto* edit = findChild<QLineEdit*>(QStringLiteral("editorId")))
+        rec->editorId = edit->text();
+    if (auto* edit = findChild<QLineEdit*>(QStringLiteral("name")))
+        rec->locationName = edit->text();
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("parentId")))
+        rec->parentId = static_cast<quint32>(spin->value());
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("x")))
+        rec->x = static_cast<quint32>(spin->value());
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("y")))
+        rec->y = static_cast<quint32>(spin->value());
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("z")))
+        rec->z = static_cast<quint32>(spin->value());
+    // linkedRefs is intentionally not written back; see loadSession().
+}

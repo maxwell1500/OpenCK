@@ -1481,17 +1481,15 @@ undo stack.
 Replace this with a working-copy edit session: clone the record/components,
 bind the dialog to the copy, validate and compare on OK, push
 `EditRecordCommand` only after a successful commit, and discard on Cancel or
-close. **Status 2026-09-26 — the full-record session is done; read-only widget
-gaps remain.**
-
-`RecordEditSession` (`src/view/window/recordeditsession.hpp`) owns a working copy
+close. **Status 2026-09-26 — done.** `RecordEditSession`
+(`src/view/window/recordeditsession.hpp`) owns a working copy
 of the whole record. The dialog's property grid and any custom data widget edit
 *that* copy, so only `commit()` writes the live record and it always goes through
 the document's undo stack; `discard()` drops the copy, and `QtFormDialog::reject()`
 calls it so both Cancel and closing the window discard. Because the copy is a
 whole record rather than just its components, a widget writing plain fields is
 covered for free — no per-widget snapshot logic. `HasFormComponents<T>` gates
-which types expose working components. Custom data widgets may implement
+which types expose working components. Custom data widgets implement
 `FormDataWidget` (`src/view/widgets/formdatawidget.hpp`) for `loadSession()`,
 `validateSession()` and `applySession()`; a failing `validateSession()` blocks
 the commit and shows the reason.
@@ -1512,17 +1510,34 @@ This supersedes the previous revision's `EditComponentsCommand` and
 a type-erased path; the session is strictly stronger, so both were removed rather
 than left as dead code.
 
-**Still open — and it is a usability bug, not a corruption one:** of the 16
-`*DataWidget` implementations, only `InfoDataWidget`, `QuestDataWidget` and
-`WorldspaceDataWidget` ever wrote back to the record; the other 13 read the
-record into `QLineEdit`/`QSpinBox` controls and never wrote it, so their edits
-are silently discarded. They are now safe (they are editing the working copy,
-and Cancel works), but their changes still do not reach the record. Giving them
-`applySession()` is the remaining Series 1 work: mostly mechanical, one widget at
-a time, and each needs a test that the control value survives into the record.
-The legacy `openOrFocus()` overload that takes a live `recordPtr` is kept for
-dialogs with no record to edit and is documented as a footgun; nothing in
-production uses it.
+**Series 1 is now done.** The full-record session is described above. The last
+piece was the custom data widgets themselves: of the 16 `*DataWidget`
+implementations, only `InfoDataWidget`, `QuestDataWidget` and `WorldspaceDataWidget`
+ever wrote to the record, so the other 13 read the record into controls and threw
+the user's edits away. All 12 of those now implement `FormDataWidget` —
+`loadSession()` repopulates the controls from the session's working record,
+`validateSession()` rejects malformed FormIDs with a message naming the offending
+row, and `applySession()` writes the controls back into the working record.
+`Tes3RecordDataWidget` is deliberately still read-only, as documented on the
+class. Controls are found by `objectName` in the session methods, matching the
+convention `Tes3RecordDataWidget` already used.
+
+Fixing this surfaced two silent-truncation bugs of the same family Series 2 dealt
+with, where a spin box range did not match the field it fed:
+
+- `HazdRecord.limit`, `.target` and `.flags` are `quint8`, but the spin boxes
+  allowed `INT_MAX`, so any value above 255 was silently truncated. Capped at 255.
+- `CellRecord.cellX`/`.cellY` are `quint32`, but the spin boxes accepted
+  -99999..99999, so a negative coordinate became a huge unsigned value. Interior
+  cell coordinates are non-negative, so the range is now 0..99999.
+
+`test_recorddatawidgets` drives all 12 the way the dialog does — construct with the
+working record, edit a control, validate, apply — and checks the value reached the
+record through `commit()` and came back through `undo()`, that untouched fields
+survive, that a refused FormID writes nothing, and that every widget is actually
+discovered as a `FormDataWidget` (a silent failure to derive from the interface
+would otherwise make a widget stop being applied). Its hex parsing is pinned
+separately. Checked with a negative control to confirm the assertions bite.
 
 ### Series 2 — Width-correct component property bindings
 

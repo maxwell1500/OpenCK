@@ -1,6 +1,7 @@
 #include "racedatawidget.hpp"
 #include "../libs/files/esm/racerecord.hpp"
 #include "../libs/components/formcomponents.hpp"
+#include "../widgets/recordfieldparse.hpp"
 
 #include <QFormLayout>
 #include <QGroupBox>
@@ -19,6 +20,8 @@ RaceDataWidget::RaceDataWidget(void* recordPtr, FormComponents* components,
     : QWidget(parent)
     , m_recordPtr(recordPtr)
 {
+    Q_UNUSED(components);
+
     auto* mainLayout = new QVBoxLayout(this);
 
     if (!m_recordPtr)
@@ -28,14 +31,12 @@ RaceDataWidget::RaceDataWidget(void* recordPtr, FormComponents* components,
         return;
     }
 
-    auto* rec = static_cast<RaceRecord*>(m_recordPtr);
-
     auto* dataGroup = new QGroupBox(QStringLiteral("Race Data"), this);
     auto* dataForm = new QFormLayout(dataGroup);
 
     auto* flagsSpin = new QSpinBox(dataGroup);
+    flagsSpin->setObjectName(QStringLiteral("raceFlags"));
     flagsSpin->setRange(0, INT_MAX);
-    flagsSpin->setValue(static_cast<int>(rec->raceFlags));
     dataForm->addRow(QStringLiteral("Race Flags:"), flagsSpin);
 
     mainLayout->addWidget(dataGroup);
@@ -43,8 +44,7 @@ RaceDataWidget::RaceDataWidget(void* recordPtr, FormComponents* components,
     auto* listGroup = new QGroupBox(QStringLiteral("NPC Variables"), this);
     auto* listLayout = new QVBoxLayout(listGroup);
     auto* varList = new QListWidget(listGroup);
-    for (quint32 id : rec->npcVariables)
-        varList->addItem(QStringLiteral("0x%1").arg(id, 8, 16, QChar('0')));
+    varList->setObjectName(QStringLiteral("npcVariables"));
     listLayout->addWidget(varList);
     auto* varBtnLayout = new QHBoxLayout();
     auto* addVarBtn = new QPushButton(QStringLiteral("Add"), listGroup);
@@ -56,14 +56,71 @@ RaceDataWidget::RaceDataWidget(void* recordPtr, FormComponents* components,
     mainLayout->addWidget(listGroup);
 
     QObject::connect(addVarBtn, &QPushButton::clicked, this, [varList]() {
-        varList->addItem(QStringLiteral("0x00000000"));
+        varList->addItem(formatFormId(0));
     });
     QObject::connect(rmVarBtn, &QPushButton::clicked, this, [varList]() {
         auto items = varList->selectedItems();
         for (auto* item : items) delete item;
     });
+
+    loadSession();
 }
 
 RaceDataWidget::~RaceDataWidget() = default;
+
+void RaceDataWidget::loadSession()
+{
+    if (!m_recordPtr) return;
+    auto* rec = static_cast<RaceRecord*>(m_recordPtr);
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("raceFlags")))
+        spin->setValue(static_cast<int>(rec->raceFlags));
+    if (auto* list = findChild<QListWidget*>(QStringLiteral("npcVariables")))
+    {
+        list->clear();
+        for (quint32 id : rec->npcVariables)
+            list->addItem(formatFormId(id));
+    }
+}
+
+bool RaceDataWidget::validateSession(QString* error)
+{
+    auto* list = findChild<QListWidget*>(QStringLiteral("npcVariables"));
+    if (!list) return true;
+    for (int row = 0; row < list->count(); ++row)
+    {
+        quint32 ignored = 0;
+        if (!parseFormId(list->item(row)->text(), ignored))
+        {
+            if (error)
+                *error = QStringLiteral("NPC Variable %1 is not a valid FormID: \"%2\".")
+                             .arg(row + 1).arg(list->item(row)->text());
+            return false;
+        }
+    }
+    return true;
+}
+
+void RaceDataWidget::applySession()
+{
+    if (!m_recordPtr) return;
+    auto* rec = static_cast<RaceRecord*>(m_recordPtr);
+    if (auto* spin = findChild<QSpinBox*>(QStringLiteral("raceFlags")))
+        rec->raceFlags = static_cast<quint32>(spin->value());
+    if (auto* list = findChild<QListWidget*>(QStringLiteral("npcVariables")))
+    {
+        QVector<quint32> ids;
+        ids.reserve(list->count());
+        for (int row = 0; row < list->count(); ++row)
+        {
+            quint32 id = 0;
+            // validateSession() already rejected anything unparseable, so a
+            // failure here can only mean the list changed underneath us; skip
+            // rather than write a bogus id.
+            if (parseFormId(list->item(row)->text(), id))
+                ids.append(id);
+        }
+        rec->npcVariables = ids;
+    }
+}
 
 } // namespace openck
