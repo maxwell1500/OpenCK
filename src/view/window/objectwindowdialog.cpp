@@ -274,20 +274,37 @@ ObjectWindowDialog::ObjectWindowDialog(Data* data, QWidget* parent)
                 return w;
             });
         // SCEN is deliberately registered only once, as a read-only view of the
-        // raw PHDA subrecords. It previously had a second, later registration
-        // for a timeline widget that overwrote this one, and that widget only
-        // ever edited a vector it owned itself — the phases were never read
-        // from or written back to the record, so it looked editable and silently
+        // raw subrecords. It previously had a second, later registration for a
+        // timeline widget that overwrote this one, and that widget only ever
+        // edited a vector it owned itself — the phases were never read from or
+        // written back to the record, so it looked editable and silently
         // discarded every change. registerFactory() now logs a warning on
-        // replacement so that failure cannot happen quietly again. A persisted
-        // scene editor is still to be written.
+        // replacement so that failure cannot happen quietly again.
+        //
+        // The phase timeline is still not persisted, and deliberately so: the
+        // PHDA layout is unverified. A byte scan of Skyrim.esm, Dawnguard.esm,
+        // Dragonborn.esm and HearthFires.esm (329 MB, 9,143 SCEN records) found
+        // no PHDA subrecords at all, so there is no real phase data anywhere on
+        // this machine to check an encoding against. Writing guessed bytes into
+        // a user's scene would be worse than offering no editor. The notice
+        // below says so rather than leaving the user to wonder.
         QtFormDialogManager::instance().registerFactory(
             QStringLiteral("SCEN"),
             [](FormComponents*, void* recPtr, QWidget* parent) -> QWidget* {
-                auto* w = new RawSubrecordWidget(parent);
+                auto* container = new QWidget(parent);
+                auto* layout = new QVBoxLayout(container);
+                layout->setContentsMargins(0, 0, 0, 0);
+                auto* notice = new QLabel(
+                    tr("Scene phases (PHDA) are shown below as stored bytes. "
+                       "They cannot be edited yet: the on-disk layout has not "
+                       "been validated against real data."), container);
+                notice->setWordWrap(true);
+                layout->addWidget(notice);
+                auto* raw = new RawSubrecordWidget(container);
                 if (auto* rec = static_cast<ScenRecord*>(recPtr))
-                    w->setSubrecords(rec->rawSubRecords);
-                return w;
+                    raw->setSubrecords(rec->rawSubRecords);
+                layout->addWidget(raw, 1);
+                return container;
             });
         for (NAME code : Data::tes3MappedCodes())
         {

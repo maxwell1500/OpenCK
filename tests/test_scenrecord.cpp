@@ -115,17 +115,28 @@ void TestScenRecord::testRoundTrip()
 
 void TestScenRecord::testPhdaRawRoundTrip()
 {
-    // PHDA (phase flags) is opaque binary: SCEN stores it in rawSubRecords and
+    // PHDA (phase data) is opaque binary: SCEN stores it in rawSubRecords and
     // must preserve it byte-for-byte across a save/load cycle.
+    //
+    // The bytes below are ARBITRARY. They are not a real PHDA and the offsets
+    // carry no known meaning — an earlier version of this test annotated them as
+    // "phase count" and "per-phase flags", which was invented and could mislead
+    // someone into building a phase editor on top of it. A byte scan of
+    // Skyrim.esm, Dawnguard.esm, Dragonborn.esm and HearthFires.esm (329 MB,
+    // 9,143 SCEN records) found ZERO PHDA subrecords, so no real phase data
+    // exists on this machine to validate a layout against.
+    //
+    // This test therefore proves exactly one thing: opaque subrecords survive a
+    // save/load cycle untouched. It proves nothing about PHDA's structure.
     ScenRecord rec;
     rec.editorId = QStringLiteral("SceneWithPhases");
     rec.formId = 0x30002;
 
     QByteArray phda(24, 0);
-    phda[0] = static_cast<char>(0x01);          // phase count
-    phda[4] = static_cast<char>(0x10);          // per-phase flags
+    phda[0] = static_cast<char>(0x01);
+    phda[4] = static_cast<char>(0x10);
     phda[8] = static_cast<char>(0x40);
-    phda[12] = static_cast<char>(0x01);         // unknown per-phase data
+    phda[12] = static_cast<char>(0x01);
     phda[16] = static_cast<char>(0xAB);
     phda[20] = static_cast<char>(0xCD);
 

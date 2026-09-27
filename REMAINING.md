@@ -1683,7 +1683,55 @@ second registration wins while the discarded factory is never called.
 tests (`test_scenetimeline`, `test_scenephasemodel`) — they are working,
 tested components awaiting a persisted scene editor, not dead code.
 
-**Still open:** a persisted SCEN editor.
+**The heavyweight real-data tests are intermittently failing; the cause is not
+diagnosed.** Observed 2026-09-26 across several full runs of an unchanged tree:
+
+- `test_structuredfidelity` walks the whole of `Starfield.esm` — about 1.2 GB,
+  3.49 million index entries, ~250 s — and exits `0xc0000409` (stack buffer
+  overrun) on some runs while passing on others. It failed three times in a row
+  and then passed in a later batch.
+- `test_loader` (~256 s against real game data) failed once inside a batch and
+  passed immediately when re-run on its own.
+
+The obvious first hypothesis for the first of these, that the on-demand game
+folder was evicting the file mid-read, was tested and **is wrong**: a preflight
+that read the entire file end to end still crashed, and the run took 300 s
+rather than skipping, so the data was fully resident. That preflight was reverted
+rather than left in to double the I/O for nothing.
+
+No cause has been established, and with two independent heavyweight tests
+failing intermittently the likeliest explanations are resource pressure or
+something time- or order-dependent rather than a single parser bug — but that is
+a guess, not a finding. Until it is diagnosed, **the suite is not reliably
+green**, and a passing run is not proof that a change is safe. Bisecting from the
+hand-rolled subrecord walkers in `test_structuredfidelity.cpp` (`isContiguous`,
+`subStreamNames`) is the obvious first step: they advance `pos` by a length read
+out of the file and are the most likely place for an out-of-bounds access on
+unusual input.
+
+**Still open:** a persisted SCEN editor — and it is blocked on evidence, not
+effort. The phase timeline is held in `ScenePhaseModel` and rendered by
+`SceneTimelineWidget` (both with passing tests), but the phases have to live in
+the PHDA subrecord, whose layout is unverified. A byte scan of `Skyrim.esm`,
+`Dawnguard.esm`, `Dragonborn.esm` and `HearthFires.esm` — 329 MB containing
+**9,143 SCEN records — found zero PHDA subrecords.** The base game ships no phase
+data, Oblivion is not installed, and no fixture in this repository contains a
+real PHDA. So there is nothing here to validate an encoding against, and writing
+guessed bytes into a user's scene data is worse than offering no editor.
+
+The `RawSubrecordWidget` factory for SCEN now carries a visible notice saying the
+phases are shown as stored bytes and cannot be edited yet, rather than leaving a
+user to wonder. `test_scenrecord`'s PHDA fixture was also corrected: it used to
+annotate arbitrary bytes as "phase count" and "per-phase flags", an invention
+that could easily have been mistaken for a specification. It now states plainly
+that the bytes are arbitrary and that the test proves only byte preservation, not
+structure.
+
+To unblock this, one of the following would do it: a real PHDA sample from a mod
+that uses scene phases; an Oblivion install (MORGS, and Oblivion's own scripts);
+or a documented layout cross-checked against several real scenes. With any of
+those, the work is the same shape as the NIF container: decode, edit, re-encode,
+and prove byte-exact round-trip for untouched phases.
 
 **The container, keyword and spell tables now commit their vectors.** All three
 rendered their vector and mutated it only on Add and Remove: typing a new Form ID
