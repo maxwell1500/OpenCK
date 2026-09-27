@@ -144,9 +144,23 @@ build, which is what the LGPL dynamic-link clause intends.
   consumed 8 bytes and yielded 0.0 where the same stream position read as
   u32 + memcpy gave the correct 4-byte float (verified by device pos +
   value against ground-truth bytes). u8/u16/u32/i32 reads are exact.
+- **`git commit -q` can mask a failed commit.** Observed 2026-09-26: a commit
+  message containing backticks was passed inline through PowerShell, which
+  evaluated them as command substitution; `git commit -q` printed nothing, the
+  shell still reported success, and the change sat staged and uncommitted. Always
+  write the message to a file and pass `-F <file>`, then confirm with
+  `git log --oneline -1` that the hash and subject actually changed. Do not trust
+  the exit code alone.
+- **The `Game` enum merges Skyrim LE, SE and AE into one value, on purpose.**
+  They share a record layout, so record parsing and writing need no SE-specific
+  branch and the merge is correct there. It is *not* correct for archive writing:
+  LE uses BSA 0x68 and SE/AE use 0x69. That is why
+  `BsaArchive::targetsForGame()` offers both for `Game::Skyrim` and the Create
+  Archive dialog asks, rather than guessing. There is no LE/SE signal anywhere in
+  the codebase today, so do not add a heuristic that infers one from a filename
+  or a data-folder path without checking a real archive first.
 - **Keep a `LOG_INFO` line at the top of new editor windows** so the
-  log file shows when each window opens, matching the convention in
-  the existing main window.
+  log file shows when each window opens, matching the convention in  the existing main window.
 
 ## Debugging
 
