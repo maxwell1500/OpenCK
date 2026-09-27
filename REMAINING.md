@@ -2024,6 +2024,33 @@ is already done and does not need redoing.
 archives must skip stubs or it will conclude the wrong thing — as an earlier
 sample of this work did.
 
+**Oblivion is installed and reachable, which changes what is knowable — and
+immediately exposed a gap.** `test_ntdlayout` now prefers
+`F:/XboxGames/.../Oblivion GOTY English/Data/Oblivion - Meshes.bsa` over the
+on-demand Skyrim archives, because Oblivion sits on a normal local drive and is
+always fully resident. The archive opens fine (it is **BSA version 0x67**, an
+independent confirmation of the Oblivion target preset), and the fitter runs for
+~100 s over it — but samples **zero** `NiTransformData` blocks, because:
+
+- Oblivion meshes use the header line `Gamebryo File Format, Version 20.0.0.4`,
+  and some files in the same archive use `10.1.0.101`, `10.1.0.106` and
+  `10.2.0.0`.
+- `NifBlockFile` accepts only the TES4-era `20.2.x` line, so every block in
+  every file is rejected.
+
+So the NIF work to date is Skyrim/Starfield-shaped and says nothing about
+Oblivion. Teaching `NifBlockFile` the `20.0.0.4` variant (the same header with a
+different version string, and the same optional post-author u32 question) is
+prerequisite to fitting `NiTransformData` against Oblivion data, and would also
+be the first real Oblivion NIF support in the project. The test now skips with
+that explanation rather than reporting a meaningless "no layout fits" verdict.
+
+**PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),
+`DLCShiveringIsles.esp` and `Knights.esp` found zero `PHDA` subrecords, just as
+the Skyrim masters did. The GOTY install does not help the SCEN editor; the
+Shivering Isles content is dialogue rather than phase data. Persisting scene
+phases still needs a real PHDA sample from a mod.
+
 **`NiTransformData` (Skyrim 1.5 / Oblivion) remains the only NIF-resident
 keyframe format reachable here**, and it is still refused for writing until its
 encoding is confirmed. Hand-decoding samples was not converging, so this is now
