@@ -2031,26 +2031,77 @@ is already done and does not need redoing.
 archives must skip stubs or it will conclude the wrong thing — as an earlier
 sample of this work did.
 
+**Oblivion NIF support: DONE for reading and lossless saving. 7,962 of 7,962
+`Gamebryo` NIFs in `Oblivion - Meshes.bsa` round-trip byte-exactly.**
+`test_nifroundtriparchive` walks the whole archive (~110 s, on a local drive so it
+is fully reproducible) and asserts that every `Gamebryo` file survives a load and
+a save unchanged.
+
+The cause was measured from real bytes, and the first guess was wrong. The header
+line was the easy part: `NifBlockFile` matched one exact string,
+`Gamebryo File Format, Version 20.2.0.7`, and now matches the shape
+(`Gamebryo File Format, Version <maj>.<min>.<patch>.<build>`), recording the
+dotted version via `headerVersion()`.
+
+The real difference is that **three header fields were added part-way through the
+`Gamebryo` line, and an older file has none of them.** Decoded from a 229-byte
+`20.0.0.4` file whose single block is a `NiNode` named "Scene Root" that consumes
+the file exactly, and confirmed against the vendored nifgen `Header` struct
+(`build/blender/.../nifgen/formats/nif/nimain/structs/Header.py`), which gates
+each field on a version:
+
+| field | present from | absent in `20.0.0.4`? |
+|---|---|---|
+| `endian_type` (u8) | `0x14000003` (20.0.0.3) | **yes** — reading it anyway picks up the low byte of `user_version` |
+| `num_strings` / `max_string_length` / `strings` | `0x14010001` (20.1.0.1) | **yes** |
+| `block_size[num_blocks]` | `0x14020005` (20.2.0.5) | **yes** |
+
+The missing size table is the significant one: without it the file records nothing
+that delimits one block from the next, so the payload region cannot be split. Those
+files therefore load and re-save byte for byte, but their block region is kept as
+one opaque run and `hasIndividualBlocks()` returns false. Callers that want
+individual blocks must check it.
+
+Measured result over the archive (7,962 `Gamebryo` files, **0** failures):
+
+| header version | count |
+|---|---|
+| `20.0.0.4` | 7,282 |
+| `20.0.0.5` | 100 |
+| `10.2.0.0` | 490 |
+| `10.1.0.106` | 82 |
+| `10.1.0.101` | 8 |
+
+The `10.x` files are what the `unsupported byte order 10` failures were: 580 of
+them, and the whole group is now explained by the missing `endian_type` byte.
+
+**Still not covered: the 70 `NetImmerse File Format` files** in the same archive
+(41 at `10.0.1.0`, 23 at `10.0.1.2`, 4 at `4.0.0.2`, 1 at `3.3.0.13`, 1 at
+`4.2.1.0`). Those are the Morrowind-era container, not a `Gamebryo` variant — a
+different header shape entirely, with copyright lines and a `Top Level Object`
+block marker instead of a root table. The test counts them separately and reports
+them rather than letting them hide in a general failure count, so the two formats
+are never confused again. Supporting them is untouched remaining work.
+
 **Oblivion is installed and reachable, which changes what is knowable — and
-immediately exposed a gap.** `test_ntdlayout` now prefers
+immediately exposed a second gap.** `test_ntdlayout` prefers
 `F:/XboxGames/.../Oblivion GOTY English/Data/Oblivion - Meshes.bsa` over the
 on-demand Skyrim archives, because Oblivion sits on a normal local drive and is
 always fully resident. The archive opens fine (it is **BSA version 0x67**, an
-independent confirmation of the Oblivion target preset), and the fitter runs for
-~100 s over it — but samples **zero** `NiTransformData` blocks, because:
+independent confirmation of the Oblivion target preset). It now parses those
+headers cleanly — but still samples **zero** `NiTransformData` blocks, for the
+reason above: Oblivion meshes are all pre-20.2.0.5 containers, so no individual
+block is addressable to hand to the fitter. The test skips with that explanation
+rather than reporting a meaningless "no layout fits" verdict, and the skip is now
+honest about which of the two reasons applies.
 
-- Oblivion meshes use the header line `Gamebryo File Format, Version 20.0.0.4`,
-  and some files in the same archive use `10.1.0.101`, `10.1.0.106` and
-  `10.2.0.0`.
-- `NifBlockFile` accepts only the TES4-era `20.2.x` line, so every block in
-  every file is rejected.
-
-So the NIF work to date is Skyrim/Starfield-shaped and says nothing about
-Oblivion. Teaching `NifBlockFile` the `20.0.0.4` variant (the same header with a
-different version string, and the same optional post-author u32 question) is
-prerequisite to fitting `NiTransformData` against Oblivion data, and would also
-be the first real Oblivion NIF support in the project. The test now skips with
-that explanation rather than reporting a meaningless "no layout fits" verdict.
+So `NiTransformData` fitting is blocked on a different prerequisite than it was:
+not the header line, but per-block payload parsers for the pre-20.2.0.5 container.
+Recovering block boundaries there means parsing each block type's own field layout
+in order, which is how the reference reader does it (nifgen's `read_blocks` simply
+parses blocks back to back and only consults a size table when the version has
+one). That is a much larger job than a header variant, and it is the honest next
+step rather than a guess.
 
 **PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),
 `DLCShiveringIsles.esp` and `Knights.esp` found zero `PHDA` subrecords, just as

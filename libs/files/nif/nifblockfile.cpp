@@ -1,4 +1,6 @@
 #include "nifblockfile.hpp"
+#include <QRegularExpression>
+#include <QRegularExpressionMatch>
 
 #include <QFile>
 #include <QSaveFile>
@@ -136,6 +138,28 @@ constexpr int kMaxBlockTypes = 1000;
 constexpr int kMaxGroups = 10000;
 constexpr int kMaxStringLength = 4096;
 
+// Two header fields were added part-way through the Gamebryo line, and their
+// absence is not cosmetic: it changes where the block payloads start.
+//
+// The endian_type byte only exists from 20.0.0.3 on. Earlier files predate the
+// field and are always little-endian, so the byte is simply not in the file:
+// reading it anyway picks up the low byte of user_version, which for the
+// shipped 10.2.0.0 meshes reads back as an "endianness" of 10.
+constexpr quint32 kEndianFieldVersion = 0x14000003u;
+
+// The per-block size table arrived in 20.2.0.5. Before it, the file records
+// neither block lengths nor anything else that delimits them, so the payload
+// region has to be kept as one opaque run. The header string table arrived in
+// 20.1.0.1.
+//
+// Both thresholds are from the NIF format definition (the vendored nifgen
+// `Header` struct, which gates `block_size` on version >= 0x14020005 and
+// `num_strings`/`max_string_length`/`strings` on version >= 0x14010001), and
+// both are confirmed against shipped Oblivion bytes: a 20.0.0.4 file goes
+// straight from the block type index table to the group count.
+constexpr quint32 kBlockSizeTableVersion = 0x14020005u;
+constexpr quint32 kStringTableVersion = 0x14010001u;
+
 } // namespace
 
 bool NifBlockFile::isBethesdaNif(const QString& path)
@@ -180,12 +204,15 @@ bool NifBlockFile::load(const QString& path)
 
 void NifBlockFile::reset()
 {
+    mHeaderVersion.clear();
+    mHeaderLine.clear();
     mBlockTypes.clear();
     mTypeIndex.clear();
     mBlockSize.clear();
     mStrings.clear();
     mGroupIds.clear();
     mBlocks.clear();
+    mBlockRegion.clear();
     mTrailing.clear();
 }
 
@@ -205,13 +232,33 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
         if (!c.ok() || ch == '\n') break;
         magic.append(static_cast<char>(ch));
     }
-    if (magic != "Gamebryo File Format, Version 20.2.0.7")
-        return bad(QStringLiteral("unsupported version line '%1'").arg(QString::fromLatin1(magic.left(60))));
+    // The line is "Gamebryo File Format, Version <major>.<minor>.<patch>.<build>".
+    // Matching one exact string was wrong: Skyrim ships 20.2.0.7, Oblivion
+    // meshes 20.0.0.4, and some files in the same archive 10.1.0.101 /
+    // 10.1.0.106 / 10.2.0.0. Only the shape is stable, so match the shape and
+    // let the rest of the parse prove the file is consistent.
+    static const QByteArray kMagicPrefix = "Gamebryo File Format, Version ";
+    static const QRegularExpression kVersionPattern(
+        QStringLiteral("^Gamebryo File Format, Version "
+                       "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,5})$"));
+    if (!magic.startsWith(kMagicPrefix))
+        return bad(QStringLiteral("unrecognised header line '%1'").arg(QString::fromLatin1(magic.left(60))));
+    const QRegularExpressionMatch match = kVersionPattern.match(QString::fromLatin1(magic));
+    if (!match.hasMatch())
+        return bad(QStringLiteral("unrecognised version line '%1'").arg(QString::fromLatin1(magic.left(60))));
+    mHeaderVersion = QStringLiteral("%1.%2.%3.%4")
+                          .arg(match.captured(1), match.captured(2),
+                               match.captured(3), match.captured(4));
+    // Re-emit the line byte for byte rather than rebuilding it from the parsed
+    // numbers, so a re-save cannot silently restamp the file's version.
+    mHeaderLine = raw.left(c.pos());
 
     mVersion = c.u32();
-    const quint8 endian = c.u8();
-    if (!c.ok() || endian != 1)
-        return bad(QStringLiteral("unsupported byte order %1").arg(endian));
+    if (mVersion >= kEndianFieldVersion) {
+        const quint8 endian = c.u8();
+        if (!c.ok() || endian != 1)
+            return bad(QStringLiteral("unsupported byte order %1").arg(endian));
+    }
 
     mUserVersion = c.u32();
     const quint32 numBlocks = c.u32();
@@ -220,6 +267,10 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
         return bad(QStringLiteral("implausible header: blocks=%1 bsVersion=%2")
                        .arg(numBlocks).arg(mBsVersion));
 
+    // bs_header holds bs_version (already read) then a run of ExportStrings
+    // whose membership depends on bs_version: unknown_int only above 130,
+    // max_filepath only from 103. Both variants are tried by the caller, so
+    // guessing wrong here only costs one retry.
     mAuthor = readExportString(c);
     mHasUnknownInt = hasUnknownInt;
     if (hasUnknownInt) mUnknownInt = c.u32();
@@ -248,24 +299,31 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
             return bad(QStringLiteral("block %1 has out-of-range type index %2").arg(i).arg(ti));
         mTypeIndex.append(ti);
     }
-    for (quint32 i = 0; i < numBlocks; ++i)
-        mBlockSize.append(c.u32());
-    if (!c.ok()) return bad(QStringLiteral("truncated block size table"));
+    if (!c.ok()) return bad(QStringLiteral("truncated block type index table"));
 
-    const quint32 numStrings = c.u32();
-    mMaxStringLen = c.u32();
-    if (!c.ok() || numStrings > kMaxStrings || mMaxStringLen > kMaxStringLength)
-        return bad(QStringLiteral("implausible string table: %1 strings, max %2")
-                       .arg(numStrings).arg(mMaxStringLen));
-    mStrings.clear();
-    for (quint32 i = 0; i < numStrings; ++i) {
-        const quint32 len = c.u32();
-        if (!c.ok() || len > mMaxStringLen + 1)
-            return bad(QStringLiteral("string %1 has bad length %2 (max %3)")
-                           .arg(i).arg(len).arg(mMaxStringLen));
-        mStrings.append(QString::fromLatin1(c.raw(len)));
+    const bool hasSizeTable = mVersion >= kBlockSizeTableVersion;
+    if (hasSizeTable) {
+        for (quint32 i = 0; i < numBlocks; ++i)
+            mBlockSize.append(c.u32());
+        if (!c.ok()) return bad(QStringLiteral("truncated block size table"));
     }
-    if (!c.ok()) return bad(QStringLiteral("truncated string table"));
+
+    if (mVersion >= kStringTableVersion) {
+        const quint32 numStrings = c.u32();
+        mMaxStringLen = c.u32();
+        if (!c.ok() || numStrings > kMaxStrings || mMaxStringLen > kMaxStringLength)
+            return bad(QStringLiteral("implausible string table: %1 strings, max %2")
+                           .arg(numStrings).arg(mMaxStringLen));
+        mStrings.clear();
+        for (quint32 i = 0; i < numStrings; ++i) {
+            const quint32 len = c.u32();
+            if (!c.ok() || len > mMaxStringLen + 1)
+                return bad(QStringLiteral("string %1 has bad length %2 (max %3)")
+                               .arg(i).arg(len).arg(mMaxStringLen));
+            mStrings.append(QString::fromLatin1(c.raw(len)));
+        }
+        if (!c.ok()) return bad(QStringLiteral("truncated string table"));
+    }
 
     const quint32 numGroups = c.u32();
     if (!c.ok() || numGroups > kMaxGroups)
@@ -274,6 +332,18 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
     for (quint32 i = 0; i < numGroups; ++i)
         mGroupIds.append(c.u32());
     if (!c.ok()) return bad(QStringLiteral("truncated group table"));
+
+    if (!hasSizeTable) {
+        // No size table: everything from here to end of file is the block
+        // region, kept as one run. The trailing num_roots + roots table is part
+        // of it, which is harmless because the region is never reinterpreted.
+        mBlockRegion = raw.mid(c.pos());
+        LOG_INFO(QString("NifBlockFile: %1 blocks in one opaque region (%2 bytes), "
+                         "%3 group(s), bsVersion %4")
+                     .arg(numBlocks).arg(mBlockRegion.size())
+                     .arg(mGroupIds.size()).arg(mBsVersion));
+        return true;
+    }
 
     mBlocks.clear();
     mBlocks.reserve(numBlocks);
@@ -327,11 +397,11 @@ QList<int> NifBlockFile::findBlocks(const QString& typeName) const
 QByteArray NifBlockFile::serialize() const
 {
     QByteArray out;
-    out.append("Gamebryo File Format, Version 20.2.0.7\n");
+    out.append(mHeaderLine);
     appendU32(out, mVersion);
-    appendU8(out, 1);
+    if (mVersion >= kEndianFieldVersion) appendU8(out, 1);
     appendU32(out, mUserVersion);
-    appendU32(out, static_cast<quint32>(mBlocks.size()));
+    appendU32(out, static_cast<quint32>(mTypeIndex.size()));
     appendU32(out, mBsVersion);
     out.append(mAuthor);
     if (mHasUnknownInt) appendU32(out, mUnknownInt);
@@ -345,18 +415,29 @@ QByteArray NifBlockFile::serialize() const
         out.append(bytes);
     }
     for (quint16 ti : mTypeIndex) appendU16(out, ti);
-    for (quint32 size : mBlockSize) appendU32(out, size);
 
-    appendU32(out, static_cast<quint32>(mStrings.size()));
-    appendU32(out, mMaxStringLen);
-    for (const QString& s : mStrings) {
-        const QByteArray bytes = s.toLatin1();
-        appendU32(out, static_cast<quint32>(bytes.size()));
-        out.append(bytes);
+    const bool hasSizeTable = mVersion >= kBlockSizeTableVersion;
+    if (hasSizeTable) {
+        for (quint32 size : mBlockSize) appendU32(out, size);
+    }
+
+    if (mVersion >= kStringTableVersion) {
+        appendU32(out, static_cast<quint32>(mStrings.size()));
+        appendU32(out, mMaxStringLen);
+        for (const QString& s : mStrings) {
+            const QByteArray bytes = s.toLatin1();
+            appendU32(out, static_cast<quint32>(bytes.size()));
+            out.append(bytes);
+        }
     }
 
     appendU32(out, static_cast<quint32>(mGroupIds.size()));
     for (quint32 id : mGroupIds) appendU32(out, id);
+
+    if (!hasSizeTable) {
+        out.append(mBlockRegion);
+        return out;
+    }
 
     // All block payloads first, then the per-block footer array: the footer
     // is a separate trailing table, not a per-block suffix.

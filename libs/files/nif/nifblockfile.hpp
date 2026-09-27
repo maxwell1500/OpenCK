@@ -49,7 +49,17 @@ public:
     QList<int> findBlocks(const QString& typeName) const;
 
     quint32 bsVersion() const { return mBsVersion; }
+    /// Dotted version from the header line, e.g. "20.0.0.4" or "20.2.0.7".
+    QString headerVersion() const { return mHeaderVersion; }
     int stringCount() const { return mStrings.size(); }
+
+    // False for the pre-20.2.0.5 container, which carries no per-block size
+    // table. Those files load and re-save byte for byte, but the block region
+    // cannot be split into individual blocks: the file simply does not record
+    // where one block ends and the next begins, so only a per-block-type payload
+    // parser could recover that, and there is not one here yet. Callers that
+    // want individual blocks must check this before asking for them.
+    bool hasIndividualBlocks() const { return mBlockRegion.isEmpty(); }
 
     // Clip name -> owning controller block, gathered from every
     // NiControllerSequence. A clip name only exists here, so this is what ties
@@ -112,6 +122,13 @@ private:
     quint32 mVersion = 0x14020007;
     quint32 mUserVersion = 0;
     quint32 mBsVersion = 0;
+    /// The dotted version from the header line, e.g. "20.0.0.7". Recorded
+    /// so a caller can tell which game's file it is looking at.
+    QString mHeaderVersion;
+    /// The version line including its trailing newline, kept verbatim. The
+    /// serializer must not rewrite it: the line is part of the file's bytes and
+    /// a NIF that is re-saved as a different version stops being the same file.
+    QByteArray mHeaderLine;
     quint32 mUnknownInt = 0;
     QByteArray mAuthor;
     QByteArray mExportScript;
@@ -123,6 +140,9 @@ private:
     quint32 mMaxStringLen = 0;
     QVector<quint32> mGroupIds;
     QVector<Block> mBlocks;
+    /// Everything from the first block payload to end of file, for containers
+    /// that carry no size table and therefore cannot be split. Empty otherwise.
+    QByteArray mBlockRegion;
     bool mHasFooter = false;
     bool mHasUnknownInt = false;
     QByteArray mTrailing;  // bytes after the block footer, preserved verbatim

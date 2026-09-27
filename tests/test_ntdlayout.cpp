@@ -211,14 +211,16 @@ void TestNtdLayout::fit()
 
     say(QStringLiteral("  archive: %1").arg(opened));
 
-    // Zero sampled blocks means the archive opened but its NIFs were not
-    // readable, not that no data was there. Oblivion's meshes use
-    // "Gamebryo File Format, Version 20.0.0.4" and some files use 10.x, and
-    // NifBlockFile only accepts the TES4-era 20.2.x header, so every block is
-    // skipped. Say so and skip rather than reporting a meaningless verdict.
+    // Zero sampled blocks means the archive opened but no block was addressable,
+    // not that no data was there. The header now parses, but Oblivion's meshes
+    // are all pre-20.2.0.5 containers, which carry no per-block size table, so
+    // their block region is one opaque run and no individual block can be
+    // handed to the fitter. Say so and skip rather than reporting a meaningless
+    // verdict.
     if (blocksSeen == 0)
-        QSKIP("the archive opened, but no NIF could be parsed: NifBlockFile does "
-              "not accept this game's NIF version line yet");
+        QSKIP("the archive opened and its NIF headers parse, but these are "
+              "pre-20.2.0.5 containers with no block size table, so no "
+              "individual block is addressable yet");
 
     if (fits.isEmpty()) {
         say("  NO candidate layout fits even one block exactly");

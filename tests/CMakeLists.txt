@@ -499,6 +499,11 @@ openck_add_test(test_qtformdialog)
 
 
 # Fits the Skyrim 1.5 / Oblivion NiTransformData layout against real blocks.
+# Byte-exact NIF round-trip over a whole shipped mesh archive.
+add_executable(test_nifroundtriparchive test_nifroundtriparchive.cpp)
+target_link_libraries(test_nifroundtriparchive PRIVATE openck_files openck_esm test_stubs Qt6::Test)
+target_include_directories(test_nifroundtriparchive PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_heavy_test(test_nifroundtriparchive)
 add_executable(test_ntdlayout test_ntdlayout.cpp)
 target_link_libraries(test_ntdlayout PRIVATE openck_files Qt6::Test)
 target_include_directories(test_ntdlayout PRIVATE ${TEST_INCLUDE_DIRS})
