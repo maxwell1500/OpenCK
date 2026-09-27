@@ -151,6 +151,17 @@ build, which is what the LGPL dynamic-link clause intends.
   write the message to a file and pass `-F <file>`, then confirm with
   `git log --oneline -1` that the hash and subject actually changed. Do not trust
   the exit code alone.
+- **A `-F` message file that already exists will silently reuse its old
+  contents.** Observed 2026-09-27: a scratch message path under `%TEMP%` was
+  reused from two days earlier, so a commit went out under a completely
+  unrelated subject that described work not in the commit at all — and the exit
+  code was 0, so the mistake was invisible until the log was read. Prefer a
+  message path you have just written, or delete it first; and compare the
+  resulting `git log -1 --format=%s` against the subject you intended *word for
+  word*, not just the hash. `Set-Content -Encoding UTF8` also writes a BOM on
+  Windows PowerShell 5.1, which becomes part of the subject — write the file
+  with `[System.IO.File]::WriteAllText($p, $text, (New-Object System.Text.UTF8Encoding($false)))`
+  and check `[int][char]$subject[0]` is the character you expect.
 - **The `Game` enum merges Skyrim LE, SE and AE into one value, on purpose.**
   They share a record layout, so record parsing and writing need no SE-specific
   branch and the merge is correct there. It is *not* correct for archive writing:
