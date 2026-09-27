@@ -2148,33 +2148,52 @@ way the reference reader does, guarded so a wrong layout cannot do damage:
   `NiStringExtraData`, `NiBinaryExtraData`, `NiKeyframeData` and the
   transform/float/bool/pos/color data and controller/interpolator chain).
 
-**The discrepancy, precisely.** In a shipped 20.0.0.4 file, a `NiNode` block runs
-from its `SizedString` name to its `flags` field across **four** 32-bit words
-where the reference field list accounts for three:
+**The discrepancy, resolved: a per-block tag word, not a surplus field.** An
+earlier note in this file claimed a 4-byte surplus in `NiObjectNET` between a
+node's name and its `flags`. That was wrong, and the mistake is worth recording
+because it nearly sent the work down a false path. Chasing it produced the actual
+answer: **up to and including `10.1.0.106` every non-`bhk` block is preceded by a
+u32 that must be zero**, and the walker was not consuming it.
+
+The evidence is a `10.1.0.106` file whose block region opens with a zero word
+immediately before its first block's name:
 
 ```
-name "hollowedTree"        SizedString, u32 length + 12 bytes
-num_extra_data_list = 1    Uint
-extra_data_list[0] = 2     Ref
-0xFFFFFFFF                  <- controller
-0xFFFFFFFF                  <- UNACCOUNTED FOR
-flags = 0x0010              Ushort (bsVersion 11)
-translation (0,0,0) / rotation (identity) / scale (1.0)
+306 = 0x00000000   <- per-block tag, not an empty name
+310 = 15           <- name length
+314 = "MS14LongGrass01"
+329 = 1, 333 = 1, 337 = 0xFFFFFFFF, 341 = 0x0010   <- count, ref, controller, flags
 ```
 
-Everything after the extra word lines up exactly: the rotation is a clean identity
-with 1.0 on the diagonal and the next block's name is the literal `BSX` followed
-by a plausible `next_extra_data` ref and flags value. A file whose `NiNode`
-declares **no** extra data has exactly the expected two words, so the delta
-appears only when the list is non-empty. Reading each list entry as 8 bytes fits
-both observed files, but it still does not make the archive walk, so it is not
-adopted: the code keeps the documented 4-byte `Ref` and records the mismatch
-rather than encoding a guess. Files stay on the opaque path, which round-trips
-byte for byte, until this is resolved.
+Consuming the tag lines that file up completely; without it the name is read two
+words early, which is what looked like a surplus field. With the tag handled, the
+whole archive walks past `NiNode` — **block 0 no longer fails for a single file**,
+across all 7,962. The reference reader's own field list documents the same rule
+(`version <= 0x0A01006A and not block_type.startswith("bhk")`).
 
-The next step is a file with **two or more** extra-data entries: that
-distinguishes "entries are 8 bytes" from "there is one extra field" and settles
-it from bytes rather than inference.
+This also settles a second question that had been left open. Two of the three
+candidate readings of the earlier "surplus" were "each extra-data entry is 8
+bytes" and "there is one extra field when the list is non-empty"; the third
+candidate, "nothing is wrong here at all", is the correct one. The documented
+4-byte `Ref` array is right and was never changed.
+
+**What blocks the walk now, per block type.** With the base chain correct the
+test names the exact blocker for every file, and the current standings are:
+
+| blocker | files |
+|---|---|
+| `NiStringExtraData` | 721 |
+| `NiBinaryExtraData` | 218 |
+| `NiTriStripsData` | 155 |
+| `NiNode` (as a non-first block) | 53 |
+| `NiTriShape` | 20 |
+| `NiMaterialProperty` | 11 |
+
+`NiStringExtraData`, `NiBinaryExtraData` and `NiTriStripsData` already have
+walkers, so those are layout bugs in the walkers rather than missing layouts -
+the next thing to do is decode one block of each from bytes the way the
+`10.1.0.106` node above was decoded. The rest still need writing. One file walks
+end to end today; the rest stay on the opaque path and round-trip byte for byte.
 
 
 **PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),

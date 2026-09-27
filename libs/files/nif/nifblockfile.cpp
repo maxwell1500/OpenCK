@@ -25,6 +25,11 @@ public:
     int remaining() const { return mData.size() - mPos; }
     bool atEnd() const { return mPos >= mData.size(); }
 
+    // Free-text note a walker leaves behind for the failure report. It carries
+    // no parsing meaning; it exists so a rejected block can say which field it
+    // was in rather than only how far it got.
+    QString note;
+
     quint8 u8()
     {
         if (!take(1)) return 0;
@@ -180,6 +185,12 @@ using BlockWalker = bool (*)(Cursor&, quint32 version, quint32 bsVersion);
 // different header again (that is the NetImmerse case, handled elsewhere).
 constexpr quint32 kWalkVersionFloor = 0x0A000000u;
 
+// Up to and including 10.1.0.106 every non-bhk block is preceded by a u32 that
+// must be zero. Confirmed from bytes: a 10.1.0.106 file has a zero word
+// immediately before its first block's name, and removing it lines the whole
+// block up, where without it the name lands two words early.
+constexpr quint32 kBlockDummyVersion = 0x0A01006Au;
+
 bool skipRefs(Cursor& c, quint32 count)
 {
     for (quint32 i = 0; i < count; ++i) c.u32();
@@ -208,16 +219,8 @@ bool walkNiObjectNET(Cursor& c, quint32 version)
     if (version >= 50331648u && version <= 67240448u) c.u32();  // extra_data
     if (version >= 167772416u) {                                 // num_extra_data_list
         const quint32 n = c.u32();
+        c.note = QStringLiteral("extra_data_list=%1").arg(n);
         if (!c.ok() || n > 100000u) return false;
-        // UNRESOLVED: the shipped files do not agree with this being a plain
-        // array of 4-byte Refs. In a 20.0.0.4 file whose NiNode declares one
-        // entry there are four words between the end of the name and the
-        // object's flags, where a 4-byte Ref accounts for only three. A file
-        // that declares no entries has exactly two. Reading entries as 8 bytes
-        // fits both of those, and still does not make the archive walk, so the
-        // discrepancy is recorded here rather than papered over with a guess.
-        // Until it is resolved these files keep the opaque-region path, which
-        // round-trips byte for byte.
         if (!skipRefs(c, n)) return false;
     }
     if (version >= 50331648u) c.u32();                           // controller
@@ -673,8 +676,18 @@ bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString
     sizes.reserve(static_cast<int>(numBlocks));
 
     for (quint32 i = 0; i < numBlocks; ++i) {
-        const int start = c.pos();
         const QString type = mBlockTypes.at(mTypeIndex.at(i));
+        if (mVersion <= kBlockDummyVersion && !type.startsWith(QStringLiteral("bhk"))) {
+            const quint32 tag = c.u32();
+            if (!c.ok() || tag != 0) {
+                error = QStringLiteral("block %1 (%2) is not preceded by a zero tag "
+                                       "(got 0x%3)")
+                            .arg(i).arg(type).arg(tag, 8, 16, QChar('0'));
+                return false;
+            }
+        }
+        const int start = c.pos();
+        c.note.clear();
         const auto walker = walkers.constFind(type);
         if (walker == walkers.constEnd()) {
             error = QStringLiteral("no payload layout for block type %1").arg(type);
@@ -682,8 +695,8 @@ bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString
         }
         if (!(*walker)(c, mVersion, mBsVersion) || !c.ok()) {
             error = QStringLiteral("block %1 (%2) could not be walked: read %3 byte(s) "
-                                   "from offset %4")
-                        .arg(i).arg(type).arg(c.pos() - start).arg(start);
+                                   "from offset %4 %5")
+                        .arg(i).arg(type).arg(c.pos() - start).arg(start).arg(c.note);
             return false;
         }
         Block block;

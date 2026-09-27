@@ -22,6 +22,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMap>
+#include <QRegularExpression>
 #include <QSet>
 #include <QTemporaryDir>
 
@@ -74,6 +75,23 @@ private:
         QFile out(QString::fromLocal8Bit(target));
         if (!out.open(QIODevice::WriteOnly)) return;
         out.write(bytes);
+    }
+
+    // Set OPENCK_TEST_NIF_DUMP_MIN_EXTRA to N to capture the first NIF whose
+    // rejected block walk reports an extra-data list of at least N entries, and
+    // OPENCK_TEST_NIF_DUMP_FAILURE to where to put it. This is how the
+    // NiObjectNET surplus word is settled from bytes: a node with two or more
+    // entries separates "8 bytes per entry" from "one extra field when the list
+    // is non-empty", which a single-entry node cannot.
+    static bool hasEnoughExtraData(const QString& walkError)
+    {
+        const QByteArray minText = qgetenv("OPENCK_TEST_NIF_DUMP_MIN_EXTRA");
+        if (minText.isEmpty()) return false;
+        const int minimum = minText.toInt();
+        const int marker = walkError.indexOf(QStringLiteral("extra_data_list="));
+        if (marker < 0) return false;
+        return walkError.mid(marker + 17).section(QRegularExpression(QStringLiteral("\\D")),
+                                                  0, 0).toInt() >= minimum;
     }
 
 public:
@@ -182,7 +200,9 @@ private slots:
                 // could not handle. This is what tells us which payload layout
                 // to write next, so it is reported rather than swallowed.
                 walkReasons[file.lastWalkError()] += 1;
-                if (maybeStopAtFailure(entry.fullPath, bytes)) return;
+                if (hasEnoughExtraData(file.lastWalkError())
+                    && maybeStopAtFailure(entry.fullPath, bytes))
+                    return;
             }
 
             if (!file.save(probe)) {
