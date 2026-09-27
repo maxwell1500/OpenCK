@@ -1021,42 +1021,55 @@ target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)
 target_include_directories(make_testplugin PRIVATE ${TEST_INCLUDE_DIRS})
 
 # Convenience target that builds every test executable.
-add_custom_target(all_tests DEPENDS copy_ads_dll
-    test_animationeventvalidator test_archivebrowser test_assetresolver
-    test_audiopipelinetools test_autopainter test_ba2dx10 test_ba2write
-    test_blenderlauncher test_blendtreemodel test_bnetclient test_brushalphamask
-    test_brushdefinition test_bsaarchive test_bsawrite test_btdfile test_btdterrain
-    test_cellrecord test_cellviewcanvas test_cli test_collisionshapegenerator
-    test_columnvalidator test_component test_compressedrecord test_conditionrecord
-    test_configpaths test_conflict test_creatureattachpoints test_creatureeditor
-    test_crashhandler test_csvsnippet test_datamodel test_ddsdecoder test_dumpesm test_editor_lifecycle
-    test_editor_widgets test_editor_writeback test_editorproperty test_editrecordcommand test_efshrecord
-    test_esl test_exportimport     test_facefxactor test_fbximporter test_fuzparser test_gameformat test_gitrepository
-    test_gizmomath test_groundtruth test_headerparsing test_hknpphysicssystem test_iconrenderer
-    test_imgsrecord test_integration test_loader test_locationrecord test_lodgenerator
-    test_mastermanagement test_materialpropertygraph test_materialruletemplate
-    test_meshlodconfig test_meshprobe test_missingrecords test_modmanager
-    test_multigame test_navmeshtoolkit
-    test_navmrecord     test_nifanimation test_nifblockfile test_nifintegration test_nifpyfilewrapper test_nifskinning test_nodegraph
-    test_obscript test_obscriptbinder test_obscriptcompiler test_obscriptparser
-    test_obscripttypechecker
-    test_objectwindow test_objectwindowfilter test_opallist test_packagerecord
-    test_papyruscompiler test_papyruslanguageserver test_papyrusproject
-    test_papyrusremotedebugger test_papyrustypechecker test_particlebundle
-    test_particleprojectilebindings test_particleslodpresets test_particlesimulation
-    test_perforcerepository
-    test_planetdefinition test_planetcodec test_plugincompactor test_pluginio test_pndrecord test_morphrecord test_shipcomposite test_starrecord
-    test_primitivemeshgenerator test_qtformdialog test_referencebatchactions
-    test_reportexport test_scanbtd test_scenephasemodel test_scenetimeline
-    test_scenrecord test_scripteditor test_scriptflagfile test_searchalgorithm test_shortcutmanager
-    test_specialized_widgets test_spellchecker test_starfieldesm test_starfieldtools
-    test_subrecord_roundtrip
-    test_subrecord_diff
+#
+# The list of dependencies is derived from the tests CTest will actually run
+# rather than kept by hand. A hand-kept list silently went stale: tests added
+# after it was written were never added to it, so building `all_tests` finished
+# without rebuilding them, and the suite then reported a pass using stale
+# executables. Anything registered through openck_add_test()/
+# openck_add_heavy_test() is now included automatically, forever.
+get_property(OPENCK_CTEST_TARGETS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY TESTS)
+
+# Standalone tools that are deliberately not CTest tests, so they cannot appear
+# in the list above even though a "build the test exes" target should make them.
+set(OPENCK_STANDALONE_TOOLS
+    make_testplugin
     test_fullscale_roundtrip
-    test_terrainblock
-    test_terrainoverlaymask test_textureconversionrules test_texturelayer
-    test_tes3 test_tes3roundtrip test_tes3data test_tes3recorddatawidget test_structuredfidelity test_thememanager test_tier3_components test_undostack test_warningsdock
-    test_wiring test_worldspacerecord test_xwmadecoder test_zipwriter)
+    test_meshresolve
+    test_subrecord_diff)
+
+add_custom_target(all_tests DEPENDS copy_ads_dll
+    ${OPENCK_CTEST_TARGETS}
+    ${OPENCK_STANDALONE_TOOLS})
+
+# Guard against the staleness coming back in a new form: a test_* executable
+# that neither CTest nor the standalone list knows about would be silently left
+# out of the build, which is exactly the failure this target is meant to prevent.
+# This reads the directory's target list, so it only sees targets declared above
+# it: keep this block last in the file and add new tests above it.
+get_property(OPENCK_DIR_TARGETS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+             PROPERTY BUILDSYSTEM_TARGETS)
+set(OPENCK_UNCOVERED_TARGETS)
+foreach(target IN LISTS OPENCK_DIR_TARGETS)
+    if(NOT target MATCHES "^test_")
+        continue()
+    endif()
+    get_target_property(target_type ${target} TYPE)
+    if(NOT target_type STREQUAL "EXECUTABLE")
+        continue()
+    endif()
+    if(target IN_LIST OPENCK_CTEST_TARGETS OR target IN_LIST OPENCK_STANDALONE_TOOLS)
+        continue()
+    endif()
+    list(APPEND OPENCK_UNCOVERED_TARGETS ${target})
+endforeach()
+if(OPENCK_UNCOVERED_TARGETS)
+    string(REPLACE ";" ", " OPENCK_UNCOVERED_TEXT "${OPENCK_UNCOVERED_TARGETS}")
+    message(FATAL_ERROR
+        "all_tests would not build: ${OPENCK_UNCOVERED_TEXT}. Register each with "
+        "openck_add_test()/openck_add_heavy_test(), or add it to "
+        "OPENCK_STANDALONE_TOOLS if it is deliberately not a CTest test.")
+endif()
 
 # Vendored libogg self-tests are registered with CTest (external/ogg) but the
 # subdirectory is EXCLUDE_FROM_ALL, so nothing built them: CTest reported them
