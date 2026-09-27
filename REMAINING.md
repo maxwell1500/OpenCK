@@ -1683,31 +1683,38 @@ second registration wins while the discarded factory is never called.
 tests (`test_scenetimeline`, `test_scenephasemodel`) — they are working,
 tested components awaiting a persisted scene editor, not dead code.
 
-**The heavyweight real-data tests are intermittently failing; the cause is not
-diagnosed.** Observed 2026-09-26 across several full runs of an unchanged tree:
+**The heavyweight real-data tests were failing on QTest's watchdog, not a
+memory bug — fixed 2026-09-26.** `test_structuredfidelity` and `test_loader`
+were intermittently reported as failing with `0xc0000409`, which reads exactly
+like a stack buffer overrun and sent me looking for an out-of-bounds access in
+the hand-rolled subrecord walkers. That diagnosis was **wrong**. The real cause,
+visible once the failing run's output was kept instead of discarded, is:
 
-- `test_structuredfidelity` walks the whole of `Starfield.esm` — about 1.2 GB,
-  3.49 million index entries, ~250 s — and exits `0xc0000409` (stack buffer
-  overrun) on some runs while passing on others. It failed three times in a row
-  and then passed in a later batch.
-- `test_loader` (~256 s against real game data) failed once inside a batch and
-  passed immediately when re-run on its own.
+```
+QFATAL : Test function timed out
+```
 
-The obvious first hypothesis for the first of these, that the on-demand game
-folder was evicting the file mid-read, was tested and **is wrong**: a preflight
-that read the entire file end to end still crashed, and the run took 300 s
-rather than skipping, so the data was fully resident. That preflight was reverted
-rather than left in to double the I/O for nothing.
+QTest kills a test function that exceeds five minutes and reports it as a fatal
+error with exit code `0xC0000409`. `test_structuredfidelity` streams 1.2 GB and
+builds a 3.49-million-entry index, and its runtime swings enormously with
+disk-cache warmth: across ten runs it took 93 s, 97 s, 107 s, 121 s, 220 s,
+291 s, **491 s**, 400 s, 312 s and 291 s. It therefore lands on either side of
+the 300 s boundary from run to run, which is why it looked intermittent and why
+the first investigation blamed the wrong thing. A store-eviction hypothesis had
+already been tested and disproved earlier.
 
-No cause has been established, and with two independent heavyweight tests
-failing intermittently the likeliest explanations are resource pressure or
-something time- or order-dependent rather than a single parser bug — but that is
-a guess, not a finding. Until it is diagnosed, **the suite is not reliably
-green**, and a passing run is not proof that a change is safe. Bisecting from the
-hand-rolled subrecord walkers in `test_structuredfidelity.cpp` (`isContiguous`,
-`subStreamNames`) is the obvious first step: they advance `pos` by a length read
-out of the file and are the most likely place for an out-of-bounds access on
-unusual input.
+`openck_add_heavy_test()` now registers data-heavy tests with
+`QTEST_FUNCTION_TIMEOUT` and a matching CTest `TIMEOUT`, so a correct run cannot
+be failed by a cold or warm cache. Ten consecutive runs of
+`test_structuredfidelity` then passed 10/10, including the 491 s one that the
+old limit would have killed. Note that the old limit was not merely
+inconvenient: without this change roughly one run in six failed on an unchanged
+tree, so a "green suite" claim previously meant little.
+
+The lesson worth keeping: check the *test output* of a failing run before
+inferring a cause from its exit code. `0xC0000409` is a timeout here, and the
+`strncpy`/`_chkstk` frames in the stack were the watchdog's own stack, not the
+fault.
 
 **Still open:** a persisted SCEN editor — and it is blocked on evidence, not
 effort. The phase timeline is held in `ScenePhaseModel` and rendered by

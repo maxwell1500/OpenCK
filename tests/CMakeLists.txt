@@ -55,6 +55,23 @@ function(openck_add_test name)
     )
 endfunction()
 
+# Registers a test that reads a large amount of real game data.
+#
+# QTest kills a test function that runs longer than five minutes, reporting it
+# as a fatal "timed out" failure with exit code 0xC0000409 - which is easy to
+# misread as a crash or a stack corruption. The fidelity and loader tests walk
+# or stream whole master files and have been observed between 108 s and 301 s
+# purely on disk-cache warmth, so they land on either side of that boundary
+# from run to run. Raise the per-function watchdog for these rather than let a
+# cache-warm machine fail a correct run.
+function(openck_add_heavy_test name)
+    openck_add_test(${name})
+    set_tests_properties(${name} PROPERTIES
+        ENVIRONMENT "OPENCK_LOG_DIR=${CMAKE_BINARY_DIR}/test-logs;QTEST_FUNCTION_TIMEOUT=3600000"
+        TIMEOUT 3900
+    )
+endfunction()
+
 # ESM I/O round-trip tests
 add_executable(test_pluginio test_pluginio.cpp)
 target_link_libraries(test_pluginio PRIVATE openck_esm Qt6::Test)
@@ -73,7 +90,7 @@ openck_add_test(test_integration)
 add_executable(test_loader test_loader.cpp)
 target_link_libraries(test_loader PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_loader PRIVATE ${TEST_INCLUDE_DIRS})
-openck_add_test(test_loader)
+openck_add_heavy_test(test_loader)
 
 # Conflict detection tests
 add_executable(test_conflict test_conflict.cpp)
@@ -829,7 +846,7 @@ openck_add_test(test_tes3data)
 add_executable(test_structuredfidelity test_structuredfidelity.cpp)
 target_link_libraries(test_structuredfidelity PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_structuredfidelity PRIVATE ${TEST_INCLUDE_DIRS})
-openck_add_test(test_structuredfidelity)
+openck_add_heavy_test(test_structuredfidelity)
 
 # PACK record with typed CTDA conditions
 add_executable(test_packagerecord test_packagerecord.cpp)
