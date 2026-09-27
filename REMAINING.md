@@ -2100,8 +2100,37 @@ not the header line, but per-block payload parsers for the pre-20.2.0.5 containe
 Recovering block boundaries there means parsing each block type's own field layout
 in order, which is how the reference reader does it (nifgen's `read_blocks` simply
 parses blocks back to back and only consults a size table when the version has
-one). That is a much larger job than a header variant, and it is the honest next
-step rather than a guess.
+one). `test_nifroundtriparchive` now measures what that costs, because the
+obvious plan turns out to be the wrong one.
+
+**How big the block-splitting job actually is (measured, 2026-09-27).** The
+archive declares **113 distinct block types**. A file only becomes addressable if
+*every* block in it can be walked, so coverage is a whole-file property, and the
+cumulative curve over the most frequent types is:
+
+| types implemented | files addressable | of which carry `NiTransformData` |
+|---|---|---|
+| top 5 | 100 / 7,962 | 0 |
+| top 10 | 328 | 0 |
+| top 15 | 2,895 | 0 |
+| top 20 | 4,182 | 2 |
+| top 30 | 6,100 | 5 |
+| top 40 | 6,911 | 5 |
+| all 113 | 7,962 | 321 |
+
+Only **321 of 7,962 files carry `NiTransformData` at all**, and between them they
+contain **102 distinct block types**. So the tempting milestone — "implement the
+twenty commonest types, which covers half the archive" — would have been a large
+body of work that unblocked **2** of the 321 files the `NiTransformData` fitter
+actually needs. The animated meshes that carry it are precisely the files that
+also pull in the particle, physics, skinning and morph families, so "common" and
+"needed" are almost disjoint sets here.
+
+Recorded so the next attempt does not spend itself on the top-20 plan. The real
+choice is: implement ~102–113 payload walkers (a large but bounded project that
+finally makes these files block-addressable and unblocks the fitter), or accept
+that the pre-20.2.0.5 container is read-and-save-only for now. `test_ntdlayout`
+prints the curve on every run, so the numbers stay honest as things change.
 
 **PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),
 `DLCShiveringIsles.esp` and `Knights.esp` found zero `PHDA` subrecords, just as
@@ -2116,9 +2145,10 @@ approached as a fit rather than a guess: `test_ntdlayout` pulls every reachable
 `NiTransformData` block and tries all 24 candidate layouts (six channel
 orderings x first-key-carries-time x counts-up-front), keeping only a layout
 that consumes *every* block exactly. A layout that fits some blocks but not all
-is reported and deliberately left unproven. Run it when a Skyrim archive is
-resident. Oblivion would add more samples of the same generation; it is not
-installed on this machine.
+is reported and deliberately left unproven. The fitter is blocked on the
+block-splitting work above rather than on anything about Oblivion itself: the
+headers parse, and the 321 candidate files are identified, but no block in them
+can be handed to the fitter individually yet.
 
 **The game folders are on-demand installs, and that makes the archive tests
 flaky.** Individual `.ba2` files flip between resident and evicted between runs

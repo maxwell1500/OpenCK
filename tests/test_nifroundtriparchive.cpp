@@ -105,6 +105,9 @@ private slots:
         int netImmerse = 0;
         int smallestNifSize = 0;
         QMap<QString, int> versionCounts;
+        QMap<QString, int> typeCensus;
+        QList<QSet<QString>> typeSets;
+        int filesWalked = 0;
         QMap<QString, int> failureReasons;
         QMap<QString, QString> firstFailure;
         QSet<QString> extensions;
@@ -195,6 +198,13 @@ private slots:
                 continue;
             }
             ++roundTripped;
+            for (int b = 0; b < file.declaredBlockCount(); ++b)
+                typeCensus[file.declaredBlockType(b)] += 1;
+            ++filesWalked;
+            typeSets.append(QSet<QString>());
+            QSet<QString>& last = typeSets.last();
+            for (int b = 0; b < file.declaredBlockCount(); ++b)
+                last.insert(file.declaredBlockType(b));
         }
 
         qInfo().noquote() << "attempted" << attempted
@@ -206,6 +216,63 @@ private slots:
                           << "extensions" << extensions.values();
         for (auto it = versionCounts.begin(); it != versionCounts.end(); ++it)
             qInfo().noquote() << "header version" << it.key() << it.value();
+        qInfo().noquote() << "distinct declared block types:" << typeCensus.size();
+
+        // Splitting a block region needs a payload parser for *every* block in
+        // the file, so coverage is a whole-file property, not a per-block one.
+        // This curve answers "how many types would have to be understood before
+        // N files become addressable", which is the real size of the job. The
+        // second column is the subset that actually carries NiTransformData,
+        // which is what the layout fitter needs in order to run at all.
+        {
+            QList<QPair<int, QString>> ranked;
+            for (auto it = typeCensus.begin(); it != typeCensus.end(); ++it)
+                ranked.append(qMakePair(it.value(), it.key()));
+            std::sort(ranked.begin(), ranked.end(),
+                      [](const QPair<int, QString>& a, const QPair<int, QString>& b) {
+                          return a.first > b.first;
+                      });
+            const QString kWanted = QStringLiteral("NiTransformData");
+
+            // The files that actually carry NiTransformData are animated meshes,
+            // which is not the same set as "common" files: they pull in the
+            // physics, particle and skinning families too. So the work list that
+            // matters is the union of types over exactly those files, not the
+            // globally most frequent ones.
+            QSet<QString> wantedTypes;
+            int wantedFiles = 0;
+            for (const QSet<QString>& set : typeSets) {
+                if (!set.contains(kWanted)) continue;
+                ++wantedFiles;
+                wantedTypes.unite(set);
+            }
+            qInfo().noquote() << "files carrying" << kWanted << ":" << wantedFiles
+                              << "distinct types across them:" << wantedTypes.size();
+
+            QSet<QString> covered;
+            for (int k = 0; k < ranked.size(); ++k) {
+                covered.insert(ranked.at(k).second);
+                int files = 0;
+                int withTransformData = 0;
+                for (const QSet<QString>& set : typeSets) {
+                    bool all = true;
+                    for (const QString& t : set) {
+                        if (!covered.contains(t)) { all = false; break; }
+                    }
+                    if (!all) continue;
+                    ++files;
+                    if (set.contains(kWanted)) ++withTransformData;
+                }
+                const int n = k + 1;
+                if (n == 5 || n == 10 || n == 15 || n == 16 || n == 20 || n == 25
+                    || n == 30 || n == 40 || n == 50 || n == ranked.size())
+                    qInfo().noquote() << "top" << n << "types ->" << files << "of"
+                                      << filesWalked << "files splittable, of which"
+                                      << withTransformData << "carry" << kWanted;
+            }
+        }
+        for (auto it = typeCensus.begin(); it != typeCensus.end(); ++it)
+            qInfo().noquote() << "block type" << it.key() << it.value();
         for (auto it = failureReasons.begin(); it != failureReasons.end(); ++it)
             qInfo().noquote() << "failure:" << it.key() << it.value()
                               << "first:" << firstFailure.value(it.key());

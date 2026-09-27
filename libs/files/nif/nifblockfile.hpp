@@ -61,6 +61,20 @@ public:
     // want individual blocks must check this before asking for them.
     bool hasIndividualBlocks() const { return mBlockRegion.isEmpty(); }
 
+    // How many blocks the header declares. This is known even for a container
+    // with no size table, where count() is 0 because the payloads could not be
+    // split: declaredBlockCount() is the number of blocks in the file,
+    // count() is how many can be handed out individually.
+    int declaredBlockCount() const { return mTypeIndex.size(); }
+
+    // Resolved class name of declared block i. Valid whether or not the
+    // container could be split, so it still answers "what is in this file".
+    QString declaredBlockType(int index) const
+    {
+        if (index < 0 || index >= mTypeIndex.size()) return QString();
+        return mBlockTypes.value(mTypeIndex.at(index));
+    }
+
     // Clip name -> owning controller block, gathered from every
     // NiControllerSequence. A clip name only exists here, so this is what ties
     // a controller to a named animation in the editor.
