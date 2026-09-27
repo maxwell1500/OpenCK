@@ -2129,8 +2129,53 @@ also pull in the particle, physics, skinning and morph families, so "common" and
 Recorded so the next attempt does not spend itself on the top-20 plan. The real
 choice is: implement ~102–113 payload walkers (a large but bounded project that
 finally makes these files block-addressable and unblocks the fitter), or accept
-that the pre-20.2.0.5 container is read-and-save-only for now. `test_ntdlayout`
+that the pre-20.2.0.5 container is read-and-save-only for now. `test_nifroundtriparchive`
 prints the curve on every run, so the numbers stay honest as things change.
+
+**Block-walking framework is in place; one format discrepancy is blocking it.**
+`NifBlockFile` now recovers block boundaries by walking each block's fields the
+way the reference reader does, guarded so a wrong layout cannot do damage:
+
+- Walkers are strict per block, and the walk is accepted **only** if it lands
+  exactly on the trailing `num_roots` + root-ref table with nothing left over.
+  Anything else falls back to the opaque region, so a misread type degrades to
+  "read and save" instead of shifting every later block.
+- `hasIndividualBlocks()` reports which happened, and `lastWalkError()` names the
+  block type that stopped the walk, so the test can report the next type to
+  write rather than swallowing it.
+- 14 walkers are written (the `NiObject`/`NiObjectNET`/`NiAVObject`/`NiExtraData`
+  /`NiGeometry` chains, `NiNode`, `NiTriStrips`, `NiTriStripsData`, `BSXFlags`,
+  `NiStringExtraData`, `NiBinaryExtraData`, `NiKeyframeData` and the
+  transform/float/bool/pos/color data and controller/interpolator chain).
+
+**The discrepancy, precisely.** In a shipped 20.0.0.4 file, a `NiNode` block runs
+from its `SizedString` name to its `flags` field across **four** 32-bit words
+where the reference field list accounts for three:
+
+```
+name "hollowedTree"        SizedString, u32 length + 12 bytes
+num_extra_data_list = 1    Uint
+extra_data_list[0] = 2     Ref
+0xFFFFFFFF                  <- controller
+0xFFFFFFFF                  <- UNACCOUNTED FOR
+flags = 0x0010              Ushort (bsVersion 11)
+translation (0,0,0) / rotation (identity) / scale (1.0)
+```
+
+Everything after the extra word lines up exactly: the rotation is a clean identity
+with 1.0 on the diagonal and the next block's name is the literal `BSX` followed
+by a plausible `next_extra_data` ref and flags value. A file whose `NiNode`
+declares **no** extra data has exactly the expected two words, so the delta
+appears only when the list is non-empty. Reading each list entry as 8 bytes fits
+both observed files, but it still does not make the archive walk, so it is not
+adopted: the code keeps the documented 4-byte `Ref` and records the mismatch
+rather than encoding a guess. Files stay on the opaque path, which round-trips
+byte for byte, until this is resolved.
+
+The next step is a file with **two or more** extra-data entries: that
+distinguishes "entries are 8 bytes" from "there is one extra field" and settles
+it from bytes rather than inference.
+
 
 **PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),
 `DLCShiveringIsles.esp` and `Knights.esp` found zero `PHDA` subrecords, just as

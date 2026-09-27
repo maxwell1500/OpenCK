@@ -160,6 +160,280 @@ constexpr quint32 kEndianFieldVersion = 0x14000003u;
 constexpr quint32 kBlockSizeTableVersion = 0x14020005u;
 constexpr quint32 kStringTableVersion = 0x14010001u;
 
+// --- Walking a block region that has no size table ---------------------------
+//
+// A pre-20.2.0.5 file records no block lengths, so the only way to find where
+// one block ends and the next begins is to read the block: every field in
+// order, including the variable-length arrays. Each walker below therefore has
+// to know a block type's real field layout, not merely its fixed size.
+//
+// Every walker is strict. It either consumes the whole block or reports failure,
+// and the walk as a whole is only accepted if it lands exactly on the footer at
+// the end of the region. A layout that is wrong for some type therefore
+// degrades to the opaque fallback rather than silently shifting every later
+// block and mislabelling the file.
+
+using BlockWalker = bool (*)(Cursor&, quint32 version, quint32 bsVersion);
+
+// The oldest container these walkers claim to understand. 10.1.x is the first
+// Gamebryo version with a user_version field, and everything below that has a
+// different header again (that is the NetImmerse case, handled elsewhere).
+constexpr quint32 kWalkVersionFloor = 0x0A000000u;
+
+bool skipRefs(Cursor& c, quint32 count)
+{
+    for (quint32 i = 0; i < count; ++i) c.u32();
+    return c.ok();
+}
+
+// A String is an inline u32-length-prefixed string up to 20.0.0.5 and a
+// string-table index from 20.1.0.3 on, which is the same version at which the
+// header grows a string table to index into.
+bool skipString(Cursor& c, quint32 version)
+{
+    if (version <= kBlockSizeTableVersion - 1u) {
+        const quint32 len = c.u32();
+        if (!c.ok() || len > static_cast<quint32>(kMaxStringLength)) return false;
+        c.raw(static_cast<int>(len));
+        return c.ok();
+    }
+    c.u32();
+    return c.ok();
+}
+
+bool walkNiObjectNET(Cursor& c, quint32 version)
+{
+    if (!skipString(c, version)) return false;
+    // legacy_extra_data is four u32s; nothing here is old enough to carry one.
+    if (version >= 50331648u && version <= 67240448u) c.u32();  // extra_data
+    if (version >= 167772416u) {                                 // num_extra_data_list
+        const quint32 n = c.u32();
+        if (!c.ok() || n > 100000u) return false;
+        // UNRESOLVED: the shipped files do not agree with this being a plain
+        // array of 4-byte Refs. In a 20.0.0.4 file whose NiNode declares one
+        // entry there are four words between the end of the name and the
+        // object's flags, where a 4-byte Ref accounts for only three. A file
+        // that declares no entries has exactly two. Reading entries as 8 bytes
+        // fits both of those, and still does not make the archive walk, so the
+        // discrepancy is recorded here rather than papered over with a guess.
+        // Until it is resolved these files keep the opaque-region path, which
+        // round-trips byte for byte.
+        if (!skipRefs(c, n)) return false;
+    }
+    if (version >= 50331648u) c.u32();                           // controller
+    return c.ok();
+}
+
+bool walkNiAVObject(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    // flags narrows to a u16 on the old stream versions.
+    if (bsVersion > 26) c.u32();
+    else if (version >= 50331648u) c.u16();
+    else return false;
+    c.raw(12);   // translation
+    c.raw(36);   // rotation
+    c.f32();     // scale
+    if (version <= 67240448u) c.raw(12);                        // velocity
+    if (bsVersion <= 34) {                                      // properties
+        const quint32 n = c.u32();
+        if (!c.ok() || n > 100000u) return false;
+        if (!skipRefs(c, n)) return false;
+    }
+    // Bounding volumes only exist in the 3.x-4.x range, which is not walked.
+    if (version >= 167772416u) c.u32();                          // collision object
+    return c.ok();
+}
+
+// NiExtraData descends from NiObject, not NiObjectNET, so it does not carry a
+// controller ref. Its name is still a String, and every concrete extra-data
+// block appends its own payload after next_extra_data.
+bool walkNiExtraData(Cursor& c, quint32 version)
+{
+    if (!skipString(c, version)) return false;
+    c.u32();  // next_extra_data
+    return c.ok();
+}
+
+bool walkBSXFlags(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiExtraData(c, version)) return false;
+    c.u32();  // integer_data
+    return c.ok();
+}
+
+bool walkNiStringExtraData(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiExtraData(c, version)) return false;
+    if (!skipString(c, version)) return false;
+    return c.ok();
+}
+
+bool walkNiBinaryExtraData(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiExtraData(c, version)) return false;
+    const quint32 len = c.u32();
+    if (!c.ok() || len > 64u * 1024u * 1024u) return false;
+    c.raw(static_cast<int>(len));
+    return c.ok();
+}
+
+// NiGeometry adds a bounding sphere and a skin ref to NiAVObject.
+bool walkNiGeometry(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiAVObject(c, version, bsVersion)) return false;
+    c.raw(12);  // bounding sphere centre
+    c.f32();    // bounding sphere radius
+    c.u32();    // skin
+    return c.ok();
+}
+
+// NiKeyframeData: rotations, then the translation and scale channels. The first
+// key of each channel carries no time, which is why the counts are not simply
+// multiplied out.
+void skipKeyChannel(Cursor& c)
+{
+    const quint32 numKeys = c.u32();
+    const quint8 interpolation = c.u8();
+    if (!c.ok() || numKeys > 10'000'000u || interpolation > 3) return;
+    for (quint32 i = 0; i < numKeys; ++i) {
+        if (i > 0) c.f32();
+        c.raw(12);  // value
+    }
+}
+
+bool walkNiKeyframeData(Cursor& c, quint32 version, quint32)
+{
+    Q_UNUSED(version)
+    const quint32 numRotationKeys = c.u32();
+    const quint8 rotationType = c.u8();
+    if (!c.ok() || numRotationKeys > 10'000'000u || rotationType > 3) return false;
+    c.f32();  // order
+    for (quint32 i = 0; i < numRotationKeys; ++i) {
+        if (i > 0) c.f32();
+        c.raw(16);  // quaternion
+    }
+    skipKeyChannel(c);  // translations
+    skipKeyChannel(c);  // scales
+    return c.ok();
+}
+
+// NiFloatData / NiBoolData / NiPosData / NiColorData all carry a single
+// keyframe channel and nothing else.
+bool walkKeyGroupData(Cursor& c, quint32, quint32)
+{
+    skipKeyChannel(c);
+    return c.ok();
+}
+
+// NiTimeController: the common prefix of every controller, including the
+// interpolated ones, which insert the interpolator ref between it and `data`.
+bool walkNiTimeController(Cursor& c)
+{
+    c.u32();    // next_controller
+    c.u32();    // flags
+    c.f32();    // frequency
+    c.f32();    // phase
+    c.f32();    // start_time
+    c.f32();    // stop_time
+    c.u32();    // target
+    return c.ok();
+}
+
+bool walkKeyframeController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    Q_UNUSED(version)
+    if (!walkNiTimeController(c)) return false;
+    c.u32();  // interpolator
+    c.u32();  // data
+    return c.ok();
+}
+
+bool walkNiTransformController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkKeyframeController(c, version, bsVersion)) return false;
+    c.u32();  // unknown_q_q_speed_integer
+    return c.ok();
+}
+
+bool walkNiTransformInterpolator(Cursor& c, quint32, quint32)
+{
+    c.raw(32);  // translation + rotation + scale
+    c.u32();    // data
+    return c.ok();
+}
+
+bool walkNiNode(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiAVObject(c, version, bsVersion)) return false;
+    const quint32 numChildren = c.u32();
+    if (!c.ok() || numChildren > 100000u) return false;
+    if (!skipRefs(c, numChildren)) return false;
+    if (bsVersion < 130) {
+        const quint32 numEffects = c.u32();
+        if (!c.ok() || numEffects > 100000u) return false;
+        if (!skipRefs(c, numEffects)) return false;
+    }
+    return c.ok();
+}
+
+bool walkNiTriStripsData(Cursor& c, quint32, quint32)
+{
+    // NiTriBasedGeomData contributes the triangle data itself, whose layout
+    // depends on the stream version, so only the modern form is walked.
+    const quint16 numStrips = c.u16();
+    const quint8 hasPoints = c.u8();
+    if (!c.ok() || hasPoints > 1) return false;
+    for (quint16 s = 0; s < numStrips; ++s) {
+        const quint16 numTriangles = c.u16();
+        const quint8 hasVertexColors = c.u8();
+        const quint16 numVertexBytes = c.u16();
+        if (!c.ok() || hasVertexColors > 1) return false;
+        if (!c.ok()) return false;
+        c.raw(numTriangles * 6);   // triangle indices
+        if (hasVertexColors) c.raw(numTriangles * (numVertexBytes ? numVertexBytes * 3 : 4));
+        if (hasPoints) {
+            c.u16();              // num_points
+            c.u8();               // point flags
+            c.u16();              // unused
+            const quint16 numPointBytes = c.u16();
+            c.raw(numPointBytes);
+        }
+    }
+    return c.ok();
+}
+
+const QHash<QString, BlockWalker>& blockWalkers()
+{
+    // Built imperatively rather than from an initializer list: the values are
+    // function pointers, which the list constructor will not take here.
+    static const QHash<QString, BlockWalker> kWalkers = [] {
+        QHash<QString, BlockWalker> table;
+        const auto add = [&table](const char* name, BlockWalker walker) {
+            table.insert(QString::fromLatin1(name), walker);
+        };
+        // Geometry and the object base chain.
+        add("NiNode", walkNiNode);
+        add("NiTriStrips", walkNiGeometry);
+        add("NiTriShape", walkNiGeometry);
+        add("NiTriStripsData", walkNiTriStripsData);
+        // Extra data.
+        add("BSXFlags", walkBSXFlags);
+        add("NiStringExtraData", walkNiStringExtraData);
+        add("NiBinaryExtraData", walkNiBinaryExtraData);
+        // Animation: data, controllers, interpolators.
+        add("NiTransformData", walkNiKeyframeData);
+        add("NiFloatData", walkKeyGroupData);
+        add("NiBoolData", walkKeyGroupData);
+        add("NiPosData", walkKeyGroupData);
+        add("NiColorData", walkKeyGroupData);
+        add("NiTransformController", walkNiTransformController);
+        add("NiTransformInterpolator", walkNiTransformInterpolator);
+        return table;
+    }();
+    return kWalkers;
+}
+
 } // namespace
 
 bool NifBlockFile::isBethesdaNif(const QString& path)
@@ -214,6 +488,7 @@ void NifBlockFile::reset()
     mBlocks.clear();
     mBlockRegion.clear();
     mTrailing.clear();
+    mWalkError.clear();
 }
 
 bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& error)
@@ -334,14 +609,27 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
     if (!c.ok()) return bad(QStringLiteral("truncated group table"));
 
     if (!hasSizeTable) {
-        // No size table: everything from here to end of file is the block
-        // region, kept as one run. The trailing num_roots + roots table is part
-        // of it, which is harmless because the region is never reinterpreted.
+        // No size table. Try to recover the block boundaries by walking each
+        // block's own fields, the way the reference reader does. Only a walk
+        // that lands exactly on the trailing root table is accepted, so an
+        // unknown or misread type falls back to one opaque region rather than
+        // shifting every later block.
+        if (mVersion >= kWalkVersionFloor && splitBlockRegion(raw, c.pos(), mWalkError)) {
+            LOG_INFO(QString("NifBlockFile: walked %1 blocks, %2 string(s), "
+                             "%3 group(s), bsVersion %4")
+                         .arg(mBlocks.size()).arg(mStrings.size())
+                         .arg(mGroupIds.size()).arg(mBsVersion));
+            return true;
+        }
+        mBlocks.clear();
+        mBlockSize.clear();
         mBlockRegion = raw.mid(c.pos());
         LOG_INFO(QString("NifBlockFile: %1 blocks in one opaque region (%2 bytes), "
-                         "%3 group(s), bsVersion %4")
+                         "%3 group(s), bsVersion %4%5")
                      .arg(numBlocks).arg(mBlockRegion.size())
-                     .arg(mGroupIds.size()).arg(mBsVersion));
+                     .arg(mGroupIds.size()).arg(mBsVersion)
+                     .arg(mWalkError.isEmpty() ? QString()
+                                     : QStringLiteral(" (%1)").arg(mWalkError)));
         return true;
     }
 
@@ -369,6 +657,75 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
     LOG_INFO(QString("NifBlockFile: %1 blocks, %2 strings, %3 group(s), bsVersion %4")
                  .arg(mBlocks.size()).arg(mStrings.size()).arg(mGroupIds.size())
                  .arg(mBsVersion));
+    return true;
+}
+
+bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString& error)
+{
+    error.clear();
+    Cursor c(raw, startPos);
+    const quint32 numBlocks = static_cast<quint32>(mTypeIndex.size());
+    const QHash<QString, BlockWalker>& walkers = blockWalkers();
+
+    QVector<Block> blocks;
+    QVector<quint32> sizes;
+    blocks.reserve(static_cast<int>(numBlocks));
+    sizes.reserve(static_cast<int>(numBlocks));
+
+    for (quint32 i = 0; i < numBlocks; ++i) {
+        const int start = c.pos();
+        const QString type = mBlockTypes.at(mTypeIndex.at(i));
+        const auto walker = walkers.constFind(type);
+        if (walker == walkers.constEnd()) {
+            error = QStringLiteral("no payload layout for block type %1").arg(type);
+            return false;
+        }
+        if (!(*walker)(c, mVersion, mBsVersion) || !c.ok()) {
+            error = QStringLiteral("block %1 (%2) could not be walked: read %3 byte(s) "
+                                   "from offset %4")
+                        .arg(i).arg(type).arg(c.pos() - start).arg(start);
+            return false;
+        }
+        Block block;
+        block.type = type;
+        block.data = raw.mid(start, c.pos() - start);
+        block.footer = QByteArray();
+        blocks.append(block);
+        sizes.append(static_cast<quint32>(block.data.size()));
+    }
+
+    // The region must end with the root table and nothing else. Requiring an
+    // exact match is what makes the walk trustworthy: a layout that is subtly
+    // wrong lands in the wrong place and is rejected here, not accepted.
+    const int footerStart = c.pos();
+    const quint32 numRoots = c.u32();
+    if (!c.ok() || numRoots > numBlocks) {
+        error = QStringLiteral("implausible root count %1 after the last block")
+                    .arg(numRoots);
+        return false;
+    }
+    // num_roots has just been consumed, so exactly one u32 per root is left.
+    const qint64 rootBytes = 4 * static_cast<qint64>(numRoots);
+    if (raw.size() - c.pos() != rootBytes) {
+        error = QStringLiteral("walk ended at %1 leaving %2 byte(s), expected %3 "
+                               "root ref(s)")
+                    .arg(c.pos()).arg(raw.size() - c.pos()).arg(numRoots);
+        return false;
+    }
+    for (quint32 r = 0; r < numRoots; ++r) {
+        const quint32 root = c.u32();
+        if (!c.ok() || (root != 0xFFFFFFFFu && root >= numBlocks)) {
+            error = QStringLiteral("root table entry %1 is out of range").arg(r);
+            return false;
+        }
+    }
+
+    mBlocks = blocks;
+    mBlockSize = sizes;
+    // The root table is part of the block region and has to be written back, so
+    // it is kept from num_roots onwards rather than from after the refs.
+    mTrailing = raw.mid(footerStart);
+    mHasFooter = false;
     return true;
 }
 
@@ -435,7 +792,15 @@ QByteArray NifBlockFile::serialize() const
     for (quint32 id : mGroupIds) appendU32(out, id);
 
     if (!hasSizeTable) {
-        out.append(mBlockRegion);
+        // Either the region was never split, in which case it is emitted whole,
+        // or it was split and the blocks plus the root table reproduce it.
+        if (!mBlockRegion.isEmpty()) {
+            out.append(mBlockRegion);
+            return out;
+        }
+        for (const Block& block : mBlocks)
+            out.append(block.data);
+        out.append(mTrailing);
         return out;
     }
 

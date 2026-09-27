@@ -38,6 +38,12 @@ public:
     // Human-readable reason the last load() returned false.
     QString lastError() const { return mLastError; }
 
+    // Why the last load() could not split the block region, when it could not.
+    // Empty when the region was split, or when the file has a size table. This
+    // is the signal for which block type still needs a payload layout, so it
+    // names the type rather than reporting a position.
+    QString lastWalkError() const { return mWalkError; }
+
     int count() const { return mBlocks.size(); }
     const Block& block(int index) const { return mBlocks.at(index); }
     void setBlockData(int index, const QByteArray& data);
@@ -132,6 +138,11 @@ public:
 private:
     void reset();
     bool parse(const QByteArray& raw, bool hasUnknownInt, QString& error);
+    // Recover individual block boundaries in a container that has no size table,
+    // by walking each block's fields. Fails unless every block type is
+    // understood and the walk lands exactly on the trailing root table, so a
+    // partial or wrong result is never used.
+    bool splitBlockRegion(const QByteArray& raw, int startPos, QString& error);
 
     quint32 mVersion = 0x14020007;
     quint32 mUserVersion = 0;
@@ -161,6 +172,7 @@ private:
     bool mHasUnknownInt = false;
     QByteArray mTrailing;  // bytes after the block footer, preserved verbatim
     QString mLastError;
+    QString mWalkError;
 };
 
 #endif // NIFBLOCKFILE_HPP

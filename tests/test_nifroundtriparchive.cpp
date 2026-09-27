@@ -100,12 +100,14 @@ private slots:
         int attempted = 0;
         int roundTripped = 0;
         int opaqueBlocks = 0;
+        int walked = 0;
         int failedToParse = 0;
         int gamebryo = 0;
         int netImmerse = 0;
         int smallestNifSize = 0;
         QMap<QString, int> versionCounts;
         QMap<QString, int> typeCensus;
+        QMap<QString, int> walkReasons;
         QList<QSet<QString>> typeSets;
         int filesWalked = 0;
         QMap<QString, int> failureReasons;
@@ -172,7 +174,16 @@ private slots:
                 continue;
             }
             versionCounts[file.headerVersion()] += 1;
-            if (!file.hasIndividualBlocks()) ++opaqueBlocks;
+            if (file.hasIndividualBlocks()) {
+                ++walked;
+            } else {
+                ++opaqueBlocks;
+                // Bucket the reason the walk gave up, naming the block type it
+                // could not handle. This is what tells us which payload layout
+                // to write next, so it is reported rather than swallowed.
+                walkReasons[file.lastWalkError()] += 1;
+                if (maybeStopAtFailure(entry.fullPath, bytes)) return;
+            }
 
             if (!file.save(probe)) {
                 ++failedToParse;
@@ -212,7 +223,7 @@ private slots:
                           << "netimmerse" << netImmerse
                           << "round-tripped" << roundTripped
                           << "failed" << failedToParse
-                          << "opaque block region" << opaqueBlocks
+                          << "walked" << walked << "opaque" << opaqueBlocks
                           << "extensions" << extensions.values();
         for (auto it = versionCounts.begin(); it != versionCounts.end(); ++it)
             qInfo().noquote() << "header version" << it.key() << it.value();
@@ -273,6 +284,8 @@ private slots:
         }
         for (auto it = typeCensus.begin(); it != typeCensus.end(); ++it)
             qInfo().noquote() << "block type" << it.key() << it.value();
+        for (auto it = walkReasons.begin(); it != walkReasons.end(); ++it)
+            qInfo().noquote() << "walk stopped:" << it.key() << it.value();
         for (auto it = failureReasons.begin(); it != failureReasons.end(); ++it)
             qInfo().noquote() << "failure:" << it.key() << it.value()
                               << "first:" << firstFailure.value(it.key());
