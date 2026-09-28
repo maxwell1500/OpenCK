@@ -437,7 +437,12 @@ bool walkNiTriStripsData(Cursor& c, quint32 version, quint32 bsVersion)
     if (hasPoints) {
         for (quint16 s = 0; s < numStrips; ++s) c.raw(stripLengths.at(s) * 2);
     }
-    c.raw(numTriangles * 6);   // triangle indices, three u16 each
+    // No triangle indices follow. The triangles are implicit in the strip's
+    // point runs - a strip of n points is n-2 triangles - which is why
+    // num_triangles equals sum(strip_lengths) - 2 * num_strips. Verified against
+    // a real 20.0.0.4 block: the geometry fields plus the strip fields account
+    // for all 76,318 bytes of it exactly, with nothing left over. Appending
+    // num_triangles * 6 here overran the block by 12,624 bytes.
     return c.ok();
 }
 

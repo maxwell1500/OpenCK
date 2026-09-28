@@ -2177,54 +2177,65 @@ bytes" and "there is one extra field when the list is non-empty"; the third
 candidate, "nothing is wrong here at all", is the correct one. The documented
 4-byte `Ref` array is right and was never changed.
 
-**What blocks the walk now, per block type.** With the base chain correct the
-test names the exact blocker for every file, and the current standings are:
+**There is an oracle for the block lengths, and it is already on disk.** The
+creation kit is installed on this machine
+(`C:\Program Files (x86)\Steam\steamapps\common\Starfield\CreationKit.exe`), but
+it turns out not to be needed. Its NIF I/O is the `nifpy`/`pyffi` library, and
+that same library is vendored inside the Blender addon already in the tree, at
+`build/blender/.../io_scene_niftools/dependencies` (nifgen + pyffi, Python 3.12
+is on `PATH`). Note that `external/pynifly` is an empty placeholder despite what
+`AGENTS.md` says about it.
 
-| blocker | files | note |
-|---|---|---|
-| `NiTriStripsData` | 882 | rewritten from the real `NiGeometryData` field list, but its *length* is unverified |
-| `NiBinaryExtraData` | 356 | layout is trivial and correct, so an earlier block is ending at the wrong offset |
-| `NiStringExtraData` | 36 | as above |
-| `NiMaterialProperty` | 18 | walker not written |
-| `NiTransformData` | 9 | |
+The authoritative reader is three lines of Python:
 
-`NiStringExtraData` came down from 721 once the extra-data base was fixed, and
-`NiBinaryExtraData`'s apparent rise from 218 is those files simply getting past
-the string block and failing one step later.
+```python
+import nifgen.formats.nif as NifFormat
+with open(path, "rb") as handle:
+    nif = NifFormat.NifFile.from_stream(handle)   # NifFile, not NIFFile
+for block in nif.blocks:
+    print(type(block).__name__, block.io_start, block.io_size)
+```
 
-**Three hypotheses tried and refuted, so they are not retried.** Each looked
-convincing on a single hand-decoded file and each is wrong across the archive:
+It parses pre-20.2.0.5 containers - the ones with no size table - and reports
+every block's start and length. That is exactly the thing hand-decoding could
+only guess at, so the remaining work is a diff against ground truth rather than a
+grind. `AGENTS.md`'s claim that `external/pynifly` provides NIF I/O should be
+corrected to point at where the code actually is.
 
-- *`NiExtraData` carries a `next_extra_data` ref.* True only up to `0x04020200`;
-  for every version walked here the base is just the name. Reading the ref
-  shifted every following field by four bytes.
-- *Extra-data entries are 8 bytes.* One 20.0.0.4 file appears to want this - with
-  8 the node ends where the next block's name reads `03 00 00 00 "BSX"` - but it
-  fails **every one of the 7,962 files** at that block.
-- *A flat extra word on every 20.x node*, and *a per-version entry size of 4 then
-  8*. Both are the same observation wearing different clothes, and both drive
-  `walked` to **0**.
+**The "surplus word" was a misread byte, not a format quirk.** This entry
+previously recorded an unexplained 4-byte surplus in `NiObjectNET`, and three
+hypotheses were tried and refuted against the archive trying to explain it. The
+oracle shows the real story: in the file in question `num_extra_data_list` is
+**2**, not 1, and the two 4-byte refs account for the difference exactly. A single
+byte had been read wrong by hand, and every hypothesis built on top of it was
+chasing that error. The documented 4-byte `Ref` was correct from the start and
+the walker was never wrong here; the per-block length check below is what would
+have caught it immediately.
 
-Four-byte entries hold up, so the handful of files that still disagree are
-unexplained rather than accommodated.
+**NiTriStripsData: triangles are implicit.** The walker appended
+`num_triangles * 6` bytes of triangle indices. They are not stored - a strip of n
+points is n-2 triangles, which is why `num_triangles` equals
+`sum(strip_lengths) - 2 * num_strips`. Checked against a real 20.0.0.4 block, the
+geometry fields plus the strip fields account for all 76,318 bytes exactly, with
+nothing left over; the phantom indices overran the block by 12,624 bytes.
+Removing them takes `NiTriStripsData` from 882 failing files to **8**.
 
-**The remaining obstacle is block *lengths*, not block *layouts*.** A walker can
-consume the wrong number of bytes and still report success, and only a later
-block notices - which is exactly the `NiBinaryExtraData` symptom: a two-line
-correct layout failing on files whose earlier blocks walked without complaint.
-Terminating is not evidence. Checking a walker's length against one hand-decoded
-block is, and `lastWalkError()` already reports the byte count and offset needed
-to do it. That check has to be done per block type, and there are ~100 of them, so
-this is a grind rather than something to guess at.
+**What blocks the walk now.** Blockers are named per type, so this is a
+diff-against-the-oracle list rather than guesswork:
 
-`NiTriStripsData` is the one to do first: it is the largest single blocker, and
-its chain (`group_id` when present, `num_vertices`, the keep/compress flag pair,
-`has_vertices`, vertices as `Vector3`, `data_flags`, `has_normals`, normals,
-optional tangents and bitangents, the bounding sphere, `has_vertex_colors`,
-vertex colours, `uv_sets` counted from `data_flags & 63`, consistency flags, an
-additional-data ref, then `num_triangles`, `num_strips`, `strip_lengths[]`,
-`has_points`, `points[][]` and the triangle indices) is known from the field
-list but has not yet been confirmed against a block.
+| blocker | files |
+|---|---|
+| `NiBinaryExtraData` | 356 |
+| `NiStringExtraData` | 36 |
+| `NiMaterialProperty` | 18 |
+| `NiTransformData` | 9 |
+| `NiTriStripsData` | 8 |
+| `NiStencilProperty`, `NiGeomMorpherController`, `NiTexturingProperty` | 2 each |
+
+`NiBinaryExtraData` is two lines of correct layout, so those 356 are again a
+*length* error in an earlier block rather than a missing one. The next step is
+mechanical: dump the oracle's block boundaries for one failing file, compare them
+against the walker's, and fix the first field that diverges.
 
 
 **PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),
