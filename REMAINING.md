@@ -2103,42 +2103,48 @@ parses blocks back to back and only consults a size table when the version has
 one). `test_nifroundtriparchive` now measures what that costs, because the
 obvious plan turns out to be the wrong one.
 
-**Current walk frontier (measured 2026-09-28).** `walked 1 / opaque 7,961 of 7,962`.
-The remaining failures are almost entirely *missing handlers*, not bad layouts:
+**Current walk frontier (measured 2026-09-28, re-derive with `OPENCK_TEST_NIF_CENSUS`).**
+**Splittable files: 6,161 of 7,962 (77%), up from 1.** The round-trip is byte
+exact across all 7,962, which is the constraint that mattered: every layout below
+was confirmed against the reference reader's `io_start`/`io_size` before being
+believed, and a wrong one degrades to the opaque fallback rather than corrupting
+anything.
 
-| block type without a walker | files |
-|---|---|
-| `bhkRigidBody` | 777 |
-| `bhkRigidBodyT` | 563 |
-| `NiControllerManager` | 423 |
-| `NiTexturingProperty` | 136 |
-| `NiMaterialProperty` | 104 |
-| `bhkConvexTransformShape` | 89 |
-| `BSFurnitureMarker` | 75 |
-| `bhkListShape` | 74 |
-| `BSBound` | 42 |
-| `NiZBufferProperty` | 33 |
+The count moved only when the *walk* was fixed, not when handlers were added.
+Three bugs were each worth thousands of files, and in every case the census
+attributed the failure to a block further along than the one that was wrong:
 
-Six handlers landed this pass and now report zero: `bhkNiTriStripsShape` (4,297
-files), `bhkMoppBvTreeShape` (4,281), `bhkConvexVerticesShape` (987),
-`bhkBoxShape` (370), `bhkCapsuleShape` (120), `bhkSphereShape` (11).
+- `NiTriShape`/`NiTriStrips` are `NiTriBasedGeom` (a data ref, a skin ref and a
+  `MaterialData`, nine bytes) and were being read as a `NiGeometry` bounding
+  sphere plus a skin ref, twenty bytes. Eleven too many, so every later block
+  landed eleven bytes early. The bounding sphere only exists for a 20.2.0.7
+  particle-system case.
+- A block's bytes start *before* the per-block zero tag, not after. Versions up
+  to 10.1.0.106 put a four-byte zero in front of every non-`bhk` block, and the
+  walker consumed and discarded it — four bytes lost per re-serialized block.
+- The header re-emitted the group table from a parsed member, dropping four bytes
+  on any file whose reference and group tables are empty, because the
+  block-reference table is not modelled. Those bytes are now kept verbatim.
 
-**Two measurement traps here, both of which produced a wrong priority order.**
+**Three declared field widths are wrong in nifgen, and each cost real coverage:**
 
-1. *The reason string embeds a byte offset*, so every failing file landed in its
-   own bucket and the distribution was spread over 466 near-unique keys. The block
-   type also appears in the reason, so "356 `NiBinaryExtraData`" was the count of
-   distinct files whose reason mentioned that type, not a per-type total. The
-   figures that order was built from were meaningless. The test now records the
-   first path per reason and writes the full table to the path in
-   `OPENCK_TEST_NIF_CENSUS`, so this is re-derivable.
-2. *A file fails on the first type it has no handler for*, so clearing a handler
-   does not free its files — it reveals whatever was behind it. `bhkRigidBody`
-   (777) and `bhkRigidBodyT` (563) were entirely invisible until
-   `bhkNiTriStripsShape` and `bhkMoppBvTreeShape` were understood. Per-type counts
-   describe a **frontier, not a backlog**, and `walked 1` will not move until the
-   frontier is clear. Neither the two Havok shapes (54% and 64% of the archive
-   respectively) appeared in the previously recorded top list at all.
+| field | declared | on disk |
+|---|---|---|
+| `HavokFilter` | layer + flags + group (6 bytes) | one packed u32 (**4**) — worth 4,234 files |
+| `TexDesc.uv_set` | ushort | u32 |
+| `NiAlphaProperty.threshold` | float | a byte holding 127 |
+
+`NiSkinInstance`'s bone array is declared `BoneData` at 70 bytes per bone and is
+actually one ref per bone (28 bytes for three bones). Fixing it moved nothing,
+because those files had already lost their position earlier.
+
+**Attribution is unreliable by construction** and continues to mislead: the
+6,161-file class blamed `bhkMoppBvTreeShape` and the block actually wrong was the
+`bhkNiTriStripsShape` before it. Two earlier reports were bucketed per file
+because the reason string embeds a byte offset, and a bucket keyed on something
+that changes per failing file cannot be aggregated. `tools/nifwalkdump` prints the
+offsets the walk got right before failing, which is what makes the first
+divergence findable rather than guessable.
 
 Measured before the frontier is worth re-reading: the archive declares **113
 distinct block types**. A file only becomes addressable if *every* block in it can
