@@ -807,6 +807,138 @@ bool walkBSFurnitureMarker(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// bhkConvexTransformShape: a ref to the shape it transforms, a material, a
+// radius, eight unused bytes and a 4x4 matrix.
+bool walkBhkConvexTransformShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipRefs(c, 1)) return false;      // shape
+    if (!skipHavokMaterial(c, version)) return false;
+    c.f32();                                // radius
+    c.raw(8);                               // unused_01
+    c.raw(64);                              // transform (Matrix44)
+    return c.ok();
+}
+
+// bhkListShape: a child-shape array, then a material, two child properties and a
+// filter array.
+bool walkBhkListShape(Cursor& c, quint32 version, quint32)
+{
+    const quint32 numSubShapes = c.u32();
+    if (!c.ok() || numSubShapes > 100000u) return false;
+    if (!skipRefs(c, numSubShapes)) return false;
+    if (!skipHavokMaterial(c, version)) return false;
+    if (!skipBhkWorldObjCInfoProperty(c)) return false;   // child_shape_property
+    if (!skipBhkWorldObjCInfoProperty(c)) return false;   // child_filter_property
+    const quint32 numFilters = c.u32();
+    if (!c.ok() || numFilters > 100000u) return false;
+    for (quint32 i = 0; i < numFilters; ++i) {
+        if (!skipHavokFilter(c)) return false;
+    }
+    return c.ok();
+}
+
+// NiZBufferProperty: flags, and a test function from 4.1.0.4 up to 20.0.0.5.
+constexpr quint32 kZBufferFunctionFirstVersion = 67174412u;   // 4.1.0.4
+constexpr quint32 kZBufferFunctionLastVersion = 335544325u;  // 20.0.0.5
+
+bool walkNiZBufferProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    c.u32();                                              // flags
+    if (version >= kZBufferFunctionFirstVersion
+        && version <= kZBufferFunctionLastVersion)
+        c.u32();                                          // function
+    return c.ok();
+}
+
+// NiBillboardNode: a NiNode that carries a billboard mode from 10.1.0.0.
+bool walkNiBillboardNode(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiNode(c, version, bsVersion)) return false;
+    if (version >= 167837696u) c.u32();   // billboard_mode
+    return c.ok();
+}
+
+// --- Havok constraints and shape phantoms --------------------------------------
+//
+// Every bhk constraint shares a BhkConstraintCInfo: two entity refs, a priority,
+// and a count. Then each adds its own CInfo, which through bs_version 16 is a
+// handful of Vector4s and a few floats, and after that reorders into pivots,
+// axes and planes with the same total width.
+constexpr quint32 kConstraintMotorVersion = 335675399u;   // 20.1.0.15
+constexpr quint32 kConstraintOldBsVersion = 16u;
+
+bool skipBhkConstraintCInfo(Cursor& c)
+{
+    c.u32();     // num_entities
+    if (!skipRefs(c, 1)) return false;   // entity_a
+    if (!skipRefs(c, 1)) return false;   // entity_b
+    c.u32();     // priority
+    return c.ok();
+}
+
+bool walkBhkLimitedHingeConstraint(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!skipBhkConstraintCInfo(c)) return false;
+    if (bsVersion <= kConstraintOldBsVersion) {
+        c.raw(16 * 7);        // pivots, axes and perpendicular axes
+    } else {
+        c.raw(16 * 8);        // the same vectors, reordered
+        c.raw(12);            // min_angle, max_angle, max_friction
+        if (version >= kConstraintMotorVersion) return false;  // motor: unmeasured
+    }
+    return c.ok();
+}
+
+bool walkBhkRagdollConstraint(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!skipBhkConstraintCInfo(c)) return false;
+    if (bsVersion <= kConstraintOldBsVersion) {
+        c.raw(16 * 6);        // pivot, plane and twist per entity
+    } else {
+        c.raw(16 * 8);        // twist, plane, motor and pivot per entity
+        c.raw(24);            // six angle and friction floats
+        if (version >= kConstraintMotorVersion) return false;  // motor: unmeasured
+    }
+    return c.ok();
+}
+
+bool walkBhkPrismaticConstraint(Cursor& c, quint32 version, quint32)
+{
+    if (!skipBhkConstraintCInfo(c)) return false;
+    if (version <= 335544325u) {
+        c.raw(16 * 8);        // pivot, rotation, plane and sliding per entity
+    } else {
+        c.raw(16 * 8);
+        c.raw(12);            // min_distance, max_distance, friction
+        if (version >= kConstraintMotorVersion) return false;  // motor: unmeasured
+    }
+    return c.ok();
+}
+
+// The shape phantoms differ only in the type name: eight unused bytes and a
+// 4x4 transform. They need no references of their own, so the matrix is the
+// whole payload.
+bool walkBhkSimpleShapePhantom(Cursor& c, quint32, quint32)
+{
+    c.raw(8);      // unused_01
+    c.raw(64);     // transform (Matrix44)
+    return c.ok();
+}
+
+// NiVertexColorProperty: flags, and through 20.0.0.5 a vertex and a lighting
+// mode. From 20.1.0.3 the two modes pack into the flags word.
+bool walkNiVertexColorProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    c.u32();                                              // flags
+    if (version <= 335544325u) {
+        c.u32();                                          // vertex_mode
+        c.u32();                                          // lighting_mode
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -842,6 +974,19 @@ const QHash<QString, BlockWalker>& blockWalkers()
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
+        add("bhkConvexTransformShape", walkBhkConvexTransformShape);
+        add("bhkListShape", walkBhkListShape);
+        add("NiZBufferProperty", walkNiZBufferProperty);
+        add("NiBillboardNode", walkNiBillboardNode);
+        // Havok constraints and shape phantoms.
+        add("bhkLimitedHingeConstraint", walkBhkLimitedHingeConstraint);
+        add("bhkRagdollConstraint", walkBhkRagdollConstraint);
+        add("bhkPrismaticConstraint", walkBhkPrismaticConstraint);
+        add("bhkSimpleShapePhantom", walkBhkSimpleShapePhantom);
+        add("bhkSimpleShapeBall", walkBhkSimpleShapePhantom);
+        add("bhkSimpleShapeCylinder", walkBhkSimpleShapePhantom);
+        add("bhkSimpleShapeCapsule", walkBhkSimpleShapePhantom);
+        add("NiVertexColorProperty", walkNiVertexColorProperty);
         // Extra data.
         add("BSXFlags", walkBSXFlags);
         add("NiStringExtraData", walkNiStringExtraData);
