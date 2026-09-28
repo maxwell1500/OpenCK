@@ -587,6 +587,226 @@ bool walkBhkConvexVerticesShape(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// --- Havok objects with an entity prefix -------------------------------------
+//
+// A HavokFilter is a single u32 on the wire. nifgen decomposes it into layer,
+// flags and group for editing, but its stored size is 4, and reading the three
+// parts separately would over-read by 6 bytes per filter.
+//
+// A BhkWorldObjCInfoProperty is three u32s: data, size, capacity_and_flags.
+bool skipHavokFilter(Cursor& c) { c.u32(); return c.ok(); }
+
+// A BhkWorldObjectCInfo, and the world-object prefix in front of it.
+//
+// The 20 bytes here were read field by field out of a shipped 20.0.0.4 file
+// rather than summed from the attribute list, because two of the enums are
+// single bytes. At the offset where this struct starts the bytes are
+// `60 af e5 04 | 01 | a2 37 7c | 00 00 00 00 | 00 00 00 00 | 00 00 00 80`:
+// unused_01, then broad_phase_type = 0x01 as a *byte*, then three bytes of
+// unused_02, then the property's data, size and capacity_and_flags. Reading
+// broad_phase_type as a u32 instead consumes the unused bytes and lands four
+// bytes off, which is enough to fail every file that carries one.
+bool skipHavokWorldObjectInfo(Cursor& c)
+{
+    c.raw(4);                                  // unused_01
+    c.u8();                                    // broad_phase_type
+    c.raw(3);                                  // unused_02
+    c.raw(12);                                 // property (3 x u32)
+    return c.ok();
+}
+
+// The prefix every BhkWorldObject, and therefore every BhkEntity, carries.
+bool skipHavokWorldObject(Cursor& c, quint32 version)
+{
+    if (!skipRefs(c, 1)) return false;               // shape
+    // unknown_int is only in the file for the oldest versions that have it.
+    if (version <= kHavokMaterialUnknownIntVersion) c.u32();
+    if (!skipHavokFilter(c)) return false;           // havok_filter
+    return skipHavokWorldObjectInfo(c);
+}
+
+// A BhkEntityCInfo: a byte of response, a byte of unused, a u16 delay. Verified
+// against the same file, where the entity prefix ends in `01 ff ff ff`.
+bool skipHavokEntityInfo(Cursor& c)
+{
+    c.raw(4);
+    return c.ok();
+}
+
+bool skipHavokEntity(Cursor& c, quint32 version)
+{
+    if (!skipHavokWorldObject(c, version)) return false;
+    return skipHavokEntityInfo(c);
+}
+
+// The rigid body info block, whose layout is selected by the bs_version in the
+// header rather than the file version.
+constexpr quint32 kRigidBodyCInfo2010BsVersion = 83u;
+constexpr quint32 kRigidBodyCInfo2014BsVersion = 130u;
+constexpr quint32 kRigidBodyFlagsBsVersion = 76u;
+
+// bhkRigidBodyCInfo550660, the layout used through bs_version 34 - which covers
+// every Oblivion and Skyrim mesh. 196 bytes at 20.0.0.4, measured: the block's
+// rigid_body_info sits at 103040 and the block ends 196 bytes later.
+//
+// Leading group (unused_01, filter, unused_02) is only in the file from
+// 10.1.0.0 on. The tail is fixed: 116 bytes of transform and inertia, eight
+// floats, four u32 enums, and 12 unused bytes.
+bool skipRigidBodyCInfo550660(Cursor& c, quint32 version)
+{
+    if (version >= kMoppOffsetVersion) {
+        c.raw(4);                              // unused_01
+        if (!skipHavokFilter(c)) return false; // havok_filter
+        c.raw(4);                              // unused_02
+    }
+    c.raw(1);                                  // collision_response (a byte)
+    c.raw(1);                                  // unused_03
+    c.raw(2);                                  // process_contact_callback_delay
+    c.raw(4);                                  // unused_04
+    c.raw(116);                                // translation, rotation, velocities,
+                                              // inertia tensor, centre of mass
+    c.raw(32);                                 // mass and seven floats
+    c.raw(16);                                 // four u32 enums
+    c.raw(12);                                 // unused_05
+    return c.ok();
+}
+
+// bhkRigidBody, and bhkRigidBodyT with it - the latter adds no fields of its
+// own, only a different type name, so it shares this walker.
+bool walkBhkRigidBody(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!skipHavokEntity(c, version)) return false;
+    if (bsVersion <= kMoppBuildTypeBsVersion) {
+        if (!skipRigidBodyCInfo550660(c, version)) return false;
+    } else if (bsVersion >= kRigidBodyCInfo2010BsVersion
+               && bsVersion != kRigidBodyCInfo2014BsVersion) {
+        // BhkRigidBodyCInfo2010 has not been measured against shipped bytes, so
+        // decline rather than guess: a wrong length would misread every block
+        // after this one. The opaque fallback keeps the file readable.
+        return false;
+    } else if (bsVersion == kRigidBodyCInfo2014BsVersion) {
+        return false;
+    }
+    const quint32 numConstraints = c.u32();
+    if (!c.ok() || numConstraints > 100000u) return false;
+    if (!skipRefs(c, numConstraints)) return false;
+    if (bsVersion < kRigidBodyFlagsBsVersion) c.u32();    // body_flags
+    else c.u16();
+    return c.ok();
+}
+
+// The bhk collision objects - bhkCollisionObject and its SP/P/Blend/NP
+// variants - differ only in the default they give the flags field, so they all
+// share one layout and one walker.
+//
+// Ten bytes, read from a shipped 20.0.0.4 file where the block is
+// `00 00 00 00 | 01 00 | 06 00 00 00`: a ref to the target node, the flags, and
+// a ref to the body. The flags are a u16, not the u32 the attribute list's type
+// name suggests, and the block is two bytes short of the twelve that u32 would
+// imply.
+bool walkBhkCollisionObject(Cursor& c, quint32, quint32)
+{
+    if (!skipRefs(c, 1)) return false;          // target
+    c.u16();                                   // flags
+    if (!skipRefs(c, 1)) return false;          // body
+    return c.ok();
+}
+
+// --- Property and controller blocks ------------------------------------------
+
+// NiMaterialProperty: the NiObjectNET prefix, then the colours. The 20-byte
+// prefix is the name, a zero extra-data count and a null controller, which is
+// how every property block starts.
+//
+// Verified against a shipped 20.0.0.4 file: 20 bytes of prefix, four Color3s at
+// 12 bytes each, then glossiness and alpha, for 80 bytes total - the oracle's
+// io_size exactly. flags is only in the file for the 3.x-10.0.1.2 range, and
+// emissive_mult only once bs_version passes 21, which Oblivion at bs_version 11
+// does not reach.
+bool walkNiMaterialProperty(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    if (version >= 50331648u && version <= 167772418u) c.u16();   // flags
+    if (bsVersion < 26) {
+        c.raw(12);                                              // ambient_color
+        c.raw(12);                                              // diffuse_color
+    }
+    c.raw(12);                                                  // specular_color
+    c.raw(12);                                                  // emissive_color
+    c.f32();                                                    // glossiness
+    c.f32();                                                    // alpha
+    if (bsVersion > 21) c.f32();                                // emissive_mult
+    return c.ok();
+}
+
+// NiStencilProperty. Through 20.0.0.5 it is an enabled byte, a test function, a
+// reference and a mask, then three actions and a draw mode. From 20.1.0.3 the
+// whole set collapses into a packed flags word plus a reference.
+constexpr quint32 kStencilPackedVersion = 335609859u;   // 20.1.0.3
+
+bool walkNiStencilProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    if (version >= kStencilPackedVersion) {
+        c.u32();      // flags
+        c.u32();      // stencil_ref
+        return c.ok();
+    }
+    if (version <= 167772418u) c.u16();   // flags
+    c.u8();                                // stencil_enabled
+    c.u32();                               // stencil_function
+    c.u32();                               // stencil_ref
+    c.u32();                               // stencil_mask
+    c.u32();                               // fail_action
+    c.u32();                               // z_fail_action
+    c.u32();                               // pass_action
+    c.u32();                               // draw_mode
+    return c.ok();
+}
+
+// NiControllerManager: the time-controller prefix, a cumulative byte, the
+// sequence refs, and a palette ref.
+bool walkNiControllerManager(Cursor& c, quint32, quint32)
+{
+    if (!walkNiTimeController(c)) return false;
+    c.u8();                                 // cumulative
+    const quint32 numSequences = c.u32();
+    if (!c.ok() || numSequences > 100000u) return false;
+    if (!skipRefs(c, numSequences)) return false;
+    if (!skipRefs(c, 1)) return false;       // object_palette
+    return c.ok();
+}
+
+// BSBound: an extra-data name and a centre/dimensions pair.
+bool walkBSBound(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiExtraData(c, version)) return false;
+    c.vec3();     // center
+    c.vec3();     // dimensions
+    return c.ok();
+}
+
+// BSFurnitureMarker: a name, a position count, and the positions. Through
+// bs_version 34 a FurniturePosition is a Vector3 offset, a u16 orientation and
+// two bytes; later it becomes a heading, an animation type and entry points,
+// which have not been measured here.
+constexpr quint32 kFurniturePositionBsVersion = 34u;
+
+bool walkBSFurnitureMarker(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiExtraData(c, version)) return false;
+    const quint32 numPositions = c.u32();
+    if (!c.ok() || numPositions > 100000u) return false;
+    if (bsVersion > kFurniturePositionBsVersion) return false;
+    for (quint32 i = 0; i < numPositions; ++i) {
+        c.vec3();     // offset
+        c.u16();      // orientation
+        c.u8();       // position_ref_1
+        c.u8();       // position_ref_2
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -608,6 +828,20 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkBoxShape", walkBhkBoxShape);
         add("bhkCapsuleShape", walkBhkCapsuleShape);
         add("bhkConvexVerticesShape", walkBhkConvexVerticesShape);
+        add("bhkRigidBody", walkBhkRigidBody);
+        add("bhkRigidBodyT", walkBhkRigidBody);
+        add("bhkCollisionObject", walkBhkCollisionObject);
+        add("bhkSPCollisionObject", walkBhkCollisionObject);
+        add("bhkPCollisionObject", walkBhkCollisionObject);
+        add("bhkBlendCollisionObject", walkBhkCollisionObject);
+        add("bhkNPCollisionObject", walkBhkCollisionObject);
+        // Properties and controllers.
+        add("NiMaterialProperty", walkNiMaterialProperty);
+        add("NiStencilProperty", walkNiStencilProperty);
+        add("NiControllerManager", walkNiControllerManager);
+        // Extra data.
+        add("BSBound", walkBSBound);
+        add("BSFurnitureMarker", walkBSFurnitureMarker);
         // Extra data.
         add("BSXFlags", walkBSXFlags);
         add("NiStringExtraData", walkNiStringExtraData);
