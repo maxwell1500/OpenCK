@@ -394,6 +394,13 @@ add_executable(test_fullscale_roundtrip test_fullscale_roundtrip.cpp)
 target_link_libraries(test_fullscale_roundtrip PRIVATE openck_model test_stubs Qt6::Core)
 target_include_directories(test_fullscale_roundtrip PRIVATE ${TEST_INCLUDE_DIRS})
 
+# Dumps this build's block boundaries for a NIF so they can be diffed against the
+# reference reader. A diagnostic, not a test: its input is a .nif on disk and the
+# useful output is the offsets, not an exit code.
+add_executable(nifwalkdump ../tools/nifwalkdump.cpp)
+target_link_libraries(nifwalkdump PRIVATE openck_files Qt6::Core)
+target_include_directories(nifwalkdump PRIVATE ${TEST_INCLUDE_DIRS})
+
 # BTDX v2 GNRL writer round-trip (create -> open/extract).
 add_executable(test_ba2write test_ba2write.cpp)
 target_link_libraries(test_ba2write PRIVATE openck_model test_stubs Qt6::Test)
@@ -1034,6 +1041,7 @@ get_property(OPENCK_CTEST_TARGETS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY
 # in the list above even though a "build the test exes" target should make them.
 set(OPENCK_STANDALONE_TOOLS
     make_testplugin
+    nifwalkdump
     test_fullscale_roundtrip
     test_meshresolve
     test_subrecord_diff)

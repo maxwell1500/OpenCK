@@ -235,6 +235,24 @@ private slots:
                 failureReasons[reason] += 1;
                 if (!firstFailure.contains(reason))
                     firstFailure[reason] = entry.fullPath;
+                // A file that walks but does not re-save is a different failure
+                // from one that does not walk, and OPENCK_TEST_NIF_DUMP_FAILURE
+                // never fires for it - that capture is on the walk path. Without
+                // a capture here the bytes have to be taken from the archive
+                // again by hand to be compared, so give it its own.
+                const QByteArray saveFailTarget =
+                    qgetenv("OPENCK_TEST_NIF_DUMP_SAVEFAIL");
+                if (!saveFailTarget.isEmpty()) {
+                    QFile dump(QString::fromLocal8Bit(saveFailTarget));
+                    if (dump.open(QIODevice::WriteOnly)) {
+                        dump.write(bytes);
+                        dump.close();
+                        qWarning().noquote()
+                            << "captured non-round-tripping NIF" << entry.fullPath
+                            << "to" << dump.fileName();
+                        return;
+                    }
+                }
                 continue;
             }
             ++roundTripped;
@@ -332,6 +350,12 @@ private slots:
                 QString report;
                 report += QStringLiteral("walked %1 opaque %2 of %3 gamebryo\n")
                               .arg(walked).arg(opaqueBlocks).arg(gamebryo);
+                for (auto it = failureReasons.begin(); it != failureReasons.end(); ++it) {
+                    report += QStringLiteral("SAVEFAIL %1\t%2\t%3\n")
+                                  .arg(it.value(), 6)
+                                  .arg(it.key())
+                                  .arg(firstFailure.value(it.key()));
+                }
                 for (auto it = walkReasons.begin(); it != walkReasons.end(); ++it) {
                     report += QStringLiteral("%1\t%2\t%3\n")
                                   .arg(it.value(), 6)

@@ -289,13 +289,42 @@ bool walkNiBinaryExtraData(Cursor& c, quint32 version, quint32)
 }
 
 // NiGeometry adds a bounding sphere and a skin ref to NiAVObject.
-bool walkNiGeometry(Cursor& c, quint32 version, quint32 bsVersion)
+// A MaterialData: from 10.0.0.0 to 20.1.0.3 it is a single flag, and only when
+// that flag is set does a shader name and an extra-data int follow. From
+// 20.1.0.15 it becomes a material-name list, which is not walked here.
+constexpr quint32 kMaterialDataFirstVersion = 167772416u;  // 10.0.0.0
+constexpr quint32 kMaterialDataLastVersion = 335609859u;    // 20.1.0.3
+
+bool skipMaterialData(Cursor& c, quint32 version)
+{
+    if (version >= 335675397u) return false;   // material list: unmeasured
+    if (version < kMaterialDataFirstVersion
+        || version > kMaterialDataLastVersion)
+        return c.ok();
+    if (c.u8()) {                              // has_shader
+        if (!skipString(c, version)) return false;
+        c.u32();                               // shader_extra_data
+    }
+    return c.ok();
+}
+
+// NiTriShape and NiTriStrips - both NiTriBasedGeom - carry a data ref, a skin
+// ref and a MaterialData.
+//
+// This previously read a NiGeometry bounding sphere (centre and radius) plus a
+// skin ref, which is 20 bytes where the real payload is 9 - eleven bytes too
+// many. Because a pre-20.2.0.5 container records no block lengths, every block
+// after the first NiTriShape in a file landed eleven bytes early, and the walk
+// then failed wherever it happened to notice, blaming whichever type it was
+// reading at the time. That is what the several thousand "could not be walked"
+// failures were. The bounding sphere only exists for a 20.2.0.7 particle-system
+// special case, not for the tri-based geometry.
+bool walkNiTriBasedGeom(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkNiAVObject(c, version, bsVersion)) return false;
-    c.raw(12);  // bounding sphere centre
-    c.f32();    // bounding sphere radius
-    c.u32();    // skin
-    return c.ok();
+    if (!skipRefs(c, 1)) return false;    // data
+    if (!skipRefs(c, 1)) return false;    // skin_instance
+    return skipMaterialData(c, version);
 }
 
 // NiKeyframeData: rotations, then the translation and scale channels. The first
@@ -926,16 +955,53 @@ bool walkBhkSimpleShapePhantom(Cursor& c, quint32, quint32)
     return c.ok();
 }
 
-// NiVertexColorProperty: flags, and through 20.0.0.5 a vertex and a lighting
-// mode. From 20.1.0.3 the two modes pack into the flags word.
+// NiVertexColorProperty: a flags word, and through 20.0.0.5 a vertex mode and a
+// lighting mode. From 20.1.0.3 the two modes pack into the flags word.
+//
+// The flags are a u16 and the two modes are u32, which is 22 bytes for a
+// 10.2.0.0 file: twelve of NiObjectNET, then two, four and four. Reading the
+// flags as a u32 makes the block two bytes long and shifts everything after it.
 bool walkNiVertexColorProperty(Cursor& c, quint32 version, quint32)
 {
     if (!walkNiObjectNET(c, version)) return false;
-    c.u32();                                              // flags
+    c.u16();                                              // flags
     if (version <= 335544325u) {
         c.u32();                                          // vertex_mode
         c.u32();                                          // lighting_mode
     }
+    return c.ok();
+}
+
+// NiAlphaProperty: a flags word and a one-byte threshold. The threshold is a
+// byte, not a float - a shipped 10.2.0.0 file stores 127 in it, which as a
+// float would be a denormal rather than a threshold.
+constexpr quint32 kAlphaPropertyOldVersion = 33751040u;    // 2.0.0.4
+constexpr quint32 kAlphaPropertyStarfield = 335741185u;    // 20.2.0.9
+constexpr quint32 kAlphaPropertyStarfieldEnd = 335741186u;
+
+bool walkNiAlphaProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    c.u16();                                              // flags
+    c.u8();                                               // threshold
+    if (version <= kAlphaPropertyOldVersion) {
+        c.u16();                                          // unknown_short_1
+        c.u32();                                          // unknown_int_2
+    } else if (version >= kAlphaPropertyStarfield
+               && version <= kAlphaPropertyStarfieldEnd) {
+        c.u16();                                          // unknown_short_1
+    }
+    return c.ok();
+}
+
+// NiSpecularProperty is just a flags word; earlier versions put the specular
+// colour and strength beside it, and from 20.1.0.3 the version lives inside the
+// flags word instead.
+bool walkNiSpecularProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    c.u16();                                              // flags
+    if (version < 335609859u) c.u32();                    // colour and strength
     return c.ok();
 }
 
@@ -1033,6 +1099,46 @@ bool walkNiTexturingProperty(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// A FormatPrefs is three four-byte enums: a pixel layout, a mipmap choice and
+// an alpha format. nifgen models all three as boolean-like types, but the block
+// is 12 bytes wide, not 3.
+bool skipFormatPrefs(Cursor& c) { c.raw(12); return c.ok(); }
+
+// NiSourceTexture: an external/internal flag, a file name, an optional pixel
+// data ref, the format preferences, an is-static byte and a direct-render flag.
+//
+// The format preferences and the is-static byte are read whether or not the
+// texture is external. Reading them only for internal textures - which the
+// version-gated field list suggests, because each carries an `and
+// use_external == 0` - leaves the block 13 bytes short, and this type is on
+// 1,882 of the archive's files.
+//
+// Checked against two shipped files, one 20.0.0.4 and one 10.2.0.0, both 81
+// bytes: 12 of NiObjectNET, the flag, a 50-byte file-name string, a 4-byte ref,
+// 12 of format prefs, and two single bytes.
+constexpr quint32 kSourceTextureRefVersion = 167772420u;   // 10.0.0.4
+constexpr quint32 kSourceTextureNameVersion = 167837696u;  // 10.1.0.0
+constexpr quint32 kSourceTextureDirectRender = 167837799u;
+constexpr quint32 kSourceTexturePersist = 335675396u;      // 20.1.0.15
+
+bool walkNiSourceTexture(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    const quint8 useExternal = c.u8();
+    if (version <= 167772419u && useExternal == 0) c.u8();   // use_internal
+    if (!skipString(c, version)) return false;                // file_name
+    if (version >= kSourceTextureRefVersion) {
+        if (!skipRefs(c, 1)) return false;                    // pixel_data
+    }
+    if (!skipFormatPrefs(c)) return false;                    // format_prefs
+    c.u8();                                                   // is_static
+    if (version >= kSourceTextureDirectRender) c.u8();        // direct_render
+    if (version >= kSourceTexturePersist) {
+        c.u8();                                               // persist_render_data
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1044,8 +1150,8 @@ const QHash<QString, BlockWalker>& blockWalkers()
         };
         // Geometry and the object base chain.
         add("NiNode", walkNiNode);
-        add("NiTriStrips", walkNiGeometry);
-        add("NiTriShape", walkNiGeometry);
+        add("NiTriStrips", walkNiTriBasedGeom);
+        add("NiTriShape", walkNiTriBasedGeom);
         add("NiTriStripsData", walkNiTriStripsData);
         // Havok collision shapes.
         add("bhkNiTriStripsShape", walkBhkNiTriStripsShape);
@@ -1081,7 +1187,11 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkSimpleShapeCylinder", walkBhkSimpleShapePhantom);
         add("bhkSimpleShapeCapsule", walkBhkSimpleShapePhantom);
         add("NiVertexColorProperty", walkNiVertexColorProperty);
+        add("NiAlphaProperty", walkNiAlphaProperty);
+        add("NiSpecularProperty", walkNiSpecularProperty);
+        add("NiTriShapeData", walkNiGeometryData);
         add("NiTexturingProperty", walkNiTexturingProperty);
+        add("NiSourceTexture", walkNiSourceTexture);
         // Extra data.
         add("BSXFlags", walkBSXFlags);
         add("NiStringExtraData", walkNiStringExtraData);
@@ -1265,6 +1375,7 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
         if (!c.ok()) return bad(QStringLiteral("truncated string table"));
     }
 
+    const int headerTailStart = c.pos();
     const quint32 numGroups = c.u32();
     if (!c.ok() || numGroups > kMaxGroups)
         return bad(QStringLiteral("implausible group count %1").arg(numGroups));
@@ -1272,6 +1383,7 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
     for (quint32 i = 0; i < numGroups; ++i)
         mGroupIds.append(c.u32());
     if (!c.ok()) return bad(QStringLiteral("truncated group table"));
+    mHeaderTail = raw.mid(headerTailStart, c.pos() - headerTailStart);
 
     if (!hasSizeTable) {
         // No size table. Try to recover the block boundaries by walking each
@@ -1334,11 +1446,21 @@ bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString
 
     QVector<Block> blocks;
     QVector<quint32> sizes;
+    mWalkedOffsets.clear();
+    mWalkedTypes.clear();
+    mWalkedOffsets.reserve(static_cast<int>(numBlocks));
+    mWalkedTypes.reserve(static_cast<int>(numBlocks));
     blocks.reserve(static_cast<int>(numBlocks));
     sizes.reserve(static_cast<int>(numBlocks));
 
     for (quint32 i = 0; i < numBlocks; ++i) {
         const QString type = mBlockTypes.at(mTypeIndex.at(i));
+        // A block's bytes start *before* the zero tag, not after it. The tag is
+        // four bytes of the file, so leaving it out makes the re-serialized
+        // block four bytes short. That is invisible while the region is opaque
+        // - it is copied through whole - and becomes a whole-file mismatch the
+        // moment the region splits. A 9-block 10.1.0.106 file loses 36 bytes.
+        const int blockStart = c.pos();
         if (mVersion <= kBlockDummyVersion && !type.startsWith(QStringLiteral("bhk"))) {
             const quint32 tag = c.u32();
             if (!c.ok() || tag != 0) {
@@ -1363,10 +1485,12 @@ bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString
         }
         Block block;
         block.type = type;
-        block.data = raw.mid(start, c.pos() - start);
+        block.data = raw.mid(blockStart, c.pos() - blockStart);
         block.footer = QByteArray();
         blocks.append(block);
         sizes.append(static_cast<quint32>(block.data.size()));
+        mWalkedOffsets.append(blockStart);
+        mWalkedTypes.append(type);
     }
 
     // The region must end with the root table and nothing else. Requiring an
@@ -1463,8 +1587,11 @@ QByteArray NifBlockFile::serialize() const
         }
     }
 
-    appendU32(out, static_cast<quint32>(mGroupIds.size()));
-    for (quint32 id : mGroupIds) appendU32(out, id);
+    // The block-reference count, its references, the group count and the group
+    // ids are re-emitted from the bytes that were read, not rebuilt from
+    // mGroupIds: the reference table is not modelled, and rebuilding drops four
+    // bytes on every file whose tables are empty.
+    out.append(mHeaderTail);
 
     if (!hasSizeTable) {
         // Either the region was never split, in which case it is emitted whole,

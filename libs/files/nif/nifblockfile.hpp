@@ -81,6 +81,29 @@ public:
         return mBlockTypes.value(mTypeIndex.at(index));
     }
 
+    // How far the split got, even when it did not finish.
+    //
+    // A container with no size table has to be walked block by block, and a
+    // wrong payload length for any one of them makes every later block land in
+    // the wrong place. When that happens lastWalkError() names the block the
+    // walk gave up on, which is *not* the block that is wrong: by then the
+    // position is already lost, so the error usually names whatever type it
+    // happened to be reading when it read payload as a name. These give the
+    // offsets of the blocks that did land correctly, so the first block whose
+    // offset disagrees with the reference reader is the actual culprit and can
+    // be found by comparison rather than guessed at.
+    int walkedBlockCount() const { return mWalkedOffsets.size(); }
+    int walkedBlockOffset(int index) const
+    {
+        if (index < 0 || index >= mWalkedOffsets.size()) return -1;
+        return mWalkedOffsets.at(index);
+    }
+    QString walkedBlockType(int index) const
+    {
+        if (index < 0 || index >= mWalkedTypes.size()) return QString();
+        return mWalkedTypes.at(index);
+    }
+
     // Clip name -> owning controller block, gathered from every
     // NiControllerSequence. A clip name only exists here, so this is what ties
     // a controller to a named animation in the editor.
@@ -164,7 +187,23 @@ private:
     QStringList mStrings;
     quint32 mMaxStringLen = 0;
     QVector<quint32> mGroupIds;
+    /// The header bytes between the end of the last table we model (the string
+    /// table, or the block-size table when there is no string table) and the
+    /// first block payload, kept verbatim.
+    ///
+    /// This span holds the block-reference count and its references along with
+    /// the group count and ids. The reference table is not modelled at all, and
+    /// reconstructing the group table from mGroupIds loses four bytes for a file
+    /// whose tables are empty - which is most of them. That does not corrupt the
+    /// file so much as make it differ from the original by exactly that much,
+    /// and only once the block region splits: while the region is opaque it is
+    /// copied through whole, so the header mistake round-trips by coincidence.
+    QByteArray mHeaderTail;
     QVector<Block> mBlocks;
+    /// Offsets and types of the blocks the split walked successfully, kept even
+    /// when the split then failed, so the divergence can be located.
+    QVector<int> mWalkedOffsets;
+    QStringList mWalkedTypes;
     /// Everything from the first block payload to end of file, for containers
     /// that carry no size table and therefore cannot be split. Empty otherwise.
     QByteArray mBlockRegion;
