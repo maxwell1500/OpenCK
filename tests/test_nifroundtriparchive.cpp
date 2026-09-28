@@ -127,6 +127,18 @@ private slots:
         QMap<QString, int> versionCounts;
         QMap<QString, int> typeCensus;
         QMap<QString, int> walkReasons;
+    // The block type the layout fitter is waiting on, named here so the counters
+    // below can refer to it without a second literal.
+    static const QString kTransformDataType = QStringLiteral("NiTransformData");
+    int transformDataFiles = 0;
+    int transformDataAddressable = 0;
+    // The union of block types across the animated meshes that are still not
+    // addressable, and how many of those files carry each. This is the actual
+    // remaining work list for the fitter: the files are known and their blocks
+    // are already declared, so the only question is which payload layout is
+    // missing and how many files it would recover.
+    QSet<QString> transformDataBlockedTypes;
+    QMap<QString, int> transformDataBlockedByType;
     // An example file per walk reason. The counts alone cannot be acted on: to
     // diff a walker against the nifgen oracle you need the actual bytes of a
     // file that stops for that reason, and the archive is a build input that is
@@ -199,6 +211,32 @@ private slots:
                 continue;
             }
             versionCounts[file.headerVersion()] += 1;
+            // Does this file carry NiTransformData, and is it addressable? The
+            // block region either splits or it does not, and a file only becomes
+            // addressable when every block in it can be walked, so the pair of
+            // flags is what says whether the layout fitter can be given any
+            // NiTransformData block at all. Tracked for every file rather than
+            // only the ones that walk, because the interesting number is how many
+            // of the animated meshes are *still* not addressable.
+            {
+                bool carriesTransformData = false;
+                QSet<QString> declaredTypes;
+                for (int b = 0; b < file.declaredBlockCount(); ++b) {
+                    const QString t = file.declaredBlockType(b);
+                    declaredTypes.insert(t);
+                    if (t == kTransformDataType) carriesTransformData = true;
+                }
+                if (carriesTransformData) {
+                    ++transformDataFiles;
+                    if (file.hasIndividualBlocks()) {
+                        ++transformDataAddressable;
+                    } else {
+                        transformDataBlockedTypes.unite(declaredTypes);
+                        for (const QString& t : declaredTypes)
+                            transformDataBlockedByType[t] += 1;
+                    }
+                }
+            }
             if (file.hasIndividualBlocks()) {
                 ++walked;
             } else {
@@ -350,6 +388,17 @@ private slots:
                 QString report;
                 report += QStringLiteral("walked %1 opaque %2 of %3 gamebryo\n")
                               .arg(walked).arg(opaqueBlocks).arg(gamebryo);
+                report += QStringLiteral("NIFTRANSFORM files=%1 addressable=%2 blocked=%3\n")
+                              .arg(transformDataFiles)
+                              .arg(transformDataAddressable)
+                              .arg(transformDataFiles - transformDataAddressable);
+                // Ranked by how many of the still-blocked animated meshes carry
+                // the type, so the order is the order that unblocks them.
+                for (auto it = transformDataBlockedByType.begin();
+                     it != transformDataBlockedByType.end(); ++it) {
+                    report += QStringLiteral("NIFBLOCKED %1\t%2\n")
+                                  .arg(it.value(), 6).arg(it.key());
+                }
                 for (auto it = failureReasons.begin(); it != failureReasons.end(); ++it) {
                     report += QStringLiteral("SAVEFAIL %1\t%2\t%3\n")
                                   .arg(it.value(), 6)
