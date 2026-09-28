@@ -1136,21 +1136,14 @@ bool walkNiSourceTexture(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
-// A BoneData: a transform (translation, 3x3 rotation, scale), a bounding sphere
-// and a vertex count. 70 bytes.
-bool skipBoneData(Cursor& c)
-{
-    c.raw(12);   // skin_transform translation
-    c.raw(36);   // skin_transform rotation
-    c.f32();     // skin_transform scale
-    c.raw(12);   // bounding sphere centre
-    c.f32();     // bounding sphere radius
-    c.u16();     // num_vertices
-    return c.ok();
-}
-
 // NiSkinInstance. Its base is NiObject, not NiObjectNET, so there is no name
 // and no controller - reading either would shift every field by four bytes.
+//
+// The bones are references to NiNode blocks, not inline bone data. nifgen
+// declares the array as BoneData, but the array resolves to the named NiNodes it
+// points at, and a shipped 20.0.0.4 file measures 28 bytes with three bones:
+// four refs, a count, and three more refs. Reading 70 bytes of transform per bone
+// instead walks straight past the end of the block.
 constexpr quint32 kSkinInstancePartitionVersion = 167837797u;   // 10.1.0.1
 
 bool walkNiSkinInstance(Cursor& c, quint32 version, quint32)
@@ -1161,9 +1154,7 @@ bool walkNiSkinInstance(Cursor& c, quint32 version, quint32)
     if (!skipRefs(c, 1)) return false;    // skeleton_root
     const quint32 numBones = c.u32();
     if (!c.ok() || numBones > 10000u) return false;
-    for (quint32 i = 0; i < numBones; ++i) {
-        if (!skipBoneData(c)) return false;
-    }
+    if (!skipRefs(c, numBones)) return false;   // bones
     return c.ok();
 }
 
