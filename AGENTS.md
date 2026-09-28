@@ -24,14 +24,13 @@ under the hood and how OpenCK's architecture maps to it.
 
 Build: `cmake -S . -B build -DCMAKE_PREFIX_PATH=C:/Qt/6.5.3/msvc2019_64 && cmake --build build --config Debug --target openck`
 
-Test: every `test_*.exe` in `build/bin/Debug/` exits 0. Test exes and
-`ctest` REQUIRE `C:/Qt/6.5.3/msvc2019_64/bin` on `PATH` first — without it
-every test fails to start with `Qt6Test.dll was not found`. PowerShell
-loop:
+Test: every `test_*.exe` in `build/bin/Debug/` exits 0. Do **not** put Qt on
+`PATH` to make this work — the build deploys the Qt runtime the tests need next
+to the test exes, and `ctest` plus the bare exes run with no `PATH` help at all.
+PowerShell loop:
 
 ```powershell
-$env:PATH = "C:\Qt\6.5.3\msvc2019_64\bin;" + $env:PATH
-$tests = Get-ChildItem build\bin\Debug\test_*.exe | ForEach-Object { $_.FullName }
+$tests = Get-ChildItem build\bin\Release\test_*.exe | ForEach-Object { $_.FullName }
 $pass = 0
 foreach ($t in $tests) { & $t 2>&1 | Out-Null; if ($LASTEXITCODE -eq 0) { $pass++ } }
 "Pass: $pass"
@@ -170,6 +169,18 @@ build, which is what the LGPL dynamic-link clause intends.
   Archive dialog asks, rather than guessing. There is no LE/SE signal anywhere in
   the codebase today, so do not add a heuristic that infers one from a filename
   or a data-folder path without checking a real archive first.
+- **`Qt6Test.dll was not found` is a deployment bug, not a `PATH` problem.**
+  Observed repeatedly: every `test_*.exe` died at load with `0xC0000135`
+  (STATUS_DLL_NOT_FOUND) and `ctest` reported nothing, which reads like a broken
+  build but is a missing DLL next to the exes. Cause: `windeployqt` only ran
+  against `openck.exe`, so it deployed the closure of what the *app* links, and
+  the tests' `Qt6::Test` was never copied. `tests/CMakeLists.txt` now deploys
+  over the test exes too (`deploy_qt_test_runtime`, stamp-driven off
+  `build/qt-test-runtime.stamp`). If it ever reappears, build that target —
+  do not add Qt to `PATH`, which only hides it for interactive runs and leaves
+  CI and any other caller broken. Diagnose with
+  `exit=$LASTEXITCODE` being `-1073741515` (that is `0xC0000135`, and PowerShell
+  prints it as a negative number, so it is easy to misread as a crash).
 - **Keep a `LOG_INFO` line at the top of new editor windows** so the
   log file shows when each window opens, matching the convention in  the existing main window.
 

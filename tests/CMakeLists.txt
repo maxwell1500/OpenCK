@@ -1042,6 +1042,56 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
     ${OPENCK_CTEST_TARGETS}
     ${OPENCK_STANDALONE_TOOLS})
 
+# Deploy the Qt runtime the *tests* need next to the test executables.
+#
+# windeployqt only ever ran against openck.exe, so it deployed the closure of the
+# modules the app links. The tests additionally link Qt6::Test, which openck.exe
+# does not, so Qt6Test.dll was never copied. Every test exe then died during load
+# with STATUS_DLL_NOT_FOUND (0xC0000135) unless Qt happened to be on PATH - a
+# failure that reads like a broken build but is really a missing deployment step,
+# and it has been rediscovered far too often. Deploying over the test exes as
+# well puts the union of both closures in place.
+#
+# The exe list is derived from the same CTest-derived set as `all_tests` rather
+# than kept by hand, for the same reason: a hand-kept list goes stale silently.
+#
+# This is driven off a stamp file so it only re-runs when a test executable
+# actually changes. windeployqt is slow enough that running it on every build
+# would be felt, and a deployment step that fires on every build is one people
+# start skipping. The stamp is per-config: the exes are per-config too, so one
+# shared stamp would let a Debug build skip its own deployment because Release
+# had just refreshed it.
+if(WIN32 AND WINDEPLOYQT_EXECUTABLE)
+    set(OPENCK_QT_RUNTIME_STAMP "${CMAKE_BINARY_DIR}/qt-test-runtime-$<CONFIG>.stamp")
+    set(OPENCK_QT_DEPLOY_EXES "")
+    set(OPENCK_QT_FIRST_TEST_TARGET "")
+    foreach(target IN LISTS OPENCK_CTEST_TARGETS)
+        if(TARGET ${target})
+            list(APPEND OPENCK_QT_DEPLOY_EXES "$<TARGET_FILE:${target}>")
+            if(NOT OPENCK_QT_FIRST_TEST_TARGET)
+                set(OPENCK_QT_FIRST_TEST_TARGET ${target})
+            endif()
+        endif()
+    endforeach()
+
+    if(OPENCK_QT_DEPLOY_EXES)
+        add_custom_command(
+            OUTPUT "${OPENCK_QT_RUNTIME_STAMP}"
+            COMMAND "${WINDEPLOYQT_EXECUTABLE}"
+                --no-translations --no-opengl-sw --no-system-d3d-compiler
+                --dir "$<TARGET_FILE_DIR:${OPENCK_QT_FIRST_TEST_TARGET}>"
+                ${OPENCK_QT_DEPLOY_EXES}
+            COMMAND ${CMAKE_COMMAND} -E touch "${OPENCK_QT_RUNTIME_STAMP}"
+            DEPENDS ${OPENCK_CTEST_TARGETS}
+            COMMENT "Deploying Qt6 runtime DLLs for test executables (Qt6::Test, ...)"
+            VERBATIM
+        )
+        add_custom_target(deploy_qt_test_runtime ALL
+            DEPENDS "${OPENCK_QT_RUNTIME_STAMP}")
+        add_dependencies(all_tests deploy_qt_test_runtime)
+    endif()
+endif()
+
 # Guard against the staleness coming back in a new form: a test_* executable
 # that neither CTest nor the standalone list knows about would be silently left
 # out of the build, which is exactly the failure this target is meant to prevent.
