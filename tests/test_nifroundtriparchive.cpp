@@ -127,6 +127,12 @@ private slots:
         QMap<QString, int> versionCounts;
         QMap<QString, int> typeCensus;
         QMap<QString, int> walkReasons;
+    // An example file per walk reason. The counts alone cannot be acted on: to
+    // diff a walker against the nifgen oracle you need the actual bytes of a
+    // file that stops for that reason, and the archive is a build input that is
+    // not present on a machine without the game. Naming one lets the capture be
+    // driven by a real path rather than guessed at.
+    QMap<QString, QString> walkFirstFile;
         QList<QSet<QString>> typeSets;
         int filesWalked = 0;
         QMap<QString, int> failureReasons;
@@ -201,6 +207,8 @@ private slots:
                 // could not handle. This is what tells us which payload layout
                 // to write next, so it is reported rather than swallowed.
                 walkReasons[file.lastWalkError()] += 1;
+                if (!walkFirstFile.contains(file.lastWalkError()))
+                    walkFirstFile[file.lastWalkError()] = entry.fullPath;
                 if (hasEnoughExtraData(file.lastWalkError())
                     && maybeStopAtFailure(entry.fullPath, bytes))
                     return;
@@ -306,7 +314,40 @@ private slots:
         for (auto it = typeCensus.begin(); it != typeCensus.end(); ++it)
             qInfo().noquote() << "block type" << it.key() << it.value();
         for (auto it = walkReasons.begin(); it != walkReasons.end(); ++it)
-            qInfo().noquote() << "walk stopped:" << it.key() << it.value();
+            qInfo().noquote() << "walk stopped:" << it.key() << it.value()
+                              << "first:" << walkFirstFile.value(it.key());
+
+        // The walk-reason breakdown is the only thing that says which payload
+        // layout to write next, and it is the part that has to be acted on from
+        // outside the test: to diff a walker against the nifgen oracle you need
+        // the bytes of a file that stops for that reason, and the archive is a
+        // build input that does not exist on a machine without the game. The
+        // counts are not enough to do that, so each reason also names an example
+        // file, and OPENCK_TEST_NIF_CENSUS (a path) receives the whole table.
+        // qInfo is not enough: the log level is Error, so these lines are
+        // otherwise discarded and a 100-second pass reports nothing at all.
+        {
+            const QByteArray censusPath = qgetenv("OPENCK_TEST_NIF_CENSUS");
+            if (!censusPath.isEmpty()) {
+                QString report;
+                report += QStringLiteral("walked %1 opaque %2 of %3 gamebryo\n")
+                              .arg(walked).arg(opaqueBlocks).arg(gamebryo);
+                for (auto it = walkReasons.begin(); it != walkReasons.end(); ++it) {
+                    report += QStringLiteral("%1\t%2\t%3\n")
+                                  .arg(it.value(), 6)
+                                  .arg(it.key())
+                                  .arg(walkFirstFile.value(it.key()));
+                }
+                QFile out(QString::fromLocal8Bit(censusPath));
+                if (out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                    out.write(report.toUtf8());
+                    out.close();
+                } else {
+                    qWarning("could not write NIF census to %s",
+                             censusPath.constData());
+                }
+            }
+        }
         for (auto it = failureReasons.begin(); it != failureReasons.end(); ++it)
             qInfo().noquote() << "failure:" << it.key() << it.value()
                               << "first:" << firstFailure.value(it.key());

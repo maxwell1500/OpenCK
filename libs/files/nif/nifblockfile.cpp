@@ -446,6 +446,147 @@ bool walkNiTriStripsData(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// --- Havok collision shapes --------------------------------------------------
+//
+// A Havok enum is a u32 on the wire, the same width the NIF format definition
+// uses for every enum. HavokMaterial carries a leading unknown_int on the
+// oldest versions that have it; HavokFilter is a layer enum, a flags enum and a
+// u16 group.
+constexpr quint32 kHavokMaterialUnknownIntVersion = 0x0A000102u;  // 10.0.1.2
+
+bool skipHavokMaterial(Cursor& c, quint32 version)
+{
+    if (version <= kHavokMaterialUnknownIntVersion) c.u32();
+    c.u32();
+    return c.ok();
+}
+
+// bhkNiTriStripsShape is the collision shape on the large majority of shipped
+// Gamebryo meshes, which makes it by far the highest-value walker here: on its
+// own it accounts for 4,297 of the 7,962 files in Oblivion - Meshes.bsa, more
+// than every other missing layout combined.
+//
+// Layout taken from the nifgen `BhkNiTriStripsShape` chain. Its bases -
+// BhkShapeCollection, BhkShape, BhkSerializable, BhkRefObject, NiObject - add no
+// inline bytes of their own, so the block is exactly the fields below:
+//   HavokMaterial material   u32, plus a leading u32 on the oldest versions
+//   f32          radius
+//   byte         unused_01[20]
+//   u32          grow_by
+//   Vector4      scale       four floats
+//   u32          num_strips_data, then that many refs
+//   u32          num_filters, then that many HavokFilters
+//
+// Verified against a shipped 20.0.0.4 file: the oracle reports io_size 64 for
+// the block, and with both arrays empty the fields below sum to exactly 64.
+bool walkBhkNiTriStripsShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipHavokMaterial(c, version)) return false;
+    c.f32();                                   // radius
+    c.raw(20);                                 // unused_01
+    c.u32();                                   // grow_by
+    c.raw(16);                                 // scale (Vector4)
+    const quint32 numStrips = c.u32();
+    if (!c.ok() || numStrips > 100000u) return false;
+    if (!skipRefs(c, numStrips)) return false;
+    const quint32 numFilters = c.u32();
+    if (!c.ok() || numFilters > 100000u) return false;
+    for (quint32 i = 0; i < numFilters; ++i) {
+        c.u32();                               // layer
+        c.u32();                               // flags
+        c.u16();                               // group
+    }
+    return c.ok();
+}
+
+// bhkMoppBvTreeShape carries a Havok MOPP code blob, and is the collision shape
+// on most static Gamebryo geometry - 4,281 files in Oblivion - Meshes.bsa, once
+// bhkNiTriStripsShape is understood.
+//
+// From the nifgen `BhkMoppBvTreeShape` / `BhkBvTreeShape` / `HkpMoppCode`
+// attribute lists:
+//   ref         shape          a ref to the underlying bhkShape
+//   byte        unused_01[12]
+//   f32         scale
+//   u32         mopp_code.data_size
+//   Vector4     mopp_code.offset      only from 10.1.0.0
+//   enum        mopp_code.build_type only when bs_version > 34
+//   byte        mopp_code.data[data_size]
+//
+// Verified against a shipped 20.0.0.4 file (bs_version 11, so no build_type):
+// the oracle reports io_size 25845 for a data_size of 25805, and the fields
+// above plus the 4-byte shape ref sum to exactly that.
+constexpr quint32 kMoppOffsetVersion = 0x0A010000u;   // 10.1.0.0
+constexpr quint32 kMoppBuildTypeBsVersion = 34u;
+
+bool walkBhkMoppBvTreeShape(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!skipRefs(c, 1)) return false;                       // shape
+    c.raw(12);                                              // unused_01
+    c.f32();                                                // scale
+    const quint32 dataSize = c.u32();
+    if (!c.ok() || dataSize > 64u * 1024u * 1024u) return false;
+    if (version >= kMoppOffsetVersion) c.raw(16);            // mopp_code.offset
+    if (bsVersion > kMoppBuildTypeBsVersion) c.u32();        // mopp_code.build_type
+    c.raw(static_cast<int>(dataSize));                      // mopp_code.data
+    return c.ok();
+}
+
+// The four convex shapes all share a base of HavokMaterial + an f32 radius
+// (nifgen `bhkConvexShape` -> `bhkSphereRepShape` -> `bhkConvexShapeBase`, of
+// which only the first two add inline bytes). What follows is each shape's own
+// fields, taken from the corresponding nifgen attribute list.
+bool walkBhkSphereShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipHavokMaterial(c, version)) return false;
+    c.f32();                                   // radius
+    return c.ok();
+}
+
+bool walkBhkBoxShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipHavokMaterial(c, version)) return false;
+    c.f32();                                   // radius
+    c.raw(8);                                  // unused_01
+    c.vec3();                                  // dimensions (half extents)
+    c.f32();                                   // unused_float
+    return c.ok();
+}
+
+bool walkBhkCapsuleShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipHavokMaterial(c, version)) return false;
+    c.f32();                                   // radius
+    c.raw(8);                                  // unused_01
+    c.vec3();                                  // first_point
+    c.f32();                                   // radius_1
+    c.vec3();                                  // second_point
+    c.f32();                                   // radius_2
+    return c.ok();
+}
+
+// A BhkWorldObjCInfoProperty is three u32s: data, size, capacity_and_flags.
+bool skipBhkWorldObjCInfoProperty(Cursor& c)
+{
+    c.raw(12);
+    return c.ok();
+}
+
+bool walkBhkConvexVerticesShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipHavokMaterial(c, version)) return false;
+    c.f32();                                   // radius
+    if (!skipBhkWorldObjCInfoProperty(c)) return false;   // vertices_property
+    if (!skipBhkWorldObjCInfoProperty(c)) return false;   // normals_property
+    const quint32 numVertices = c.u32();
+    if (!c.ok() || numVertices > 1000000u) return false;
+    c.raw(static_cast<int>(numVertices) * 16);            // vertices as Vector4
+    const quint32 numNormals = c.u32();
+    if (!c.ok() || numNormals > 1000000u) return false;
+    c.raw(static_cast<int>(numNormals) * 16);             // normals as Vector4
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -460,6 +601,13 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiTriStrips", walkNiGeometry);
         add("NiTriShape", walkNiGeometry);
         add("NiTriStripsData", walkNiTriStripsData);
+        // Havok collision shapes.
+        add("bhkNiTriStripsShape", walkBhkNiTriStripsShape);
+        add("bhkMoppBvTreeShape", walkBhkMoppBvTreeShape);
+        add("bhkSphereShape", walkBhkSphereShape);
+        add("bhkBoxShape", walkBhkBoxShape);
+        add("bhkCapsuleShape", walkBhkCapsuleShape);
+        add("bhkConvexVerticesShape", walkBhkConvexVerticesShape);
         // Extra data.
         add("BSXFlags", walkBSXFlags);
         add("NiStringExtraData", walkNiStringExtraData);
