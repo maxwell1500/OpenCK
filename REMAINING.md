@@ -2180,20 +2180,35 @@ candidate, "nothing is wrong here at all", is the correct one. The documented
 **What blocks the walk now, per block type.** With the base chain correct the
 test names the exact blocker for every file, and the current standings are:
 
-| blocker | files |
-|---|---|
-| `NiStringExtraData` | 721 |
-| `NiBinaryExtraData` | 218 |
-| `NiTriStripsData` | 155 |
-| `NiNode` (as a non-first block) | 53 |
-| `NiTriShape` | 20 |
-| `NiMaterialProperty` | 11 |
+| blocker | files | note |
+|---|---|---|
+| `NiTriStripsData` | 563 | walker is a guess, needs the real `NiGeometryData` chain |
+| `NiBinaryExtraData` | 356 | layout is trivial and correct, so an earlier block is ending at the wrong offset |
+| `NiStringExtraData` | 36 | as above |
+| `NiMaterialProperty` | 18 | walker not written |
+| `NiTransformData` | 9 | |
 
-`NiStringExtraData`, `NiBinaryExtraData` and `NiTriStripsData` already have
-walkers, so those are layout bugs in the walkers rather than missing layouts -
-the next thing to do is decode one block of each from bytes the way the
-`10.1.0.106` node above was decoded. The rest still need writing. One file walks
-end to end today; the rest stay on the opaque path and round-trip byte for byte.
+`NiStringExtraData` came down from 721 once the extra-data base was fixed, and
+`NiBinaryExtraData`'s apparent rise from 218 is those files simply getting past
+the string block and failing one step later.
+
+**Two hypotheses tried and refuted, so they are not retried.** Both looked
+convincing on a single file and both are wrong across the archive:
+
+- *`NiExtraData` carries a `next_extra_data` ref.* True only up to `0x04020200`;
+  for every version walked here the base is just the name. Reading the ref
+  shifted every following field by four bytes.
+- *Extra-data entries are 8 bytes, not 4.* Attractive because it makes one
+  20.0.0.4 file's next block name (`"BSX"`) land at a plausible offset, and it
+  is what that one file appears to want. Applied to the archive it breaks
+  **every one of the 7,962 files** at that block, so 4 bytes stands.
+
+That `NiBinaryExtraData` fails on files whose earlier blocks walked without
+complaint is itself the useful clue: a walker can consume the wrong number of
+bytes and still "succeed", and only a later block notices. The remaining work is
+therefore to check each walker's *length* against a hand-decoded block, not
+merely that it terminates - which is why the test reports the offending block's
+index and offset rather than just a pass or fail.
 
 
 **PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),

@@ -221,6 +221,10 @@ bool walkNiObjectNET(Cursor& c, quint32 version)
         const quint32 n = c.u32();
         c.note = QStringLiteral("extra_data_list=%1").arg(n);
         if (!c.ok() || n > 100000u) return false;
+        // Entries are 4 bytes, as documented. An 8-byte reading looks
+        // attractive because it puts one 20.0.0.4 file's next block name
+        // ("BSX") at a plausible offset, but tried across the whole archive it
+        // breaks every single file at this block, so it is wrong.
         if (!skipRefs(c, n)) return false;
     }
     if (version >= 50331648u) c.u32();                           // controller
@@ -249,13 +253,13 @@ bool walkNiAVObject(Cursor& c, quint32 version, quint32 bsVersion)
 }
 
 // NiExtraData descends from NiObject, not NiObjectNET, so it does not carry a
-// controller ref. Its name is still a String, and every concrete extra-data
-// block appends its own payload after next_extra_data.
+// controller ref. In the versions walked here the base is just the name: the
+// next_extra_data ref only exists up to 0x04020200 and the legacy extra_data
+// and num_bytes fields are older still, so all three are absent. Reading the
+// ref anyway shifts every following field by four bytes.
 bool walkNiExtraData(Cursor& c, quint32 version)
 {
-    if (!skipString(c, version)) return false;
-    c.u32();  // next_extra_data
-    return c.ok();
+    return skipString(c, version);
 }
 
 bool walkBSXFlags(Cursor& c, quint32 version, quint32)

@@ -86,7 +86,8 @@ private:
     static bool hasEnoughExtraData(const QString& walkError)
     {
         const QByteArray minText = qgetenv("OPENCK_TEST_NIF_DUMP_MIN_EXTRA");
-        if (minText.isEmpty()) return false;
+        // With no threshold set this is the plain "first failure" capture.
+        if (minText.isEmpty()) return true;
         const int minimum = minText.toInt();
         const int marker = walkError.indexOf(QStringLiteral("extra_data_list="));
         if (marker < 0) return false;
