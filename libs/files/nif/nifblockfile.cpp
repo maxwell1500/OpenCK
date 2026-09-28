@@ -939,6 +939,100 @@ bool walkNiVertexColorProperty(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// A TexDesc: a ref to the source texture, two clamp/filter modes, a uv set, and
+// a flag saying whether a texture transform follows.
+//
+// The uv set is a u32, not the ushort the field is declared as - the oracle
+// reports TexDesc as 21 bytes with its fields starting at a known offset, and a
+// u16 there leaves every block two bytes short. Reading it as a u16 is what made
+// 151 files stop mid-block on this. The two modes are likewise u32 enums.
+// Through 10.3.0.1 a pair of PlayStation2 fields sits between the uv set and the
+// transform flag.
+constexpr quint32 kTexDescPackedVersion = 335609859u;   // 20.1.0.3
+constexpr quint32 kTexDescAnisotropyVersion = 335872004u;
+constexpr quint32 kTexDescTransformVersion = 167837696u;  // 10.1.0.0
+constexpr quint32 kTexDescLegacyEnd = 335544325u;        // 20.0.0.5
+constexpr quint32 kTexDescPs2End = 168034305u;           // 10.3.0.1
+
+bool skipTexDesc(Cursor& c, quint32 version)
+{
+    if (version <= 50397184u) {
+        if (!skipRefs(c, 1)) return false;   // image
+    } else {
+        if (!skipRefs(c, 1)) return false;   // source
+    }
+    if (version <= kTexDescLegacyEnd) {
+        c.u32();                              // clamp_mode
+        c.u32();                              // filter_mode
+    }
+    if (version >= kTexDescPackedVersion) c.u32();          // flags
+    if (version >= kTexDescAnisotropyVersion) c.u32();     // max_anisotropy
+    if (version <= kTexDescLegacyEnd) c.u32();              // uv_set
+    if (version <= kTexDescPs2End) {
+        c.u16();                              // ps_2_l
+        c.u16();                              // ps_2_k
+    }
+    if (version >= kTexDescTransformVersion) {
+        if (c.u8()) {                          // has_texture_transform
+            c.raw(8);      // translation
+            c.raw(8);      // scale
+            c.f32();       // rotation
+            c.u32();       // transform_method
+            c.raw(8);      // center
+        }
+    }
+    return c.ok();
+}
+
+// NiTexturingProperty: an apply mode and a slot count, then per-slot flags each
+// guarding a TexDesc, then the bump-map extras and the shader texture array.
+//
+// The slot order is base, dark, detail, gloss, glow, bump, then either the
+// normal/parallax pair or four decals depending on version, and each flag is
+// only written when the slot exists in the count. Reading a flag for a slot past
+// the count is the difference between this landing on the next block and landing
+// two bytes before it.
+constexpr quint32 kTexNormalVersion = 335675397u;   // 20.1.0.15
+constexpr quint32 kTexApplyModeFirstVersion = 50528269u;
+constexpr quint32 kTexApplyModeLastVersion = 335609857u;
+
+bool walkNiTexturingProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiObjectNET(c, version)) return false;
+    if (version <= 167772418u) c.u16();                              // flags
+    else if (version >= kTexDescPackedVersion) c.u32();               // flags
+    quint32 count = 0;
+    if (version >= kTexApplyModeFirstVersion && version <= kTexApplyModeLastVersion) {
+        c.u32();                                                      // apply_mode
+        count = c.u32();                                              // texture_count
+    } else {
+        count = c.u32();
+    }
+    if (!c.ok() || count > 32u) return false;
+
+    // Each of these reads a flag and, when it is set, the TexDesc behind it.
+    const auto slot = [&c, version](quint32 index, bool bumpExtras) {
+        if (!c.u8()) return true;                 // flag clear: nothing to read
+        if (bumpExtras) {
+            if (!skipTexDesc(c, version)) return false;
+            c.f32();                              // bump_map_luma_scale
+            c.f32();                              // bump_map_luma_offset
+            c.raw(16);                            // bump_map_matrix
+        }
+        return skipTexDesc(c, version);
+    };
+
+    for (quint32 i = 0; i < count; ++i) {
+        if (!slot(i, i == 5)) return false;
+    }
+    if (version >= 167772416u) {
+        const quint32 numShaderTextures = c.u32();
+        if (!c.ok() || numShaderTextures > 1000u) return false;
+        if (!skipRefs(c, numShaderTextures)) return false;
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -987,6 +1081,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkSimpleShapeCylinder", walkBhkSimpleShapePhantom);
         add("bhkSimpleShapeCapsule", walkBhkSimpleShapePhantom);
         add("NiVertexColorProperty", walkNiVertexColorProperty);
+        add("NiTexturingProperty", walkNiTexturingProperty);
         // Extra data.
         add("BSXFlags", walkBSXFlags);
         add("NiStringExtraData", walkNiStringExtraData);
