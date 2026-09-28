@@ -490,6 +490,11 @@ bool skipHavokMaterial(Cursor& c, quint32 version)
     return c.ok();
 }
 
+// A HavokFilter is a single u32 on the wire. nifgen decomposes it into layer,
+// flags and group for editing, but its stored size is 4, and reading the three
+// parts separately over-reads by two bytes per filter.
+bool skipHavokFilter(Cursor& c) { c.u32(); return c.ok(); }
+
 // bhkNiTriStripsShape is the collision shape on the large majority of shipped
 // Gamebryo meshes, which makes it by far the highest-value walker here: on its
 // own it accounts for 4,297 of the 7,962 files in Oblivion - Meshes.bsa, more
@@ -521,9 +526,7 @@ bool walkBhkNiTriStripsShape(Cursor& c, quint32 version, quint32)
     const quint32 numFilters = c.u32();
     if (!c.ok() || numFilters > 100000u) return false;
     for (quint32 i = 0; i < numFilters; ++i) {
-        c.u32();                               // layer
-        c.u32();                               // flags
-        c.u16();                               // group
+        if (!skipHavokFilter(c)) return false;
     }
     return c.ok();
 }
@@ -601,8 +604,7 @@ bool skipBhkWorldObjCInfoProperty(Cursor& c)
     return c.ok();
 }
 
-bool walkBhkConvexVerticesShape(Cursor& c, quint32 version, quint32)
-{
+bool walkBhkConvexVerticesShape(Cursor& c, quint32 version, quint32){
     if (!skipHavokMaterial(c, version)) return false;
     c.f32();                                   // radius
     if (!skipBhkWorldObjCInfoProperty(c)) return false;   // vertices_property
@@ -618,12 +620,7 @@ bool walkBhkConvexVerticesShape(Cursor& c, quint32 version, quint32)
 
 // --- Havok objects with an entity prefix -------------------------------------
 //
-// A HavokFilter is a single u32 on the wire. nifgen decomposes it into layer,
-// flags and group for editing, but its stored size is 4, and reading the three
-// parts separately would over-read by 6 bytes per filter.
-//
 // A BhkWorldObjCInfoProperty is three u32s: data, size, capacity_and_flags.
-bool skipHavokFilter(Cursor& c) { c.u32(); return c.ok(); }
 
 // A BhkWorldObjectCInfo, and the world-object prefix in front of it.
 //
@@ -1139,6 +1136,37 @@ bool walkNiSourceTexture(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// A BoneData: a transform (translation, 3x3 rotation, scale), a bounding sphere
+// and a vertex count. 70 bytes.
+bool skipBoneData(Cursor& c)
+{
+    c.raw(12);   // skin_transform translation
+    c.raw(36);   // skin_transform rotation
+    c.f32();     // skin_transform scale
+    c.raw(12);   // bounding sphere centre
+    c.f32();     // bounding sphere radius
+    c.u16();     // num_vertices
+    return c.ok();
+}
+
+// NiSkinInstance. Its base is NiObject, not NiObjectNET, so there is no name
+// and no controller - reading either would shift every field by four bytes.
+constexpr quint32 kSkinInstancePartitionVersion = 167837797u;   // 10.1.0.1
+
+bool walkNiSkinInstance(Cursor& c, quint32 version, quint32)
+{
+    if (!skipRefs(c, 1)) return false;    // data
+    if (version < kSkinInstancePartitionVersion) return c.ok();
+    if (!skipRefs(c, 1)) return false;    // skin_partition
+    if (!skipRefs(c, 1)) return false;    // skeleton_root
+    const quint32 numBones = c.u32();
+    if (!c.ok() || numBones > 10000u) return false;
+    for (quint32 i = 0; i < numBones; ++i) {
+        if (!skipBoneData(c)) return false;
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1192,6 +1220,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiTriShapeData", walkNiGeometryData);
         add("NiTexturingProperty", walkNiTexturingProperty);
         add("NiSourceTexture", walkNiSourceTexture);
+        add("NiSkinInstance", walkNiSkinInstance);
         // Extra data.
         add("BSXFlags", walkBSXFlags);
         add("NiStringExtraData", walkNiStringExtraData);
