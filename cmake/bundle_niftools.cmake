@@ -13,18 +13,42 @@ set(OPENCK_NIFTOOLS_ADDON_PATH "io_scene_niftools")
 set(OPENCK_NIFTOOLS_RELEASE_TAG "v0.1.1")
 
 # Locate the bundled Blender's addons directory.
-# Blender 4.x stores user addons in <blender>/4.x/scripts/addons/
+#
+# Blender keeps its scripts in a versioned directory - <major>.<minor>/scripts -
+# so the segment has to track the Blender being bundled. Hardcoding it meant that
+# bumping OPENCK_BLENDER_VERSION installed the addon somewhere that Blender never
+# looks, which presents as "the addon does not work" rather than as a missing
+# file, so derive it and fall back to whatever the bundled build actually has.
 set(OPENCK_BLENDER_DIR "${CMAKE_BINARY_DIR}/blender")
-set(OPENCK_BLENDER_ADDONS_DIR "${OPENCK_BLENDER_DIR}/blender-${OPENCK_BLENDER_VERSION}-${OPENCK_BLENDER_PLATFORM}/4.2/scripts/addons")
+set(OPENCK_BLENDER_ROOT "${OPENCK_BLENDER_DIR}/blender-${OPENCK_BLENDER_VERSION}-${OPENCK_BLENDER_PLATFORM}")
+string(REGEX REPLACE "^blender-" "" OPENCK_BLENDER_SCRIPTS_VERSION "${OPENCK_BLENDER_REVISION}")
+set(OPENCK_BLENDER_ADDONS_DIR "${OPENCK_BLENDER_ROOT}/${OPENCK_BLENDER_SCRIPTS_VERSION}/scripts/addons")
 set(OPENCK_NIFTOOLS_TARGET_DIR "${OPENCK_BLENDER_ADDONS_DIR}/${OPENCK_NIFTOOLS_ADDON_PATH}")
 
-if(EXISTS "${OPENCK_NIFTOOLS_TARGET_DIR}/__init__.py")
-    message(STATUS "Bundled NifTools addon found at ${OPENCK_NIFTOOLS_TARGET_DIR}")
+if(NOT IS_DIRECTORY "${OPENCK_BLENDER_ROOT}")
+    message(STATUS "Skipping NifTools addon download: bundled Blender not found at ${OPENCK_BLENDER_ROOT}")
     return()
 endif()
 
-if(NOT EXISTS "${OPENCK_BLENDER_DIR}")
-    message(STATUS "Skipping NifTools addon download: bundled Blender not found at ${OPENCK_BLENDER_DIR}")
+if(NOT IS_DIRECTORY "${OPENCK_BLENDER_ADDONS_DIR}")
+    file(GLOB OPENCK_BLENDER_SCRIPT_DIRS LIST_DIRECTORIES true
+        "${OPENCK_BLENDER_ROOT}/*/scripts")
+    if(OPENCK_BLENDER_SCRIPT_DIRS)
+        list(GET OPENCK_BLENDER_SCRIPT_DIRS 0 OPENCK_BLENDER_SCRIPT_DIR)
+        file(RELATIVE_PATH OPENCK_BLENDER_SCRIPT_REL
+            "${OPENCK_BLENDER_ROOT}" "${OPENCK_BLENDER_SCRIPT_DIR}")
+        set(OPENCK_BLENDER_ADDONS_DIR "${OPENCK_BLENDER_SCRIPT_DIR}/addons")
+        set(OPENCK_NIFTOOLS_TARGET_DIR "${OPENCK_BLENDER_ADDONS_DIR}/${OPENCK_NIFTOOLS_ADDON_PATH}")
+        message(WARNING
+            "Bundled Blender ${OPENCK_BLENDER_VERSION} has no "
+            "${OPENCK_BLENDER_SCRIPTS_VERSION}/scripts directory; installing NifTools "
+            "into ${OPENCK_BLENDER_SCRIPT_REL}/scripts/addons instead. Correct "
+            "OPENCK_BLENDER_REVISION in cmake/bundle_blender.cmake.")
+    endif()
+endif()
+
+if(EXISTS "${OPENCK_NIFTOOLS_TARGET_DIR}/__init__.py")
+    message(STATUS "Bundled NifTools addon found at ${OPENCK_NIFTOOLS_TARGET_DIR}")
     return()
 endif()
 

@@ -13,6 +13,12 @@
 set(OPENCK_BLENDER_VERSION "4.2.5")
 set(OPENCK_BLENDER_REVISION "blender-4.2")
 
+# The download series is the release branch, which is what
+# download.blender.org groups builds under: "Blender4.2" for 4.2.x. Derive it
+# from the revision so bumping OPENCK_BLENDER_VERSION does not leave the URL
+# pointing at the old branch.
+string(REGEX REPLACE "^blender-" "Blender" OPENCK_BLENDER_SERIES "${OPENCK_BLENDER_REVISION}")
+
 if(WIN32)
     set(OPENCK_BLENDER_PLATFORM "windows-x64")
     set(OPENCK_BLENDER_ARCHIVE_EXT "zip")
@@ -27,7 +33,7 @@ else()
     set(OPENCK_BLENDER_EXE_PATH "blender-${OPENCK_BLENDER_VERSION}-${OPENCK_BLENDER_PLATFORM}/blender")
 endif()
 
-set(OPENCK_BLENDER_URL "https://download.blender.org/release/Blender4.2/blender-${OPENCK_BLENDER_VERSION}-${OPENCK_BLENDER_PLATFORM}.${OPENCK_BLENDER_ARCHIVE_EXT}")
+set(OPENCK_BLENDER_URL "https://download.blender.org/release/${OPENCK_BLENDER_SERIES}/blender-${OPENCK_BLENDER_VERSION}-${OPENCK_BLENDER_PLATFORM}.${OPENCK_BLENDER_ARCHIVE_EXT}")
 set(OPENCK_BLENDER_DIR "${CMAKE_BINARY_DIR}/blender")
 set(OPENCK_BLENDER_EXE "${OPENCK_BLENDER_DIR}/${OPENCK_BLENDER_EXE_PATH}")
 
