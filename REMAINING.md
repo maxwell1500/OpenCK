@@ -2103,10 +2103,47 @@ parses blocks back to back and only consults a size table when the version has
 one). `test_nifroundtriparchive` now measures what that costs, because the
 obvious plan turns out to be the wrong one.
 
-**How big the block-splitting job actually is (measured, 2026-09-27).** The
-archive declares **113 distinct block types**. A file only becomes addressable if
-*every* block in it can be walked, so coverage is a whole-file property, and the
-cumulative curve over the most frequent types is:
+**Current walk frontier (measured 2026-09-28).** `walked 1 / opaque 7,961 of 7,962`.
+The remaining failures are almost entirely *missing handlers*, not bad layouts:
+
+| block type without a walker | files |
+|---|---|
+| `bhkRigidBody` | 777 |
+| `bhkRigidBodyT` | 563 |
+| `NiControllerManager` | 423 |
+| `NiTexturingProperty` | 136 |
+| `NiMaterialProperty` | 104 |
+| `bhkConvexTransformShape` | 89 |
+| `BSFurnitureMarker` | 75 |
+| `bhkListShape` | 74 |
+| `BSBound` | 42 |
+| `NiZBufferProperty` | 33 |
+
+Six handlers landed this pass and now report zero: `bhkNiTriStripsShape` (4,297
+files), `bhkMoppBvTreeShape` (4,281), `bhkConvexVerticesShape` (987),
+`bhkBoxShape` (370), `bhkCapsuleShape` (120), `bhkSphereShape` (11).
+
+**Two measurement traps here, both of which produced a wrong priority order.**
+
+1. *The reason string embeds a byte offset*, so every failing file landed in its
+   own bucket and the distribution was spread over 466 near-unique keys. The block
+   type also appears in the reason, so "356 `NiBinaryExtraData`" was the count of
+   distinct files whose reason mentioned that type, not a per-type total. The
+   figures that order was built from were meaningless. The test now records the
+   first path per reason and writes the full table to the path in
+   `OPENCK_TEST_NIF_CENSUS`, so this is re-derivable.
+2. *A file fails on the first type it has no handler for*, so clearing a handler
+   does not free its files — it reveals whatever was behind it. `bhkRigidBody`
+   (777) and `bhkRigidBodyT` (563) were entirely invisible until
+   `bhkNiTriStripsShape` and `bhkMoppBvTreeShape` were understood. Per-type counts
+   describe a **frontier, not a backlog**, and `walked 1` will not move until the
+   frontier is clear. Neither the two Havok shapes (54% and 64% of the archive
+   respectively) appeared in the previously recorded top list at all.
+
+Measured before the frontier is worth re-reading: the archive declares **113
+distinct block types**. A file only becomes addressable if *every* block in it can
+be walked, so coverage is a whole-file property, and the cumulative curve over the
+most frequent types is:
 
 | types implemented | files addressable | of which carry `NiTransformData` |
 |---|---|---|
@@ -2129,8 +2166,10 @@ also pull in the particle, physics, skinning and morph families, so "common" and
 Recorded so the next attempt does not spend itself on the top-20 plan. The real
 choice is: implement ~102–113 payload walkers (a large but bounded project that
 finally makes these files block-addressable and unblocks the fitter), or accept
-that the pre-20.2.0.5 container is read-and-save-only for now. `test_nifroundtriparchive`
-prints the curve on every run, so the numbers stay honest as things change.
+that the pre-20.2.0.5 container is read-and-save-only for now.
+`test_nifroundtriparchive` recomputes the curve and the frontier on every run —
+write it to `OPENCK_TEST_NIF_CENSUS` to read the table, since the log level pins
+`qInfo` to Error and discards it otherwise.
 
 **Block-walking framework is in place; one format discrepancy is blocking it.**
 `NifBlockFile` now recovers block boundaries by walking each block's fields the
