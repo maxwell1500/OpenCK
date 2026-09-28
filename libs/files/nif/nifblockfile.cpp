@@ -221,10 +221,13 @@ bool walkNiObjectNET(Cursor& c, quint32 version)
         const quint32 n = c.u32();
         c.note = QStringLiteral("extra_data_list=%1").arg(n);
         if (!c.ok() || n > 100000u) return false;
-        // Entries are 4 bytes, as documented. An 8-byte reading looks
-        // attractive because it puts one 20.0.0.4 file's next block name
-        // ("BSX") at a plausible offset, but tried across the whole archive it
-        // breaks every single file at this block, so it is wrong.
+        // Entries are 4 bytes. Widening them to 8 fits one 20.0.0.4 file, whose
+        // next block name then reads `03 00 00 00 "BSX"`, but that file is not
+        // representative: 8-byte entries across the archive fail every file at
+        // this block, and so do a flat extra word on every 20.x node and
+        // per-version entry sizes. Four is the only reading that holds up, so
+        // the handful of files that still disagree are unexplained rather than
+        // accommodated.
         if (!skipRefs(c, n)) return false;
     }
     if (version >= 50331648u) c.u32();                           // controller
@@ -384,29 +387,57 @@ bool walkNiNode(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
-bool walkNiTriStripsData(Cursor& c, quint32, quint32)
+// NiGeometryData: the vertex stream, and the per-vertex attribute flags that
+// say which optional arrays follow it. Those "has_*" fields are bytes holding
+// sentinels rather than booleans - 6, 7 and 15 mean "stored in a compressed
+// form" and not "this many" - so they cannot be read as a count.
+bool walkNiGeometryData(Cursor& c, quint32 version, quint32 bsVersion)
 {
-    // NiTriBasedGeomData contributes the triangle data itself, whose layout
-    // depends on the stream version, so only the modern form is walked.
-    const quint16 numStrips = c.u16();
-    const quint8 hasPoints = c.u8();
-    if (!c.ok() || hasPoints > 1) return false;
-    for (quint16 s = 0; s < numStrips; ++s) {
-        const quint16 numTriangles = c.u16();
-        const quint8 hasVertexColors = c.u8();
-        const quint16 numVertexBytes = c.u16();
-        if (!c.ok() || hasVertexColors > 1) return false;
-        if (!c.ok()) return false;
-        c.raw(numTriangles * 6);   // triangle indices
-        if (hasVertexColors) c.raw(numTriangles * (numVertexBytes ? numVertexBytes * 3 : 4));
-        if (hasPoints) {
-            c.u16();              // num_points
-            c.u8();               // point flags
-            c.u16();              // unused
-            const quint16 numPointBytes = c.u16();
-            c.raw(numPointBytes);
-        }
+    Q_UNUSED(bsVersion)
+    if (version >= 167837810u) c.u32();                      // group_id
+    const quint16 numVertices = c.u16();
+    if (!c.ok() || numVertices > 1000000u) return false;
+    if (version >= 167837696u) { c.u8(); c.u8(); }            // keep/compress flags
+    const quint8 hasVertices = c.u8();
+    if (!c.ok() || hasVertices > 1) return false;
+    if (hasVertices) c.raw(numVertices * 12);                 // vertices, Vector3
+    quint16 dataFlags = 0;
+    if (version >= 167772416u) dataFlags = c.u16();
+    if (!c.ok()) return false;
+    const quint8 hasNormals = c.u8();
+    if (!c.ok() || hasNormals > 1) return false;
+    if (hasNormals) c.raw(numVertices * 12);                 // normals, Vector3
+    if (version >= 167837696u && hasNormals && (dataFlags & 4096u) != 0) {
+        c.raw(numVertices * 12);                             // tangents
+        c.raw(numVertices * 12);                             // bitangents
     }
+    c.raw(16);                                                // bounding sphere
+    const quint8 hasVertexColors = c.u8();
+    if (!c.ok() || hasVertexColors > 1) return false;
+    if (hasVertexColors) c.raw(numVertices * 16);             // vertex colours, Color4
+    if (hasVertices) c.raw(numVertices * 8 * (dataFlags & 63u));  // uv_sets, TexCoord
+    if (version >= 167772416u) c.u16();                      // consistency flags
+    if (version >= 335544324u) c.u32();                      // additional data ref
+    return c.ok();
+}
+
+bool walkNiTriStripsData(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiGeometryData(c, version, bsVersion)) return false;
+    const quint16 numTriangles = c.u16();
+    const quint16 numStrips = c.u16();
+    if (!c.ok() || numStrips > 4096u) return false;
+    QVector<quint16> stripLengths;
+    stripLengths.reserve(numStrips);
+    for (quint16 i = 0; i < numStrips; ++i) stripLengths.append(c.u16());
+    if (!c.ok()) return false;
+    quint8 hasPoints = 0;
+    if (version >= 167772419u) hasPoints = c.u8();
+    if (!c.ok() || hasPoints > 1) return false;
+    if (hasPoints) {
+        for (quint16 s = 0; s < numStrips; ++s) c.raw(stripLengths.at(s) * 2);
+    }
+    c.raw(numTriangles * 6);   // triangle indices, three u16 each
     return c.ok();
 }
 

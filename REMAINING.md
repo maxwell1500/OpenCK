@@ -2182,7 +2182,7 @@ test names the exact blocker for every file, and the current standings are:
 
 | blocker | files | note |
 |---|---|---|
-| `NiTriStripsData` | 563 | walker is a guess, needs the real `NiGeometryData` chain |
+| `NiTriStripsData` | 882 | rewritten from the real `NiGeometryData` field list, but its *length* is unverified |
 | `NiBinaryExtraData` | 356 | layout is trivial and correct, so an earlier block is ending at the wrong offset |
 | `NiStringExtraData` | 36 | as above |
 | `NiMaterialProperty` | 18 | walker not written |
@@ -2192,23 +2192,39 @@ test names the exact blocker for every file, and the current standings are:
 `NiBinaryExtraData`'s apparent rise from 218 is those files simply getting past
 the string block and failing one step later.
 
-**Two hypotheses tried and refuted, so they are not retried.** Both looked
-convincing on a single file and both are wrong across the archive:
+**Three hypotheses tried and refuted, so they are not retried.** Each looked
+convincing on a single hand-decoded file and each is wrong across the archive:
 
 - *`NiExtraData` carries a `next_extra_data` ref.* True only up to `0x04020200`;
   for every version walked here the base is just the name. Reading the ref
   shifted every following field by four bytes.
-- *Extra-data entries are 8 bytes, not 4.* Attractive because it makes one
-  20.0.0.4 file's next block name (`"BSX"`) land at a plausible offset, and it
-  is what that one file appears to want. Applied to the archive it breaks
-  **every one of the 7,962 files** at that block, so 4 bytes stands.
+- *Extra-data entries are 8 bytes.* One 20.0.0.4 file appears to want this - with
+  8 the node ends where the next block's name reads `03 00 00 00 "BSX"` - but it
+  fails **every one of the 7,962 files** at that block.
+- *A flat extra word on every 20.x node*, and *a per-version entry size of 4 then
+  8*. Both are the same observation wearing different clothes, and both drive
+  `walked` to **0**.
 
-That `NiBinaryExtraData` fails on files whose earlier blocks walked without
-complaint is itself the useful clue: a walker can consume the wrong number of
-bytes and still "succeed", and only a later block notices. The remaining work is
-therefore to check each walker's *length* against a hand-decoded block, not
-merely that it terminates - which is why the test reports the offending block's
-index and offset rather than just a pass or fail.
+Four-byte entries hold up, so the handful of files that still disagree are
+unexplained rather than accommodated.
+
+**The remaining obstacle is block *lengths*, not block *layouts*.** A walker can
+consume the wrong number of bytes and still report success, and only a later
+block notices - which is exactly the `NiBinaryExtraData` symptom: a two-line
+correct layout failing on files whose earlier blocks walked without complaint.
+Terminating is not evidence. Checking a walker's length against one hand-decoded
+block is, and `lastWalkError()` already reports the byte count and offset needed
+to do it. That check has to be done per block type, and there are ~100 of them, so
+this is a grind rather than something to guess at.
+
+`NiTriStripsData` is the one to do first: it is the largest single blocker, and
+its chain (`group_id` when present, `num_vertices`, the keep/compress flag pair,
+`has_vertices`, vertices as `Vector3`, `data_flags`, `has_normals`, normals,
+optional tangents and bitangents, the bounding sphere, `has_vertex_colors`,
+vertex colours, `uv_sets` counted from `data_flags & 63`, consistency flags, an
+additional-data ref, then `num_triangles`, `num_strips`, `strip_lengths[]`,
+`has_points`, `points[][]` and the triangle indices) is known from the field
+list but has not yet been confirmed against a block.
 
 
 **PHDA is still unobtainable.** A byte scan of `Oblivion.esm` (265 MB),
