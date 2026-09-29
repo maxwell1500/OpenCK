@@ -1459,6 +1459,104 @@ bool walkNiBoolInterpolator(Cursor& c, quint32, quint32)
     return c.ok();
 }
 
+// The single-interpolator controllers: the time-controller prefix, a ref to the
+// interpolator, and whatever the specific controller adds.
+//
+// 30 bytes for an NiAlphaController (26 of time controller and a ref) and 32 for
+// an NiMaterialColorController, whose target colour is a two-byte enum and not
+// the Color4 the older layout implies. The extra data ref that used to sit beside
+// them is only in the file up to 10.1.0.0, which 20.0.0.4 is past.
+constexpr quint32 kInterpControllerDataEnd = 167837799u;   // 10.1.0.0
+
+bool walkSingleInterpController(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiTimeController(c)) return false;
+    if (!skipRefs(c, 1)) return false;    // interpolator
+    if (version <= kInterpControllerDataEnd) {
+        if (!skipRefs(c, 1)) return false;   // data
+    }
+    return c.ok();
+}
+
+bool walkNiAlphaController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    return walkSingleInterpController(c, version, bsVersion);
+}
+
+bool walkNiMaterialColorController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkSingleInterpController(c, version, bsVersion)) return false;
+    c.u16();      // target colour enum
+    return c.ok();
+}
+
+// NiGeomMorpherController: the interp-controller prefix, then the morph data and
+// its interpolators. 89 bytes in a shipped 20.0.0.4 file with six interpolators,
+// which fixes the morpher flags at two bytes - not the four an enum would
+// suggest.
+constexpr quint32 kGeomMorpherFlagsVersion = 167772418u;   // 10.0.1.2
+constexpr quint32 kGeomMorpherInterpsVersion = 167837802u;  // 10.1.0.2
+constexpr quint32 kGeomMorpherUnknownEnd = 335544325u;    // 20.0.0.5
+constexpr quint32 kGeomMorpherUnknownFirst = 167903232u;  // 10.2.0.0
+
+bool walkNiGeomMorpherController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiTimeController(c)) return false;
+    if (version >= kGeomMorpherFlagsVersion) c.u16();     // morpher_flags
+    if (!skipRefs(c, 1)) return false;                    // data
+    if (version >= 67108866u) c.u8();                     // always_update
+    quint32 numInterpolators = 0;
+    if (version >= kGeomMorpherInterpsVersion) {
+        numInterpolators = c.u32();
+        if (!c.ok() || numInterpolators > 10000u) return false;
+        if (version <= kGeomMorpherUnknownEnd) {
+            if (!skipRefs(c, numInterpolators)) return false;
+        }
+    }
+    if (version >= kGeomMorpherUnknownFirst && version <= kGeomMorpherUnknownEnd
+        && bsVersion > 9) {
+        const quint32 numUnknown = c.u32();
+        if (!c.ok() || numUnknown > 10000u) return false;
+        c.raw(static_cast<int>(numUnknown * 4u));
+    }
+    return c.ok();
+}
+
+// NiBlendInterpolator and its four subclasses. From 10.1.0.2 the array size is a
+// byte and from 10.1.0.3 a flags byte appears ahead of it; when the
+// manager-controlled bit is set the whole priority block is absent, which is why a
+// NiBlendTransformInterpolator can be six bytes.
+//
+// 10.2.0.0, measured: flags 1, array size 2, weight threshold 0.0 - and no
+// transform value, because the value field only exists in the older versions.
+constexpr quint32 kBlendFlagsVersion = 167837808u;   // 10.1.0.3
+constexpr quint32 kBlendArraySizeVersion = 167837806u;
+
+bool walkNiBlendInterpolator(Cursor& c, quint32 version, quint32, quint32 valueBytes)
+{
+    if (version < kBlendFlagsVersion) {
+        // The pre-10.1.0.3 shape has a different set of fields - a grow-by, a
+        // single-interpolator ref and wider priorities - and has not been
+        // measured, so decline rather than guess.
+        return false;
+    }
+    const quint8 flags = c.u8();
+    c.u8();                                     // array_size
+    c.f32();                                    // weight_threshold
+    if ((flags & 1u) == 0) {
+        c.u8();     // interp_count
+        c.u8();     // single_index
+        c.u8();     // high_priority
+        c.u8();     // next_high_priority
+        c.f32();    // single_time
+        c.f32();    // high_weights_sum
+        c.f32();    // next_high_weights_sum
+        c.f32();    // high_ease_spinner
+    }
+    if (valueBytes > 0) c.raw(static_cast<int>(valueBytes));
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1500,6 +1598,22 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiFloatInterpolator", walkNiFloatInterpolator);
         add("NiPoint3Interpolator", walkNiPoint3Interpolator);
         add("NiBoolInterpolator", walkNiBoolInterpolator);
+        // Controllers and blend interpolators.
+        add("NiAlphaController", walkNiAlphaController);
+        add("NiMaterialColorController", walkNiMaterialColorController);
+        add("NiGeomMorpherController", walkNiGeomMorpherController);
+        add("NiBlendTransformInterpolator", [](Cursor& c, quint32 v, quint32 b) {
+            return walkNiBlendInterpolator(c, v, b, 0);
+        });
+        add("NiBlendFloatInterpolator", [](Cursor& c, quint32 v, quint32 b) {
+            return walkNiBlendInterpolator(c, v, b, 4);
+        });
+        add("NiBlendPoint3Interpolator", [](Cursor& c, quint32 v, quint32 b) {
+            return walkNiBlendInterpolator(c, v, b, 12);
+        });
+        add("NiBlendBoolInterpolator", [](Cursor& c, quint32 v, quint32 b) {
+            return walkNiBlendInterpolator(c, v, b, 1);
+        });
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
