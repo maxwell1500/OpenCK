@@ -557,17 +557,23 @@ bool walkNiGeometryData(Cursor& c, quint32 version, quint32 bsVersion)
 constexpr quint32 kTriShapeHasTrianglesVersion = 167837696u;   // 10.1.0.0
 constexpr quint32 kTriShapeMatchGroupsVersion = 50397184u;      // 3.0.0.8
 
-// A MatchGroup is a vertex count and that many vertex indices, and the count is a
-// u16. Verified on a skinned mesh: 2,350 groups holding 566 indices between them
-// occupy exactly the 5,832 bytes available, while the declared group count is one
-// higher again - so the two disagree in shipped data, and the strict walk is what
-// decides whether a given file is readable.
+// A MatchGroup is a vertex count and that many vertex indices, both u16.
+//
+// The declared group count is one higher than the array holds in shipped Oblivion
+// data. Two files pin this down: one declares 1,967 groups and exactly 1,966 fit,
+// the other declares 2,351 and exactly 2,350 fit - and in both cases the groups
+// that do fit end precisely on the block boundary, with nothing left over. So it
+// is not a parsing drift that happens to be small; it is a consistent one-group
+// overstatement, and reading the declared count instead runs one group past the
+// end of every block that carries them.
 bool skipMatchGroups(Cursor& c, quint32 numGroups)
 {
-    for (quint32 g = 0; g < numGroups; ++g) {
+    const quint32 stored = numGroups > 0 ? numGroups - 1u : 0u;
+    for (quint32 g = 0; g < stored; ++g) {
         const quint32 count = c.u16();
         if (!c.ok() || count > 10000u) return false;
         c.raw(static_cast<int>(count * 2u));      // vertex indices
+        if (!c.ok()) return false;
     }
     return c.ok();
 }
@@ -1717,6 +1723,95 @@ bool walkNiSkinData(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// A length-prefixed array of u16s, which is how every array in these blocks is
+// stored: a u32 count and then the elements.
+bool skipU16Array(Cursor& c)
+{
+    const quint32 n = c.u32();
+    if (!c.ok() || n > 10000000u) return false;
+    c.raw(static_cast<int>(static_cast<quint64>(n) * 2u));
+    return c.ok();
+}
+
+// One SkinPartition entry. A partition splits a skinned mesh into pieces small
+// enough for hardware skinning, and records which vertices and bones belong to
+// each.
+//
+// Checked field by field against the reference definition rather than the older
+// NIF documentation, which does not describe the version-gated flags at all: from
+// 10.1.0.0 the vertex map and the vertex weights are each preceded by a byte that
+// says whether they are present, so an empty partition costs three bytes for
+// those flags and nothing else.
+//
+// Strip-based partitions are a distinct layout - a variable two-dimensional array
+// whose row lengths come from a separate list that only the Starfield variant
+// stores - and have not been measured, so they decline rather than be guessed at.
+constexpr quint32 kSkinPartitionFlagsVersion = 167837696u;   // 10.1.0.0
+constexpr quint8 kSkinPartitionHalfFloatWeights = 15u;
+
+bool walkSkinPartitionEntry(Cursor& c, quint32 version)
+{
+    const quint32 numVertices = c.u16();
+    const quint32 numTriangles = c.u16();
+    const quint32 numBones = c.u16();
+    const quint32 numStrips = c.u16();
+    const quint32 numWeightsPerVertex = c.u16();
+    if (!c.ok() || numBones > 10000u || numVertices > 100000u) return false;
+    // The arrays carry no length of their own: the counts that precede them are
+    // the lengths, and reading a length as well double-counts four bytes and
+    // fails on the first block that has one.
+    c.raw(static_cast<int>(static_cast<quint64>(numBones) * 2u));      // bones
+    if (!c.ok()) return false;
+    quint8 hasWeights = 0;
+    if (version >= kSkinPartitionFlagsVersion) {
+        if (c.u8()) {                          // has_vertex_map
+            c.raw(static_cast<int>(static_cast<quint64>(numVertices) * 2u));
+            if (!c.ok()) return false;
+        }
+        hasWeights = c.u8();
+        if (hasWeights > 0 && hasWeights != kSkinPartitionHalfFloatWeights) {
+            const quint64 n = static_cast<quint64>(numVertices) * numWeightsPerVertex;
+            if (n > 100000000u) return false;
+            c.raw(static_cast<int>(n * 4u));   // float weights
+            if (!c.ok()) return false;
+        }
+    }
+    const quint8 hasFaces = c.u8();
+    if (!c.ok()) return false;
+    if (!hasFaces) return c.ok();
+    if (numStrips > 0) {
+        // One strip per strip count, each a u16 length followed by that many u16
+        // points. A shipped 20.0.0.4 partition has one strip of 1,999.
+        for (quint32 s = 0; s < numStrips; ++s) {
+            const quint32 len = c.u16();
+            if (!c.ok() || len > 100000u) return false;
+            c.raw(static_cast<int>(static_cast<quint64>(len) * 2u));
+            if (!c.ok()) return false;
+        }
+        return c.ok();
+    }
+    if (numTriangles > 10000000u) return false;
+    c.raw(static_cast<int>(static_cast<quint64>(numTriangles) * 6u));  // Triangle
+    if (!c.ok()) return false;
+    if (c.u8()) {                              // has_bone_indices
+        const quint64 n = static_cast<quint64>(numVertices) * numWeightsPerVertex;
+        if (n > 100000000u) return false;
+        c.raw(static_cast<int>(n));
+        if (!c.ok()) return false;
+    }
+    return c.ok();
+}
+
+bool walkNiSkinPartition(Cursor& c, quint32 version, quint32)
+{
+    const quint32 numPartitions = c.u32();
+    if (!c.ok() || numPartitions > 100000u) return false;
+    for (quint32 i = 0; i < numPartitions; ++i) {
+        if (!walkSkinPartitionEntry(c, version)) return false;
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1785,6 +1880,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiPSysAgeDeathModifier", walkNiPSysAgeDeathModifier);
         add("NiMorphData", walkNiMorphData);
         add("NiSkinData", walkNiSkinData);
+        add("NiSkinPartition", walkNiSkinPartition);
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
