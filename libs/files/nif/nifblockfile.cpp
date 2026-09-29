@@ -1102,7 +1102,7 @@ constexpr quint32 kZBufferFunctionLastVersion = 335544325u;  // 20.0.0.5
 bool walkNiZBufferProperty(Cursor& c, quint32 version, quint32)
 {
     if (!walkNiObjectNET(c, version)) return false;
-    c.u32();                                              // flags
+    c.u16();                                              // flags
     if (version >= kZBufferFunctionFirstVersion
         && version <= kZBufferFunctionLastVersion)
         c.u32();                                          // function
