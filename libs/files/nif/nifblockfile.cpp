@@ -557,19 +557,18 @@ bool walkNiGeometryData(Cursor& c, quint32 version, quint32 bsVersion)
 constexpr quint32 kTriShapeHasTrianglesVersion = 167837696u;   // 10.1.0.0
 constexpr quint32 kTriShapeMatchGroupsVersion = 50397184u;      // 3.0.0.8
 
-// A MatchGroup is a vertex count and that many vertex indices, both u16.
+// A MatchGroup is a vertex count and that many vertex indices, both u16, and the
+// group count that precedes them is a u16 as well.
 //
-// The declared group count is one higher than the array holds in shipped Oblivion
-// data. Two files pin this down: one declares 1,967 groups and exactly 1,966 fit,
-// the other declares 2,351 and exactly 2,350 fit - and in both cases the groups
-// that do fit end precisely on the block boundary, with nothing left over. So it
-// is not a parsing drift that happens to be small; it is a consistent one-group
-// overstatement, and reading the declared count instead runs one group past the
-// end of every block that carries them.
+// The reference definition says Uint, and reading four bytes there is what made
+// the array look one group short on every file: the count lands correctly either
+// way, but four bytes consumes the first two bytes of the array as well, so the
+// parse starts two bytes late and comes up one group long. Two files settle it -
+// 2,351 groups over 5,836 bytes and 1,967 over 8,512 both land exactly on their
+// block boundary with a u16 count and no adjustment.
 bool skipMatchGroups(Cursor& c, quint32 numGroups)
 {
-    const quint32 stored = numGroups > 0 ? numGroups - 1u : 0u;
-    for (quint32 g = 0; g < stored; ++g) {
+    for (quint32 g = 0; g < numGroups; ++g) {
         const quint32 count = c.u16();
         if (!c.ok() || count > 10000u) return false;
         c.raw(static_cast<int>(count * 2u));      // vertex indices
@@ -599,7 +598,7 @@ bool walkNiTriShapeData(Cursor& c, quint32 version, quint32 bsVersion)
     }
     if (!c.ok()) return false;
     if (version < kTriShapeMatchGroupsVersion) return c.ok();
-    const quint32 numMatchGroups = c.u32();
+    const quint32 numMatchGroups = c.u16();
     if (!c.ok() || numMatchGroups > 10000000u) return false;
     return skipMatchGroups(c, numMatchGroups);
 }
