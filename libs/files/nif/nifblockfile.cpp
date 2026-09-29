@@ -362,7 +362,11 @@ bool walkNiTriBasedGeom(Cursor& c, quint32 version, quint32 bsVersion)
 // because reading 0 as "linear" silently drops the tangents from every
 // non-linear group.
 constexpr quint32 kKeyTypeLinear = 1u;
-constexpr quint32 kKeyTypeMax = 3u;
+constexpr quint32 kKeyTypeQuadratic = 2u;
+constexpr quint32 kKeyTypeTbc = 3u;
+constexpr quint32 kKeyTypeXyzRotation = 4u;
+constexpr quint32 kKeyTypeConst = 5u;
+constexpr quint32 kKeyTypeMax = 5u;
 constexpr quint32 kRotationTypeXyz = 4u;
 
 // A key is a time, the value, and - for anything other than linear - a forward
@@ -375,8 +379,10 @@ bool skipKeyframeGroup(Cursor& c, quint32 valueBytes)
     if (numKeys == 0) return true;              // no interpolation, no keys
     const quint32 interpolation = c.u32();
     if (!c.ok() || interpolation > kKeyTypeMax) return false;
-    const quint32 keyBytes = 4u + valueBytes
-        + (interpolation == kKeyTypeLinear ? 0u : valueBytes * 2u);
+    // Linear and constant keys carry no tangents; quadratic and TBC do.
+    const bool noTangents = (interpolation == kKeyTypeLinear
+                          || interpolation == kKeyTypeConst);
+    const quint32 keyBytes = 4u + valueBytes + (noTangents ? 0u : valueBytes * 2u);
     c.raw(static_cast<int>(static_cast<quint64>(numKeys) * keyBytes));
     return c.ok();
 }
