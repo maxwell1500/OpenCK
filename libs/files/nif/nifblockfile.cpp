@@ -337,20 +337,6 @@ bool walkNiTriBasedGeom(Cursor& c, quint32 version, quint32 bsVersion)
     return skipMaterialData(c, version);
 }
 
-// NiKeyframeData: rotations, then the translation and scale channels. The first
-// key of each channel carries no time, which is why the counts are not simply
-// multiplied out.
-void skipKeyChannel(Cursor& c)
-{
-    const quint32 numKeys = c.u32();
-    const quint8 interpolation = c.u8();
-    if (!c.ok() || numKeys > 10'000'000u || interpolation > 3) return;
-    for (quint32 i = 0; i < numKeys; ++i) {
-        if (i > 0) c.f32();
-        c.raw(12);  // value
-    }
-}
-
 // The 20.x form of NiTransformData, where a rotation type of 4 means the block
 // stores three separate KeyGroups - one per axis - rather than a quaternion
 // channel.
@@ -394,6 +380,19 @@ bool skipKeyframeGroup(Cursor& c, quint32 valueBytes)
     c.raw(static_cast<int>(static_cast<quint64>(numKeys) * keyBytes));
     return c.ok();
 }
+
+// The single-channel data blocks are KeyGroups, and unlike every other structure
+// here they carry no version gate at all - so the older reader that used to sit
+// for them, a one-byte interpolation and a fixed twelve-byte value, was wrong in
+// every version rather than only in the new ones. It is seven bytes short on a
+// 24-byte NiFloatData, because a quadratic float key is sixteen bytes and carries
+// two tangents, and the interpolation is a u32.
+//
+// The four differ only in the width of the value the keys interpolate.
+bool walkFloatData(Cursor& c, quint32, quint32) { return skipKeyframeGroup(c, 4); }
+bool walkBoolData(Cursor& c, quint32, quint32) { return skipKeyframeGroup(c, 1); }
+bool walkPosData(Cursor& c, quint32, quint32) { return skipKeyframeGroup(c, 12); }
+bool walkColorData(Cursor& c, quint32, quint32) { return skipKeyframeGroup(c, 16); }
 
 // numRotationKeys has already been read. hasRotationType says whether the caller
 // has already consumed the rotation type; it has not when the count is zero,
@@ -449,19 +448,13 @@ bool walkNiKeyframeData(Cursor& c, quint32 version, quint32)
         if (i > 0) c.f32();
         c.raw(16);                                         // quaternion
     }
-    skipKeyChannel(c);                                     // translations
-    skipKeyChannel(c);                                     // scales
+    if (!skipKeyframeGroup(c, 12)) return false;   // translations
+    if (!skipKeyframeGroup(c, 4)) return false;    // scales
     return c.ok();
 }
 
 // NiFloatData / NiBoolData / NiPosData / NiColorData all carry a single
 // keyframe channel and nothing else.
-bool walkKeyGroupData(Cursor& c, quint32, quint32)
-{
-    skipKeyChannel(c);
-    return c.ok();
-}
-
 // NiTimeController: the common prefix of every controller, including the
 // interpolated ones, which insert the interpolator ref between it and `data`.
 // The prefix on every time-controller-based block: a next-controller ref, a
@@ -1652,6 +1645,78 @@ bool walkNiPSysAgeDeathModifier(Cursor& c, quint32 version, quint32)
     return skipRefs(c, 1);                         // spawn_modifier
 }
 
+// NiMorphData: a morph-target count, a vertex count, a relative-targets flag,
+// and then one Morph per target.
+//
+// A Morph in these versions is a frame name and one Vector3 per vertex - the
+// legacy weight is not present, because it is gated on a bs_version below ten and
+// the shipped 20.0.0.4 file that pins this down has eleven. Confirmed exactly on
+// that file: nine bytes of header, six morphs, names totalling 64 characters,
+// and 6 * 839 vectors of twelve bytes each makes 60,505 - the block size the
+// reference reader reports to the byte.
+//
+// Below 10.1.0.2 a Morph carries key frames instead of a frame name, and those
+// keys have not been measured, so this declines rather than guess at them.
+constexpr quint32 kMorphFrameNameVersion = 167837802u;   // 10.1.0.2
+constexpr quint32 kMorphLegacyWeightFirst = 167837800u;
+constexpr quint32 kMorphLegacyWeightLast = 335609858u;   // 20.1.0.2
+
+bool walkNiMorphData(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    const quint32 numMorphs = c.u32();
+    const quint32 numVertices = c.u32();
+    c.u8();                                          // relative_targets
+    if (!c.ok() || numMorphs > 100000u || numVertices > 10000000u) return false;
+    if (version < kMorphFrameNameVersion) return false;
+    for (quint32 i = 0; i < numMorphs; ++i) {
+        if (!skipString(c, version)) return false;    // frame_name
+        if (version >= kMorphLegacyWeightFirst && version <= kMorphLegacyWeightLast
+            && bsVersion < 10) {
+            c.f32();                                  // legacy_weight
+        }
+        c.raw(static_cast<int>(static_cast<quint64>(numVertices) * 12u));
+        if (!c.ok()) return false;
+    }
+    return c.ok();
+}
+
+// NiSkinData: the skin transform, a bone count, a weights flag, and then one
+// inline BoneData per bone.
+//
+// A BoneData here is not the same thing as the bone refs inside NiSkinInstance -
+// this one is a full transform, a bounding sphere, a vertex count and that many
+// vertex weights, each a u16 index and an f32 weight. Checked against a shipped
+// 20.0.0.4 block of 17,777 bytes with 26 bones: 57 bytes of header, 26 bodies of
+// 70 bytes, and 15,900 bytes of six-byte weights - which divides exactly, where
+// an eight-byte weight does not.
+constexpr quint32 kSkinDataPartitionFirst = 67108866u;
+constexpr quint32 kSkinDataPartitionLast = 167837696u;   // 10.1.0.0
+constexpr quint32 kSkinDataWeightVersion = 67240192u;    // 4.0.0.1
+constexpr int kBoneVertDataBytes = 6;
+
+bool walkNiSkinData(Cursor& c, quint32 version, quint32)
+{
+    c.raw(52);                                 // skin_transform (NiTransform)
+    const quint32 numBones = c.u32();
+    if (!c.ok() || numBones > 10000u) return false;
+    if (version >= kSkinDataPartitionFirst && version <= kSkinDataPartitionLast) {
+        if (!skipRefs(c, 1)) return false;     // skin_partition
+    }
+    bool hasVertexWeights = true;
+    if (version >= kSkinDataWeightVersion) hasVertexWeights = c.u8() != 0;
+    for (quint32 i = 0; i < numBones; ++i) {
+        c.raw(52);                             // BoneData.skin_transform
+        c.raw(16);                             // BoneData.bounding_sphere
+        const quint32 numVerts = c.u16();
+        if (!c.ok() || numVerts > 100000u) return false;
+        if (version <= kSkinDataWeightVersion || hasVertexWeights) {
+            c.raw(static_cast<int>(static_cast<quint64>(numVerts) * kBoneVertDataBytes));
+            if (!c.ok()) return false;
+        }
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1718,6 +1783,8 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
         add("NiPSysRotationModifier", walkNiPSysRotationModifier);
         add("NiPSysAgeDeathModifier", walkNiPSysAgeDeathModifier);
+        add("NiMorphData", walkNiMorphData);
+        add("NiSkinData", walkNiSkinData);
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
@@ -1746,10 +1813,10 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiBinaryExtraData", walkNiBinaryExtraData);
         // Animation: data, controllers, interpolators.
         add("NiTransformData", walkNiKeyframeData);
-        add("NiFloatData", walkKeyGroupData);
-        add("NiBoolData", walkKeyGroupData);
-        add("NiPosData", walkKeyGroupData);
-        add("NiColorData", walkKeyGroupData);
+        add("NiFloatData", walkFloatData);
+        add("NiBoolData", walkBoolData);
+        add("NiPosData", walkPosData);
+        add("NiColorData", walkColorData);
         add("NiTransformController", walkNiTransformController);
         add("NiTransformInterpolator", walkNiTransformInterpolator);
         return table;
