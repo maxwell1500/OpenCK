@@ -1113,7 +1113,10 @@ bool walkNiZBufferProperty(Cursor& c, quint32 version, quint32)
 bool walkNiBillboardNode(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkNiNode(c, version, bsVersion)) return false;
-    if (version >= 167837696u) c.u32();   // billboard_mode
+    // The mode is a two-byte enum, not a u32. Reading four bytes here overruns
+    // the block by two and shifts every block after it, which surfaces as a
+    // nonsense name length in the next block rather than as a billboard error.
+    if (version >= 167837696u) c.u16();   // billboard_mode
     return c.ok();
 }
 
