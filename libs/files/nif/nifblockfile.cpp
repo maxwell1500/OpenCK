@@ -1923,13 +1923,13 @@ bool walkNiAmbientLight(Cursor& c, quint32 version, quint32 bsVersion)
     return walkNiLight(c, version, bsVersion);
 }
 
+// A directional light is the light base and nothing more. The direction, shadow
+// centre and shadow plane that the format is often described as carrying are not
+// in the reference definition, and reading them overruns the block by twenty-
+// eight bytes - which surfaced as a failure in whatever block followed.
 bool walkNiDirectionalLight(Cursor& c, quint32 version, quint32 bsVersion)
 {
-    if (!walkNiLight(c, version, bsVersion)) return false;
-    c.raw(12);  // direction
-    c.raw(12);  // shadow_center
-    c.f32();    // shadow_plane
-    return c.ok();
+    return walkNiLight(c, version, bsVersion);
 }
 
 bool walkNiPointLight(Cursor& c, quint32 version, quint32 bsVersion)
