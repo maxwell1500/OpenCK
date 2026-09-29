@@ -2049,6 +2049,17 @@ bool walkNiPathInterpolator(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// A texture transform controller is a float single-interpolator controller
+// plus a shader flag, a texture slot and an operation selector.
+bool walkNiTextureTransformController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkSingleInterpController(c, version, bsVersion)) return false;
+    c.u8();    // shader_map
+    c.u32();   // texture_slot
+    c.u32();   // operation
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2183,6 +2194,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiPosData", walkPosData);
         add("NiColorData", walkColorData);
         add("NiTransformController", walkNiTransformController);
+        add("NiTextureTransformController", walkNiTextureTransformController);
         add("NiTransformInterpolator", walkNiTransformInterpolator);
         return table;
     }();
