@@ -1977,6 +1977,76 @@ bool walkNiVisController(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// The particle system is the tri-based geometry prefix plus a world-space flag
+// and the modifier list. The bs >= 83 and bs >= 100 fields in the reference are
+// Skyrim-and-later additions; no Oblivion mesh carries them.
+bool walkNiParticleSystem(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiTriBasedGeom(c, version, bsVersion)) return false;
+    if (version >= 167837696u) {
+        c.u8();                                   // world_space
+        const quint32 n = c.u32();                // num_modifiers
+        if (!c.ok() || n > 100000u) return false;
+        if (!skipRefs(c, n)) return false;
+    }
+    return c.ok();
+}
+
+// A property is the object-net prefix and nothing else; each subclass then adds
+// its own small payload.
+bool walkNiProperty(Cursor& c, quint32 version, quint32)
+{
+    return walkNiObjectNET(c, version);
+}
+bool walkNiFogProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiProperty(c, version, 0)) return false;
+    c.u16();    // flags
+    c.f32();    // fog_depth
+    c.raw(12);  // fog_color
+    return c.ok();
+}
+
+bool walkNiWireframeProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiProperty(c, version, 0)) return false;
+    c.u16();    // flags
+    return c.ok();
+}
+
+// A blend controller is the time-controller prefix and a key count.
+bool walkBhkBlendController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiTimeController(c)) return false;
+    c.u32();    // keys
+    return c.ok();
+}
+
+// A transform shape wraps another shape in a 4x4 matrix.
+bool walkBhkTransformShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipHavokMaterial(c, version)) return false;
+    if (!skipRefs(c, 1)) return false;   // shape
+    if (!skipHavokMaterial(c, version)) return false;  // material
+    c.f32();                             // radius
+    c.raw(64);                           // transform
+    return c.ok();
+}
+
+// A path interpolator steers along a curve: flags, banking parameters and the
+// two data refs that hold the path and the percent channel.
+bool walkNiPathInterpolator(Cursor& c, quint32 version, quint32)
+{
+    c.u16();    // flags
+    c.u32();    // bank_dir
+    c.f32();    // max_bank_angle
+    c.f32();    // smoothing
+    c.u16();    // follow_axis
+    if (!skipRefs(c, 1)) return false;   // path_data
+    if (!skipRefs(c, 1)) return false;   // percent_data
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2052,6 +2122,18 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiVisController", walkNiVisController);
         add("NiBoneLODController", walkNiBSBoneLODController);
         add("NiBSBoneLODController", walkNiBSBoneLODController);
+        // Geometry and particles.
+        add("NiGeometry", walkNiTriBasedGeom);
+        add("NiParticles", walkNiTriBasedGeom);
+        add("NiParticleSystem", walkNiParticleSystem);
+        // Properties.
+        add("NiFogProperty", walkNiFogProperty);
+        add("NiWireframeProperty", walkNiWireframeProperty);
+        // Havok.
+        add("bhkBlendController", walkBhkBlendController);
+        add("bhkTransformShape", walkBhkTransformShape);
+        // Interpolators.
+        add("NiPathInterpolator", walkNiPathInterpolator);
         // Particle emitter controllers.
         add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
         add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
