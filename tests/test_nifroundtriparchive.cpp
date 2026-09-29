@@ -139,6 +139,7 @@ private slots:
     // missing and how many files it would recover.
     QSet<QString> transformDataBlockedTypes;
     QMap<QString, int> transformDataBlockedByType;
+    QStringList transformDataFirstFiles;
     // An example file per walk reason. The counts alone cannot be acted on: to
     // diff a walker against the nifgen oracle you need the actual bytes of a
     // file that stops for that reason, and the archive is a build input that is
@@ -228,6 +229,13 @@ private slots:
                 }
                 if (carriesTransformData) {
                     ++transformDataFiles;
+                    // Name a few, so an animated mesh can actually be captured
+                    // and diffed. The blockers only mean anything against a real
+                    // file: a skinned mesh and an animated one fail on entirely
+                    // different block families, and picking the wrong one
+                    // optimises the wrong thing.
+                    if (transformDataFirstFiles.size() < 5)
+                        transformDataFirstFiles.append(entry.fullPath);
                     if (file.hasIndividualBlocks()) {
                         ++transformDataAddressable;
                     } else {
@@ -392,6 +400,8 @@ private slots:
                               .arg(transformDataFiles)
                               .arg(transformDataAddressable)
                               .arg(transformDataFiles - transformDataAddressable);
+                for (const QString& p : transformDataFirstFiles)
+                    report += QStringLiteral("NIFTRANSFORMFILE %1\n").arg(p);
                 // Ranked by how many of the still-blocked animated meshes carry
                 // the type, so the order is the order that unblocks them.
                 for (auto it = transformDataBlockedByType.begin();

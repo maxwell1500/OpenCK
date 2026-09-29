@@ -367,10 +367,21 @@ bool walkKeyGroupData(Cursor& c, quint32, quint32)
 
 // NiTimeController: the common prefix of every controller, including the
 // interpolated ones, which insert the interpolator ref between it and `data`.
+// The prefix on every time-controller-based block: a next-controller ref, a
+// flags word, and the four timing floats, then a target ref.
+//
+// The flags are a u16. Decoded from a shipped 20.0.0.4
+// NiMultiTargetTransformController, whose forty bytes are
+// `ff ff ff ff | 2c 00 | 00 00 80 3f | 00 00 00 00 | ff ff 7f 7f | ff ff 7f ff |
+// 00 00 00 00 | 03 00 | ...` - the 0x2c flags, 1.0 frequency, 0.0 phase and the
+// two clamped times only line up if the flags occupy two bytes. As a u32 every
+// one of those floats is read two bytes early.
+constexpr int kTimeControllerBytes = 26;
+
 bool walkNiTimeController(Cursor& c)
 {
     c.u32();    // next_controller
-    c.u32();    // flags
+    c.u16();    // flags
     c.f32();    // frequency
     c.f32();    // phase
     c.f32();    // start_time
@@ -792,14 +803,72 @@ bool walkNiStencilProperty(Cursor& c, quint32 version, quint32)
 
 // NiControllerManager: the time-controller prefix, a cumulative byte, the
 // sequence refs, and a palette ref.
+//
+// 43 bytes in a shipped 20.0.0.4 file: 26 of time controller, one byte of
+// cumulative, a u32 sequence count, two refs and a palette ref.
 bool walkNiControllerManager(Cursor& c, quint32, quint32)
 {
     if (!walkNiTimeController(c)) return false;
     c.u8();                                 // cumulative
     const quint32 numSequences = c.u32();
-    if (!c.ok() || numSequences > 100000u) return false;
+    if (!c.ok() || numSequences > 10000u) return false;
     if (!skipRefs(c, numSequences)) return false;
     if (!skipRefs(c, 1)) return false;       // object_palette
+    return c.ok();
+}
+
+// NiMultiTargetTransformController: the time-controller prefix, a u16 count of
+// extra targets, and that many refs. The count is a u16, not a u32 - the same
+// two-byte lesson as the flags, and the same forty-byte file confirms it.
+bool walkNiMultiTargetTransformController(Cursor& c, quint32, quint32)
+{
+    if (!walkNiTimeController(c)) return false;
+    const quint16 numExtraTargets = c.u16();
+    if (!c.ok()) return false;
+    if (!skipRefs(c, numExtraTargets)) return false;
+    return c.ok();
+}
+
+// NiTextKeyExtraData: a name, a key count, then that many (time, value) pairs.
+//
+// 63 bytes in a shipped file: four of empty name, a u32 count of three, and
+// three keys of 13, 31 and 11 bytes - each a time float, a u32 string length,
+// and that many characters.
+bool walkNiTextKeyExtraData(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiExtraData(c, version)) return false;
+    const quint32 numKeys = c.u32();
+    if (!c.ok() || numKeys > 100000u) return false;
+    for (quint32 i = 0; i < numKeys; ++i) {
+        c.f32();                                    // time
+        if (!skipString(c, version)) return false;   // value
+    }
+    return c.ok();
+}
+
+// NiStringPalette: a count, the total length of the blob, and the blob itself.
+// The blob is several NUL-terminated strings run together, so it is not a list
+// of separate strings and must not be split on the NULs.
+bool walkNiStringPalette(Cursor& c, quint32, quint32)
+{
+    c.u32();     // num_strings
+    const quint32 length = c.u32();
+    if (!c.ok() || length > 1024u * 1024u) return false;
+    c.raw(static_cast<int>(length));
+    return c.ok();
+}
+
+// NiDefaultAVObjectPalette: a scene ref, an object count, and that many names.
+// The object refs themselves live in the file's global reference table, so only
+// the names are inline.
+bool walkNiDefaultAVObjectPalette(Cursor& c, quint32 version, quint32)
+{
+    if (!skipRefs(c, 1)) return false;    // scene
+    const quint32 numObjs = c.u32();
+    if (!c.ok() || numObjs > 100000u) return false;
+    for (quint32 i = 0; i < numObjs; ++i) {
+        if (!skipString(c, version)) return false;
+    }
     return c.ok();
 }
 
@@ -1190,6 +1259,10 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiMaterialProperty", walkNiMaterialProperty);
         add("NiStencilProperty", walkNiStencilProperty);
         add("NiControllerManager", walkNiControllerManager);
+        add("NiMultiTargetTransformController", walkNiMultiTargetTransformController);
+        add("NiTextKeyExtraData", walkNiTextKeyExtraData);
+        add("NiStringPalette", walkNiStringPalette);
+        add("NiDefaultAVObjectPalette", walkNiDefaultAVObjectPalette);
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
