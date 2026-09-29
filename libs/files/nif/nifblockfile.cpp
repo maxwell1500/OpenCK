@@ -385,23 +385,30 @@ bool skipKeyframeGroup(Cursor& c, quint32 valueBytes)
     return c.ok();
 }
 
-// numRotationKeys and rotationType have already been read by the caller; this
-// picks up at the per-axis groups.
-bool walkNiTransformData20(Cursor& c, quint32 numRotationKeys, quint32 rotationType)
+// numRotationKeys has already been read. hasRotationType says whether the caller
+// has already consumed the rotation type; it has not when the count is zero,
+// because a block with no rotation keys has no type in the file at all and the
+// translation group starts four bytes earlier.
+//
+// Verified against two shipped 20.0.0.4 blocks: 1,084 bytes with a rotation key,
+// three axis groups of nine quadratic float keys, 38 linear translation keys and
+// no scale keys; and 1,936 bytes with no rotation keys, 120 linear translation
+// keys and no scale keys.
+bool walkNiTransformData20(Cursor& c, bool hasRotationType, quint32 rotationType)
 {
-    Q_UNUSED(numRotationKeys)
-    if (!c.ok()) return false;
-    if (rotationType != kRotationTypeXyz) {
-        // A quaternion channel rather than per-axis groups. Its keys are a time
-        // and a quaternion, and the tangents it may carry have not been
-        // measured, so decline rather than guess.
-        return false;
+    if (hasRotationType) {
+        if (rotationType != kRotationTypeXyz) {
+            // A quaternion channel rather than per-axis groups. Its keys are a
+            // time and a quaternion, and the tangents it may carry have not been
+            // measured, so decline rather than guess.
+            return false;
+        }
+        for (int axis = 0; axis < 3; ++axis) {
+            if (!skipKeyframeGroup(c, 4)) return false;    // float value
+        }
     }
-    for (int axis = 0; axis < 3; ++axis) {
-        if (!skipKeyframeGroup(c, 4)) return false;        // float value
-    }
-    if (!skipKeyframeGroup(c, 12)) return false;           // Vector3 value
-    if (!skipKeyframeGroup(c, 4)) return false;            // float value
+    if (!skipKeyframeGroup(c, 12)) return false;           // translation, Vector3
+    if (!skipKeyframeGroup(c, 4)) return false;            // scale, float
     return c.ok();
 }
 
@@ -409,17 +416,22 @@ bool walkNiKeyframeData(Cursor& c, quint32 version, quint32)
 {
     Q_UNUSED(version)
     const quint32 numRotationKeys = c.u32();
-    // The rotation type is a byte in the old channel form and a u32 in the
-    // 20.x form, and the 20.x form is identified by that field being 4 - a value
-    // the old form does not use. Peeking the byte decides which this is without
-    // needing a version boundary, which would be wrong anyway: the two forms are
-    // told apart by the rotation type, not by the version.
-    const quint8 rotationTypeByte = c.u8();
     if (!c.ok() || numRotationKeys > 10'000'000u) return false;
+    if (numRotationKeys == 0) {
+        // No rotation keys, so no rotation type in the file, and nothing to
+        // inspect before the translation group.
+        return walkNiTransformData20(c, false, 0);
+    }
+    // The rotation type is a byte in the old channel form and a u32 in the 20.x
+    // form, and the 20.x form is identified by that field being 4 - a value the
+    // old form does not use. Reading the byte decides which this is without a
+    // version boundary, which would be wrong anyway: the two forms are told
+    // apart by the rotation type, not by the version.
+    const quint8 rotationTypeByte = c.u8();
+    if (!c.ok()) return false;
     if (rotationTypeByte == kRotationTypeXyz) {
         c.raw(3);                                          // rest of the u32
-        return walkNiTransformData20(c, numRotationKeys,
-                                     static_cast<quint32>(rotationTypeByte));
+        return walkNiTransformData20(c, true, kRotationTypeXyz);
     }
     if (rotationTypeByte > 3) return false;
     c.f32();                                               // order
@@ -1144,14 +1156,14 @@ bool walkNiAlphaProperty(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
-// NiSpecularProperty is just a flags word; earlier versions put the specular
-// colour and strength beside it, and from 20.1.0.3 the version lives inside the
-// flags word instead.
+// NiSpecularProperty is just a flags word after the NiObjectNET prefix - there is
+// no colour and strength beside it, contrary to what the older NIF layout says.
+// A shipped 20.0.0.4 block is 14 bytes, which is twelve of prefix and two of
+// flags; adding the four bytes of colour puts everything after it four out.
 bool walkNiSpecularProperty(Cursor& c, quint32 version, quint32)
 {
     if (!walkNiObjectNET(c, version)) return false;
-    c.u16();                                              // flags
-    if (version < 335609859u) c.u32();                    // colour and strength
+    c.u16();      // flags
     return c.ok();
 }
 
@@ -1374,6 +1386,32 @@ bool walkNiControllerSequence(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// The key-based interpolators. Their base is NiInterpolator, which is NiObject
+// with nothing inline at all, so the whole block is the value and a ref to the
+// data that drives it - eight bytes for a float, sixteen for a point, five for a
+// bool. Reading a name or a controller here, as though it were NiObjectNET, would
+// put every one of them out by eight.
+bool walkNiFloatInterpolator(Cursor& c, quint32, quint32)
+{
+    c.f32();                    // value
+    if (!skipRefs(c, 1)) return false;   // data
+    return c.ok();
+}
+
+bool walkNiPoint3Interpolator(Cursor& c, quint32, quint32)
+{
+    c.vec3();                   // value
+    if (!skipRefs(c, 1)) return false;   // data
+    return c.ok();
+}
+
+bool walkNiBoolInterpolator(Cursor& c, quint32, quint32)
+{
+    c.u8();                     // value
+    if (!skipRefs(c, 1)) return false;   // data
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1411,6 +1449,10 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiStringPalette", walkNiStringPalette);
         add("NiDefaultAVObjectPalette", walkNiDefaultAVObjectPalette);
         add("NiControllerSequence", walkNiControllerSequence);
+        // Key-based interpolators.
+        add("NiFloatInterpolator", walkNiFloatInterpolator);
+        add("NiPoint3Interpolator", walkNiPoint3Interpolator);
+        add("NiBoolInterpolator", walkNiBoolInterpolator);
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
