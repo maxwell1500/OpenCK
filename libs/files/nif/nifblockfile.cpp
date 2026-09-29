@@ -1138,6 +1138,13 @@ bool skipBhkConstraintCInfo(Cursor& c)
     return c.ok();
 }
 
+// The three constraint CInfos share a shape: a run of Vector4s, then three
+// floats, then an optional motor. The floats are read unconditionally in the
+// reference implementation - the version gates in its generated attribute list
+// describe a filtered view, not the stream - so they belong to every version,
+// and omitting them on the older branch leaves the block twelve bytes short.
+// That is what a 156-byte prismatic constraint in a 20.0.0.4 file showed, against
+// the 144 this used to read.
 bool walkBhkLimitedHingeConstraint(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!skipBhkConstraintCInfo(c)) return false;
@@ -1145,9 +1152,9 @@ bool walkBhkLimitedHingeConstraint(Cursor& c, quint32 version, quint32 bsVersion
         c.raw(16 * 7);        // pivots, axes and perpendicular axes
     } else {
         c.raw(16 * 8);        // the same vectors, reordered
-        c.raw(12);            // min_angle, max_angle, max_friction
-        if (version >= kConstraintMotorVersion) return false;  // motor: unmeasured
     }
+    c.raw(12);                // min_angle, max_angle, max_friction
+    if (version >= kConstraintMotorVersion && bsVersion > kConstraintOldBsVersion) return false;
     return c.ok();
 }
 
@@ -1156,24 +1163,21 @@ bool walkBhkRagdollConstraint(Cursor& c, quint32 version, quint32 bsVersion)
     if (!skipBhkConstraintCInfo(c)) return false;
     if (bsVersion <= kConstraintOldBsVersion) {
         c.raw(16 * 6);        // pivot, plane and twist per entity
+        c.raw(12);            // twist_min_angle, twist_max_angle, max_friction
     } else {
         c.raw(16 * 8);        // twist, plane, motor and pivot per entity
         c.raw(24);            // six angle and friction floats
-        if (version >= kConstraintMotorVersion) return false;  // motor: unmeasured
     }
+    if (version >= kConstraintMotorVersion && bsVersion > kConstraintOldBsVersion) return false;
     return c.ok();
 }
 
-bool walkBhkPrismaticConstraint(Cursor& c, quint32 version, quint32)
+bool walkBhkPrismaticConstraint(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!skipBhkConstraintCInfo(c)) return false;
-    if (version <= 335544325u) {
-        c.raw(16 * 8);        // pivot, rotation, plane and sliding per entity
-    } else {
-        c.raw(16 * 8);
-        c.raw(12);            // min_distance, max_distance, friction
-        if (version >= kConstraintMotorVersion) return false;  // motor: unmeasured
-    }
+    c.raw(16 * 8);        // pivot, rotation, plane and sliding per entity
+    c.raw(12);            // min_distance, max_distance, friction
+    if (version >= kConstraintMotorVersion && bsVersion > kConstraintOldBsVersion) return false;
     return c.ok();
 }
 
