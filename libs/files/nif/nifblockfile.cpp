@@ -1864,6 +1864,112 @@ bool walkNiPSysEmitterCtlr(Cursor& c, quint32 version, quint32 bs)
     return skipRefs(c, 1);                      // visibility_interpolator
 }
 
+// A dynamic effect is the AV-object prefix plus a switch state and the list of
+// nodes it is switched on for. The affected-node list appears in two disjoint
+// version windows - it was present early, dropped, and came back - so this is a
+// range test rather than a single cut.
+constexpr quint32 kSwitchStateVersion = 167837802u;   // 10.1.0.4
+constexpr quint32 kAffectedNodesMin = 167837696u;      // 10.1.0.1
+constexpr quint32 kAffectedNodesMax = 67108866u;       // 4.0.1.0
+
+bool walkNiDynamicEffect(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiAVObject(c, version, bsVersion)) return false;
+    if (version >= kSwitchStateVersion && bsVersion < 130) c.u8();  // switch_state
+    const bool hasAffected = (version <= kAffectedNodesMax)
+                          || (version >= kAffectedNodesMin && bsVersion < 130);
+    if (hasAffected) {
+        const quint32 n = c.u32();                     // num_affected_nodes
+        if (!c.ok() || n > 100000u) return false;
+        if (!skipRefs(c, n)) return false;             // affected_nodes
+    }
+    return c.ok();
+}
+
+// The light base: dimmer and three colours. Everything under it adds only its
+// own optical parameters, so the four families share this prefix.
+bool walkNiLight(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiDynamicEffect(c, version, bsVersion)) return false;
+    c.f32();    // dimmer
+    c.raw(12);  // ambient_color
+    c.raw(12);  // diffuse_color
+    c.raw(12);  // specular_color
+    return c.ok();
+}
+
+bool walkNiAmbientLight(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    return walkNiLight(c, version, bsVersion);
+}
+
+bool walkNiDirectionalLight(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiLight(c, version, bsVersion)) return false;
+    c.raw(12);  // direction
+    c.raw(12);  // shadow_center
+    c.f32();    // shadow_plane
+    return c.ok();
+}
+
+bool walkNiPointLight(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiLight(c, version, bsVersion)) return false;
+    c.f32();    // constant_attenuation
+    c.f32();    // linear_attenuation
+    c.f32();    // quadratic_attenuation
+    return c.ok();
+}
+
+bool walkNiSpotLight(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiPointLight(c, version, bsVersion)) return false;
+    c.f32();    // outer_spot_angle
+    // Inner angle and exponent were added together in 20.2.0.4.
+    if (version >= 335675397u) {
+        c.f32();  // inner_spot_angle
+        c.f32();  // exponent
+    }
+    return c.ok();
+}
+
+// A bone LOD controller. Its __init__ reads the counts here and the arrays in
+// hand, so the prefix is the three counts followed by the node groups; each group
+// is a bone count and that many node refs.
+//
+// The two shape-group lists are a 4.0.2.0 addition and only exist when the stream
+// version is 0, which no Oblivion or Skyrim mesh uses, so they are not walked.
+// A SkinInfoSet is a name, a data ref and a bone-index list per entry, and
+// guessing its width is worse than refusing the block outright.
+bool walkNiBSBoneLODController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiTimeController(c)) return false;
+    if (version >= 67240448u && bsVersion == 0) return false;   // shape groups
+    c.u32();  // lod
+    const quint32 numLods = c.u32();
+    if (!c.ok() || numLods > 1000u) return false;
+    const quint32 numGroups = c.u32();
+    if (!c.ok() || numGroups > 100000u) return false;
+    for (quint32 g = 0; g < numGroups; ++g) {
+        const quint32 numBones = c.u32();
+        if (!c.ok() || numBones > 100000u) return false;
+        if (!skipRefs(c, numBones)) return false;
+    }
+    return c.ok();
+}
+
+// A visibility controller is a boolean single-interpolator controller: the
+// interpolator ref, then the byte it interpolates.
+bool walkNiVisController(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkSingleInterpController(c, version, bsVersion)) return false;
+    c.u8();  // bool_value
+    if (version <= kControllerDataEnd) {
+        if (!skipRefs(c, 1)) return false;  // data
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1931,6 +2037,14 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiPSysRotationModifier", walkNiPSysRotationModifier);
         add("NiPSysAgeDeathModifier", walkNiPSysAgeDeathModifier);
         add("NiMorphData", walkNiMorphData);
+        // Lights.
+        add("NiAmbientLight", walkNiAmbientLight);
+        add("NiDirectionalLight", walkNiDirectionalLight);
+        add("NiPointLight", walkNiPointLight);
+        add("NiSpotLight", walkNiSpotLight);
+        add("NiVisController", walkNiVisController);
+        add("NiBoneLODController", walkNiBSBoneLODController);
+        add("NiBSBoneLODController", walkNiBSBoneLODController);
         // Particle emitter controllers.
         add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
         add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
