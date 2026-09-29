@@ -1163,11 +1163,13 @@ bool walkBhkRagdollConstraint(Cursor& c, quint32 version, quint32 bsVersion)
     if (!skipBhkConstraintCInfo(c)) return false;
     if (bsVersion <= kConstraintOldBsVersion) {
         c.raw(16 * 6);        // pivot, plane and twist per entity
-        c.raw(12);            // twist_min_angle, twist_max_angle, max_friction
     } else {
         c.raw(16 * 8);        // twist, plane, motor and pivot per entity
-        c.raw(24);            // six angle and friction floats
     }
+    // All six angle and friction floats, on both layouts. The reference reads
+    // them unconditionally; the older branch was missing the three plane and
+    // cone angles, which left the block twelve bytes short.
+    c.raw(24);
     if (version >= kConstraintMotorVersion && bsVersion > kConstraintOldBsVersion) return false;
     return c.ok();
 }
