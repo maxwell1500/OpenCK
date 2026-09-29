@@ -1861,16 +1861,27 @@ bool walkNiPSysModifierCtlr(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// The float modifier controllers add a data ref, but only through 10.1.0.0.
+// From 10.1.0.2 the emitter controller carries a visibility interpolator
+// instead. They are mutually exclusive, exactly like the keyframe controller's
+// interpolator-or-data pair, and reading both puts every one of these blocks
+// four bytes out.
 bool walkNiPSysModifierFloatCtlr(Cursor& c, quint32 version, quint32 bs)
 {
     if (!walkNiPSysModifierCtlr(c, version, bs)) return false;
-    return skipRefs(c, 1);                      // data
+    if (version <= kPSysModifierCtlrDataEnd) {
+        if (!skipRefs(c, 1)) return false;      // data
+    }
+    return c.ok();
 }
 
 bool walkNiPSysEmitterCtlr(Cursor& c, quint32 version, quint32 bs)
 {
     if (!walkNiPSysModifierFloatCtlr(c, version, bs)) return false;
-    return skipRefs(c, 1);                      // visibility_interpolator
+    if (version >= kInterpolatorRefVersion) {
+        if (!skipRefs(c, 1)) return false;      // visibility_interpolator
+    }
+    return c.ok();
 }
 
 // A dynamic effect is the AV-object prefix plus a switch state and the list of
