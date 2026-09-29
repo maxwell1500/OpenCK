@@ -1227,6 +1227,69 @@ bool walkNiSkinInstance(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// A ControlledBlock, as found inside a NiControllerSequence.
+//
+// 33 bytes, and the width is odd, so this does not divide into the four-byte refs
+// the field list implies - the tail is a mix of unaligned shorts and i32s. Read
+// out of a shipped 20.0.0.4 sequence whose three controlled blocks start at
+// +16, +49 and +82 from the block start; the node_name_offset values in it (0, 41
+// and 60) are what pin the middle of the layout down.
+constexpr int kControlledBlockBytes = 33;
+
+bool skipControlledBlock(Cursor& c)
+{
+    if (!skipRefs(c, 1)) return false;   // interpolator
+    if (!skipRefs(c, 1)) return false;   // controller
+    c.u32();                             // string palette ref
+    c.u8();                              // a one-byte field between them
+    c.u16();                             // node_name_offset
+    c.u16();                             //
+    c.u32();                             // property_type_offset (-1 when unset)
+    c.u16();                             // controller_type_offset
+    c.u16();                             //
+    c.u32();                             // controller_id_offset (-1 when unset)
+    c.u32();                             // interpolator_id_offset
+    return c.ok();
+}
+
+// NiControllerSequence: a name, a controlled-block count, the blocks themselves,
+// then the playback fields. The first of those is unversioned in the field list
+// but only exists from 10.1.0.2, and a phase float only between 10.1.0.2 and
+// 10.3.0.1.
+//
+// Verified against a 20.0.0.4 sequence of 169 bytes: an eight-byte name, a u32
+// count, a u32 grow-by, three 33-byte blocks, 28 bytes of weight/text-keys/
+// cycle/frequency/start/stop/manager, an 18-byte name and a palette ref.
+constexpr quint32 kSequencePlaybackVersion = 167837802u;   // 10.1.0.2
+constexpr quint32 kSequencePhaseEnd = 168034305u;          // 10.3.0.1
+constexpr quint32 kSequencePaletteFirst = 167837809u;
+constexpr quint32 kSequencePaletteLast = 335609856u;       // 20.1.0.3
+
+bool walkNiControllerSequence(Cursor& c, quint32 version, quint32)
+{
+    if (!skipString(c, version)) return false;                  // name
+    const quint32 numControlled = c.u32();
+    if (!c.ok() || numControlled > 10000u) return false;
+    c.u32();                                                   // array_grow_by
+    for (quint32 i = 0; i < numControlled; ++i) {
+        if (!skipControlledBlock(c)) return false;
+    }
+    if (version < kSequencePlaybackVersion) return c.ok();
+    c.f32();                                                    // weight
+    if (!skipRefs(c, 1)) return false;                          // text_keys
+    c.u32();                                                    // cycle_type
+    c.f32();                                                    // frequency
+    if (version <= kSequencePhaseEnd) c.f32();                  // phase
+    c.f32();                                                    // start_time
+    c.f32();                                                    // stop_time
+    if (!skipRefs(c, 1)) return false;                          // manager
+    if (!skipString(c, version)) return false;                  // accum_root_name
+    if (version >= kSequencePaletteFirst && version <= kSequencePaletteLast) {
+        if (!skipRefs(c, 1)) return false;                      // string_palette
+    }
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1263,6 +1326,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiTextKeyExtraData", walkNiTextKeyExtraData);
         add("NiStringPalette", walkNiStringPalette);
         add("NiDefaultAVObjectPalette", walkNiDefaultAVObjectPalette);
+        add("NiControllerSequence", walkNiControllerSequence);
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
