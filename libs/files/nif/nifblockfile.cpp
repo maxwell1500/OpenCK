@@ -1776,28 +1776,31 @@ bool walkSkinPartitionEntry(Cursor& c, quint32 version)
             if (!c.ok()) return false;
         }
     }
-    const quint8 hasFaces = c.u8();
-    if (!c.ok()) return false;
-    if (!hasFaces) return c.ok();
     if (numStrips > 0) {
-        // One strip per strip count, each a u16 length followed by that many u16
-        // points. A shipped 20.0.0.4 partition has one strip of 1,999.
+        // The strip form has no has-faces byte and no has-bone-indices byte, and
+        // the bone indices follow the strips unconditionally after two bytes.
+        // Reading the has-faces byte here - where the field list puts it, ahead of
+        // the strips - shifts the strip length by one byte and it comes out as 263
+        // instead of 1,999. A shipped 67,466-byte strip partition is exact with
+        // this shape and only this shape: 21,164 + 29,788 + 16,510.
         for (quint32 s = 0; s < numStrips; ++s) {
             const quint32 len = c.u16();
             if (!c.ok() || len > 100000u) return false;
             c.raw(static_cast<int>(static_cast<quint64>(len) * 2u));
             if (!c.ok()) return false;
         }
-    } else {
-        if (numTriangles > 10000000u) return false;
-        c.raw(static_cast<int>(static_cast<quint64>(numTriangles) * 6u));  // Triangle
-        if (!c.ok()) return false;
+        c.raw(2);
+        const quint64 n = static_cast<quint64>(numVertices) * numWeightsPerVertex;
+        if (n > 100000000u) return false;
+        c.raw(static_cast<int>(n));
+        return c.ok();
     }
-    // The bone indices follow either form, and are not conditional on the
-    // triangles as the field list's gates suggest. A shipped strip partition of
-    // 67,466 bytes comes up 9,891 short without them, which is exactly the
-    // 778 + 1,083 + 611 vertices of its three partitions at four bytes each plus
-    // one flag apiece.
+    const quint8 hasFaces = c.u8();
+    if (!c.ok()) return false;
+    if (!hasFaces) return c.ok();
+    if (numTriangles > 10000000u) return false;
+    c.raw(static_cast<int>(static_cast<quint64>(numTriangles) * 6u));  // Triangle
+    if (!c.ok()) return false;
     if (c.u8()) {                              // has_bone_indices
         const quint64 n = static_cast<quint64>(numVertices) * numWeightsPerVertex;
         if (n > 100000000u) return false;
