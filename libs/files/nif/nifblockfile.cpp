@@ -341,19 +341,94 @@ void skipKeyChannel(Cursor& c)
     }
 }
 
+// The 20.x form of NiTransformData, where a rotation type of 4 means the block
+// stores three separate KeyGroups - one per axis - rather than a quaternion
+// channel.
+//
+// The groups are self-describing: each carries its own key count and its own
+// interpolation, and the key width follows from the interpolation, because a
+// linear key has only a time and a value while a quadratic one also carries
+// forward and backward tangents. That is why the widths cannot be derived from
+// the value type alone.
+//
+// Checked against a shipped 20.0.0.4 block of 1,084 bytes: a u32 count and a u32
+// rotation type, three axis groups of nine quadratic float keys at 16 bytes
+// (time, value, forward, backward), a translation group of 38 linear Vector3
+// keys at 16 bytes (time, value), and an empty scale group. That is
+// 8 + 3*152 + 616 + 4 = 1,084 exactly - which is what fixes both the group layout
+// and the key widths.
+//
+// A KeyGroup with no keys holds only its count: the interpolation and the key
+// array are both absent rather than empty, so an empty group costs four bytes and
+// not twelve.
+// The KeyType values as they appear on disk: 1 is linear, 2 quadratic, 3 cubic,
+// and 0 is the unset value. They start at 1, not 0, which is worth stating
+// because reading 0 as "linear" silently drops the tangents from every
+// non-linear group.
+constexpr quint32 kKeyTypeLinear = 1u;
+constexpr quint32 kKeyTypeMax = 3u;
+constexpr quint32 kRotationTypeXyz = 4u;
+
+// A key is a time, the value, and - for anything other than linear - a forward
+// and a backward tangent. The time is the part that is easy to miss: a linear
+// Vector3 key is 16 bytes, not the 12 its value type suggests.
+bool skipKeyframeGroup(Cursor& c, quint32 valueBytes)
+{
+    const quint32 numKeys = c.u32();
+    if (!c.ok() || numKeys > 10000000u) return false;
+    if (numKeys == 0) return true;              // no interpolation, no keys
+    const quint32 interpolation = c.u32();
+    if (!c.ok() || interpolation > kKeyTypeMax) return false;
+    const quint32 keyBytes = 4u + valueBytes
+        + (interpolation == kKeyTypeLinear ? 0u : valueBytes * 2u);
+    c.raw(static_cast<int>(static_cast<quint64>(numKeys) * keyBytes));
+    return c.ok();
+}
+
+// numRotationKeys and rotationType have already been read by the caller; this
+// picks up at the per-axis groups.
+bool walkNiTransformData20(Cursor& c, quint32 numRotationKeys, quint32 rotationType)
+{
+    Q_UNUSED(numRotationKeys)
+    if (!c.ok()) return false;
+    if (rotationType != kRotationTypeXyz) {
+        // A quaternion channel rather than per-axis groups. Its keys are a time
+        // and a quaternion, and the tangents it may carry have not been
+        // measured, so decline rather than guess.
+        return false;
+    }
+    for (int axis = 0; axis < 3; ++axis) {
+        if (!skipKeyframeGroup(c, 4)) return false;        // float value
+    }
+    if (!skipKeyframeGroup(c, 12)) return false;           // Vector3 value
+    if (!skipKeyframeGroup(c, 4)) return false;            // float value
+    return c.ok();
+}
+
 bool walkNiKeyframeData(Cursor& c, quint32 version, quint32)
 {
     Q_UNUSED(version)
     const quint32 numRotationKeys = c.u32();
-    const quint8 rotationType = c.u8();
-    if (!c.ok() || numRotationKeys > 10'000'000u || rotationType > 3) return false;
-    c.f32();  // order
+    // The rotation type is a byte in the old channel form and a u32 in the
+    // 20.x form, and the 20.x form is identified by that field being 4 - a value
+    // the old form does not use. Peeking the byte decides which this is without
+    // needing a version boundary, which would be wrong anyway: the two forms are
+    // told apart by the rotation type, not by the version.
+    const quint8 rotationTypeByte = c.u8();
+    if (!c.ok() || numRotationKeys > 10'000'000u) return false;
+    if (rotationTypeByte == kRotationTypeXyz) {
+        c.raw(3);                                          // rest of the u32
+        return walkNiTransformData20(c, numRotationKeys,
+                                     static_cast<quint32>(rotationTypeByte));
+    }
+    if (rotationTypeByte > 3) return false;
+    c.f32();                                               // order
     for (quint32 i = 0; i < numRotationKeys; ++i) {
         if (i > 0) c.f32();
-        c.raw(16);  // quaternion
+        c.raw(16);                                         // quaternion
     }
-    skipKeyChannel(c);  // translations
-    skipKeyChannel(c);  // scales
+    skipKeyChannel(c);                                     // translations
+    skipKeyChannel(c);                                     // scales
     return c.ok();
 }
 
@@ -846,21 +921,29 @@ bool walkNiTextKeyExtraData(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
-// NiStringPalette: a count, the total length of the blob, and the blob itself.
-// The blob is several NUL-terminated strings run together, so it is not a list
-// of separate strings and must not be split on the NULs.
+// NiStringPalette: a byte length, the blob, and the same length again.
+//
+// The blob is several NUL-terminated strings run together, so it is not a list of
+// separate strings and must not be split on the NULs - doing that would need a
+// per-string length that is not there. The trailing repeat of the length is part
+// of the 96 bytes of a shipped 20.0.0.4 palette: 4 + 88 + 4.
 bool walkNiStringPalette(Cursor& c, quint32, quint32)
 {
-    c.u32();     // num_strings
     const quint32 length = c.u32();
     if (!c.ok() || length > 1024u * 1024u) return false;
     c.raw(static_cast<int>(length));
+    c.u32();     // the length again
     return c.ok();
 }
 
-// NiDefaultAVObjectPalette: a scene ref, an object count, and that many names.
-// The object refs themselves live in the file's global reference table, so only
-// the names are inline.
+// NiDefaultAVObjectPalette: a scene ref, an object count, and that many entries.
+// Each entry is a length-prefixed name *followed by* its ref - the ref trails the
+// name rather than leading it, which is the opposite of every other struct here
+// and is what makes the block 95 bytes rather than 91.
+//
+// Checked: 8 bytes of header, then 26, 35 and 26 for three names of 18, 27 and
+// 18 characters. The names are the ones the controller sequences and the
+// transform controllers are indexed by.
 bool walkNiDefaultAVObjectPalette(Cursor& c, quint32 version, quint32)
 {
     if (!skipRefs(c, 1)) return false;    // scene
@@ -868,6 +951,7 @@ bool walkNiDefaultAVObjectPalette(Cursor& c, quint32 version, quint32)
     if (!c.ok() || numObjs > 100000u) return false;
     for (quint32 i = 0; i < numObjs; ++i) {
         if (!skipString(c, version)) return false;
+        if (!skipRefs(c, 1)) return false;    // the entry's own ref
     }
     return c.ok();
 }
