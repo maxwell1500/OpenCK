@@ -548,6 +548,53 @@ bool walkNiGeometryData(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// The triangle list and per-vertex match groups that NiTriShapeData adds on top
+// of the plain geometry data. Skinned meshes carry both, and a mesh with a few
+// thousand vertices is tens of kilobytes short without them.
+constexpr quint32 kTriShapeHasTrianglesVersion = 167837696u;   // 10.1.0.0
+constexpr quint32 kTriShapeMatchGroupsVersion = 50397184u;      // 3.0.0.8
+
+// A MatchGroup is a vertex count and that many vertex indices, and the count is a
+// u16. Verified on a skinned mesh: 2,350 groups holding 566 indices between them
+// occupy exactly the 5,832 bytes available, while the declared group count is one
+// higher again - so the two disagree in shipped data, and the strict walk is what
+// decides whether a given file is readable.
+bool skipMatchGroups(Cursor& c, quint32 numGroups)
+{
+    for (quint32 g = 0; g < numGroups; ++g) {
+        const quint32 count = c.u16();
+        if (!c.ok() || count > 10000u) return false;
+        c.raw(static_cast<int>(count * 2u));      // vertex indices
+    }
+    return c.ok();
+}
+
+// The triangle header is seven bytes, and its first two fields are u16s: a
+// shipped skinned mesh stores 3,922 triangles as `52 0f` and 11,766 triangle
+// points as `f6 2d`, followed by two bytes and a has-triangles flag, with the
+// triangle data starting on the eighth. Reading the counts as u32 puts the block
+// tens of kilobytes out - 29,369 on a mesh with 2,351 vertices.
+bool walkNiTriShapeData(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiGeometryData(c, version, bsVersion)) return false;
+    const quint32 numTriangles = c.u16();
+    c.u16();                                     // num_triangle_points
+    c.raw(2);                                    // two fields not yet named
+    if (!c.ok() || numTriangles > 10000000u) return false;
+    if (version >= kTriShapeHasTrianglesVersion) {
+        if (c.u8()) {                            // has_triangles
+            c.raw(static_cast<int>(numTriangles * 6u));
+        }
+    } else {
+        c.raw(static_cast<int>(numTriangles * 6u));
+    }
+    if (!c.ok()) return false;
+    if (version < kTriShapeMatchGroupsVersion) return c.ok();
+    const quint32 numMatchGroups = c.u32();
+    if (!c.ok() || numMatchGroups > 10000000u) return false;
+    return skipMatchGroups(c, numMatchGroups);
+}
+
 bool walkNiTriStripsData(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkNiGeometryData(c, version, bsVersion)) return false;
@@ -1471,7 +1518,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiVertexColorProperty", walkNiVertexColorProperty);
         add("NiAlphaProperty", walkNiAlphaProperty);
         add("NiSpecularProperty", walkNiSpecularProperty);
-        add("NiTriShapeData", walkNiGeometryData);
+        add("NiTriShapeData", walkNiTriShapeData);
         add("NiTexturingProperty", walkNiTexturingProperty);
         add("NiSourceTexture", walkNiSourceTexture);
         add("NiSkinInstance", walkNiSkinInstance);
