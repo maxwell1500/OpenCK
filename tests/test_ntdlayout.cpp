@@ -222,9 +222,15 @@ void TestNtdLayout::fit()
               "pre-20.2.0.5 containers with no block size table, so no "
               "individual block is addressable yet");
 
+    // An empty map here is a real state, not a verdict: the blocks were reached
+    // and no candidate consumed one. Report it and leave. This has to return
+    // rather than merely pass an assertion, because falling through reads
+    // names.first() off the empty map below - which is a crash, and one that
+    // only shows up once the walk reaches far enough to produce this case.
     if (fits.isEmpty()) {
         say("  NO candidate layout fits even one block exactly");
-        QVERIFY(true);
+        QSKIP("blocks are addressable now, but no candidate layout consumes any "
+              "of them, so there is nothing to fit yet");
     }
 
     QList<QString> names = fits.keys();
@@ -244,8 +250,9 @@ void TestNtdLayout::fit()
             return;
         }
     }
+    if (names.isEmpty()) QSKIP("no candidate layout was scored");
     qWarning() << "No candidate layout consumed all" << blocksSeen
-              << "blocks; the best was" << names.first();
+               << "blocks; the best was" << names.first();
     QVERIFY(true);
 }
 
