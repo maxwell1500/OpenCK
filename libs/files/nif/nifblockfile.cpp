@@ -77,7 +77,17 @@ public:
 private:
     bool take(int n)
     {
-        if (!mOk || n < 0 || mPos + n > mData.size()) { mOk = false; return false; }
+        // The bounds check is done in 64-bit on purpose. A payload that claims a
+        // huge length - which a misparsed field on a file this code does not yet
+        // understand will happily do - overflows mPos + n, wraps negative, passes
+        // the comparison, and then asks QByteArray::mid for a multi-gigabyte
+        // slice. That aborts the process rather than rejecting the block, so a
+        // wrong layout anywhere turned into a crash instead of a failed walk.
+        if (!mOk || n < 0) { mOk = false; return false; }
+        if (static_cast<qint64>(mPos) + n > static_cast<qint64>(mData.size())) {
+            mOk = false;
+            return false;
+        }
         mPos += n;
         return true;
     }
@@ -1557,6 +1567,91 @@ bool walkNiBlendInterpolator(Cursor& c, quint32 version, quint32, quint32 valueB
     return c.ok();
 }
 
+// The particle-system modifiers. Their base is NiPSysModifier: a name, an order,
+// a particle count and a dead flag - nine bytes after the name.
+//
+// Pinned by four blocks that differ only in name length and their own fields:
+// a 37-byte NiPSysPositionModifier with a 24-character name and no fields of its
+// own, and a 60-byte NiPSysSpawnModifier with a 21-character name and 26 bytes
+// of fields, both leave exactly nine.
+bool walkNiPSysModifier(Cursor& c, quint32 version)
+{
+    if (!skipString(c, version)) return false;    // name
+    c.u32();                                      // order
+    c.u32();                                      // num_particles
+    c.u8();                                       // is_dead
+    return c.ok();
+}
+
+bool walkNiPSysUpdateCtlr(Cursor& c, quint32, quint32)
+{
+    return walkNiTimeController(c);
+}
+
+bool walkNiPSysPositionModifier(Cursor& c, quint32 version, quint32)
+{
+    return walkNiPSysModifier(c, version);
+}
+
+bool walkNiPSysColorModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    return skipRefs(c, 1);                        // data
+}
+
+bool walkNiPSysBoundUpdateModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.u16();                                      // update_skip
+    return c.ok();
+}
+
+bool walkNiPSysSpawnModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.u16();                                      // num_spawn_generations
+    c.f32();                                       // percentage_spawned
+    c.u16();                                       // min_num_to_spawn
+    c.u16();                                       // max_num_to_spawn
+    c.f32();                                       // spawn_speed_variation
+    c.f32();                                       // spawn_dir_variation
+    c.f32();                                       // life_span
+    c.f32();                                       // life_span_variation
+    return c.ok();
+}
+
+bool walkNiPSysGrowFadeModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.f32();                                       // grow_time
+    c.u16();                                       // grow_generation
+    c.f32();                                       // fade_time
+    c.u16();                                       // fade_generation
+    c.f32();                                       // base_scale
+    return c.ok();
+}
+
+bool walkNiPSysRotationModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.f32();                                       // rotation_speed
+    c.f32();                                       // rotation_speed_variation
+    c.raw(16);                                     // unknown_vector (Vector4)
+    c.u8();                                        // unknown_byte
+    c.f32();                                       // rotation_angle
+    c.f32();                                       // rotation_angle_variation
+    c.u8();                                        // random_rot_speed_sign
+    c.u8();                                        // random_axis
+    return c.ok();
+}
+
+bool walkNiPSysAgeDeathModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.u8();                                        // spawn_on_death
+    return skipRefs(c, 1);                         // spawn_modifier
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1614,6 +1709,15 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiBlendBoolInterpolator", [](Cursor& c, quint32 v, quint32 b) {
             return walkNiBlendInterpolator(c, v, b, 1);
         });
+        // Particle system.
+        add("NiPSysUpdateCtlr", walkNiPSysUpdateCtlr);
+        add("NiPSysPositionModifier", walkNiPSysPositionModifier);
+        add("NiPSysColorModifier", walkNiPSysColorModifier);
+        add("NiPSysBoundUpdateModifier", walkNiPSysBoundUpdateModifier);
+        add("NiPSysSpawnModifier", walkNiPSysSpawnModifier);
+        add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
+        add("NiPSysRotationModifier", walkNiPSysRotationModifier);
+        add("NiPSysAgeDeathModifier", walkNiPSysAgeDeathModifier);
         // Extra data.
         add("BSBound", walkBSBound);
         add("BSFurnitureMarker", walkBSFurnitureMarker);
