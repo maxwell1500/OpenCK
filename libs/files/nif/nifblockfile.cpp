@@ -480,19 +480,31 @@ bool walkNiTimeController(Cursor& c)
     return c.ok();
 }
 
+// A keyframe controller is the time-controller prefix and *one* of two refs: the
+// interpolator from 10.1.0.2 on, or the data it used to point at before that.
+// They are mutually exclusive, and reading both puts every one of these blocks
+// four bytes out - which is what a 30-byte NiTransformController in a 10.2.0.0
+// file showed, against the 38 this used to read.
+constexpr quint32 kInterpolatorRefVersion = 167837800u;   // 10.1.0.2
+constexpr quint32 kControllerDataEnd = 167837799u;         // 10.1.0.0
+
 bool walkKeyframeController(Cursor& c, quint32 version, quint32 bsVersion)
 {
-    Q_UNUSED(version)
+    Q_UNUSED(bsVersion)
     if (!walkNiTimeController(c)) return false;
-    c.u32();  // interpolator
-    c.u32();  // data
+    if (version >= kInterpolatorRefVersion) {
+        c.u32();  // interpolator
+    } else if (version <= kControllerDataEnd) {
+        c.u32();  // data
+    }
     return c.ok();
 }
 
 bool walkNiTransformController(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkKeyframeController(c, version, bsVersion)) return false;
-    c.u32();  // unknown_q_q_speed_integer
+    // A one-version field: only 20.1.0.15 carries it.
+    if (version == 335676695u) c.u32();  // unknown_q_q_speed_integer
     return c.ok();
 }
 
@@ -1479,8 +1491,10 @@ constexpr quint32 kInterpControllerDataEnd = 167837799u;   // 10.1.0.0
 bool walkSingleInterpController(Cursor& c, quint32 version, quint32)
 {
     if (!walkNiTimeController(c)) return false;
-    if (!skipRefs(c, 1)) return false;    // interpolator
-    if (version <= kInterpControllerDataEnd) {
+    // Either the interpolator or the data it replaced, never both.
+    if (version >= kInterpolatorRefVersion) {
+        if (!skipRefs(c, 1)) return false;   // interpolator
+    } else if (version <= kInterpControllerDataEnd) {
         if (!skipRefs(c, 1)) return false;   // data
     }
     return c.ok();
@@ -1819,6 +1833,37 @@ bool walkNiSkinPartition(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// The particle emitter controllers. Their base is NiPSysModifierCtlr: the
+// single-interpolator controller prefix plus the name of the modifier they drive.
+//
+// Fixed by three measured blocks: a 48-byte base, a 52-byte float controller that
+// adds a data ref, and a 56-byte NiPSysEmitterCtlr that adds a data ref and a
+// visibility interpolator. 48 = 26 of time controller, a ref, and an 18-byte name.
+constexpr quint32 kPSysModifierCtlrDataEnd = 167837799u;   // 10.1.0.0
+
+bool walkNiPSysModifierCtlr(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiTimeController(c)) return false;
+    if (!skipRefs(c, 1)) return false;          // interpolator
+    if (version <= kPSysModifierCtlrDataEnd) {
+        if (!skipRefs(c, 1)) return false;      // data, older versions only
+    }
+    if (!skipString(c, version)) return false;  // modifier_name
+    return c.ok();
+}
+
+bool walkNiPSysModifierFloatCtlr(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysModifierCtlr(c, version, bs)) return false;
+    return skipRefs(c, 1);                      // data
+}
+
+bool walkNiPSysEmitterCtlr(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysModifierFloatCtlr(c, version, bs)) return false;
+    return skipRefs(c, 1);                      // visibility_interpolator
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -1886,6 +1931,18 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiPSysRotationModifier", walkNiPSysRotationModifier);
         add("NiPSysAgeDeathModifier", walkNiPSysAgeDeathModifier);
         add("NiMorphData", walkNiMorphData);
+        // Particle emitter controllers.
+        add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
+        add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysEmitterDeclinationCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysEmitterDeclinationVarCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysEmitterInitialRadiusCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysEmitterLifeSpanCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysEmitterSpeedCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysGravityStrengthCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysInitialRotAngleCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysInitialRotSpeedCtlr", walkNiPSysModifierFloatCtlr);
+        add("NiPSysInitialRotSpeedVarCtlr", walkNiPSysModifierFloatCtlr);
         add("NiSkinData", walkNiSkinData);
         add("NiSkinPartition", walkNiSkinPartition);
         // Extra data.
