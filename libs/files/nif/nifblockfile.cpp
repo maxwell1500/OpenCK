@@ -379,10 +379,12 @@ bool skipKeyframeGroup(Cursor& c, quint32 valueBytes)
     if (numKeys == 0) return true;              // no interpolation, no keys
     const quint32 interpolation = c.u32();
     if (!c.ok() || interpolation > kKeyTypeMax) return false;
-    // Linear and constant keys carry no tangents; quadratic and TBC do.
-    const bool noTangents = (interpolation == kKeyTypeLinear
-                          || interpolation == kKeyTypeConst);
-    const quint32 keyBytes = 4u + valueBytes + (noTangents ? 0u : valueBytes * 2u);
+    // A quadratic key carries a forward and a backward tangent, each as wide as
+    // the value; a TBC key carries a tension, bias and continuity triple instead,
+    // which is twelve bytes whatever the value is.
+    quint32 keyBytes = 4u + valueBytes;
+    if (interpolation == kKeyTypeQuadratic) keyBytes += valueBytes * 2u;
+    else if (interpolation == kKeyTypeTbc) keyBytes += 12u;
     c.raw(static_cast<int>(static_cast<quint64>(numKeys) * keyBytes));
     return c.ok();
 }
@@ -409,50 +411,35 @@ bool walkColorData(Cursor& c, quint32, quint32) { return skipKeyframeGroup(c, 16
 // three axis groups of nine quadratic float keys, 38 linear translation keys and
 // no scale keys; and 1,936 bytes with no rotation keys, 120 linear translation
 // keys and no scale keys.
-bool walkNiTransformData20(Cursor& c, bool hasRotationType, quint32 rotationType)
-{
-    if (hasRotationType) {
-        if (rotationType != kRotationTypeXyz) {
-            // A quaternion channel rather than per-axis groups. Its keys are a
-            // time and a quaternion, and the tangents it may carry have not been
-            // measured, so decline rather than guess.
-            return false;
-        }
-        for (int axis = 0; axis < 3; ++axis) {
-            if (!skipKeyframeGroup(c, 4)) return false;    // float value
-        }
-    }
-    if (!skipKeyframeGroup(c, 12)) return false;           // translation, Vector3
-    if (!skipKeyframeGroup(c, 4)) return false;            // scale, float
-    return c.ok();
-}
-
 bool walkNiKeyframeData(Cursor& c, quint32 version, quint32)
 {
-    Q_UNUSED(version)
     const quint32 numRotationKeys = c.u32();
     if (!c.ok() || numRotationKeys > 10'000'000u) return false;
     if (numRotationKeys == 0) {
         // No rotation keys, so no rotation type in the file, and nothing to
         // inspect before the translation group.
-        return walkNiTransformData20(c, false, 0);
+        if (!skipKeyframeGroup(c, 12)) return false;   // translations
+        if (!skipKeyframeGroup(c, 4)) return false;    // scales
+        return c.ok();
     }
-    // The rotation type is a byte in the old channel form and a u32 in the 20.x
-    // form, and the 20.x form is identified by that field being 4 - a value the
-    // old form does not use. Reading the byte decides which this is without a
-    // version boundary, which would be wrong anyway: the two forms are told
-    // apart by the rotation type, not by the version.
-    const quint8 rotationTypeByte = c.u8();
+    // The rotation type is a u32 in every version - reading one byte of it
+    // leaves the quaternion form three bytes short. A type of 4 means three
+    // per-axis float groups; anything else is a run of quaternion keys.
+    const quint32 rotationType = c.u32();               // KeyType
     if (!c.ok()) return false;
-    if (rotationTypeByte == kRotationTypeXyz) {
-        c.raw(3);                                          // rest of the u32
-        return walkNiTransformData20(c, true, kRotationTypeXyz);
-    }
-    if (rotationTypeByte > 3) return false;
-    c.f32();                                               // order
-    for (quint32 i = 0; i < numRotationKeys; ++i) {
-        if (i > 0) c.f32();
-        c.raw(16);                                         // quaternion
+    if (rotationType != kRotationTypeXyz) {
+        // A time, the quaternion, and - for the cubic channel alone - a TBC
+        // tangent triple. The time is absent only for the narrow 10.1.0.0 range.
+        int keyBytes = 16;                              // quaternion
+        if (version <= 167837696u || version >= 167837802u) keyBytes += 4;  // time
+        if (rotationType == 3u) keyBytes += 12;         // tbc
+        c.raw(static_cast<int>(static_cast<quint64>(numRotationKeys) * keyBytes));
+        if (!c.ok()) return false;
+    } else {
+        if (version <= 167837696u) c.f32();             // order
+        for (int axis = 0; axis < 3; ++axis) {
+            if (!skipKeyframeGroup(c, 4)) return false; // xyz rotations
+        }
     }
     if (!skipKeyframeGroup(c, 12)) return false;   // translations
     if (!skipKeyframeGroup(c, 4)) return false;    // scales
