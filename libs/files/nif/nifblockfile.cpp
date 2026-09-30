@@ -517,9 +517,11 @@ bool walkNiTransformController(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
-bool walkNiTransformInterpolator(Cursor& c, quint32, quint32)
+bool walkNiTransformInterpolator(Cursor& c, quint32 version, quint32)
 {
     c.raw(32);  // translation + rotation + scale
+    // The quaternion transform carries three validity bytes in the oldest shape.
+    if (version <= 167837805u) c.raw(3);   // trs_valid
     c.u32();    // data
     return c.ok();
 }
