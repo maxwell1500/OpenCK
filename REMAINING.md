@@ -2042,7 +2042,7 @@ sample of this work did.
 round-tripping and being *block-addressable* are different claims: the first means
 a file loads and saves back unchanged, which holds for all 7,962 whether the
 block region was split or kept as one opaque run. The second means the blocks
-were individually located and typed, which is 7,954 of 7,962 — see the walk
+were individually located and typed, which is all 7,962 — see the walk
 frontier below.
 `test_nifroundtriparchive` walks the whole archive (~110 s, on a local drive so it
 is fully reproducible) and asserts that every `Gamebryo` file survives a load and
@@ -2115,15 +2115,14 @@ one). `test_nifroundtriparchive` now measures what that costs, because the
 obvious plan turns out to be the wrong one.
 
 **Current walk frontier (measured 2026-09-30, re-derive with `OPENCK_TEST_NIF_CENSUS`).**
-**Splittable files: 7,954 of 7,962 (99.9%), up from 1.** The round-trip is byte
-exact across all 7,962, which is the constraint that mattered: every layout below
-was confirmed against the reference reader's `io_start`/`io_size` before being
-believed, and a wrong one degrades to the opaque fallback rather than corrupting
-anything.
+**Splittable files: 7,962 of 7,962, up from 1. No file in the archive is opaque.**
+The round-trip is byte exact across all 7,962, which is the constraint that
+mattered: every layout below was confirmed against the reference reader's
+`io_start`/`io_size` before being believed, and a wrong one degrades to the opaque
+fallback rather than corrupting anything.
 
 **All 321 files that carry `NiTransformData` are addressable**, so `test_ntdlayout`
-now runs rather than skipping. The eight files still opaque are all
-`meshes/landscape/lod/*.nif`; see *The last eight files* below.
+now runs rather than skipping.
 
 The count moved only when the *walk* was fixed, not when handlers were added.
 Three bugs were each worth thousands of files, and in every case the census
@@ -2184,7 +2183,7 @@ most frequent types is:
 | top 20 | 4,182 | 2 |
 | top 30 | 6,100 | 5 |
 | top 40 | 6,911 | 5 |
-| all 113 | 7,954 | 321 |
+| all 113 | 7,962 | 321 |
 
 Only **321 of 7,962 files carry `NiTransformData` at all**, and between them they
 contain **102 distinct block types**. So the tempting milestone — "implement the
@@ -2202,23 +2201,35 @@ that the pre-20.2.0.5 container is read-and-save-only for now.
 write it to `OPENCK_TEST_NIF_CENSUS` to read the table, since the log level pins
 `qInfo` to Error and discards it otherwise.
 
-**The last eight files.** The 102–113 walker project is finished; the walker set
-covers every block type the archive declares, so the frontier is now the eight
-`meshes/landscape/lod/*.nif` files, which are one investigation rather than eight:
+**The last eight files: generated, not malformed.** The 102–113 walker project is
+finished and the frontier is closed, but the final eight were worth recording
+because the diagnosis was the opposite of what it looked like. The eight
+`meshes/landscape/lod/*.nif` meshes reported "walk ended leaving N bytes". The
+walk was correct: it stopped exactly where the root table sits, reading one root,
+block zero — where a conforming writer puts it, and where the reference reader
+lands too. The bytes after it belong to no block.
 
-- 20.0.0.5, two blocks each: `NiTriStrips` then `NiTriStripsData`. Both blocks
-  decode exactly per the reference field list, yet 1 KB to 235 KB is left over
-  before the root ref. **The reference reader cannot parse these files either** —
-  it reports "End of file not reached" — so there is no oracle here and the extra
-  data is a shape nifgen does not describe. Not accommodated: guessing a length
-  would be unmeasured, and the walk guard means a wrong guess degrades to opaque
-  rather than corrupting.
+The cause is provenance, not format. These are the distant-terrain LOD quads, and
+they are *generated* rather than exported: tes4ll, which lists a NIF exporter
+among its features, writes them, so a valid NIF is followed by the tool's own
+payload. The block payloads decode exactly per the field list, which is why this
+never looked like a walker problem — and why the reference reader also fails on
+them, with "End of file not reached", for the same reason rather than a different
+one. (Their residual data is not a uniform array either: values in the thousands
+where one file has 88 vertices, no consistent element width across files, so it
+is not a payload the format describes.)
 
-The honest read is that these need a reference reader that understands the
-landscape strip shape, not more walkers. One imperial-city file had the same
-signature and *was* solvable — a 4,096 cap on the strip count with no evidence
-behind it, against a block holding 5,732 strips — which is why it is worth
-re-checking this group once the reference can read it.
+The fix is to read the root table where the walk ends and keep whatever follows
+as trailing bytes, the way the header tail and per-block footers already are.
+
+**Loosening an exact-match check is how a real bug gets masked, so the safety
+argument is the part worth keeping.** Nothing is scanned: the root count is read
+at the position the walk ended, so a walk that is a few bytes out still has to
+find a root count in range there. And a trailing remainder is accepted only when
+at least one root was read — a zero read as a root count satisfies every other
+test, so without that condition a mis-walk would quietly become a pass. The
+archive test asserts byte-identical re-saves for all 7,962 either way, so this
+cannot hide a wrong layout in the output.
 
 **Block-walking framework is in place; one format discrepancy is blocking it.**
 `NifBlockFile` now recovers block boundaries by walking each block's fields the
