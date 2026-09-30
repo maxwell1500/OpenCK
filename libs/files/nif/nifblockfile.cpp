@@ -2132,8 +2132,9 @@ bool walkNiPSysData(Cursor& c, quint32 version, quint32 bsVersion)
     if (hasVertexColors) c.raw(static_cast<int>(numVertices) * 16);
     if (hasVertices) c.raw(static_cast<int>(numVertices) * 8 * (dataFlags & 63u));
     if (version >= 167772416u) c.u16();                  // consistency flags
-    // NiParticlesData: num_particles and particle_radius are both older-version
-    // fields and are absent here.
+    // The additional geometry data ref appears with 20.0.0.4.
+    if (version >= 335544324u) c.u32();                  // additional_data
+    // NiParticlesData.
     const quint8 hasRadii = c.u8();
     if (!c.ok() || hasRadii > 1) return false;
     if (hasRadii) c.raw(static_cast<int>(numVertices) * 4);
@@ -2144,25 +2145,40 @@ bool walkNiPSysData(Cursor& c, quint32 version, quint32 bsVersion)
     if (hasSizes) c.raw(static_cast<int>(numVertices) * 4);
     const quint8 hasRotations = c.u8();
     if (!c.ok() || hasRotations > 1) return false;
-    if (hasRotations) c.raw(static_cast<int>(numActive) * 16);
-    // NiPSysData: one particle_info per vertex, then the rotation speeds and the
-    // added-particle counts.
-    c.raw(static_cast<int>(numVertices) * 40);
+    if (hasRotations) c.raw(static_cast<int>(numVertices) * 16);
+    // The rotation angles and axes also appear with 20.0.0.4.
+    if (version >= 335544324u) {
+        const quint8 hasRotationAngles = c.u8();
+        if (!c.ok() || hasRotationAngles > 1) return false;
+        if (hasRotationAngles) c.raw(static_cast<int>(numVertices) * 4);
+        const quint8 hasRotationAxes = c.u8();
+        if (!c.ok() || hasRotationAxes > 1) return false;
+        if (hasRotationAxes) c.raw(static_cast<int>(numVertices) * 12);
+    }
+    // NiPSysData: one particle info per vertex. The rotation axis is a
+    // 10.0.1.1-and-older field, so the record is 40 bytes there and 28 after.
+    const int particleInfoSize = (version <= 168034305u) ? 40 : 28;
+    c.raw(static_cast<int>(numVertices) * particleInfoSize);
+    if (bsVersion == 155u) c.raw(12);                           // unknown_vector
+    if (version == 335676423u) c.u8();                          // unknown byte
     if (version >= 335544322u) {
-        c.u8();                                           // has_rotation_speeds
-        c.raw(static_cast<int>(numActive) * 4);          // rotation_speeds
+        const quint8 hasRotationSpeeds = c.u8();
+        if (!c.ok() || hasRotationSpeeds > 1) return false;
+        if (hasRotationSpeeds) c.raw(static_cast<int>(numVertices) * 4);
     }
     c.u16();                                              // num_added_particles
     c.u16();                                              // added_particles_base
+    if (version == 335676423u) c.u8();                    // unknown byte
     return c.ok();
 }
 
-// An emitter is a particle modifier - so it starts with the modifier's name -
-// followed by its optical parameters. The colour is a Color4, and the radius,
-// life span and their variations only exist from 10.1.0.5.
+// An emitter is a particle modifier - so it carries the modifier's name, order,
+// target and active flag - followed by its optical parameters. The colour is a
+// Color4; only the radius variation is a 10.1.0.5 field, the life span and its
+// variation are always there.
 bool walkNiPSysEmitter(Cursor& c, quint32 version, quint32)
 {
-    if (!skipString(c, version)) return false;   // name
+    if (!walkNiPSysModifier(c, version)) return false;
     c.f32();    // speed
     c.f32();    // speed_variation
     c.f32();    // declination
@@ -2171,11 +2187,10 @@ bool walkNiPSysEmitter(Cursor& c, quint32 version, quint32)
     c.f32();    // planar_angle_variation
     c.raw(16);  // initial_color
     c.f32();    // initial_radius
-    if (version >= 168034305u) {
-        c.f32();  // radius_variation
-        c.f32();  // life_span
-        c.f32();  // life_span_variation
-    }
+    if (version >= 168034305u) c.f32();  // radius_variation
+    c.f32();    // life_span
+    c.f32();    // life_span_variation
+    if (version == 335676423u) c.raw(8);  // unknown_q_q_speed_floats
     return c.ok();
 }
 
@@ -2210,12 +2225,6 @@ bool walkNiPSysCylinderEmitter(Cursor& c, quint32 version, quint32 bs)
     c.f32();    // radius
     c.f32();    // height
     return c.ok();
-}
-
-// A particle modifier is a bare object carrying only a name.
-bool walkNiPSysModifier(Cursor& c, quint32 version, quint32)
-{
-    return skipString(c, version);
 }
 
 // A boolean modifier controller is the modifier controller plus the byte it
@@ -2307,7 +2316,9 @@ bool walkNiMeshParticleSystem(Cursor& c, quint32 version, quint32 bsVersion)
 bool walkNiPSysMeshEmitter(Cursor& c, quint32 version, quint32 bs)
 {
     if (!walkNiPSysEmitter(c, version, bs)) return false;
-    c.u32();    // num_emitter_meshes
+    const quint32 numEmitterMeshes = c.u32();
+    if (!c.ok() || numEmitterMeshes > 100000u) return false;
+    c.raw(static_cast<int>(numEmitterMeshes) * 4);  // emitter_meshes
     c.u32();    // initial_velocity_type
     c.u32();    // emission_type
     c.raw(12);  // emission_axis
