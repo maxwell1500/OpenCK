@@ -2386,7 +2386,9 @@ bool walkBhkMalleableConstraint(Cursor& c, quint32 version, quint32 bsVersion)
         c.raw(16 * 8 + 12);
         break;
     case 7:                                         // ragdoll
-        if (bsVersion <= kConstraintOldBsVersion) c.raw(16 * 6 + 12);
+        // Six vectors on the old streams, eight on the new; both then carry
+        // cone, plane-min, plane-max, twist-min, twist-max and friction floats.
+        if (bsVersion <= kConstraintOldBsVersion) c.raw(16 * 6 + 24);
         else c.raw(16 * 8 + 24);
         break;
     case 8:                                         // stiff_spring
