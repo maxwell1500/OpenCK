@@ -2148,14 +2148,11 @@ bool walkBhkBlendController(Cursor& c, quint32 version, quint32 bsVersion)
 }
 
 // A transform shape wraps another shape in a 4x4 matrix.
+// bhkTransformShape and bhkConvexTransformShape are the same shape: a ref to the
+// child shape, the material, a radius, eight bytes of padding and the transform.
 bool walkBhkTransformShape(Cursor& c, quint32 version, quint32)
 {
-    if (!skipHavokMaterial(c, version)) return false;
-    if (!skipRefs(c, 1)) return false;   // shape
-    if (!skipHavokMaterial(c, version)) return false;  // material
-    c.f32();                             // radius
-    c.raw(64);                           // transform
-    return c.ok();
+    return walkBhkConvexTransformShape(c, version, 0);
 }
 
 // A path interpolator steers along a curve: flags, banking parameters and the
