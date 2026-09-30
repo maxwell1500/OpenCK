@@ -550,12 +550,18 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     verification:** display-dependent Play confirmation on a skinned animated
     mesh and visual confirmation of the GPU shader.
 
-    **Status 2026-09-13:** Automated tests added.
-    `test_nifanimation` (6/6) covers JSON and XML export→import round-trips
-    for clips/channels/keyframes (translation, rotation, scale) and markers,
-    plus the null-export and missing-file import error paths. The
-    in-viewport 3D playback is scoped in §8 (it is further along than the
-    old note below suggested).
+     **Status 2026-09-13:** Automated tests added.
+     `test_nifanimation` (6/6) covers JSON and XML export→import round-trips
+     for clips/channels/keyframes (translation, rotation, scale) and markers,
+     plus the null-export and missing-file import error paths. The
+     in-viewport 3D playback is scoped in §8 (it is further along than the
+     old note below suggested).
+
+     **Status 2026-09-30:** the blocker on `NifAnimationWriter` is gone. The
+     writer refused to write because the animated meshes it needs could not be
+     block-split; all 321 files carrying `NiTransformData` are now addressable
+     and `test_ntdlayout` fits a layout instead of skipping. Writing still
+     needs an end-to-end keyframe-write test against a real archive file.
 3. **Particle FX.** The NIF particle block parser
     (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
     `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle
@@ -2032,7 +2038,12 @@ archives must skip stubs or it will conclude the wrong thing — as an earlier
 sample of this work did.
 
 **Oblivion NIF support: DONE for reading and lossless saving. 7,962 of 7,962
-`Gamebryo` NIFs in `Oblivion - Meshes.bsa` round-trip byte-exactly.**
+`Gamebryo` NIFs in `Oblivion - Meshes.bsa` round-trip byte-exactly.** Note that
+round-tripping and being *block-addressable* are different claims: the first means
+a file loads and saves back unchanged, which holds for all 7,962 whether the
+block region was split or kept as one opaque run. The second means the blocks
+were individually located and typed, which is 7,952 of 7,962 — see the walk
+frontier below.
 `test_nifroundtriparchive` walks the whole archive (~110 s, on a local drive so it
 is fully reproducible) and asserts that every `Gamebryo` file survives a load and
 a save unchanged.
@@ -2103,12 +2114,17 @@ parses blocks back to back and only consults a size table when the version has
 one). `test_nifroundtriparchive` now measures what that costs, because the
 obvious plan turns out to be the wrong one.
 
-**Current walk frontier (measured 2026-09-28, re-derive with `OPENCK_TEST_NIF_CENSUS`).**
-**Splittable files: 6,161 of 7,962 (77%), up from 1.** The round-trip is byte
+**Current walk frontier (measured 2026-09-30, re-derive with `OPENCK_TEST_NIF_CENSUS`).**
+**Splittable files: 7,952 of 7,962 (99.9%), up from 1.** The round-trip is byte
 exact across all 7,962, which is the constraint that mattered: every layout below
 was confirmed against the reference reader's `io_start`/`io_size` before being
 believed, and a wrong one degrades to the opaque fallback rather than corrupting
 anything.
+
+**All 321 files that carry `NiTransformData` are addressable**, so `test_ntdlayout`
+now runs rather than skipping. The ten files still opaque are eight
+`meshes/landscape/lod/*.nif` plus one imperial-city mesh and one Ayleid emitter
+controller; see *The last ten files* below.
 
 The count moved only when the *walk* was fixed, not when handlers were added.
 Three bugs were each worth thousands of files, and in every case the census
@@ -2146,6 +2162,16 @@ that changes per failing file cannot be aggregated. `tools/nifwalkdump` prints t
 offsets the walk got right before failing, which is what makes the first
 divergence findable rather than guessable.
 
+**Two ways this project loses a layout silently, both worth checking first on any
+new block type.** A duplicate `add()` registration is overwritten by the second
+call with no diagnostic — a `bhkBlendCollisionObject` was registered correctly and
+then again to the plain collision-object walker, so the type looked handled and
+was not. The same happened with a three-argument overload of `walkNiPSysModifier`
+that nothing called and whose comment described the wrong layout. And
+`read %3` in a walk error is *bytes consumed*, not bytes expected, so a failure
+naming a block some way downstream is usually displaced damage: `bhkTransformShape`
+read four bytes too few and the census blamed the `NiNode` after it.
+
 Measured before the frontier is worth re-reading: the archive declares **113
 distinct block types**. A file only becomes addressable if *every* block in it can
 be walked, so coverage is a whole-file property, and the cumulative curve over the
@@ -2159,7 +2185,7 @@ most frequent types is:
 | top 20 | 4,182 | 2 |
 | top 30 | 6,100 | 5 |
 | top 40 | 6,911 | 5 |
-| all 113 | 7,962 | 321 |
+| all 113 | 7,952 | 321 |
 
 Only **321 of 7,962 files carry `NiTransformData` at all**, and between them they
 contain **102 distinct block types**. So the tempting milestone — "implement the
@@ -2176,6 +2202,25 @@ that the pre-20.2.0.5 container is read-and-save-only for now.
 `test_nifroundtriparchive` recomputes the curve and the frontier on every run —
 write it to `OPENCK_TEST_NIF_CENSUS` to read the table, since the log level pins
 `qInfo` to Error and discards it otherwise.
+
+**The last ten files.** The 102–113 walker project is finished; the walker set
+covers every block type the archive declares, so the frontier is now these ten
+files and each is its own investigation rather than a missing layout:
+
+- Eight `meshes/landscape/lod/*.nif` (20.0.0.5, two blocks each: `NiTriStrips`
+  then `NiTriStripsData`). Both blocks decode exactly per the reference field
+  list, yet ~4 KB is left over before the root ref. **The reference reader cannot
+  parse these files either** — it reports "End of file not reached" — so there is
+  no oracle here and the extra data is a shape nifgen does not describe. Not
+  accommodated: guessing a length would be unmeasured, and the walk guard means a
+  wrong guess degrades to opaque rather than corrupting.
+- `meshes/architecture/imperialcity/ictempleoneeg01.nif` — a 1.2 MB
+  `NiTriStripsData` at block 3, same signature as the landscape group.
+- `meshes/dungeons/ayleidruins/interior/arwelkydclusterfx01.nif` — an
+  `NiPSysEmitterCtlr` that stops after 34 bytes.
+
+The honest read is that the last ten need a reference reader that understands
+these two shapes, not more walkers.
 
 **Block-walking framework is in place; one format discrepancy is blocking it.**
 `NifBlockFile` now recovers block boundaries by walking each block's fields the
