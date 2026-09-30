@@ -909,6 +909,20 @@ bool walkBhkCollisionObject(Cursor& c, quint32, quint32)
     return c.ok();
 }
 
+// A blend collision object is the collision object plus the heir and velocity
+// gains, and on the older stream versions two more floats.
+bool walkBhkBlendCollisionObject(Cursor& c, quint32, quint32 bsVersion)
+{
+    if (!walkBhkCollisionObject(c, 0, 0)) return false;
+    c.f32();    // heir_gain
+    c.f32();    // vel_gain
+    if (bsVersion < 9u) {
+        c.f32();  // unknown_float_1
+        c.f32();  // unknown_float_2
+    }
+    return c.ok();
+}
+
 // --- Property and controller blocks ------------------------------------------
 
 // NiMaterialProperty: the NiObjectNET prefix, then the colours. The 20-byte
@@ -2359,9 +2373,9 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkRigidBody", walkBhkRigidBody);
         add("bhkRigidBodyT", walkBhkRigidBody);
         add("bhkCollisionObject", walkBhkCollisionObject);
+        add("bhkBlendCollisionObject", walkBhkBlendCollisionObject);
         add("bhkSPCollisionObject", walkBhkCollisionObject);
         add("bhkPCollisionObject", walkBhkCollisionObject);
-        add("bhkBlendCollisionObject", walkBhkCollisionObject);
         add("bhkNPCollisionObject", walkBhkCollisionObject);
         // Properties and controllers.
         add("NiMaterialProperty", walkNiMaterialProperty);
