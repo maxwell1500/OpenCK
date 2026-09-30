@@ -1572,9 +1572,8 @@ constexpr quint32 kBlendArraySizeVersion = 167837806u;
 bool walkNiBlendInterpolator(Cursor& c, quint32 version, quint32, quint32 valueBytes)
 {
     if (version < kBlendFlagsVersion) {
-        // The pre-10.1.0.3 shape has a different set of fields - a grow-by, a
-        // single-interpolator ref and wider priorities - and has not been
-        // measured, so decline rather than guess.
+        // The pre-10.1.0.3 shape carries an array of InterpBlendItem records
+        // that has not been fully measured, so decline rather than guess.
         return false;
     }
     const quint8 flags = c.u8();
@@ -2228,6 +2227,16 @@ bool walkNiBoolTimelineInterpolator(Cursor& c, quint32, quint32)
     return c.ok();
 }
 
+// A stiff spring constraint is the constraint CInfo plus two pivots and a length.
+bool walkBhkStiffSpringConstraint(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!skipBhkConstraintCInfo(c)) return false;
+    c.raw(16);   // pivot_a
+    c.raw(16);   // pivot_b
+    c.f32();     // length
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2323,6 +2332,8 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiPSysResetOnLoopCtlr", walkNiPSysResetOnLoopCtlr);
         add("NiFlipController", walkNiFlipController);
         add("NiBoolTimelineInterpolator", walkNiBoolTimelineInterpolator);
+        add("bhkHingeConstraint", walkBhkLimitedHingeConstraint);
+        add("bhkStiffSpringConstraint", walkBhkStiffSpringConstraint);
         // Particle emitter controllers.
         add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
         add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
