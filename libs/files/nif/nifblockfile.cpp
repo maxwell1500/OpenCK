@@ -1440,19 +1440,41 @@ bool walkNiSkinInstance(Cursor& c, quint32 version, quint32)
 // and 60) are what pin the middle of the layout down.
 constexpr int kControlledBlockBytes = 33;
 
-bool skipControlledBlock(Cursor& c)
+// A controlled block names the node and controller it drives. The five string
+// slots are inline sized strings up to 20.0.0.5, palette offsets from 10.1.0.5
+// through 20.1.0.3, and fixed strings after that; the node name joins them from
+// 10.1.0.0 through 10.1.0.2. The blend interpolator and its index only exist for
+// 10.1.0.0 through 10.1.0.2.
+bool skipControlledBlock(Cursor& c, quint32 version, quint32 bsVersion)
 {
-    if (!skipRefs(c, 1)) return false;   // interpolator
-    if (!skipRefs(c, 1)) return false;   // controller
-    c.u32();                             // string palette ref
-    c.u8();                              // a one-byte field between them
-    c.u16();                             // node_name_offset
-    c.u16();                             //
-    c.u32();                             // property_type_offset (-1 when unset)
-    c.u16();                             // controller_type_offset
-    c.u16();                             //
-    c.u32();                             // controller_id_offset (-1 when unset)
-    c.u32();                             // interpolator_id_offset
+    if (version <= 167837799u) {
+        if (!skipString(c, version)) return false;              // target_name
+    }
+    if (version >= 167837802u) {
+        if (!skipRefs(c, 1)) return false;                      // interpolator
+    }
+    if (version <= 335872000u) {
+        if (!skipRefs(c, 1)) return false;                      // controller
+    }
+    if (version >= 167837800u && version <= 167837806u) {
+        if (!skipRefs(c, 1)) return false;                      // blend_interpolator
+        c.u16();                                                // blend_index
+    }
+    if (version >= 167837802u && bsVersion > 0u) c.u8();        // priority
+    if (version >= 167837800u && version <= 167837809u) {
+        for (int i = 0; i < 5; ++i) {
+            if (!skipString(c, version)) return false;          // the five strings
+        }
+    }
+    if (version >= 167903232u && version <= 335609856u) {
+        if (!skipRefs(c, 1)) return false;                      // string_palette
+        c.raw(20);                                              // five string offsets
+    }
+    if (version >= 335609857u) {
+        for (int i = 0; i < 5; ++i) {
+            if (!skipString(c, version)) return false;          // the five strings
+        }
+    }
     return c.ok();
 }
 
@@ -1469,14 +1491,14 @@ constexpr quint32 kSequencePhaseEnd = 168034305u;          // 10.3.0.1
 constexpr quint32 kSequencePaletteFirst = 167837809u;
 constexpr quint32 kSequencePaletteLast = 335609856u;       // 20.1.0.3
 
-bool walkNiControllerSequence(Cursor& c, quint32 version, quint32)
+bool walkNiControllerSequence(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!skipString(c, version)) return false;                  // name
     const quint32 numControlled = c.u32();
     if (!c.ok() || numControlled > 10000u) return false;
     c.u32();                                                   // array_grow_by
     for (quint32 i = 0; i < numControlled; ++i) {
-        if (!skipControlledBlock(c)) return false;
+        if (!skipControlledBlock(c, version, bsVersion)) return false;
     }
     if (version < kSequencePlaybackVersion) return c.ok();
     c.f32();                                                    // weight
@@ -1486,10 +1508,20 @@ bool walkNiControllerSequence(Cursor& c, quint32 version, quint32)
     if (version <= kSequencePhaseEnd) c.f32();                  // phase
     c.f32();                                                    // start_time
     c.f32();                                                    // stop_time
+    if (version == 167837802u) c.u8();                          // play_backwards
     if (!skipRefs(c, 1)) return false;                          // manager
     if (!skipString(c, version)) return false;                  // accum_root_name
+    if (version >= 335740936u) c.u32();                         // accum_flags
     if (version >= kSequencePaletteFirst && version <= kSequencePaletteLast) {
         if (!skipRefs(c, 1)) return false;                      // string_palette
+    }
+    if (version >= 335675399u && bsVersion >= 24u && bsVersion <= 28u) {
+        if (!skipRefs(c, 1)) return false;                      // anim_notes
+    }
+    if (version >= 335675399u && bsVersion > 28u) {
+        const quint32 numAnimNoteArrays = c.u16();
+        if (!c.ok() || numAnimNoteArrays > 10000u) return false;
+        if (!skipRefs(c, numAnimNoteArrays)) return false;      // anim_note_arrays
     }
     return c.ok();
 }
