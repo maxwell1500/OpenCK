@@ -1189,13 +1189,23 @@ bool walkBhkPrismaticConstraint(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
-// The shape phantoms differ only in the type name: eight unused bytes and a
-// 4x4 transform. They need no references of their own, so the matrix is the
-// whole payload.
+// The shape phantoms differ only in the type name: the world-object header, eight
+// unused bytes and a 4x4 transform. They need no references of their own, so the
+// matrix is the whole payload.
+//
+// The world-object header is twenty-eight bytes: a shape ref, an unknown int, the
+// Havok filter and the world-object info. The reference gates the last three behind
+// an older version, but they are present in 20.0.0.4 files - a 100-byte phantom
+// against the 72 this used to read is what showed it.
 bool walkBhkSimpleShapePhantom(Cursor& c, quint32, quint32)
 {
-    c.raw(8);      // unused_01
-    c.raw(64);     // transform (Matrix44)
+    c.u32();    // shape
+    c.u32();    // unknown_int
+    c.u32();    // havok_filter
+    c.u32();    // broad_phase_type
+    c.raw(12);  // property: data, size, capacity_and_flags
+    c.raw(8);   // unused_01
+    c.raw(64);  // transform (Matrix44)
     return c.ok();
 }
 
