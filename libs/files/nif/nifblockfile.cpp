@@ -1553,6 +1553,8 @@ constexpr quint32 kInterpControllerDataEnd = 167837799u;   // 10.1.0.0
 bool walkSingleInterpController(Cursor& c, quint32 version, quint32)
 {
     if (!walkNiTimeController(c)) return false;
+    // NiInterpController's manager-controlled flag, for a few 10.1.0.0 versions.
+    if (version >= 167837800u && version <= 167837804u) c.u8();
     // Either the interpolator or the data it replaced, never both.
     if (version >= kInterpolatorRefVersion) {
         if (!skipRefs(c, 1)) return false;   // interpolator
@@ -1586,6 +1588,8 @@ constexpr quint32 kGeomMorpherUnknownFirst = 167903232u;  // 10.2.0.0
 bool walkNiGeomMorpherController(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkNiTimeController(c)) return false;
+    // NiInterpController's manager-controlled flag, for a few 10.1.0.0 versions.
+    if (version >= 167837800u && version <= 167837804u) c.u8();
     if (version >= kGeomMorpherFlagsVersion) c.u16();     // morpher_flags
     if (!skipRefs(c, 1)) return false;                    // data
     if (version >= 67108866u) c.u8();                     // always_update
