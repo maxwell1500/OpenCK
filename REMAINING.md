@@ -2042,7 +2042,7 @@ sample of this work did.
 round-tripping and being *block-addressable* are different claims: the first means
 a file loads and saves back unchanged, which holds for all 7,962 whether the
 block region was split or kept as one opaque run. The second means the blocks
-were individually located and typed, which is 7,952 of 7,962 — see the walk
+were individually located and typed, which is 7,954 of 7,962 — see the walk
 frontier below.
 `test_nifroundtriparchive` walks the whole archive (~110 s, on a local drive so it
 is fully reproducible) and asserts that every `Gamebryo` file survives a load and
@@ -2115,16 +2115,15 @@ one). `test_nifroundtriparchive` now measures what that costs, because the
 obvious plan turns out to be the wrong one.
 
 **Current walk frontier (measured 2026-09-30, re-derive with `OPENCK_TEST_NIF_CENSUS`).**
-**Splittable files: 7,952 of 7,962 (99.9%), up from 1.** The round-trip is byte
+**Splittable files: 7,954 of 7,962 (99.9%), up from 1.** The round-trip is byte
 exact across all 7,962, which is the constraint that mattered: every layout below
 was confirmed against the reference reader's `io_start`/`io_size` before being
 believed, and a wrong one degrades to the opaque fallback rather than corrupting
 anything.
 
 **All 321 files that carry `NiTransformData` are addressable**, so `test_ntdlayout`
-now runs rather than skipping. The ten files still opaque are eight
-`meshes/landscape/lod/*.nif` plus one imperial-city mesh and one Ayleid emitter
-controller; see *The last ten files* below.
+now runs rather than skipping. The eight files still opaque are all
+`meshes/landscape/lod/*.nif`; see *The last eight files* below.
 
 The count moved only when the *walk* was fixed, not when handlers were added.
 Three bugs were each worth thousands of files, and in every case the census
@@ -2185,7 +2184,7 @@ most frequent types is:
 | top 20 | 4,182 | 2 |
 | top 30 | 6,100 | 5 |
 | top 40 | 6,911 | 5 |
-| all 113 | 7,952 | 321 |
+| all 113 | 7,954 | 321 |
 
 Only **321 of 7,962 files carry `NiTransformData` at all**, and between them they
 contain **102 distinct block types**. So the tempting milestone — "implement the
@@ -2203,24 +2202,23 @@ that the pre-20.2.0.5 container is read-and-save-only for now.
 write it to `OPENCK_TEST_NIF_CENSUS` to read the table, since the log level pins
 `qInfo` to Error and discards it otherwise.
 
-**The last ten files.** The 102–113 walker project is finished; the walker set
-covers every block type the archive declares, so the frontier is now these ten
-files and each is its own investigation rather than a missing layout:
+**The last eight files.** The 102–113 walker project is finished; the walker set
+covers every block type the archive declares, so the frontier is now the eight
+`meshes/landscape/lod/*.nif` files, which are one investigation rather than eight:
 
-- Eight `meshes/landscape/lod/*.nif` (20.0.0.5, two blocks each: `NiTriStrips`
-  then `NiTriStripsData`). Both blocks decode exactly per the reference field
-  list, yet ~4 KB is left over before the root ref. **The reference reader cannot
-  parse these files either** — it reports "End of file not reached" — so there is
-  no oracle here and the extra data is a shape nifgen does not describe. Not
-  accommodated: guessing a length would be unmeasured, and the walk guard means a
-  wrong guess degrades to opaque rather than corrupting.
-- `meshes/architecture/imperialcity/ictempleoneeg01.nif` — a 1.2 MB
-  `NiTriStripsData` at block 3, same signature as the landscape group.
-- `meshes/dungeons/ayleidruins/interior/arwelkydclusterfx01.nif` — an
-  `NiPSysEmitterCtlr` that stops after 34 bytes.
+- 20.0.0.5, two blocks each: `NiTriStrips` then `NiTriStripsData`. Both blocks
+  decode exactly per the reference field list, yet 1 KB to 235 KB is left over
+  before the root ref. **The reference reader cannot parse these files either** —
+  it reports "End of file not reached" — so there is no oracle here and the extra
+  data is a shape nifgen does not describe. Not accommodated: guessing a length
+  would be unmeasured, and the walk guard means a wrong guess degrades to opaque
+  rather than corrupting.
 
-The honest read is that the last ten need a reference reader that understands
-these two shapes, not more walkers.
+The honest read is that these need a reference reader that understands the
+landscape strip shape, not more walkers. One imperial-city file had the same
+signature and *was* solvable — a 4,096 cap on the strip count with no evidence
+behind it, against a block holding 5,732 strips — which is why it is worth
+re-checking this group once the reference can read it.
 
 **Block-walking framework is in place; one format discrepancy is blocking it.**
 `NifBlockFile` now recovers block boundaries by walking each block's fields the
