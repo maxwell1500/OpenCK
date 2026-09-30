@@ -2133,6 +2133,101 @@ bool walkNiPSysData(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// An emitter is a particle modifier - so it starts with the modifier's name -
+// followed by its optical parameters. The colour is a Color4, and the radius,
+// life span and their variations only exist from 10.1.0.5.
+bool walkNiPSysEmitter(Cursor& c, quint32 version, quint32)
+{
+    if (!skipString(c, version)) return false;   // name
+    c.f32();    // speed
+    c.f32();    // speed_variation
+    c.f32();    // declination
+    c.f32();    // declination_variation
+    c.f32();    // planar_angle
+    c.f32();    // planar_angle_variation
+    c.raw(16);  // initial_color
+    c.f32();    // initial_radius
+    if (version >= 168034305u) {
+        c.f32();  // radius_variation
+        c.f32();  // life_span
+        c.f32();  // life_span_variation
+    }
+    return c.ok();
+}
+
+// A volume emitter adds the object it emits from.
+bool walkNiPSysVolumeEmitter(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysEmitter(c, version, bs)) return false;
+    if (version >= 167837696u) c.u32();   // emitter_object
+    return c.ok();
+}
+
+// The volume emitters are the volume emitter plus their own dimensions.
+bool walkNiPSysBoxEmitter(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysVolumeEmitter(c, version, bs)) return false;
+    c.f32();    // width
+    c.f32();    // height
+    c.f32();    // depth
+    return c.ok();
+}
+
+bool walkNiPSysSphereEmitter(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysVolumeEmitter(c, version, bs)) return false;
+    c.f32();    // radius
+    return c.ok();
+}
+
+bool walkNiPSysCylinderEmitter(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysVolumeEmitter(c, version, bs)) return false;
+    c.f32();    // radius
+    c.f32();    // height
+    return c.ok();
+}
+
+// A particle modifier is a bare object carrying only a name.
+bool walkNiPSysModifier(Cursor& c, quint32 version, quint32)
+{
+    return skipString(c, version);
+}
+
+// A boolean modifier controller is the modifier controller plus the byte it
+// interpolates, and on the older versions a data ref.
+bool walkNiPSysModifierActiveCtlr(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysModifierCtlr(c, version, bs)) return false;
+    c.u8();    // bool_value
+    if (version <= kPSysModifierCtlrDataEnd) {
+        if (!skipRefs(c, 1)) return false;   // data
+    }
+    return c.ok();
+}
+
+// A reset-on-loop controller is the time-controller prefix and nothing else.
+bool walkNiPSysResetOnLoopCtlr(Cursor& c, quint32, quint32)
+{
+    return walkNiTimeController(c);
+}
+
+// A flip controller is a float single-interpolator controller plus a texture
+// slot; the accumulation time, delta and source count are older-version fields.
+bool walkNiFlipController(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkSingleInterpController(c, version, bs)) return false;
+    c.u32();    // texture_slot
+    return c.ok();
+}
+
+// A boolean timeline interpolator is the boolean interpolator prefix and a byte.
+bool walkNiBoolTimelineInterpolator(Cursor& c, quint32, quint32)
+{
+    c.u8();    // bool_value
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2221,6 +2316,13 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkTransformShape", walkBhkTransformShape);
         // Interpolators.
         add("NiPathInterpolator", walkNiPathInterpolator);
+        add("NiPSysBoxEmitter", walkNiPSysBoxEmitter);
+        add("NiPSysSphereEmitter", walkNiPSysSphereEmitter);
+        add("NiPSysCylinderEmitter", walkNiPSysCylinderEmitter);
+        add("NiPSysModifierActiveCtlr", walkNiPSysModifierActiveCtlr);
+        add("NiPSysResetOnLoopCtlr", walkNiPSysResetOnLoopCtlr);
+        add("NiFlipController", walkNiFlipController);
+        add("NiBoolTimelineInterpolator", walkNiBoolTimelineInterpolator);
         // Particle emitter controllers.
         add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
         add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
