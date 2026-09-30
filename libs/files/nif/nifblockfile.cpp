@@ -498,6 +498,9 @@ bool walkKeyframeController(Cursor& c, quint32 version, quint32 bsVersion)
 {
     Q_UNUSED(bsVersion)
     if (!walkNiTimeController(c)) return false;
+    // NiInterpController carries a manager-controlled flag for a few versions
+    // between the data ref and the interpolator ref.
+    if (version >= 167837800u && version <= 167837804u) c.u8();   // manager_controlled
     if (version >= kInterpolatorRefVersion) {
         c.u32();  // interpolator
     } else if (version <= kControllerDataEnd) {
@@ -1592,27 +1595,67 @@ bool walkNiGeomMorpherController(Cursor& c, quint32 version, quint32 bsVersion)
 constexpr quint32 kBlendFlagsVersion = 167837808u;   // 10.1.0.3
 constexpr quint32 kBlendArraySizeVersion = 167837806u;
 
-bool walkNiBlendInterpolator(Cursor& c, quint32 version, quint32, quint32 valueBytes)
+// A blend interpolator changes shape three times. Up to 10.0.1.5 the array size
+// is a ushort with a grow-by, the items carry an int priority and the trailing
+// scalars are ushorts and ints; 10.0.1.6 and .7 narrow those; 10.1.0.0 on drops
+// the grow-by for a flags byte and folds the item array behind a
+// single-interpolator flag. The derived type appends the blended value, but only
+// the quaternion transform gates that on the version, so it disappears with
+// 10.1.0.0 along with the array shape.
+bool walkNiBlendInterpolator(Cursor& c, quint32 version, quint32, int modernValue,
+                             int oldValue)
 {
-    if (version < kBlendFlagsVersion) {
-        // The pre-10.1.0.3 shape carries an array of InterpBlendItem records
-        // that has not been fully measured, so decline rather than guess.
-        return false;
+    const int valueLen = (version <= 167837805u) ? oldValue : modernValue;
+    if (version >= 167837808u) {
+        const quint8 flags = c.u8();
+        const quint8 arraySize = c.u8();
+        c.f32();                                  // weight_threshold
+        if ((flags & 1u) == 0) {
+            c.u8();    // interp_count
+            c.u8();    // single_index
+            c.u8();    // high_priority
+            c.u8();    // next_high_priority
+            c.f32();   // single_time
+            c.f32();   // high_weights_sum
+            c.f32();   // next_high_weights_sum
+            c.f32();   // high_ease_spinner
+            c.raw(static_cast<int>(arraySize) * 17);   // interp_array_items
+        }
+        if (valueLen > 0) c.raw(valueLen);
+        return c.ok();
     }
-    const quint8 flags = c.u8();
-    c.u8();                                     // array_size
-    c.f32();                                    // weight_threshold
-    if ((flags & 1u) == 0) {
-        c.u8();     // interp_count
-        c.u8();     // single_index
-        c.u8();     // high_priority
-        c.u8();     // next_high_priority
-        c.f32();    // single_time
-        c.f32();    // high_weights_sum
-        c.f32();    // next_high_weights_sum
-        c.f32();    // high_ease_spinner
+    quint32 arraySize = 0;
+    if (version <= 167837805u) {
+        arraySize = c.u16();                      // array_size
+        c.u16();                                  // array_grow_by
+    } else {
+        arraySize = c.u8();                       // array_size
     }
-    if (valueBytes > 0) c.raw(static_cast<int>(valueBytes));
+    if (!c.ok() || arraySize > 100000u) return false;
+    const int itemBytes = (version <= 167837805u) ? 20 : 17;
+    c.raw(static_cast<int>(arraySize) * itemBytes);   // interp_array_items
+    c.u8();                                       // manager_controlled
+    c.f32();                                      // weight_threshold
+    c.u8();                                       // only_use_highest_weight
+    if (version <= 167837805u) {
+        c.u16();  // interp_count
+        c.u16();  // single_index
+    } else {
+        c.u8();   // interp_count
+        c.u8();   // single_index
+    }
+    if (version >= 167837804u) {
+        c.u32();  // single_interpolator
+        c.f32();  // single_time
+    }
+    if (version <= 167837805u) {
+        c.u32();  // high_priority (int)
+        c.u32();  // next_high_priority
+    } else {
+        c.u8();   // high_priority (sbyte)
+        c.u8();   // next_high_priority
+    }
+    if (valueLen > 0) c.raw(valueLen);
     return c.ok();
 }
 
@@ -2474,16 +2517,16 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiMaterialColorController", walkNiMaterialColorController);
         add("NiGeomMorpherController", walkNiGeomMorpherController);
         add("NiBlendTransformInterpolator", [](Cursor& c, quint32 v, quint32 b) {
-            return walkNiBlendInterpolator(c, v, b, 0);
+            return walkNiBlendInterpolator(c, v, b, 0, 35);
         });
         add("NiBlendFloatInterpolator", [](Cursor& c, quint32 v, quint32 b) {
-            return walkNiBlendInterpolator(c, v, b, 4);
+            return walkNiBlendInterpolator(c, v, b, 4, 4);
         });
         add("NiBlendPoint3Interpolator", [](Cursor& c, quint32 v, quint32 b) {
-            return walkNiBlendInterpolator(c, v, b, 12);
+            return walkNiBlendInterpolator(c, v, b, 12, 12);
         });
         add("NiBlendBoolInterpolator", [](Cursor& c, quint32 v, quint32 b) {
-            return walkNiBlendInterpolator(c, v, b, 1);
+            return walkNiBlendInterpolator(c, v, b, 1, 1);
         });
         // Particle system.
         add("NiPSysUpdateCtlr", walkNiPSysUpdateCtlr);
