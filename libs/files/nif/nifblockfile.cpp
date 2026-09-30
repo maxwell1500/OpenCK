@@ -1677,7 +1677,8 @@ bool walkNiPSysGrowFadeModifier(Cursor& c, quint32 version, quint32)
     c.u16();                                       // grow_generation
     c.f32();                                       // fade_time
     c.u16();                                       // fade_generation
-    c.f32();                                       // base_scale
+    // The base scale is a 20.2.0.4 field, not part of the older versions.
+    if (version >= 335675399u) c.f32();           // base_scale
     return c.ok();
 }
 
@@ -2349,6 +2350,32 @@ bool walkNiPSysGravityModifier(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// A mesh particle data is the particle data plus the pool size, fill flag,
+// generation count and mesh ref, all from 10.1.0.0 on.
+bool walkNiMeshPSysData(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiPSysData(c, version, bsVersion)) return false;
+    if (version >= 167903232u) {
+        c.u32();    // default_pool_size
+        c.u8();     // fill_pools_on_load
+        c.u32();    // num_generations
+        c.u32();    // particle_meshes
+    }
+    return c.ok();
+}
+
+// A drag modifier is the particle modifier's name plus the drag parameters.
+bool walkNiPSysDragModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.u32();    // drag_object
+    c.raw(12);  // drag_axis
+    c.f32();    // percentage
+    c.f32();    // range
+    c.f32();    // range_falloff
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2452,6 +2479,9 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkMultiSphereShape", walkBhkMultiSphereShape);
         add("NiDitherProperty", walkNiDitherProperty);
         add("NiPSysGravityModifier", walkNiPSysGravityModifier);
+        add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
+        add("NiMeshPSysData", walkNiMeshPSysData);
+        add("NiPSysDragModifier", walkNiPSysDragModifier);
         // Particle emitter controllers.
         add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
         add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
