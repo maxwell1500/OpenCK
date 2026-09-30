@@ -1157,6 +1157,18 @@ bool skipBhkConstraintCInfo(Cursor& c)
 // and omitting them on the older branch leaves the block twelve bytes short.
 // That is what a 156-byte prismatic constraint in a 20.0.0.4 file showed, against
 // the 144 this used to read.
+// A hinge constraint is the constraint CInfo plus the hinge vectors. The oldest
+// shape has five of them and the newest eight; the streams in between carry
+// nothing extra, so they are declined rather than guessed.
+bool walkBhkHingeConstraint(Cursor& c, quint32 version, quint32)
+{
+    if (!skipBhkConstraintCInfo(c)) return false;
+    if (version <= 335544325u) c.raw(16 * 5);
+    else if (version >= 335675399u) c.raw(16 * 8);
+    else return false;
+    return c.ok();
+}
+
 bool walkBhkLimitedHingeConstraint(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!skipBhkConstraintCInfo(c)) return false;
@@ -2649,7 +2661,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiPSysResetOnLoopCtlr", walkNiPSysResetOnLoopCtlr);
         add("NiFlipController", walkNiFlipController);
         add("NiBoolTimelineInterpolator", walkNiBoolTimelineInterpolator);
-        add("bhkHingeConstraint", walkBhkLimitedHingeConstraint);
+        add("bhkHingeConstraint", walkBhkHingeConstraint);
         add("bhkStiffSpringConstraint", walkBhkStiffSpringConstraint);
         add("bhkMalleableConstraint", walkBhkMalleableConstraint);
         add("NiMeshParticleSystem", walkNiMeshParticleSystem);
