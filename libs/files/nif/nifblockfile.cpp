@@ -1984,12 +1984,12 @@ bool walkNiBSBoneLODController(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
-// A visibility controller is a boolean single-interpolator controller: the
-// interpolator ref, then the byte it interpolates.
+// A visibility controller is a single-interpolator controller and nothing more:
+// the boolean interpolator controller adds no field of its own, so the byte that
+// was being read here put the block one byte long and shifted everything after.
 bool walkNiVisController(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkSingleInterpController(c, version, bsVersion)) return false;
-    c.u8();  // bool_value
     if (version <= kControllerDataEnd) {
         if (!skipRefs(c, 1)) return false;  // data
     }
