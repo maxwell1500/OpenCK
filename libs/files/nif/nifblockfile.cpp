@@ -2297,12 +2297,11 @@ bool walkNiPSysCylinderEmitter(Cursor& c, quint32 version, quint32 bs)
     return c.ok();
 }
 
-// A boolean modifier controller is the modifier controller plus the byte it
-// interpolates, and on the older versions a data ref.
+// A boolean modifier controller is the modifier controller plus a boolean data
+// ref, and only on the old streams.
 bool walkNiPSysModifierActiveCtlr(Cursor& c, quint32 version, quint32 bs)
 {
     if (!walkNiPSysModifierCtlr(c, version, bs)) return false;
-    c.u8();    // bool_value
     if (version <= kPSysModifierCtlrDataEnd) {
         if (!skipRefs(c, 1)) return false;   // data
     }
@@ -2333,11 +2332,10 @@ bool walkNiFlipController(Cursor& c, quint32 version, quint32 bs)
     return c.ok();
 }
 
-// A boolean timeline interpolator is the boolean interpolator prefix and a byte.
-bool walkNiBoolTimelineInterpolator(Cursor& c, quint32, quint32)
+// A boolean timeline interpolator is the boolean interpolator with nothing added.
+bool walkNiBoolTimelineInterpolator(Cursor& c, quint32 version, quint32 bs)
 {
-    c.u8();    // bool_value
-    return c.ok();
+    return walkNiBoolInterpolator(c, version, bs);
 }
 
 // A stiff spring constraint is the constraint CInfo plus two pivots and a length.
