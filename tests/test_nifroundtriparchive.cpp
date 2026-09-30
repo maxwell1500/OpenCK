@@ -37,6 +37,13 @@ class TestNifRoundTripArchive : public QObject
 private:
     static QString archivePath()
     {
+        // The default archive is the one the layouts were fitted against.
+        // OPENCK_TEST_NIF_ARCHIVE points the same assertions at another mesh
+        // archive, which is how a corpus the walkers have never seen gets
+        // checked rather than assumed.
+        const QByteArray override = qgetenv("OPENCK_TEST_NIF_ARCHIVE");
+        if (!override.isEmpty())
+            return QString::fromLocal8Bit(override);
         return QStringLiteral(
             "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/"
             "Oblivion GOTY English/Data/Oblivion - Meshes.bsa");

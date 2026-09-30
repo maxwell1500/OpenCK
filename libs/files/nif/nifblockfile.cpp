@@ -2577,6 +2577,69 @@ bool walkNiPSysBombModifier(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// hkPackedNiTriStripsData: the Havok collision copy of a strip mesh, on nearly
+// every physics-enabled mesh. A TriangleData is the three vertex indices, the
+// welding bitfield, and - up to 20.0.0.5 - a face normal. A sub-part is a
+// filter, a vertex count and a material.
+//
+// This shape is absent from Oblivion's base mesh archive, which is why 7,962 of
+// 7,962 there says nothing about it.
+bool walkHkPackedNiTriStripsData(Cursor& c, quint32 version, quint32)
+{
+    const quint32 numTriangles = c.u32();
+    if (!c.ok() || numTriangles > 10000000u) return false;
+    const int triangleBytes = (version <= 335544325u) ? 20 : 8;
+    c.raw(static_cast<int>(numTriangles) * triangleBytes);   // triangles
+    const quint32 numVertices = c.u32();
+    if (!c.ok() || numVertices > 10000000u) return false;
+    quint8 compressed = 0;
+    if (version >= 335675399u) compressed = c.u8();           // compressed
+    if (!c.ok() || compressed > 1) return false;
+    c.raw(static_cast<int>(numVertices) * (compressed ? 6 : 12));  // vertices
+    if (version >= 335675399u) {
+        const quint32 numSubShapes = c.u16();
+        if (!c.ok() || numSubShapes > 10000u) return false;
+        for (quint32 i = 0; i < numSubShapes; ++i) {
+            if (!skipHavokFilter(c)) return false;            // filter
+            c.u32();                                         // num_vertices
+            if (!skipHavokMaterial(c, version)) return false; // material
+        }
+    }
+    return c.ok();
+}
+
+// A wind modifier is a particle modifier with a strength float.
+bool walkBSWindModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.f32();    // strength
+    return c.ok();
+}
+
+// bhkPackedNiTriStripsShape: the shape that wraps a packed strip mesh, with the
+// bounding sphere it claims, twice over, and the ref to the data. Absent from
+// Oblivion's base mesh archive, so it is on nearly every physics mesh in the DLC.
+bool walkBhkPackedNiTriStripsShape(Cursor& c, quint32 version, quint32)
+{
+    if (version <= 335544325u) {
+        const quint32 numSubShapes = c.u16();
+        if (!c.ok() || numSubShapes > 10000u) return false;
+        for (quint32 i = 0; i < numSubShapes; ++i) {
+            if (!skipHavokFilter(c)) return false;            // filter
+            c.u32();                                         // num_vertices
+            if (!skipHavokMaterial(c, version)) return false; // material
+        }
+    }
+    c.u32();    // user_data
+    c.raw(4);   // unused_01
+    c.f32();    // radius
+    c.raw(4);   // unused_02
+    c.raw(16);  // scale, Vector4
+    c.f32();    // radius_copy
+    c.raw(16);  // scale_copy, Vector4
+    return skipRefs(c, 1);    // data
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2686,6 +2749,9 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("BSPSysArrayEmitter", walkBSPSysArrayEmitter);
         add("NiPSysBombModifier", walkNiPSysBombModifier);
         add("NiPSysMeshUpdateModifier", walkNiPSysMeshUpdateModifier);
+        add("hkPackedNiTriStripsData", walkHkPackedNiTriStripsData);
+        add("bhkPackedNiTriStripsShape", walkBhkPackedNiTriStripsShape);
+        add("BSWindModifier", walkBSWindModifier);
         add("NiPSysPlanarCollider", walkNiPSysPlanarCollider);
         add("NiPSysSphericalCollider", walkNiPSysSphericalCollider);
         add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
