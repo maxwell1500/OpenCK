@@ -618,7 +618,9 @@ bool walkNiTriStripsData(Cursor& c, quint32 version, quint32 bsVersion)
     if (!walkNiGeometryData(c, version, bsVersion)) return false;
     const quint16 numTriangles = c.u16();
     const quint16 numStrips = c.u16();
-    if (!c.ok() || numStrips > 4096u) return false;
+    // A single imperial-city strip mesh has 5,732 strips, so the bound has to be
+    // generous; the point array it implies is what actually bounds the block.
+    if (!c.ok() || numStrips > 100000u) return false;
     QVector<quint16> stripLengths;
     stripLengths.reserve(numStrips);
     for (quint16 i = 0; i < numStrips; ++i) stripLengths.append(c.u16());
