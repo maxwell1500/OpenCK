@@ -2321,6 +2321,15 @@ bool walkNiFlipController(Cursor& c, quint32 version, quint32 bs)
 {
     if (!walkSingleInterpController(c, version, bs)) return false;
     c.u32();    // texture_slot
+    if (version >= 50528269u && version <= 167837799u) c.f32();  // accum_time
+    if (version <= 167837799u) c.f32();                          // delta
+    const quint32 numSources = c.u32();
+    if (!c.ok() || numSources > 100000u) return false;
+    if (version >= 50528269u) {
+        if (!skipRefs(c, numSources)) return false;              // sources
+    } else if (version <= 50397184u) {
+        if (!skipRefs(c, numSources)) return false;              // images
+    }
     return c.ok();
 }
 
