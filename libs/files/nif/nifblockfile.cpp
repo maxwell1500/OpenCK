@@ -2271,6 +2271,60 @@ bool walkBhkMalleableConstraint(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// A mesh particle system is the particle system and nothing more.
+bool walkNiMeshParticleSystem(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    return walkNiParticleSystem(c, version, bsVersion);
+}
+
+// A mesh emitter is the emitter plus a mesh count, two emission enums and an
+// axis.
+bool walkNiPSysMeshEmitter(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysEmitter(c, version, bs)) return false;
+    c.u32();    // num_emitter_meshes
+    c.u32();    // initial_velocity_type
+    c.u32();    // emission_type
+    c.raw(12);  // emission_axis
+    return c.ok();
+}
+
+// A multi-sphere shape is the sphere-rep base, a world-object property, a sphere
+// count and that many center-and-radius records.
+bool walkBhkMultiSphereShape(Cursor& c, quint32 version, quint32)
+{
+    if (!skipHavokMaterial(c, version)) return false;
+    c.raw(12);                                    // shape_property
+    const quint32 numSpheres = c.u32();
+    if (!c.ok() || numSpheres > 100000u) return false;
+    c.raw(static_cast<int>(numSpheres) * 16);    // centre and radius per sphere
+    return c.ok();
+}
+
+// A dither property is the property base and a two-byte flags word.
+bool walkNiDitherProperty(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiProperty(c, version, 0)) return false;
+    c.u16();    // flags
+    return c.ok();
+}
+
+// A gravity modifier is the particle modifier's name plus the gravity parameters.
+// The world-aligned flag is a newer-stream addition.
+bool walkNiPSysGravityModifier(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.u32();    // gravity_object
+    c.raw(12);  // gravity_axis
+    c.f32();    // decay
+    c.f32();    // strength
+    c.u32();    // force_type
+    c.f32();    // turbulence
+    c.f32();    // turbulence_scale
+    if (bsVersion > kConstraintOldBsVersion) c.u8();  // world_aligned
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2369,6 +2423,11 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkHingeConstraint", walkBhkLimitedHingeConstraint);
         add("bhkStiffSpringConstraint", walkBhkStiffSpringConstraint);
         add("bhkMalleableConstraint", walkBhkMalleableConstraint);
+        add("NiMeshParticleSystem", walkNiMeshParticleSystem);
+        add("NiPSysMeshEmitter", walkNiPSysMeshEmitter);
+        add("bhkMultiSphereShape", walkBhkMultiSphereShape);
+        add("NiDitherProperty", walkNiDitherProperty);
+        add("NiPSysGravityModifier", walkNiPSysGravityModifier);
         // Particle emitter controllers.
         add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
         add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
