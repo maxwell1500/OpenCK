@@ -2510,6 +2510,50 @@ bool walkNiPSysSphericalCollider(Cursor& c, quint32 version, quint32 bs)
     return c.ok();
 }
 
+// A camera is the AV object plus its projection frustum and viewport, the frustum
+// flags and the orthographic byte, all of which arrive with 10.1.0.0.
+bool walkNiCamera(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!walkNiAVObject(c, version, bsVersion)) return false;
+    if (version >= 167837696u) c.u16();   // camera_flags
+    c.raw(24);                            // the six frustum planes
+    if (version >= 167837696u) c.u8();    // use_orthographic_projection
+    c.raw(16);                            // the four viewport edges
+    c.f32();                              // lod_adjust
+    if (!skipRefs(c, 1)) return false;    // scene
+    c.u32();                              // num_screen_polygons
+    if (version >= 67240192u) c.u32();    // num_screen_textures
+    return c.ok();
+}
+
+// A parent-velocity modifier is a particle modifier with a damping float.
+bool walkBSParentVelocityModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.f32();    // damping
+    return c.ok();
+}
+
+// An array emitter is the volume emitter with nothing added.
+bool walkBSPSysArrayEmitter(Cursor& c, quint32 version, quint32 bs)
+{
+    return walkNiPSysVolumeEmitter(c, version, bs);
+}
+
+// A bomb modifier is a particle modifier with the node it follows, an axis, the
+// decay and delta-v pair and the decay and symmetry enums.
+bool walkNiPSysBombModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    c.u32();    // bomb_object
+    c.raw(12);  // bomb_axis
+    c.f32();    // decay
+    c.f32();    // delta_v
+    c.u32();    // decay_type
+    c.u32();    // symmetry_type
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2614,6 +2658,10 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiDitherProperty", walkNiDitherProperty);
         add("NiPSysGravityModifier", walkNiPSysGravityModifier);
         add("NiPSysColliderManager", walkNiPSysColliderManager);
+        add("NiCamera", walkNiCamera);
+        add("BSParentVelocityModifier", walkBSParentVelocityModifier);
+        add("BSPSysArrayEmitter", walkBSPSysArrayEmitter);
+        add("NiPSysBombModifier", walkNiPSysBombModifier);
         add("NiPSysPlanarCollider", walkNiPSysPlanarCollider);
         add("NiPSysSphericalCollider", walkNiPSysSphericalCollider);
         add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
