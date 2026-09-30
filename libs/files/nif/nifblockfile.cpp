@@ -1962,13 +1962,11 @@ bool walkNiSkinPartition(Cursor& c, quint32 version, quint32)
 // visibility interpolator. 48 = 26 of time controller, a ref, and an 18-byte name.
 constexpr quint32 kPSysModifierCtlrDataEnd = 167837799u;   // 10.1.0.0
 
-bool walkNiPSysModifierCtlr(Cursor& c, quint32 version, quint32)
+bool walkNiPSysModifierCtlr(Cursor& c, quint32 version, quint32 bs)
 {
-    if (!walkNiTimeController(c)) return false;
-    if (!skipRefs(c, 1)) return false;          // interpolator
-    if (version <= kPSysModifierCtlrDataEnd) {
-        if (!skipRefs(c, 1)) return false;      // data, older versions only
-    }
+    // The single-interpolator prefix carries the manager-controlled flag and
+    // either an interpolator or the data ref it replaced, never both.
+    if (!walkSingleInterpController(c, version, bs)) return false;
     if (!skipString(c, version)) return false;  // modifier_name
     return c.ok();
 }
