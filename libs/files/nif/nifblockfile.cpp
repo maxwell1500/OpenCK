@@ -2077,6 +2077,62 @@ bool walkNiTextureTransformController(Cursor& c, quint32 version, quint32 bsVers
     return c.ok();
 }
 
+// A particle system's data. Its geometry-data prefix carries no additional-data
+// ref - the ref the other geometry blocks have is absent here, which is easy to
+// miss because the two are otherwise identical. The particle arrays that follow
+// are sized by the vertex count, not by the active count, so a system with no
+// active particles still carries a full set of per-vertex entries.
+bool walkNiPSysData(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    Q_UNUSED(bsVersion);
+    if (version >= 167837810u) c.u32();                  // group_id
+    const quint32 numVertices = c.u16();
+    if (!c.ok() || numVertices > 1000000u) return false;
+    if (version >= 167837696u) { c.u8(); c.u8(); }        // keep/compress flags
+    const quint8 hasVertices = c.u8();
+    if (!c.ok() || hasVertices > 1) return false;
+    if (hasVertices) c.raw(static_cast<int>(numVertices) * 12);
+    quint16 dataFlags = 0;
+    if (version >= 167772416u) dataFlags = c.u16();
+    if (!c.ok()) return false;
+    const quint8 hasNormals = c.u8();
+    if (!c.ok() || hasNormals > 1) return false;
+    if (hasNormals) c.raw(static_cast<int>(numVertices) * 12);
+    if (version >= 167837696u && hasNormals && (dataFlags & 4096u) != 0) {
+        c.raw(static_cast<int>(numVertices) * 12);
+        c.raw(static_cast<int>(numVertices) * 12);
+    }
+    c.raw(16);                                            // bounding sphere
+    const quint8 hasVertexColors = c.u8();
+    if (!c.ok() || hasVertexColors > 1) return false;
+    if (hasVertexColors) c.raw(static_cast<int>(numVertices) * 16);
+    if (hasVertices) c.raw(static_cast<int>(numVertices) * 8 * (dataFlags & 63u));
+    if (version >= 167772416u) c.u16();                  // consistency flags
+    // NiParticlesData: num_particles and particle_radius are both older-version
+    // fields and are absent here.
+    const quint8 hasRadii = c.u8();
+    if (!c.ok() || hasRadii > 1) return false;
+    if (hasRadii) c.raw(static_cast<int>(numVertices) * 4);
+    const quint32 numActive = c.u16();
+    if (!c.ok() || numActive > 1000000u) return false;
+    const quint8 hasSizes = c.u8();
+    if (!c.ok() || hasSizes > 1) return false;
+    if (hasSizes) c.raw(static_cast<int>(numVertices) * 4);
+    const quint8 hasRotations = c.u8();
+    if (!c.ok() || hasRotations > 1) return false;
+    if (hasRotations) c.raw(static_cast<int>(numActive) * 16);
+    // NiPSysData: one particle_info per vertex, then the rotation speeds and the
+    // added-particle counts.
+    c.raw(static_cast<int>(numVertices) * 40);
+    if (version >= 335544322u) {
+        c.u8();                                           // has_rotation_speeds
+        c.raw(static_cast<int>(numActive) * 4);          // rotation_speeds
+    }
+    c.u16();                                              // num_added_particles
+    c.u16();                                              // added_particles_base
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2156,6 +2212,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiGeometry", walkNiTriBasedGeom);
         add("NiParticles", walkNiTriBasedGeom);
         add("NiParticleSystem", walkNiParticleSystem);
+        add("NiPSysData", walkNiPSysData);
         // Properties.
         add("NiFogProperty", walkNiFogProperty);
         add("NiWireframeProperty", walkNiWireframeProperty);
