@@ -1682,17 +1682,20 @@ bool walkNiPSysGrowFadeModifier(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
-bool walkNiPSysRotationModifier(Cursor& c, quint32 version, quint32)
+bool walkNiPSysRotationModifier(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkNiPSysModifier(c, version)) return false;
     c.f32();                                       // rotation_speed
-    c.f32();                                       // rotation_speed_variation
-    c.raw(16);                                     // unknown_vector (Vector4)
-    c.u8();                                        // unknown_byte
-    c.f32();                                       // rotation_angle
-    c.f32();                                       // rotation_angle_variation
-    c.u8();                                        // random_rot_speed_sign
+    if (version >= 335544322u) c.f32();            // rotation_speed_variation
+    // The unknown vector and byte are Starfield-format fields.
+    if (bsVersion == 155u) { c.raw(16); c.u8(); }  // unknown_vector, unknown_byte
+    if (version >= 335544322u) {
+        c.f32();                                   // rotation_angle
+        c.f32();                                   // rotation_angle_variation
+        c.u8();                                    // random_rot_speed_sign
+    }
     c.u8();                                        // random_axis
+    c.raw(12);                                     // axis
     return c.ok();
 }
 
@@ -2387,6 +2390,14 @@ bool walkNiPSysDragModifier(Cursor& c, quint32 version, quint32)
     return c.ok();
 }
 
+// A collider manager is a particle modifier carrying the head of its collider
+// chain.
+bool walkNiPSysColliderManager(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    return skipRefs(c, 1);    // collider
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2490,6 +2501,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("bhkMultiSphereShape", walkBhkMultiSphereShape);
         add("NiDitherProperty", walkNiDitherProperty);
         add("NiPSysGravityModifier", walkNiPSysGravityModifier);
+        add("NiPSysColliderManager", walkNiPSysColliderManager);
         add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
         add("NiMeshPSysData", walkNiMeshPSysData);
         add("NiPSysDragModifier", walkNiPSysDragModifier);
