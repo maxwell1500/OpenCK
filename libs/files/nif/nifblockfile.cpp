@@ -2456,16 +2456,19 @@ bool walkNiPSysGravityModifier(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
-// A mesh particle data is the particle data plus the pool size, fill flag,
-// generation count and mesh ref, all from 10.1.0.0 on.
+// A mesh particle data is the particle data plus the pool size, the fill flag,
+// a generation count with that many entries, and the mesh ref, all from
+// 10.1.0.5 on.
 bool walkNiMeshPSysData(Cursor& c, quint32 version, quint32 bsVersion)
 {
     if (!walkNiPSysData(c, version, bsVersion)) return false;
     if (version >= 167903232u) {
-        c.u32();    // default_pool_size
-        c.u8();     // fill_pools_on_load
-        c.u32();    // num_generations
-        c.u32();    // particle_meshes
+        c.u32();                                    // default_pool_size
+        c.u8();                                     // fill_pools_on_load
+        const quint32 numGenerations = c.u32();
+        if (!c.ok() || numGenerations > 1000000u) return false;
+        c.raw(static_cast<int>(numGenerations) * 4); // generations
+        c.u32();                                    // particle_meshes
     }
     return c.ok();
 }
@@ -2519,6 +2522,15 @@ bool walkNiPSysSphericalCollider(Cursor& c, quint32 version, quint32 bs)
     if (!walkNiPSysCollider(c, version, bs)) return false;
     c.f32();    // radius
     return c.ok();
+}
+
+// A mesh-update modifier is a particle modifier with a mesh count and refs.
+bool walkNiPSysMeshUpdateModifier(Cursor& c, quint32 version, quint32)
+{
+    if (!walkNiPSysModifier(c, version)) return false;
+    const quint32 numMeshes = c.u32();
+    if (!c.ok() || numMeshes > 100000u) return false;
+    return skipRefs(c, numMeshes);   // meshes
 }
 
 // A camera is the AV object plus its projection frustum and viewport, the frustum
@@ -2673,6 +2685,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("BSParentVelocityModifier", walkBSParentVelocityModifier);
         add("BSPSysArrayEmitter", walkBSPSysArrayEmitter);
         add("NiPSysBombModifier", walkNiPSysBombModifier);
+        add("NiPSysMeshUpdateModifier", walkNiPSysMeshUpdateModifier);
         add("NiPSysPlanarCollider", walkNiPSysPlanarCollider);
         add("NiPSysSphericalCollider", walkNiPSysSphericalCollider);
         add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
