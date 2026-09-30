@@ -3029,9 +3029,9 @@ bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString
         mWalkedTypes.append(type);
     }
 
-    // The region must end with the root table and nothing else. Requiring an
-    // exact match is what makes the walk trustworthy: a layout that is subtly
-    // wrong lands in the wrong place and is rejected here, not accepted.
+    // The walk must land exactly on the root table. Requiring that is what makes
+    // the walk trustworthy: a layout that is subtly wrong lands in the wrong
+    // place and is rejected here, not accepted.
     const int footerStart = c.pos();
     const quint32 numRoots = c.u32();
     if (!c.ok() || numRoots > numBlocks) {
@@ -3039,12 +3039,22 @@ bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString
                     .arg(numRoots);
         return false;
     }
-    // num_roots has just been consumed, so exactly one u32 per root is left.
+    // num_roots has just been consumed, so one u32 per root must follow it.
     const qint64 rootBytes = 4 * static_cast<qint64>(numRoots);
-    if (raw.size() - c.pos() != rootBytes) {
+    const qint64 afterRefs = raw.size() - c.pos();
+    // Eight landscape LOD meshes carry a complete NIF followed by data appended
+    // by the third-party tool that generates them (tes4ll, which lists a NIF
+    // exporter among its features). The root table is still read here, at the
+    // position the walk ended, and everything after it is kept verbatim.
+    //
+    // That only stays safe because nothing is scanned: a walk that is a few bytes
+    // out still has to find a root count in range here. A trailing remainder is
+    // accepted only with at least one root, because a zero read as a root count
+    // satisfies every other test and would quietly turn a mis-walk into a pass.
+    if (afterRefs < rootBytes || (afterRefs > rootBytes && numRoots == 0)) {
         error = QStringLiteral("walk ended at %1 leaving %2 byte(s), expected %3 "
                                "root ref(s)")
-                    .arg(c.pos()).arg(raw.size() - c.pos()).arg(numRoots);
+                    .arg(c.pos()).arg(afterRefs).arg(numRoots);
         return false;
     }
     for (quint32 r = 0; r < numRoots; ++r) {
