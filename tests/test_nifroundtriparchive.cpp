@@ -442,9 +442,14 @@ private slots:
             qInfo().noquote() << "failure:" << it.key() << it.value()
                               << "first:" << firstFailure.value(it.key());
 
-        QVERIFY2(gamebryo > 1000,
-            qPrintable(QStringLiteral("only %1 Gamebryo NIFs in the archive")
-                           .arg(gamebryo)));
+        // Guard against silently testing nothing: an archive that opens but
+        // yields no Gamebryo NIFs would otherwise pass every other assertion
+        // while covering nothing. The bar is deliberately low, because the
+        // point of OPENCK_TEST_NIF_ARCHIVE is to point this at smaller archives
+        // than the base one, where a base-archive-sized floor would be wrong.
+        QVERIFY2(gamebryo > 0,
+            qPrintable(QStringLiteral("no Gamebryo NIFs in %1")
+                           .arg(QFileInfo(path).fileName())));
 
         // Every Gamebryo file in the archive must survive a load and save
         // byte for byte. Anything else is a real fidelity failure.
