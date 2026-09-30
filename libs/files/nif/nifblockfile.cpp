@@ -2237,6 +2237,40 @@ bool walkBhkStiffSpringConstraint(Cursor& c, quint32 version, quint32 bsVersion)
     return c.ok();
 }
 
+// A malleable constraint wraps one of the other constraint types. It carries the
+// base CInfo, a type selector, a second CInfo, the wrapped type's own CInfo, and
+// through 20.0.0.5 a tau and damping.
+bool walkBhkMalleableConstraint(Cursor& c, quint32 version, quint32 bsVersion)
+{
+    if (!skipBhkConstraintCInfo(c)) return false;   // BhkConstraint base
+    const quint32 type = c.u32();                   // type
+    if (!skipBhkConstraintCInfo(c)) return false;   // constraint_info
+    switch (type) {
+    case 0:                                         // ball_and_socket
+        c.raw(32);
+        break;
+    case 1:                                         // hinge
+    case 2:                                         // limited_hinge
+        if (bsVersion <= kConstraintOldBsVersion) c.raw(16 * 7);
+        else c.raw(16 * 8 + 12);
+        break;
+    case 6:                                         // prismatic
+        c.raw(16 * 8 + 12);
+        break;
+    case 7:                                         // ragdoll
+        if (bsVersion <= kConstraintOldBsVersion) c.raw(16 * 6 + 12);
+        else c.raw(16 * 8 + 24);
+        break;
+    case 8:                                         // stiff_spring
+        c.raw(36);
+        break;
+    default:
+        return false;
+    }
+    if (version <= 335544325u) { c.f32(); c.f32(); }  // tau, damping
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2334,6 +2368,7 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiBoolTimelineInterpolator", walkNiBoolTimelineInterpolator);
         add("bhkHingeConstraint", walkBhkLimitedHingeConstraint);
         add("bhkStiffSpringConstraint", walkBhkStiffSpringConstraint);
+        add("bhkMalleableConstraint", walkBhkMalleableConstraint);
         // Particle emitter controllers.
         add("NiPSysEmitterCtlr", walkNiPSysEmitterCtlr);
         add("NiPSysModifierFloatCtlr", walkNiPSysModifierFloatCtlr);
