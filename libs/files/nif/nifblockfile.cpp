@@ -2354,9 +2354,14 @@ bool walkBhkMalleableConstraint(Cursor& c, quint32 version, quint32 bsVersion)
         c.raw(32);
         break;
     case 1:                                         // hinge
+        if (version <= 335544325u) c.raw(16 * 5);
+        else if (version >= 335675399u) c.raw(16 * 8);
+        break;
     case 2:                                         // limited_hinge
-        if (bsVersion <= kConstraintOldBsVersion) c.raw(16 * 7);
-        else c.raw(16 * 8 + 12);
+        c.raw(bsVersion <= kConstraintOldBsVersion ? 16 * 7 : 16 * 8);
+        c.raw(12);                                  // min_angle, max_angle, max_friction
+        // The motor that follows on the newer streams has not been measured.
+        if (version >= 335675399u && bsVersion > kConstraintOldBsVersion) return false;
         break;
     case 6:                                         // prismatic
         c.raw(16 * 8 + 12);
@@ -2371,7 +2376,9 @@ bool walkBhkMalleableConstraint(Cursor& c, quint32 version, quint32 bsVersion)
     default:
         return false;
     }
-    if (version <= 335544325u) { c.f32(); c.f32(); }  // tau, damping
+    if (version <= 335544325u) c.f32();               // tau
+    c.f32();                                          // damping
+    if (version >= 335675399u) c.f32();               // strength
     return c.ok();
 }
 
