@@ -1345,19 +1345,18 @@ bool walkNiTexturingProperty(Cursor& c, quint32 version, quint32)
     if (!c.ok() || count > 32u) return false;
 
     // Each of these reads a flag and, when it is set, the TexDesc behind it.
-    const auto slot = [&c, version](quint32 index, bool bumpExtras) {
-        if (!c.u8()) return true;                 // flag clear: nothing to read
-        if (bumpExtras) {
-            if (!skipTexDesc(c, version)) return false;
-            c.f32();                              // bump_map_luma_scale
-            c.f32();                              // bump_map_luma_offset
-            c.raw(16);                            // bump_map_matrix
-        }
-        return skipTexDesc(c, version);
-    };
-
+    // The bump map adds a luma scale, a luma offset and a 2x2 matrix, and from
+    // 20.1.0.0 the parallax slot adds its offset.
     for (quint32 i = 0; i < count; ++i) {
-        if (!slot(i, i == 5)) return false;
+        if (!c.u8()) continue;                 // flag clear: nothing to read
+        if (!skipTexDesc(c, version)) return false;
+        if (i == 5) {
+            c.f32();                           // bump_map_luma_scale
+            c.f32();                           // bump_map_luma_offset
+            c.raw(16);                         // bump_map_matrix
+        } else if (version >= 335675397u && i == 7) {
+            c.f32();                           // parallax_offset
+        }
     }
     if (version >= 167772416u) {
         const quint32 numShaderTextures = c.u32();
@@ -2398,6 +2397,37 @@ bool walkNiPSysColliderManager(Cursor& c, quint32 version, quint32)
     return skipRefs(c, 1);    // collider
 }
 
+// A particle collider is the bounce and spawn flags, the spawn modifier, its
+// parent manager, the next collider in the chain and the collider object.
+bool walkNiPSysCollider(Cursor& c, quint32, quint32)
+{
+    c.f32();    // bounce
+    c.u8();     // spawn_on_collide
+    c.u8();     // die_on_collide
+    if (!skipRefs(c, 1)) return false;   // spawn_modifier
+    c.u32();    // parent
+    if (!skipRefs(c, 1)) return false;   // next_collider
+    c.u32();    // collider_object
+    return c.ok();
+}
+
+bool walkNiPSysPlanarCollider(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysCollider(c, version, bs)) return false;
+    c.f32();    // width
+    c.f32();    // height
+    c.raw(12);  // x_axis
+    c.raw(12);  // y_axis
+    return c.ok();
+}
+
+bool walkNiPSysSphericalCollider(Cursor& c, quint32 version, quint32 bs)
+{
+    if (!walkNiPSysCollider(c, version, bs)) return false;
+    c.f32();    // radius
+    return c.ok();
+}
+
 const QHash<QString, BlockWalker>& blockWalkers()
 {
     // Built imperatively rather than from an initializer list: the values are
@@ -2502,6 +2532,8 @@ const QHash<QString, BlockWalker>& blockWalkers()
         add("NiDitherProperty", walkNiDitherProperty);
         add("NiPSysGravityModifier", walkNiPSysGravityModifier);
         add("NiPSysColliderManager", walkNiPSysColliderManager);
+        add("NiPSysPlanarCollider", walkNiPSysPlanarCollider);
+        add("NiPSysSphericalCollider", walkNiPSysSphericalCollider);
         add("NiPSysGrowFadeModifier", walkNiPSysGrowFadeModifier);
         add("NiMeshPSysData", walkNiMeshPSysData);
         add("NiPSysDragModifier", walkNiPSysDragModifier);
