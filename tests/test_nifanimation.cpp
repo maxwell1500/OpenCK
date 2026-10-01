@@ -421,6 +421,7 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
     int hasTransformData = 0;
     int hasSequence = 0;
     QStringList dataTypeSamples;
+    QStringList linkSamples;
 
     for (int i = 0; i < archive->fileCount() && target.isEmpty(); ++i) {
         const BsaFileEntry& entry = archive->entries()[i];
@@ -475,6 +476,58 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
             ++hasSequence;
 
         QHash<quint32, QString> clips = file.clipNamesByController();
+
+        // Diagnose the two links separately on the first few files that have a
+        // controller. The writer needs node -> controller and clip -> controller
+        // to agree on the same block index; if they do not, nothing resolves
+        // and the two halves look fine in isolation. Recording how many nodes
+        // report a controller ref, and what the clip map actually holds, says
+        // which half is wrong instead of only that the join failed.
+        if (linkSamples.size() < 4) {
+            // Raw leading bytes of the first node block. Whether the name is a
+            // string-table index or an inline fixed-width string decides the
+            // whole fix, and the bytes settle it faster than reasoning about
+            // the header version does.
+            QString nodeHex;
+            QString nodeType;
+            for (int block = 0; block < file.count(); ++block) {
+                if (!NifBlockFile::isNodeBlockType(file.declaredBlockType(block))) continue;
+                nodeType = file.declaredBlockType(block);
+                const QByteArray d = file.block(block).data;
+                for (int i = 0; i < qMin(48, d.size()); ++i)
+                    nodeHex += QStringLiteral("%1 ").arg(quint8(d.at(i)), 2, 16, QChar('0'));
+                break;
+            }
+            int nodesSeen = 0, nodesWithName = 0, refsHittingController = 0;
+            QStringList refsSeen;
+            for (int block = 0; block < file.count(); ++block) {
+                QString name;
+                quint32 ref = 0xFFFFFFFFu;
+                if (!file.nodeNetInfo(block, name, ref)) continue;
+                ++nodesSeen;
+                if (name.isEmpty()) continue;
+                ++nodesWithName;
+                if (ref == 0xFFFFFFFFu) continue;
+                if (refsSeen.size() < 4) refsSeen << QStringLiteral("%1").arg(ref);
+                if (controllers.contains(ref)) ++refsHittingController;
+            }
+            QStringList clipPairs;
+            for (auto it = clips.begin(); it != clips.end() && clipPairs.size() < 4; ++it)
+                clipPairs << QStringLiteral("%1=%2").arg(it.key()).arg(it.value());
+            linkSamples << QStringLiteral("ctrl=%1 seq=%2 nodes=%3 named=%4 refHits=%5 "
+                                          "nodeRefs=[%6] clips=%7 clipKeys=[%8] nodeType=%9 "
+                                          "nodeHex=[%10]")
+                                  .arg(controllers.size())
+                                  .arg(file.findBlocks(QStringLiteral("NiControllerSequence")).size())
+                                  .arg(nodesSeen).arg(nodesWithName)
+                                  .arg(refsHittingController)
+                                  .arg(refsSeen.join(QStringLiteral(",")))
+                                  .arg(clips.size())
+                                  .arg(clipPairs.join(QStringLiteral(",")))
+                                  .arg(nodeType)
+                                  .arg(nodeHex);
+        }
+
         int chosenBlock = -1;
         quint32 chosenController = 0;
         for (int block = 0; block < file.count(); ++block) {
@@ -558,6 +611,8 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
                     marker.write(("SAMPLES " + dataTypeSamples.join(QStringLiteral(" | "))
                                   + QStringLiteral("\n")).toUtf8());
                 }
+                for (const QString& line : linkSamples)
+                    marker.write(("LINKS " + line + QStringLiteral("\n")).toUtf8());
             } else {
                 marker.write(QStringLiteral("EDITED\t%1\t%2\tkf=%3\tconsidered=%4\t"
                                             "splitRejected=%5\tnoController=%6\tnoClip=%7\t"

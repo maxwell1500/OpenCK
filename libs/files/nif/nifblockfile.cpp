@@ -3434,8 +3434,28 @@ bool NifBlockFile::nodeNetInfo(int index, QString& nameOut, quint32& controllerR
     if (!isNodeBlockType(mBlocks.at(index).type)) return false;
     const QByteArray& data = mBlocks.at(index).data;
     Cursor c(data);
-    const quint32 nameIndex = c.u32();
-    if (!c.ok() || nameIndex >= static_cast<quint32>(mStrings.size())) return false;
+    // The name is an index into the string table from 20.1.0.1 on, and inline
+    // before that. Reading an index in a container with no string table always
+    // fails, and reading a length in one that has a table always succeeds and
+    // yields nonsense, so the two forms have to be told apart by the version
+    // rather than by trying both: this is why a 20.0.0.4 mesh reported no nodes
+    // at all even though the nodes are there, plainly named, in the bytes.
+    //
+    // Verified against a shipped Oblivion NiNode:
+    //   1b 00 00 00 "CastleIntNarrowSecretDoor02" 02 00 00 00 ...
+    // where 0x1b is the name length, not a table index.
+    QString name;
+    if (mVersion >= kStringTableVersion) {
+        const quint32 nameIndex = c.u32();
+        if (!c.ok() || nameIndex >= static_cast<quint32>(mStrings.size())) return false;
+        name = mStrings.at(static_cast<int>(nameIndex));
+    } else {
+        const quint32 length = c.u32();
+        if (!c.ok() || length > 1024u || length > static_cast<quint32>(c.remaining()))
+            return false;
+        name = QString::fromLatin1(c.raw(static_cast<int>(length)));
+        if (!c.ok()) return false;
+    }
     const quint32 numExtra = c.u32();
     if (!c.ok() || numExtra > 100000u) return false;
     for (quint32 i = 0; i < numExtra; ++i) {
@@ -3445,7 +3465,7 @@ bool NifBlockFile::nodeNetInfo(int index, QString& nameOut, quint32& controllerR
     }
     const quint32 controller = c.u32();
     if (!c.ok()) return false;
-    nameOut = mStrings.at(static_cast<int>(nameIndex));
+    nameOut = name;
     controllerRefOut = controller;
     return true;
 }
@@ -3521,5 +3541,12 @@ bool NifBlockFile::decodeControllerSequence(const QByteArray& data,
         if (!c.ok()) return false;
         out.append(qMakePair(controllerRef, name));
     }
-    return c.atEnd();
+    // Trailing bytes here are the sequence's own playback parameters (weight,
+    // cycle type, frequency, start/stop time, manager, accumulated-root name),
+    // which every game generation appends after the entry list. They are not
+    // part of what this decodes, and requiring the block to end at the last
+    // entry meant this returned false for every real file - including the
+    // 20.2.0.7 ones it was written for - so clipNamesByController() could never
+    // return anything at all. Stop cleanly at the end of the list instead.
+    return true;
 }

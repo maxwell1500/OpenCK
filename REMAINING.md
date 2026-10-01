@@ -592,36 +592,69 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
-### The actual remaining blocker: no real file resolves to a named clip
+### The node -> controller link is fixed; the clip link needs a version-aware parser
 
-With the test on the writer's own reader, the chain the writer performs -
-node -> controller -> clip -> keyframe data - completes **zero** times across
-the base archive. Measured 2026-09-30 against `Oblivion - Meshes.bsa`, all
-8,032 `.nif` entries:
+`nodeNetInfo` read the block name as a `u32` index into the string table:
 
-| | count |
-|---|---|
-| `.nif` entries in archive | 8,032 |
-| not Gamebryo (skipped) | 70 |
-| **Gamebryo, block-split by `NifBlockFile`** | **7,962 (100%)** |
-| of those, no keyframe controller block | 7,798 |
-| of those, have a controller but no node matching name+clip | 164 |
-| **resolve node -> controller -> clip -> data** | **0** |
-| files carrying keyframe data (`NiTransformData`/`NiKeyframeData`) | 90 |
-| files carrying an `NiControllerSequence` | 100 |
+```cpp
+const quint32 nameIndex = c.u32();
+if (!c.ok() || nameIndex >= static_cast<quint32>(mStrings.size())) return false;
+```
 
-So the pieces exist - 164 files have controllers, 90 have keyframe data, 100
-have a sequence carrying clip names - but no file joins them. `NifBlockFile`
-splits every file without a single failure, so this is not a block-boundary
-problem. The break is in the association, and the next step is to find which
-link fails first: whether `nodeNetInfo` fails to report the controller ref of
-an animated node in a 1.5 file, or whether the refs in `NiControllerSequence`
-do not match the indices `findBlocks` returns.
+A `20.0.0.4` container has **no string table** - it arrived in `20.1.0.1` - so
+`mStrings` is empty and this returned false for *every* node in *every*
+pre-20.2.0.5 file. Before 20.1.0.1 the name is a length-prefixed inline
+string. Verified against a shipped Oblivion `NiNode`:
 
-Note the earlier "321 files carry `NiTransformData`" figure counted files where
-the data block is *present and split*, which is not the same as files where the
-data block is *reachable from a node by a named clip*. The 90/100 figures above
-are the second, stricter question, and 0 is the answer.
+```
+1b 00 00 00  "CastleIntNarrowSecretDoor02"  02 00 00 00 01 00 00 00 02 00 00 00
+^^ 0x1b = 27, the name length - not a table index
+```
+
+**Fixed.** `nodeNetInfo` now branches on the header version. Effect, measured
+over the base archive: nodes reported went from **0 to 91** per file, and
+**84 of 91** resolve to a real keyframe controller.
+
+`decodeControllerSequence` was wrong in a second, independent way, and is
+**still open**. It began by reading offset 0 as the entry count:
+
+```cpp
+const quint32 numSequences = c.u32();
+```
+
+Offset 0 of a real `NiControllerSequence` is its **name**. The actual
+`20.0.0.4` layout, from nifgen, is:
+
+```
+NiSequence:  name (inline string)
+             num_controlled_blocks (u32)
+             array_grow_by (u32)                  [version >= 167837802]
+             controlled_blocks[num_controlled_blocks]:
+                 interpolator          (ref, 4)
+                 controller            (ref, 4)
+                 priority              (u8, 1)    [bs_version > 0]
+                 string_palette        (ref, 4)    [<= 335609856]
+                 node_name_offset          (StringOffset)
+                 property_type_offset      (StringOffset)
+                 controller_type_offset    (StringOffset)
+                 controller_id_offset      (StringOffset)
+                 interpolator_id_offset    (StringOffset)
+NiControllerSequence adds:
+             weight (f32), text_keys (ref), cycle_type (u32), frequency (f32)
+             start_time (f32), stop_time (f32), manager (ref)
+             accum_root_name (inline string)
+             string_palette (ref)               [167837809 .. 335609856]
+```
+
+So the clip name is a `node_name_offset` `StringOffset`, which for a file with
+no string table is itself an inline string, and every member is
+version-conditional. The decoder needs the header version, which it is not
+currently given: `decodeControllerSequence(const QByteArray&, ...)` has no
+version parameter. That is the change to make.
+
+`c.atEnd()` was also removed as a success condition, since every generation
+appends trailing playback parameters after the entry list and the check could
+never hold - it was silently guaranteeing zero clip names for all versions.
 
 ### Real archive NIFs are still not loadable by `NifParser` (view layer, not writer)
 
