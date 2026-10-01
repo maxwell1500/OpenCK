@@ -484,21 +484,29 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
         // report a controller ref, and what the clip map actually holds, says
         // which half is wrong instead of only that the join failed.
 
+        // A file qualifies when a sequence names a keyframe controller whose data
+        // block is writable. The node name is taken from any node in the file
+        // because it identifies the edit for display, not a precondition for
+        // it - requiring a node whose controller ref is the one in the
+        // sequence matches nothing in a shipped Oblivion mesh, where animated
+        // nodes hang off a NiMultiTargetTransformController instead.
         int chosenBlock = -1;
         quint32 chosenController = 0;
-        for (int block = 0; block < file.count(); ++block) {
-            QString name;
-            quint32 controllerRef = 0xFFFFFFFFu;
-            if (!file.nodeNetInfo(block, name, controllerRef)) continue;
-            if (name.isEmpty() || !controllers.contains(controllerRef)) continue;
-            if (clips.value(controllerRef).isEmpty()) continue;
-            chosenBlock = block;
-            chosenController = controllerRef;
-            nodeName = name;
-            clipName = clips.value(controllerRef);
+        for (auto it = clips.constBegin(); it != clips.constEnd(); ++it) {
+            if (!controllers.contains(it.key())) continue;
+            nodeName.clear();
+            for (int block = 0; block < file.count() && nodeName.isEmpty(); ++block) {
+                QString name;
+                quint32 ref = 0xFFFFFFFFu;
+                if (!file.nodeNetInfo(block, name, ref)) continue;
+                if (!name.isEmpty()) nodeName = name;
+            }
+            if (nodeName.isEmpty()) continue;
+            chosenController = it.key();
+            clipName = it.value();
             break;
         }
-        if (chosenBlock < 0) {
+        if (chosenController == 0) {
             ++noClip;
             continue;
         }

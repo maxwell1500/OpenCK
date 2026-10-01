@@ -638,7 +638,37 @@ The round-trip test is the thing worth keeping from this: it turns "the codec
 looks symmetric" into a fact about 4,412 real blocks, and it will fail loudly
 the day someone enables the writer without fixing the layout.
 
-### The clip name now resolves; the chain is open for a different reason
+### A controller sequence *is* a clip; the node match was over-constraining
+
+The writer required a controller to be reachable two ways at once: named by an
+`NiControllerSequence`, and referenced directly by a node whose name matched the
+caller's. On shipped Oblivion meshes the intersection is always empty, because
+the animated nodes there hang off a `NiMultiTargetTransformController` rather
+than pointing at a keyframe controller themselves. So no file qualified.
+
+`patchBethesdaNif` now treats a named clip's controller set as the clip. When the
+caller names a clip and the sequence owns keyframe controllers, those controllers
+are patched; the node name remains the display identity of the edit rather than a
+precondition for making it.
+
+Measured on the base archive, the writer's own census:
+
+| | before | after |
+|---|---|---|
+| no clip found (`noClip`) | 164 | 81 |
+| clip found, data block unresolved (`noDataBlock`) | 0 | 83 |
+
+83 files now reach the data-block stage. All 83 stop in
+`keyframeDataBlockFor`, which returns -1 for the 1.5 chain. That is the last
+link and it is the next piece of work.
+
+`keyframeDataBlockFor` takes the interpolator ref from the *trailing* u32 of
+the controller block. A shipped file carries the full chain -
+`NiTransformController` -> `NiBlendTransformInterpolator` ->
+`NiTransformInterpolator` -> `NiTransformData` - and in the 20.0.0.4 controller
+layout that ref is evidently not the last field, so reading it from the end picks
+up something else. The chain is present in the bytes; the field position is the
+open question.
 
 `NiStringPalette` in a pre-20.1.0.1 container is **not** a counted list of sized
 strings. It is a single length-prefixed blob holding the palette's strings back

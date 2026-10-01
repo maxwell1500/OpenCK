@@ -134,6 +134,26 @@ bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
             ++channelsPatched;
     }
 
+    // A controller sequence *is* the definition of a clip: it names the set of
+    // controllers that clip drives. Requiring one of them to also be reached
+    // from a node by name therefore over-constrains it, and on shipped Oblivion
+    // meshes it excludes every file: the animated nodes there are driven
+    // through a NiMultiTargetTransformController, so no node points directly at
+    // a keyframe controller and the intersection is always empty.
+    //
+    // So when the caller named a clip and the sequence owns keyframe
+    // controllers, those controllers are the clip. The node name stays the
+    // display identity of the edit, not a precondition for making it.
+    if (channelsPatched == 0 && !clipControllers.isEmpty()) {
+        for (quint32 controllerRef : clipControllers) {
+            if (!wantedControllers.contains(controllerRef)) continue;
+            if (patchControllerData(file, static_cast<int>(controllerRef), keyframes))
+                ++channelsPatched;
+        }
+        if (channelsPatched > 0)
+            matchedNode = true;
+    }
+
     if (!matchedNode) {
         LOG_WARNING(QString("NifAnimationWriter: target node '%1' not found in %2")
                         .arg(nodeName, nifPath));
