@@ -3491,46 +3491,94 @@ bool NifBlockFile::nodeNetInfo(int index, QString& nameOut, quint32& controllerR
 
 namespace {
 
-// Trailing u32 of a block: the keyframe data / interpolator ref in both the
-// 1.5 and 1.6+ controller layouts.
-bool trailingRef(const QByteArray& data, quint32& ref)
+// Read a u32 at an absolute offset, little-endian. Scanned at every byte offset,
+// not just multiples of four: NiInterpController puts a one-byte
+// manager_controlled into the middle of the controller, so the ref after it is
+// not 4-aligned.
+bool refAt(const QByteArray& data, int offset, quint32& ref)
 {
-    if (data.size() < 4) return false;
-    const int base = data.size() - 4;
-    ref = static_cast<quint32>(static_cast<quint8>(data.at(base)))
-        | static_cast<quint32>(static_cast<quint8>(data.at(base + 1))) << 8
-        | static_cast<quint32>(static_cast<quint8>(data.at(base + 2))) << 16
-        | static_cast<quint32>(static_cast<quint8>(data.at(base + 3))) << 24;
+    if (offset < 0 || offset + 4 > data.size()) return false;
+    ref = 0;
+    for (int i = 0; i < 4; ++i)
+        ref |= static_cast<quint32>(static_cast<quint8>(data.at(offset + i))) << (8 * i);
     return true;
+}
+
+bool isKeyframeDataType(const QString& type)
+{
+    return type == QLatin1String("NiKeyframeData")
+        || type == QLatin1String("NiAnimKeyFrameData")
+        || type == QLatin1String("NiTransformData");
+}
+
+bool isInterpolatorType(const QString& type)
+{
+    return type == QLatin1String("NiTransformInterpolator")
+        || type == QLatin1String("NiBlendTransformInterpolator")
+        || type == QLatin1String("NiKeyBasedInterpolator")
+        || type == QLatin1String("NiBlendInterpolator");
 }
 
 } // namespace
 
+// Resolve the keyframe data block a controller drives.
+//
+// The ref is found by search rather than at a fixed offset. A 20.0.0.4
+// NiTransformController is 30 bytes, and no candidate field list accounts for all
+// of them: the six-field NiKeyframeController chain is 21 bytes, and
+// NiTimeController with frequency/phase/start/stop is 33. Reading the trailing
+// u32 - which is what this used to do - is right for a 20.2.0.7
+// NiKeyframeController whose `data` is the last field, and wrong for every
+// NiTransformController, which appends unknown_q_q_speed_integer after it. An
+// offset-based repair derived from nifgen was tried and resolved fewer
+// controllers than the trailing read, because those offsets are wrong for the
+// 1.6+ case too.
+//
+// Searching sidesteps the layout question instead of guessing at it: a real ref
+// points at a block whose type is an interpolator or a keyframe data block, and
+// nothing else in these blocks reliably does. Candidates are tried in offset
+// order and the first that leads all the way to a data block wins, so a stray
+// u32 that happens to be a valid block index is not preferred over the real
+// chain - it dead-ends instead.
 int NifBlockFile::keyframeDataBlockFor(int controllerIndex) const
 {
     if (controllerIndex < 0 || controllerIndex >= mBlocks.size()) return -1;
-    quint32 ref = 0xFFFFFFFFu;
-    if (!trailingRef(mBlocks.at(controllerIndex).data, ref)) return -1;
-    if (ref >= static_cast<quint32>(mBlocks.size())) return -1;
+    const QByteArray& data = mBlocks.at(controllerIndex).data;
 
-    // 1.5 inserts an interpolator between the controller and the data.
-    const QString firstType = mBlocks.at(ref).type;
-    if (firstType == QLatin1String("NiTransformInterpolator")
-        || firstType == QLatin1String("NiQuatKeyframeController")) {
-        quint32 inner = 0xFFFFFFFFu;
-        if (!trailingRef(mBlocks.at(ref).data, inner)) return -1;
-        if (inner >= static_cast<quint32>(mBlocks.size())) return -1;
-        ref = inner;
+    auto resolveFrom = [&](auto&& self, quint32 start, int depth) -> int {
+        if (depth > 4) return -1;
+        if (start >= static_cast<quint32>(mBlocks.size())) return -1;
+        const QString type = mBlocks.at(static_cast<int>(start)).type;
+        if (isKeyframeDataType(type)) return static_cast<int>(start);
+        if (!isInterpolatorType(type)) return -1;
+        // The interpolator's own data ref is searched for the same reason the
+        // controller's is: it follows a NiQuatTransform whose size has moved
+        // between generations, and in some it is the last field rather than a
+        // fixed offset.
+        const QByteArray& inner = mBlocks.at(static_cast<int>(start)).data;
+        for (int offset = 0; offset + 4 <= inner.size(); ++offset) {
+            quint32 next = 0xFFFFFFFFu;
+            if (!refAt(inner, offset, next)) continue;
+            if (next >= static_cast<quint32>(mBlocks.size())) continue;
+            const QString nextType = mBlocks.at(static_cast<int>(next)).type;
+            if (!isKeyframeDataType(nextType) && !isInterpolatorType(nextType)) continue;
+            const int resolved = self(self, next, depth + 1);
+            if (resolved >= 0) return resolved;
+        }
+        return -1;
+    };
+
+    for (int offset = 0; offset + 4 <= data.size(); ++offset) {
+        quint32 candidate = 0xFFFFFFFFu;
+        if (!refAt(data, offset, candidate)) continue;
+        if (candidate >= static_cast<quint32>(mBlocks.size())) continue;
+        const QString type = mBlocks.at(static_cast<int>(candidate)).type;
+        if (!isKeyframeDataType(type) && !isInterpolatorType(type)) continue;
+        const int resolved = resolveFrom(resolveFrom, candidate, 0);
+        if (resolved >= 0) return resolved;
     }
-
-    const QString dataType = mBlocks.at(ref).type;
-    if (dataType == QLatin1String("NiKeyframeData")
-        || dataType == QLatin1String("NiAnimKeyFrameData")
-        || dataType == QLatin1String("NiTransformData"))
-        return static_cast<int>(ref);
     return -1;
 }
-
 QHash<quint32, QString> NifBlockFile::clipNamesByController() const
 {
     QHash<quint32, QString> names;

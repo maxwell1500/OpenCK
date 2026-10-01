@@ -535,14 +535,14 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
                     if (r >= static_cast<quint32>(file.count())) return QStringLiteral("-");
                     return file.declaredBlockType(static_cast<int>(r));
                 };
-                chainSamples << QStringLiteral("ctrl%1 size=%2 w0=%3:%4 w4=%5:%6 w9=%7:%8 "
-                                               "w13=%9:%10 w17=%11:%12")
-                                 .arg(ci).arg(cd.size())
-                                 .arg(word(0)).arg(describe(0))
-                                 .arg(word(4)).arg(describe(4))
-                                 .arg(word(9)).arg(describe(9))
-                                 .arg(word(13)).arg(describe(13))
-                                 .arg(word(17)).arg(describe(17));
+                QString hex;
+                for (int k = 0; k < cd.size(); ++k)
+                    hex += QStringLiteral("%1 ").arg(quint8(cd.at(k)), 2, 16, QChar('0'));
+                chainSamples << QStringLiteral("ctrl%1 size=%2 hex=[%3] interp6=%4 tinterp8=%5 tdata9=%6")
+                                 .arg(ci).arg(cd.size()).arg(hex)
+                                 .arg(file.declaredBlockType(6))
+                                 .arg(file.declaredBlockType(8))
+                                 .arg(file.declaredBlockType(9));
             }
             continue;
         }
