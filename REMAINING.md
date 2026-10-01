@@ -592,88 +592,57 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
-### The framing, derived exactly from the bytes
+### `NiTransformData`: block framing is known; lossless animation codec is not
 
-A shipped `NiTransformData` is 136 bytes and opens
-`num_rotation_keys = 1, rotation_type = 4`. Reading the remainder as three
-identical 40-byte groups fits the block exactly:
+The previous two paragraphs in this section incorrectly treated
+`rotation_type = 4` as either a quaternion-array count or a generic interpolation
+mode, then inferred three identical translation/rotation/scale groups from one
+136-byte sample. Both claims were wrong. The authoritative implementation is the
+block walker `walkNiKeyframeData` in `libs/files/nif/nifblockfile.cpp`, confirmed
+against shipped 20.0.0.4 blocks and against the exact full-file walk:
 
-```
-u32 num_rotation_keys            1
-u32 rotation_type                4      <- interpolation mode, not a count
-u32 count                        2      \ translations
-u32 interpolation                2      / count x { f32 time, Vector3 }
-u32 count                        2      \ rotations
-u32 interpolation                2      / count x { f32 time, Quaternion }
-u32 count                        2      \ scales
-u32 interpolation                2      / count x { f32 time, Vector3 }
-```
+1. Read `num_rotation_keys` (`u32`).
+2. If it is zero, there is **no rotation-type field**; parse translation and
+   scale `KeyGroup`s immediately.
+3. Otherwise read `rotation_type` (`u32`). When it is 4, that is the XYZ-rotation
+   discriminator: parse three scalar-float KeyGroups (one per rotation axis),
+   then translation (`Vector3`) and scale (scalar-float) KeyGroups. For other
+   rotation types the rotation channel is quaternion data, with key width
+   depending on its type and version.
+4. A KeyGroup is `u32 count`; if non-empty it has a `u32 interpolation` followed
+   by timed keys. Linear keys are `time + value`; quadratic keys add forward and
+   backward tangents; TBC keys add the T/B/C triple. An empty group is just its
+   four-byte count.
 
-3 x 40 = 120, plus the 8-byte header, is the 136 observed, with nothing left
-over. Every word in the dump lands on a group boundary at that framing, which is
-what distinguishes it from the alternatives.
+This explains the 136-byte sample exactly: `num_rotation_keys=1`,
+`rotation_type=4`; three groups each contain two quadratic float keys
+(`8-byte group header + 2 * 16 = 40`); translation and scale groups are empty
+(4 bytes each). Total: `8 + 3*40 + 4 + 4 = 136`. It is **not** three
+translation/rotation/scale groups.
 
-The previous code was wrong in four ways, and each is now a measured fact rather
-than a suspicion: it read three bare counts instead of three groups with an
-interpolation word; it sized the quaternion array by `num_rotation_keys` when
-`rotation_type` is the length; it dropped each channel's first key time when
-every key carries one; and it treated the three channels as interchangeable
-when the value sizes differ.
+Other independently checked blocks establish the same structure: a 1,084-byte
+sample contains three axis groups of nine quadratic float keys, 38 linear
+translation keys and an empty scale group (`8 + 3*152 + 616 + 4`); a
+1,936-byte sample has zero rotation keys, 120 linear translation keys and no
+scale keys. The walker accepts these and the archive regression covers all
+7,962 Gamebryo blocks byte-exactly.
 
-**An implementation of exactly this framing was tried and reverted.** It removed
-the re-encode mismatch entirely - no block produced differing bytes - but every
-one of the 4,412 then failed to *decode*, which destroys the ability to read
-these animations at all. Trading "some blocks mis-round-trip" for "no block
-decodes" is a capability regression even though the write gate is unchanged, so
-it does not stay. The framing above is what to implement next; it needs the
-per-group counts driven by the header and verified by the existing round-trip
-harness rather than by hand.
+The separate `test_ntdlayout` experiment is **not evidence for this format**:
+it tries 24 generic TRS permutations, assumes values of 12/16/12 bytes, omits
+the 8-byte NiKeyframeData header and the XYZ-rotation branch, and reported
+10/104 fits. Its score is a consequence of testing the wrong grammar. Treat
+that fitter output as invalid; the walker is the measured boundary grammar.
 
-### Why the codec is still gated off: 4,412 of 4,412 blocks disagree
-
-`decodeKeyframeData`/`encodeKeyframeData` handle `NiTransformData` as three
-independent channels - translations, rotations, scales - each with its own count
-and per-key times, the first key of each implicitly at time 0.
-
-**That layout is not the real one.** A round-trip test over the base archive
-(`testRealArchiveKeyframeCodecRoundTrip`) decoded 4,412 shipped
-`NiTransformData` blocks, re-encoded each one and compared bytes:
-
-```
-NiTransformData examined=4412 byteExact=0
-FAILURE  decode failed in meshes\architecture\farmfence\fencegateanimation.nif
-MISMATCH  48 bytes in, 104 back
-```
-
-Not one block round-trips. The two functions agreed with each other and both
-disagreed with the game, which is exactly the failure mode a self-consistent
-codec cannot detect.
-
-The real layout, from nifgen (`NiTransformData` extends `NiKeyframeData`):
-
-```
-uint32  num_rotation_keys
-uint32  rotation_type                 <- this is the quaternion array length
-QuatKey[rotation_type]                time + Quaternion(16)
-float   order
-KeyGroup xyz_rotations               uint32 count + 3 floats each
-KeyGroup translations                 uint32 count + Vector3 each
-KeyGroup scales                       uint32 count + float each  (float, not Vector3)
-```
-
-Three differences from what the code assumes, each of which alone breaks it:
-the quaternion array is sized by `rotation_type`, not `num_rotation_keys`; the
-three groups are not interchangeable (scales are single floats); and the
-per-key times are not interleaved the way the current code reads them.
-
-`isWritableKeyframeType` correctly refuses `NiTransformData` today, and that
-refusal should stay until the codec round-trips. It is the reason no Oblivion
-animation can be written back, and it is now a known shape rather than an
-open question.
-
-The round-trip test is the thing worth keeping from this: it turns "the codec
-looks symmetric" into a fact about 4,412 real blocks, and it will fail loudly
-the day someone enables the writer without fixing the layout.
+The keyframe codec still does not round-trip. The current flat
+`Nif::TransformKeyframe` representation has no per-channel interpolation type or
+tangents, stores rotation as a quaternion rather than three independently keyed
+Euler axes, and models scale as Vector3 while this block's scale channel is a
+scalar. So a lossless raw decode/encode through that type is impossible for
+quadratic XYZ channels. The byte test reports 4,412 examined, zero byte-exact,
+with both decode failures and mismatches. The test currently skips because the
+format is deliberately non-writable; it does **not** fail when the writer is
+enabled unless its assertion is fixed. Keep `NiTransformData` gated off until a
+richer channel representation and a real byte-exact test exist.
 
 ### A controller sequence *is* a clip; the node match was over-constraining
 
@@ -740,8 +709,9 @@ Effect on the base archive:
 | reach the writability gate (`notWritable`) | 0 | 5 |
 
 The 5 that now reach the gate are refused by `isWritableKeyframeType`, correctly,
-because the `NiTransformData` codec does not round-trip. That is the remaining
-blocker, and it is now a codec problem with no layout ambiguity left in it.
+because the `NiTransformData` codec does not round-trip. The block-boundary
+grammar is now known and implemented in `walkNiKeyframeData`; what remains is a
+lossless semantic representation, not a layout question.
 
 `NiStringPalette` in a pre-20.1.0.1 container is **not** a counted list of sized
 strings. It is a single length-prefixed blob holding the palette's strings back
@@ -2197,10 +2167,10 @@ testing" line:
   section this build does not model, leaving the payload start 125 bytes
   early. Rejecting them with a precise error is intentional; supporting a
   non-conformant exporter is a separate decision.
-- The 1.5 `NiTransformData` fit needs more *samples of that same generation*,
-  not other games: Skyrim SE 1.5 is installed and supplied 4,533 such blocks,
-  and Oblivion would add more of the same format. What is missing is a
-  consistent model, not data.
+- The 1.5 `NiTransformData` block grammar is implemented and measured in
+  `walkNiKeyframeData`; there is ample same-generation data (Skyrim SE 1.5
+  supplied 4,533 blocks, Oblivion thousands more). What is missing is a
+  semantic representation that preserves interpolation types and tangents.
 
 **Starfield BA2 — done, and it changed the animation target.** `BsaArchive`
 now reads the Starfield `BTDX` container. Layout (verified against the shipped
@@ -2591,17 +2561,16 @@ the Skyrim masters did. The GOTY install does not help the SCEN editor; the
 Shivering Isles content is dialogue rather than phase data. Persisting scene
 phases still needs a real PHDA sample from a mod.
 
-**`NiTransformData` (Skyrim 1.5 / Oblivion) remains the only NIF-resident
-keyframe format reachable here**, and it is still refused for writing until its
-encoding is confirmed. Hand-decoding samples was not converging, so this is now
-approached as a fit rather than a guess: `test_ntdlayout` pulls every reachable
-`NiTransformData` block and tries all 24 candidate layouts (six channel
-orderings x first-key-carries-time x counts-up-front), keeping only a layout
-that consumes *every* block exactly. A layout that fits some blocks but not all
-is reported and deliberately left unproven. The fitter is blocked on the
-block-splitting work above rather than on anything about Oblivion itself: the
-headers parse, and the 321 candidate files are identified, but no block in them
-can be handed to the fitter individually yet.
+**`NiTransformData` (Skyrim 1.5 / Oblivion) remains the only reachable NIF
+keyframe format refused for writing.** `test_ntdlayout`'s 24 generic TRS layouts
+were the wrong grammar and its 10/104 score was not evidence about the real
+format. `walkNiKeyframeData` now consumes the measured format: rotation count,
+optional rotation type, three per-axis float KeyGroups for XYZ rotations, then
+translation Vector3 and scalar scale KeyGroups; interpolation determines key
+width and tangents. Full-archive round-trip coverage confirms block boundaries,
+but the editor's flat `TransformKeyframe` cannot preserve per-channel times,
+interpolation or tangents. A channel-preserving animation payload is still
+needed before write-back is safe.
 
 **The game folders are on-demand installs, and that makes the archive tests
 flaky.** Individual `.ba2` files flip between resident and evicted between runs

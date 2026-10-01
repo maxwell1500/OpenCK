@@ -1,6 +1,7 @@
 #include <QtTest>
 #include <QTemporaryDir>
 #include <QFile>
+#include <QSet>
 #include <QtMath>
 #include <memory>
 #include <functional>
@@ -753,7 +754,10 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
 
     QMap<QString, int> examined;
     QStringList hexSamples;
+    QSet<QByteArray> sampledBlocks;
     QMap<QString, int> agreed;
+    QMap<QString, int> failures;
+    QMap<QString, int> mismatches;
     QString firstMismatch;
     QString firstFailure;
 
@@ -761,13 +765,6 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
         const BsaFileEntry& entry = archive->entries()[i];
         if (!entry.fullPath.endsWith(".nif", Qt::CaseInsensitive))
             continue;
-        // The keyframe types are rare; stop once each has been seen, so this
-        // stays a quick test rather than a second archive walk.
-        bool allSeen = true;
-        for (const QString& type : kCodecTypes)
-            if (agreed.value(type) > 0) continue; else allSeen = false;
-        if (allSeen) break;
-
         QByteArray bytes;
         if (!archive->readData(i, bytes) || !bytes.startsWith("Gamebryo File Format"))
             continue;
@@ -783,21 +780,23 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
             continue;
 
         for (const QString& type : kCodecTypes) {
-            if (agreed.value(type) > 0) continue;
             const QList<int> indices = file.findBlocks(type);
             if (indices.isEmpty()) continue;
             for (int index : indices) {
                 ++examined[type];
                 const QByteArray& original = file.block(index).data;
-                if (hexSamples.size() < 2 && original.size() <= 256) {
+                if (hexSamples.size() < 3 && original.size() <= 256
+                    && !sampledBlocks.contains(original)) {
                     QString h;
                     for (int i = 0; i < original.size(); ++i)
                         h += QStringLiteral("%1 ").arg(quint8(original.at(i)), 2, 16, QChar('0'));
                     hexSamples << QStringLiteral("%1 size=%2 hex=[%3]")
                                    .arg(type).arg(original.size()).arg(h);
+                    sampledBlocks.insert(original);
                 }
                 QVector<Nif::TransformKeyframe> decoded;
                 if (!NifBlockFile::decodeKeyframeData(type, original, decoded)) {
+                    ++failures[type];
                     if (firstFailure.isEmpty())
                         firstFailure = QStringLiteral("%1 decode failed in %2")
                                            .arg(type, entry.fullPath);
@@ -805,6 +804,7 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
                 }
                 QByteArray reencoded;
                 if (!NifBlockFile::encodeKeyframeData(type, decoded, reencoded)) {
+                    ++failures[type];
                     if (firstFailure.isEmpty())
                         firstFailure = QStringLiteral("%1 encode refused in %2")
                                            .arg(type, entry.fullPath);
@@ -813,9 +813,12 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
                 if (reencoded == original) {
                     ++agreed[type];
                 } else if (firstMismatch.isEmpty()) {
+                    ++mismatches[type];
                     firstMismatch = QStringLiteral("%1 in %2: %3 bytes in, %4 back")
                                         .arg(type, entry.fullPath)
                                         .arg(original.size()).arg(reencoded.size());
+                } else {
+                    ++mismatches[type];
                 }
             }
         }
@@ -827,12 +830,13 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
         QFile marker("C:/Users/max/AppData/Local/Temp/opencode/anim_codec.txt");
         if (marker.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             for (const QString& type : kCodecTypes) {
-                marker.write(QStringLiteral("%1 examined=%2 byteExact=%3\n")
-                                 .arg(type).arg(examined.value(type)).arg(agreed.value(type)).toUtf8());
+                marker.write(QStringLiteral("%1 examined=%2 byteExact=%3 failures=%4 mismatches=%5\n")
+                                 .arg(type).arg(examined.value(type)).arg(agreed.value(type))
+                                 .arg(failures.value(type)).arg(mismatches.value(type)).toUtf8());
             }
-                        for (const QString& hx : hexSamples)
+            for (const QString& hx : hexSamples)
                 marker.write(("HEX " + hx + QStringLiteral("\n")).toUtf8());
-if (!firstFailure.isEmpty())
+            if (!firstFailure.isEmpty())
                 marker.write(("FAILURE " + firstFailure + "\n").toUtf8());
             if (!firstMismatch.isEmpty())
                 marker.write(("MISMATCH " + firstMismatch + "\n").toUtf8());
@@ -840,15 +844,28 @@ if (!firstFailure.isEmpty())
         }
     }
 
-    // The codec is known-wrong for NiTransformData, which is what
-    // isWritableKeyframeType is correctly refusing today. Asserting a mismatch
-    // would pin the bug in place; asserting a round-trip would turn the suite
-    // red for a defect that is already recorded in REMAINING.md. So this
-    // reports and skips, and it starts failing the moment someone enables the
-    // writer without fixing the layout - which is the moment it matters.
-    QSKIP(qPrintable(QStringLiteral("NiTransformData codec does not round-trip (%1 blocks, %2 exact)")
-              .arg(examined.value(QStringLiteral("NiTransformData")))
-              .arg(agreed.value(QStringLiteral("NiTransformData")))));
+    const QString transformData = QStringLiteral("NiTransformData");
+    if (examined.value(transformData) == 0)
+        QSKIP("no NiTransformData blocks reachable in the available archive");
+
+    const bool exact = failures.value(transformData) == 0
+        && mismatches.value(transformData) == 0
+        && agreed.value(transformData) == examined.value(transformData);
+    if (!exact) {
+        // Reading is still useful while writing is deliberately gated. If the
+        // gate is accidentally opened before every sampled shipped block is
+        // byte-exact, fail instead of converting this known defect into a green
+        // test. Once the codec is exact, require the gate to be opened too.
+        QVERIFY2(!NifBlockFile::isWritableKeyframeType(transformData),
+                 "NiTransformData became writable without passing the real-file codec test");
+        QSKIP(qPrintable(QStringLiteral("NiTransformData codec: %1/%2 exact, %3 failures, %4 mismatches")
+                              .arg(agreed.value(transformData))
+                              .arg(examined.value(transformData))
+                              .arg(failures.value(transformData))
+                              .arg(mismatches.value(transformData))));
+    }
+    QVERIFY2(NifBlockFile::isWritableKeyframeType(transformData),
+             "all sampled NiTransformData blocks round-trip; enable the writer gate");
 }
 
 QTEST_MAIN(TestNifAnimation)

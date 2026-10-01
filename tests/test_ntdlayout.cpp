@@ -9,10 +9,10 @@
 #include "nifblockfile.hpp"
 #include "logger.hpp"
 
-// Fits the Skyrim 1.5 / Oblivion NiTransformData layout against every real
-// block that can be reached, so the model is chosen by evidence rather than by
-// hand-decoding a single sample. For each candidate layout the block must be
-// consumed exactly; a layout that only fits one file is not the layout.
+// Independently checks the measured 20.0.0.4 NiTransformData framing against
+// real blocks. This is deliberately not the old generic TRS fitter: rotation
+// type 4 means three XYZ float groups, followed by translation and scalar scale
+// groups, and KeyGroup key widths depend on interpolation and tangents.
 class TestNtdLayout : public QObject
 {
     Q_OBJECT
@@ -43,84 +43,48 @@ struct Cursor {
     bool end() const { return ok && p == d.size(); }
 };
 
-// Channel kinds in the block. Each key is a time plus a value of `bytes`.
-enum { CH_T = 0, CH_R = 1, CH_S = 2, CH_COUNT = 3 };
-const int kValueBytes[CH_COUNT] = { 12, 16, 12 };
-
-// Candidate layouts. `firstHasTime` distinguishes the two conventions; the
-// channel order is permuted because the block does not label its channels.
-struct Layout {
-    int order[3];
-    bool firstHasTime;
-    bool countsUpFront;
-    const char* name;
-};
-
-QVector<Layout> candidateLayouts()
+bool skipGroup(Cursor& c, quint32 valueBytes)
 {
-    QVector<Layout> all;
-    static const int perms[6][3] = {
-        {0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0},
-    };
-    static const char* orderNames[6] = {
-        "TRS", "TSR", "RTS", "RST", "STR", "SRT",
-    };
-    for (int i = 0; i < 6; ++i) {
-        for (int first = 0; first < 2; ++first) {
-            for (int up = 0; up < 2; ++up) {
-                Layout l{};
-                l.order[0] = perms[i][0];
-                l.order[1] = perms[i][1];
-                l.order[2] = perms[i][2];
-                l.firstHasTime = first != 0;
-                l.countsUpFront = up != 0;
-                l.name = orderNames[i];
-                all.append(l);
-            }
-        }
-    }
-    return all;
+    const quint32 count = c.u32();
+    if (!c.ok || count > 10000000u) return false;
+    if (count == 0) return true; // empty groups have no interpolation word
+    const quint32 interpolation = c.u32();
+    if (!c.ok || interpolation > 5u) return false;
+    quint64 bytesPerKey = 4u + valueBytes; // time + value
+    if (interpolation == 2u) bytesPerKey += 2u * valueBytes; // forward/back tangents
+    else if (interpolation == 3u) bytesPerKey += 12u; // tension/bias/continuity
+    const quint64 bytes = quint64(count) * bytesPerKey;
+    if (bytes > static_cast<quint64>(c.left())) return false;
+    c.need(static_cast<int>(bytes));
+    c.p += static_cast<int>(bytes);
+    return c.ok;
 }
 
-QString layoutName(const Layout& l)
-{
-    return QStringLiteral("%1 first=%2 up=%3")
-        .arg(QString::fromLatin1(l.name))
-        .arg(l.firstHasTime ? "time" : "notime")
-        .arg(l.countsUpFront ? "yes" : "no");
-}
-
-// Consumes the block with one candidate layout; returns true only when the
-// block is consumed exactly and every count is sane.
-bool tryLayout(const QByteArray& data, const Layout& l)
+bool tryNiTransformData20(const QByteArray& data)
 {
     Cursor c(data);
-    quint32 counts[CH_COUNT] = {0, 0, 0};
-    if (l.countsUpFront) {
-        for (int i = 0; i < CH_COUNT; ++i) {
-            counts[i] = c.u32();
-            if (!c.ok || counts[i] > 100000u) return false;
-        }
+    const quint32 numRotationKeys = c.u32();
+    if (!c.ok || numRotationKeys > 10000000u) return false;
+    if (numRotationKeys == 0) {
+        return skipGroup(c, 12) && skipGroup(c, 4) && c.end();
     }
-    for (int slot = 0; slot < CH_COUNT; ++slot) {
-        const int ch = l.order[slot];
-        if (!l.countsUpFront) {
-            counts[ch] = c.u32();
-            if (!c.ok || counts[ch] > 100000u) return false;
-        }
-        for (quint32 k = 0; k < counts[ch]; ++k) {
-            if (!l.firstHasTime && k == 0) {
-                c.need(kValueBytes[ch]);
-                c.p += kValueBytes[ch];
-            } else {
-                c.f32();
-                c.need(kValueBytes[ch]);
-                c.p += kValueBytes[ch];
-            }
-            if (!c.ok) return false;
-        }
+    const quint32 rotationType = c.u32();
+    if (!c.ok) return false;
+    if (rotationType == 4u) {
+        // XYZ rotation uses one scalar KeyGroup per axis.
+        for (int axis = 0; axis < 3; ++axis)
+            if (!skipGroup(c, 4)) return false;
+    } else {
+        // Quaternion channel. In 20.0.0.4 each key has time + quaternion;
+        // TBC rotation adds its three tangent scalars.
+        quint64 keyBytes = 20u;
+        if (rotationType == 3u) keyBytes += 12u;
+        const quint64 bytes = quint64(numRotationKeys) * keyBytes;
+        if (bytes > static_cast<quint64>(c.left())) return false;
+        c.need(static_cast<int>(bytes));
+        c.p += static_cast<int>(bytes);
     }
-    return c.end();
+    return c.ok && skipGroup(c, 12) && skipGroup(c, 4) && c.end();
 }
 
 } // namespace
@@ -168,8 +132,8 @@ void TestNtdLayout::fit()
     if (!archive) QSKIP("no reachable mesh archive");
 
     QTemporaryDir tmpDir;
-    const QVector<Layout> layouts = candidateLayouts();
-    QMap<QString, int> fits;
+    int exact = 0;
+    QString firstFailure;
     QMap<int, int> sizeHistogram;
     int blocksSeen = 0;
 
@@ -191,12 +155,14 @@ void TestNtdLayout::fit()
         for (int c : file.findBlocks(QStringLiteral("NiTransformController"))) {
             const int dataIndex = file.keyframeDataBlockFor(c);
             if (dataIndex < 0) continue;
+            if (file.headerVersion() != QStringLiteral("20.0.0.4")) continue;
             const QByteArray& block = file.block(dataIndex).data;
             if (block.isEmpty()) continue;
             ++blocksSeen;
             sizeHistogram[block.size()] += 1;
-            for (const Layout& l : layouts)
-                if (tryLayout(block, l)) fits[layoutName(l)] += 1;
+            if (tryNiTransformData20(block)) ++exact;
+            else if (firstFailure.isEmpty())
+                firstFailure = QStringLiteral("%1 (%2 bytes)").arg(e.fullPath).arg(block.size());
         }
     }
 
@@ -222,38 +188,10 @@ void TestNtdLayout::fit()
               "pre-20.2.0.5 containers with no block size table, so no "
               "individual block is addressable yet");
 
-    // An empty map here is a real state, not a verdict: the blocks were reached
-    // and no candidate consumed one. Report it and leave. This has to return
-    // rather than merely pass an assertion, because falling through reads
-    // names.first() off the empty map below - which is a crash, and one that
-    // only shows up once the walk reaches far enough to produce this case.
-    if (fits.isEmpty()) {
-        say("  NO candidate layout fits even one block exactly");
-        QSKIP("blocks are addressable now, but no candidate layout consumes any "
-              "of them, so there is nothing to fit yet");
-    }
-
-    QList<QString> names = fits.keys();
-    std::sort(names.begin(), names.end(),
-              [&fits](const QString& a, const QString& b) {
-                  return fits.value(a) > fits.value(b);
-              });
-    for (const QString& n : names)
-        say(QString("  FITS %1: %2/%3").arg(n).arg(fits.value(n)).arg(blocksSeen));
-
-    // A layout is only the layout if it consumes every real block, not just
-    // one. Anything less is reported and deliberately left unproven.
-    for (const QString& n : names) {
-        if (fits.value(n) == blocksSeen) {
-            say("  UNIVERSAL FIT: " + n);
-            qInfo().noquote() << "NiTransformData layout:" << n;
-            return;
-        }
-    }
-    if (names.isEmpty()) QSKIP("no candidate layout was scored");
-    qWarning() << "No candidate layout consumed all" << blocksSeen
-               << "blocks; the best was" << names.first();
-    QVERIFY(true);
+    say(QString("  exact 20.0.0.4 framing: %1/%2").arg(exact).arg(blocksSeen));
+    if (!firstFailure.isEmpty()) say("  first failure: " + firstFailure);
+    QVERIFY2(blocksSeen > 0, "no addressable NiTransformData blocks sampled");
+    QCOMPARE(exact, blocksSeen);
 }
 
 QTEST_MAIN(TestNtdLayout)
