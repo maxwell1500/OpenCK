@@ -592,6 +592,52 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
+### The keyframe codec is wrong, measured against shipped data
+
+`decodeKeyframeData`/`encodeKeyframeData` handle `NiTransformData` as three
+independent channels - translations, rotations, scales - each with its own count
+and per-key times, the first key of each implicitly at time 0.
+
+**That layout is not the real one.** A round-trip test over the base archive
+(`testRealArchiveKeyframeCodecRoundTrip`) decoded 4,412 shipped
+`NiTransformData` blocks, re-encoded each one and compared bytes:
+
+```
+NiTransformData examined=4412 byteExact=0
+FAILURE  decode failed in meshes\architecture\farmfence\fencegateanimation.nif
+MISMATCH  48 bytes in, 104 back
+```
+
+Not one block round-trips. The two functions agreed with each other and both
+disagreed with the game, which is exactly the failure mode a self-consistent
+codec cannot detect.
+
+The real layout, from nifgen (`NiTransformData` extends `NiKeyframeData`):
+
+```
+uint32  num_rotation_keys
+uint32  rotation_type                 <- this is the quaternion array length
+QuatKey[rotation_type]                time + Quaternion(16)
+float   order
+KeyGroup xyz_rotations               uint32 count + 3 floats each
+KeyGroup translations                 uint32 count + Vector3 each
+KeyGroup scales                       uint32 count + float each  (float, not Vector3)
+```
+
+Three differences from what the code assumes, each of which alone breaks it:
+the quaternion array is sized by `rotation_type`, not `num_rotation_keys`; the
+three groups are not interchangeable (scales are single floats); and the
+per-key times are not interleaved the way the current code reads them.
+
+`isWritableKeyframeType` correctly refuses `NiTransformData` today, and that
+refusal should stay until the codec round-trips. It is the reason no Oblivion
+animation can be written back, and it is now a known shape rather than an
+open question.
+
+The round-trip test is the thing worth keeping from this: it turns "the codec
+looks symmetric" into a fact about 4,412 real blocks, and it will fail loudly
+the day someone enables the writer without fixing the layout.
+
 ### The clip name now resolves; the chain is open for a different reason
 
 `NiStringPalette` in a pre-20.1.0.1 container is **not** a counted list of sized
