@@ -662,13 +662,44 @@ Measured on the base archive, the writer's own census:
 `keyframeDataBlockFor`, which returns -1 for the 1.5 chain. That is the last
 link and it is the next piece of work.
 
-`keyframeDataBlockFor` takes the interpolator ref from the *trailing* u32 of
-the controller block. A shipped file carries the full chain -
-`NiTransformController` -> `NiBlendTransformInterpolator` ->
-`NiTransformInterpolator` -> `NiTransformData` - and in the 20.0.0.4 controller
-layout that ref is evidently not the last field, so reading it from the end picks
-up something else. The chain is present in the bytes; the field position is the
-open question.
+### `keyframeDataBlockFor`: the 1.5 chain, and why the obvious fix regressed
+
+83 files reach the data-block stage and all 83 get -1 from
+`keyframeDataBlockFor`. The chain is present in the bytes - a shipped file holds
+`NiTransformController`, `NiBlendTransformInterpolator`,
+`NiTransformInterpolator` and `NiTransformData` - so this is a field-position
+problem, not a missing chain.
+
+`keyframeDataBlockFor` reads the ref from the **trailing u32** of the block.
+That is right for a `20.2.0.7` `NiKeyframeController`, where `data` is the final
+field, and wrong for `NiTransformController`, which appends
+`unknown_q_q_speed_integer` after `data`.
+
+The obvious repair - use real offsets - was tried and **reverted**, because it
+resolved fewer controllers than the trailing read and broke
+`test_nifblockfile`'s invariant that more than half of all controllers must
+resolve. The offsets that looked right from nifgen were wrong for the 1.6+ case
+as well, so the change was a net loss and does not stay.
+
+What is known now, from the chain dump the test now writes:
+
+- a `20.0.0.4` `NiTransformController` block is **30 bytes**.
+- offset 0 is the null `next_controller`.
+- offset 4 reads as a small integer (44 in the sampled file), which as float
+  bits is a plausible denormal, so it is probably `frequency` rather than
+  `flags`.
+
+30 bytes does not match either candidate layout:
+
+- `next_controller` + `flags` + `manager_controlled` + `interpolator` +
+  `data` + `unknown_q_q_speed_integer` = 21.
+- `NiTimeController` with `frequency`/`phase`/`start_time`/`stop_time` added =
+  33.
+
+So the real layout sits between those two and has not been determined. The next
+step is to read the 30 bytes and account for all of them rather than assume a
+field list; the dump in `testRealArchiveKeyframeWriteBack` is what does that,
+and it caps at three samples so it costs nothing to keep.
 
 `NiStringPalette` in a pre-20.1.0.1 container is **not** a counted list of sized
 strings. It is a single length-prefixed blob holding the palette's strings back

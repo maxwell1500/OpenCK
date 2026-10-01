@@ -224,7 +224,7 @@ void TestNifAnimation::testSlerpTakesShortPath()
     const TransformKeyframe& f = frames[0];
     QVERIFY(f.hasQuat);
     // Slerp midpoint of identity -> -10 deg is -5 deg about Y. An Euler lerp
-    // of 0 -> 350 deg would sit at 175 deg instead (the flip ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§8.2 kills).
+    // of 0 -> 350 deg would sit at 175 deg instead (the flip ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§8.2 kills).
     QVERIFY(qAbs(f.ry - static_cast<float>(qDegreesToRadians(-5.0))) < 0.01f);
     QVERIFY(qAbs(f.qw - 0.99905f) < 0.001f);
 }
@@ -422,6 +422,7 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
     int hasTransformData = 0;
     int hasSequence = 0;
     QStringList dataTypeSamples;
+    QStringList chainSamples;
 
     for (int i = 0; i < archive->fileCount() && target.isEmpty(); ++i) {
         const BsaFileEntry& entry = archive->entries()[i];
@@ -514,6 +515,35 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
         const int dataBlock = file.keyframeDataBlockFor(static_cast<int>(chosenController));
         if (dataBlock < 0) {
             ++noDataBlock;
+            // Show the controller's own words and what they point at. The chain
+            // NiTransformController -> NiBlendTransformInterpolator ->
+            // NiTransformInterpolator -> NiTransformData is present in the file,
+            // so a -1 means a field is being read from the wrong offset rather
+            // than that the chain is missing.
+            if (chainSamples.size() < 3) {
+                const int ci = static_cast<int>(chosenController);
+                const QByteArray cd = file.block(ci).data;
+                auto word = [&](int off) -> quint32 {
+                    if (off + 4 > cd.size()) return 0xFFFFFFFFu;
+                    quint32 v = 0;
+                    for (int k = 0; k < 4; ++k)
+                        v |= static_cast<quint32>(static_cast<quint8>(cd.at(off + k))) << (8 * k);
+                    return v;
+                };
+                auto describe = [&](int off) {
+                    const quint32 r = word(off);
+                    if (r >= static_cast<quint32>(file.count())) return QStringLiteral("-");
+                    return file.declaredBlockType(static_cast<int>(r));
+                };
+                chainSamples << QStringLiteral("ctrl%1 size=%2 w0=%3:%4 w4=%5:%6 w9=%7:%8 "
+                                               "w13=%9:%10 w17=%11:%12")
+                                 .arg(ci).arg(cd.size())
+                                 .arg(word(0)).arg(describe(0))
+                                 .arg(word(4)).arg(describe(4))
+                                 .arg(word(9)).arg(describe(9))
+                                 .arg(word(13)).arg(describe(13))
+                                 .arg(word(17)).arg(describe(17));
+            }
             continue;
         }
         const QString dataType = file.declaredBlockType(dataBlock);
@@ -571,7 +601,9 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
                                  .arg(splitRejected).arg(noController).arg(noClip)
                                  .arg(noDataBlock).arg(notWritable).arg(decodeFailed)
                                  .arg(hasTransformData).arg(hasSequence).toUtf8());
-                if (!dataTypeSamples.isEmpty()) {
+                                for (const QString& c : chainSamples)
+                    marker.write(("CHAIN " + c + QStringLiteral("\n")).toUtf8());
+if (!dataTypeSamples.isEmpty()) {
                     marker.write(("SAMPLES " + dataTypeSamples.join(QStringLiteral(" | "))
                                   + QStringLiteral("\n")).toUtf8());
                 }
