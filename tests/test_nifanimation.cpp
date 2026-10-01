@@ -11,6 +11,7 @@
 #include "../../libs/files/nifanim/nifanimationimporter.hpp"
 #include "../../libs/files/nifanim/nifanimationwriter.hpp"
 #include "../../libs/files/nif/nifparser.hpp"
+#include "../../libs/files/nif/nifblockfile.hpp"
 #include "model/tools/nifanimationstate.hpp"
 
 class TestNifAnimation : public QObject
@@ -222,7 +223,7 @@ void TestNifAnimation::testSlerpTakesShortPath()
     const TransformKeyframe& f = frames[0];
     QVERIFY(f.hasQuat);
     // Slerp midpoint of identity -> -10 deg is -5 deg about Y. An Euler lerp
-    // of 0 -> 350 deg would sit at 175 deg instead (the flip §8.2 kills).
+    // of 0 -> 350 deg would sit at 175 deg instead (the flip Ã‚Â§8.2 kills).
     QVERIFY(qAbs(f.ry - static_cast<float>(qDegreesToRadians(-5.0))) < 0.01f);
     QVERIFY(qAbs(f.qw - 0.99905f) < 0.001f);
 }
@@ -393,80 +394,49 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
             ++totalNifs;
     }
 
-    // Find a real NIF that carries both a named node and a transform controller,
-    // and record how it reads back before any edit. The node name and clip come
-    // from the file itself rather than being hardcoded, because shipping a NIF
-    // that a hand-written fixture could stand in for is exactly the gap here.
+    // Find a real archive NIF that the writer's own reader can split into
+    // blocks and that carries a node with a keyframe controller, then record
+    // the node and clip from the file itself. Hardcoding either would let a
+    // fixture stand in for the thing this test exists to check.
+    //
+    // The reader is NifBlockFile, not NifParser, and that is not a detail.
+    // NifAnimationWriter routes a Bethesda NIF through NifBlockFile and only
+    // falls back to NifParser for the internal dialect, so testing through
+    // NifParser would measure a path the writer never takes for a shipped file.
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    QString written;
+    QString target;
     QString nodeName;
     QString clipName;
     int originalKeyframes = 0;
     int filesConsidered = 0;
-    int readable = 0;
-    int readRejected = 0;
-    int parseRejected = 0;
-    int noRoot = 0;
+    int splitRejected = 0;
+    int noController = 0;
+    int notWritable = 0;
+    int noClip = 0;
+    int noDataBlock = 0;
+    int decodeFailed = 0;
+    int notGamebryo = 0;
+    int hasTransformData = 0;
+    int hasSequence = 0;
+    QStringList dataTypeSamples;
 
-    for (int i = 0; i < archive->fileCount() && written.isEmpty(); ++i) {
+    for (int i = 0; i < archive->fileCount() && target.isEmpty(); ++i) {
         const BsaFileEntry& entry = archive->entries()[i];
         if (!entry.fullPath.endsWith(".nif", Qt::CaseInsensitive))
             continue;
-        if (++filesConsidered > 4000)
-            break;
+        ++filesConsidered;
 
         QByteArray bytes;
         if (!archive->readData(i, bytes) || !bytes.startsWith("Gamebryo File Format")) {
-            ++readRejected;
+            ++notGamebryo;
             continue;
         }
-        ++readable;
 
         const QString scratch = dir.filePath(QStringLiteral("scan.nif"));
         {
             QFile out(scratch);
-            if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
-                continue;
-            if (out.write(bytes) != bytes.size()) {
-                out.close();
-                continue;
-            }
-            out.close();
-        }
-        Nif::NifParser parser;
-        if (!parser.load(scratch)) {
-            ++parseRejected;
-            continue;
-        }
-        Nif::Node* root = parser.getRoot();
-        if (!root) {
-            ++noRoot;
-            continue;
-        }
-
-        std::function<Nif::Node*(Nif::Node*)> findAnimated = [&](Nif::Node* node) -> Nif::Node* {
-            if (!node->name.isEmpty() && !node->animations.isEmpty()
-                && !node->animations.first().keyframes.isEmpty())
-                return node;
-            for (Nif::Node* child : node->children) {
-                if (Nif::Node* hit = findAnimated(child))
-                    return hit;
-            }
-            return nullptr;
-        };
-        Nif::Node* animated = findAnimated(root);
-        if (!animated)
-            continue;
-
-        const Nif::NiKeyframeController& controller = animated->animations.first();
-        if (controller.keyframes.size() < 2)
-            continue;
-
-        const QString target = dir.filePath(QStringLiteral("real.nif"));
-        {
-            QFile out(target);
             if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
                 continue;
             const bool whole = out.write(bytes) == bytes.size();
@@ -475,95 +445,214 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
                 continue;
         }
 
-        nodeName = animated->name;
-        clipName = controller.clipName;
-        originalKeyframes = controller.keyframes.size();
-        written = target;
-    }
-
-    if (written.isEmpty()) {
-        {
-            QFile marker("C:/Users/max/AppData/Local/Temp/opencode/anim_realfiles.txt");
-            if (marker.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-                marker.write(QStringLiteral("NOEDIT\tarchiveNifs=%1\tconsidered=%2\treadable=%3\t"
-                                            "readRejected=%4\tparseRejected=%5\tnoRoot=%6\n")
-                                 .arg(totalNifs).arg(filesConsidered).arg(readable).arg(readRejected)
-                                 .arg(parseRejected).arg(noRoot).toUtf8());
-                marker.close();
-            }
+        NifBlockFile file;
+        if (!file.load(scratch) || !file.hasIndividualBlocks()) {
+            ++splitRejected;
+            continue;
         }
-        QSKIP("no animated NIF found in the reachable archives");
+
+        // Same discovery the writer performs: a node block whose controller ref
+        // points at a keyframe controller, and the clip that owns it.
+        QSet<quint32> controllers;
+        for (const QString& type : {QStringLiteral("NiTransformController"),
+                                    QStringLiteral("NiKeyframeController")}) {
+            for (int index : file.findBlocks(type))
+                controllers.insert(static_cast<quint32>(index));
+        }
+        if (controllers.isEmpty()) {
+            ++noController;
+            continue;
+        }
+
+        // Which of the links the writer needs are actually present. The writer
+        // joins node -> controller -> clip -> data; recording each link
+        // separately is what says which one is missing, rather than only that
+        // the whole chain failed.
+        if (!file.findBlocks(QStringLiteral("NiTransformData")).isEmpty()
+            || !file.findBlocks(QStringLiteral("NiKeyframeData")).isEmpty())
+            ++hasTransformData;
+        if (!file.findBlocks(QStringLiteral("NiControllerSequence")).isEmpty())
+            ++hasSequence;
+
+        QHash<quint32, QString> clips = file.clipNamesByController();
+        int chosenBlock = -1;
+        quint32 chosenController = 0;
+        for (int block = 0; block < file.count(); ++block) {
+            QString name;
+            quint32 controllerRef = 0xFFFFFFFFu;
+            if (!file.nodeNetInfo(block, name, controllerRef)) continue;
+            if (name.isEmpty() || !controllers.contains(controllerRef)) continue;
+            if (clips.value(controllerRef).isEmpty()) continue;
+            chosenBlock = block;
+            chosenController = controllerRef;
+            nodeName = name;
+            clipName = clips.value(controllerRef);
+            break;
+        }
+        if (chosenBlock < 0) {
+            ++noClip;
+            continue;
+        }
+
+        const int dataBlock = file.keyframeDataBlockFor(static_cast<int>(chosenController));
+        if (dataBlock < 0) {
+            ++noDataBlock;
+            continue;
+        }
+        const QString dataType = file.declaredBlockType(dataBlock);
+        // Record what the first few real candidates actually contain. Oblivion's
+        // animation data is NiTransformData, which is decoded but deliberately
+        // not re-encoded, so this is where "no writable animated NIF" is decided
+        // and the reason needs to be on record rather than inferred.
+        if (dataTypeSamples.size() < 6) {
+            QVector<Nif::TransformKeyframe> probe;
+            const bool decoded = NifBlockFile::decodeKeyframeData(
+                dataType, file.block(dataBlock).data, probe);
+            dataTypeSamples << QStringLiteral("%1(%2) writable=%3 decoded=%4 kf=%5")
+                                   .arg(dataType, clipName)
+                                   .arg(NifBlockFile::isWritableKeyframeType(dataType) ? 1 : 0)
+                                   .arg(decoded ? 1 : 0)
+                                   .arg(probe.size());
+        }
+        if (!NifBlockFile::isWritableKeyframeType(dataType)) {
+            ++notWritable;
+            continue;
+        }
+        QVector<Nif::TransformKeyframe> original;
+        if (!NifBlockFile::decodeKeyframeData(dataType, file.block(dataBlock).data, original)
+            || original.size() < 2) {
+            ++decodeFailed;
+            continue;
+        }
+
+        const QString out = dir.filePath(QStringLiteral("real.nif"));
+        {
+            QFile f(out);
+            if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+                continue;
+            const bool whole = f.write(bytes) == bytes.size();
+            f.close();
+            if (!whole)
+                continue;
+        }
+        originalKeyframes = original.size();
+        target = out;
     }
 
-    // QTest's own output is unreliable to read back in this environment, and a
-    // skip is indistinguishable from a pass on an exit code. Drop a marker so
-    // the difference is on disk, where a build log or a later run can see it.
+    // QTest output is unreliable to read back in this environment and a skip is
+    // indistinguishable from a pass on an exit code, so the outcome is written
+    // to a file where it can be seen.
     {
         QFile marker("C:/Users/max/AppData/Local/Temp/opencode/anim_realfiles.txt");
         if (marker.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            marker.write(QStringLiteral("EDITED\t%1\t%2\tkf=%3\tconsidered=%4\n")
-                             .arg(nodeName, clipName)
-                             .arg(originalKeyframes)
-                             .arg(filesConsidered).toUtf8());
+            if (target.isEmpty()) {
+                marker.write(QStringLiteral("NOEDIT\tarchiveNifs=%1\tconsidered=%2\tnotGamebryo=%3\t"
+                                            "splitRejected=%4\tnoController=%5\tnoClip=%6\t"
+                                            "noDataBlock=%7\tnotWritable=%8\tdecodeFailed=%9\t"
+                                            "hasTransformData=%10\thasSequence=%11\n")
+                                 .arg(totalNifs).arg(filesConsidered).arg(notGamebryo)
+                                 .arg(splitRejected).arg(noController).arg(noClip)
+                                 .arg(noDataBlock).arg(notWritable).arg(decodeFailed)
+                                 .arg(hasTransformData).arg(hasSequence).toUtf8());
+                if (!dataTypeSamples.isEmpty()) {
+                    marker.write(("SAMPLES " + dataTypeSamples.join(QStringLiteral(" | "))
+                                  + QStringLiteral("\n")).toUtf8());
+                }
+            } else {
+                marker.write(QStringLiteral("EDITED\t%1\t%2\tkf=%3\tconsidered=%4\t"
+                                            "splitRejected=%5\tnoController=%6\tnoClip=%7\t"
+                                            "noDataBlock=%8\tnotWritable=%9\tdecodeFailed=%10\n")
+                                 .arg(nodeName, clipName).arg(originalKeyframes)
+                                 .arg(filesConsidered).arg(splitRejected).arg(noController)
+                                 .arg(noClip).arg(noDataBlock).arg(notWritable)
+                                 .arg(decodeFailed).toUtf8());
+            }
             marker.close();
         }
     }
 
-    qInfo().noquote() << "editing" << nodeName << "clip" << clipName
-                      << "with" << originalKeyframes << "keyframes from" << filesConsidered
-                      << "files considered";
+    if (target.isEmpty())
+        QSKIP("no writable animated NIF found in the reachable archives");
 
-    // Edit the time of every keyframe, keeping the count the file already had.
-    // Changing the count is exercised by the synthetic test; what this test is
-    // for is that a real file's controller is found, rewritten and still parses
-    // as the same tree afterwards.
-    Nif::NifParser before;
-    QVERIFY(before.load(written));
-    std::vector<float> newTimes;
-    for (int i = 0; i < originalKeyframes; ++i)
-        newTimes.push_back(0.5f * static_cast<float>(i));
-
+    // Edit the times, keeping the count the file already had. Changing the
+    // count is covered by the synthetic test; the point here is that a real
+    // file's controller is located, rewritten, and the result still opens.
     QVector<Nif::TransformKeyframe> edited;
     for (int i = 0; i < originalKeyframes; ++i) {
         Nif::TransformKeyframe kf;
-        kf.time = newTimes[i];
+        kf.time = 0.5f * static_cast<float>(i);
         kf.translation = {static_cast<float>(i), 0.0f, 0.0f};
-        kf.rotation = {newTimes[i], 0.0f, 0.0f, 0.0f, 1.0f};
+        kf.rotation = {kf.time, 0.0f, 0.0f, 0.0f, 1.0f};
         kf.scale = {1.0f, 1.0f, 1.0f};
         edited.append(kf);
     }
 
-    QVERIFY2(NifAnimationWriter::writeKeyframesToNif(written, nodeName, edited, clipName),
-             qPrintable(QStringLiteral("write failed for %1 clip %2").arg(nodeName, clipName)));
+    const QByteArray before = [&] {
+        QFile f(target);
+        return f.open(QIODevice::ReadOnly) ? f.readAll() : QByteArray();
+    }();
+    QVERIFY(!before.isEmpty());
 
-    // The edited file must still parse, keep its node and clip names, and now
-    // carry the new times. A writer that produced a file the reader cannot
-    // reopen has destroyed the user's mesh, which is the failure this guards.
-    Nif::NifParser after;
-    QVERIFY2(after.load(written), qPrintable(QStringLiteral("reparse failed: %1").arg(written)));
-    Nif::Node* newRoot = after.getRoot();
-    QVERIFY(newRoot);
+    QVERIFY2(NifAnimationWriter::writeKeyframesToNif(target, nodeName, edited, clipName),
+             qPrintable(QStringLiteral("write failed for node %1 clip %2").arg(nodeName, clipName)));
 
-    std::function<Nif::Node*(Nif::Node*)> findNamed = [&](Nif::Node* node) -> Nif::Node* {
-        if (node->name == nodeName)
-            return node;
-        for (Nif::Node* child : node->children) {
-            if (Nif::Node* hit = findNamed(child))
-                return hit;
-        }
-        return nullptr;
-    };
-    Nif::Node* reloaded = findNamed(newRoot);
-    QVERIFY2(reloaded, qPrintable(QStringLiteral("node %1 vanished after write-back").arg(nodeName)));
-    QCOMPARE(reloaded->animations.size(), 1);
-    QCOMPARE(reloaded->animations.first().clipName, clipName);
+    // The file must still open through the block reader, keep its block count,
+    // and now carry the edited times. A writer that produced a file the reader
+    // cannot reopen has destroyed the user's mesh, which is what this guards.
+    NifBlockFile after;
+    QVERIFY2(after.load(target), qPrintable(QStringLiteral("reopen failed: %1").arg(target)));
 
-    const QVector<Nif::TransformKeyframe>& writtenKeys = reloaded->animations.first().keyframes;
-    QCOMPARE(writtenKeys.size(), originalKeyframes);
-    for (int i = 0; i < originalKeyframes; ++i)
-        QVERIFY2(qAbs(writtenKeys.at(i).time - newTimes[i]) < 0.0001f,
+    const QHash<quint32, QString> clipsAfter = after.clipNamesByController();
+    QVERIFY2(clipsAfter.values().contains(clipName),
+             qPrintable(QStringLiteral("clip %1 lost after write-back").arg(clipName)));
+
+    quint32 reFound = 0;
+    for (int block = 0; block < after.count(); ++block) {
+        QString name;
+        quint32 controllerRef = 0xFFFFFFFFu;
+        if (!after.nodeNetInfo(block, name, controllerRef)) continue;
+        if (name == nodeName && clipsAfter.value(controllerRef) == clipName)
+            reFound = controllerRef;
+    }
+    QVERIFY2(reFound != 0, qPrintable(QStringLiteral("node %1 lost its controller").arg(nodeName)));
+
+    const int dataBlockAfter = after.keyframeDataBlockFor(static_cast<int>(reFound));
+    QVERIFY2(dataBlockAfter >= 0, "keyframe data block not resolvable after write-back");
+
+    QVector<Nif::TransformKeyframe> readBack;
+    QVERIFY2(NifBlockFile::decodeKeyframeData(after.declaredBlockType(dataBlockAfter),
+                                               after.block(dataBlockAfter).data, readBack),
+             "written keyframe data does not decode");
+    QCOMPARE(readBack.size(), originalKeyframes);
+    for (int i = 0; i < originalKeyframes; ++i) {
+        QVERIFY2(qAbs(readBack.at(i).time - edited.at(i).time) < 0.0001f,
                  qPrintable(QStringLiteral("keyframe %1 time %2, wanted %3")
-                                .arg(i).arg(writtenKeys.at(i).time).arg(newTimes[i])));
+                                .arg(i).arg(readBack.at(i).time).arg(edited.at(i).time)));
+    }
+
+    // Capture the pre-write state through the same reader, so the comparison
+    // below is between two reads of the file rather than a tautology.
+    NifBlockFile preWrite;
+    QVERIFY(preWrite.load(target));
+    const int preBlockCount = preWrite.count();
+
+    // Every block the writer did not touch must come back byte for byte. It
+    // edits payloads in place, so a save that reorders, re-encodes or drops any
+    // other block would silently corrupt a real mesh while the keyframe check
+    // above still passed.
+    QCOMPARE(after.count(), preBlockCount);
+    int compared = 0;
+    for (int block = 0; block < after.count(); ++block) {
+        if (block == dataBlockAfter)
+            continue;
+        QVERIFY2(after.declaredBlockType(block) == preWrite.declaredBlockType(block),
+                 qPrintable(QStringLiteral("block %1 changed type").arg(block)));
+        QVERIFY2(after.block(block).data == preWrite.block(block).data,
+                 qPrintable(QStringLiteral("block %1 (%2) changed although it was not edited")
+                                .arg(block).arg(after.declaredBlockType(block))));
+        ++compared;
+    }
+    QVERIFY(compared > 0);
 }
 
 QTEST_MAIN(TestNifAnimation)

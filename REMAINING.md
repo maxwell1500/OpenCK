@@ -557,48 +557,94 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      in-viewport 3D playback is scoped in §8 (it is further along than the
      old note below suggested).
 
-   **Status 2026-09-30:** the blocker on `NifAnimationWriter` is gone. The
-   writer refused to write because the animated meshes it needs could not be
-   block-split; all 321 files carrying `NiTransformData` are now addressable
-   and `test_ntdlayout` fits a layout instead of skipping. The end-to-end
-   write-back test now exists
-   (`TestNifAnimation::testRealArchiveKeyframeWriteBack`) and it **skips**,
-   which is the finding: see the parser gap below.
+   **Status 2026-09-30:** the end-to-end write-back test now exists
+   (`TestNifAnimation::testRealArchiveKeyframeWriteBack`) and it **skips**.
+   The skip is the finding, and it is not the one recorded in the previous
+   revision of this file - see the correction below.
 
-### Real archive NIFs are not loadable by `NifParser` (blocks animation write-back)
+### Correction: the `NifParser` header gate is *not* the animation writer's blocker
 
-`NifParser::load` reads real Gamebryo binaries through
-`Gamebryo::parseHeader`, whose first real check is an exact match on the
-magic line:
+The previous revision of this file named `NifParser`'s exact-match on the
+20.2.0.7 magic line as the thing standing between `NifAnimationWriter` and a
+real-file write-back test. **That is wrong**, and it is worth recording why,
+because the error was in the test rather than in the writer.
+
+`NifAnimationWriter::writeKeyframesToNif` routes on
+`NifBlockFile::isBethesdaNif(nifPath)`:
+
+```cpp
+if (NifBlockFile::isBethesdaNif(nifPath)) {
+    patchBethesdaNif(nifPath, nodeName, keyframes, clipName, patched);  // NifBlockFile
+    return true;
+}
+// only then:
+Nif::NifParser parser;   // internal dialect, not a shipped file
+```
+
+So for any shipped file the writer uses **`NifBlockFile`**, which already walks
+a `20.0.0.4` container. The first version of the test loaded files through
+`NifParser`, therefore exercised a path the writer never takes, and skipped for
+a reason that had nothing to do with the writer. The reader must match the
+path under test; a test of the wrong reader measures the wrong thing and looks
+like a real blocker.
+
+`NifParser`'s 20.0.0.4 gap is still real and still worth fixing, but it belongs
+to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
+not to animation write-back.
+
+### The actual remaining blocker: no real file resolves to a named clip
+
+With the test on the writer's own reader, the chain the writer performs -
+node -> controller -> clip -> keyframe data - completes **zero** times across
+the base archive. Measured 2026-09-30 against `Oblivion - Meshes.bsa`, all
+8,032 `.nif` entries:
+
+| | count |
+|---|---|
+| `.nif` entries in archive | 8,032 |
+| not Gamebryo (skipped) | 70 |
+| **Gamebryo, block-split by `NifBlockFile`** | **7,962 (100%)** |
+| of those, no keyframe controller block | 7,798 |
+| of those, have a controller but no node matching name+clip | 164 |
+| **resolve node -> controller -> clip -> data** | **0** |
+| files carrying keyframe data (`NiTransformData`/`NiKeyframeData`) | 90 |
+| files carrying an `NiControllerSequence` | 100 |
+
+So the pieces exist - 164 files have controllers, 90 have keyframe data, 100
+have a sequence carrying clip names - but no file joins them. `NifBlockFile`
+splits every file without a single failure, so this is not a block-boundary
+problem. The break is in the association, and the next step is to find which
+link fails first: whether `nodeNetInfo` fails to report the controller ref of
+an animated node in a 1.5 file, or whether the refs in `NiControllerSequence`
+do not match the indices `findBlocks` returns.
+
+Note the earlier "321 files carry `NiTransformData`" figure counted files where
+the data block is *present and split*, which is not the same as files where the
+data block is *reachable from a node by a named clip*. The 90/100 figures above
+are the second, stricter question, and 0 is the answer.
+
+### Real archive NIFs are still not loadable by `NifParser` (view layer, not writer)
+
+`Gamebryo::parseHeaderVariant` matches the magic line exactly:
 
 ```cpp
 if (magic != "Gamebryo File Format, Version 20.2.0.7") return false;
 ```
 
-`parseHeaderVariant` also pins `bsVersion` handling to the Starfield-era
-header shape. Every NIF shipped in an **Oblivion** archive is version
-`20.0.0.4`, with no per-block size table, so the header check rejects the
-file before any block is read. Measured 2026-09-30 with the new test against
-`Oblivion - Meshes.bsa`: **8,032 NIFs in the archive, 3,980 read from the
-archive, 3,980 of those rejected by the parser, 0 loaded.**
+Every NIF in an Oblivion archive is `20.0.0.4`, so `NifParser` rejects it
+before reading a block: 3,980 of 3,980 archive members rejected, 0 loaded.
 
-This is why `testRealNifSurvey`'s "8/8 shipped files load" is true and does
-not contradict this: that test reads loose `.nif` files from
-`OPENCK_DATA_DIR` (Starfield, `20.2.0.7`), not archive members. Two different
-container generations, and only the newer one is loadable.
+This does not contradict `test_nifskilling`'s "8/8 shipped files load": that
+test reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield
+content (`20.2.0.7`). Two container generations, only the newer one loadable.
 
-Consequences:
-- `NifAnimationWriter` cannot yet be exercised against a real archive file,
-  so its correctness on a real pre-20.2.0.5 container is still unproven.
-  Its blocker is no longer addressability, it is this header gate.
-- The 7,962/7,962 figure belongs to `NifBlockFile`, which walks blocks
-  without needing the header variant. It is unaffected by this and still
-  holds.
-
-The fix is a pre-20.2.0.5 header path in `parseHeader`, reusing the block
-boundary work already in `libs/files/nif/nifblockfile.cpp` (it already walks
-a version-less container end to end). Until that exists, the write-back test
-skips, and the skip is the honest outcome rather than a pass.
+Fixing it is more than a version-tolerance tweak, which is why it was not done
+blind: pre-20.1.0.1 containers have **no string table**, so block names are
+inline fixed-length strings rather than indices into one. `parseAvPrefix` and
+every other block parser read `nameIdx` as a `u32` lookup into
+`Header::strings`, so a pre-20.2.0.5 header path must also give those parsers
+an inline-string form. `NifBlockFile` already handles both generations and its
+header parser is version-generic, so it is the natural model.
 3. **Particle FX.** The NIF particle block parser
     (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
     `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle
