@@ -490,6 +490,21 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
             // the header version does.
             QString nodeHex;
             QString nodeType;
+            // Raw bytes of the first NiControllerSequence too. Whether the
+            // per-entry names are 4-byte StringOffsets or fixed 32-byte strings
+            // decides the entry layout, and guessing wrong yields plausible-
+            // looking garbage rather than an obvious failure.
+            QString seqHex;
+            int seqTypeLen = 0;
+            for (int block = 0; block < file.count(); ++block) {
+                if (file.declaredBlockType(block) != QStringLiteral("NiControllerSequence"))
+                    continue;
+                const QByteArray d = file.block(block).data;
+                for (int i = 0; i < qMin(192, d.size()); ++i)
+                    seqHex += QStringLiteral("%1 ").arg(quint8(d.at(i)), 2, 16, QChar('0'));
+                seqTypeLen = d.size();
+                break;
+            }
             for (int block = 0; block < file.count(); ++block) {
                 if (!NifBlockFile::isNodeBlockType(file.declaredBlockType(block))) continue;
                 nodeType = file.declaredBlockType(block);
@@ -516,7 +531,7 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
                 clipPairs << QStringLiteral("%1=%2").arg(it.key()).arg(it.value());
             linkSamples << QStringLiteral("ctrl=%1 seq=%2 nodes=%3 named=%4 refHits=%5 "
                                           "nodeRefs=[%6] clips=%7 clipKeys=[%8] nodeType=%9 "
-                                          "nodeHex=[%10]")
+                                          "nodeHex=[%10] seqLen=%11 seqHex=[%12]")
                                   .arg(controllers.size())
                                   .arg(file.findBlocks(QStringLiteral("NiControllerSequence")).size())
                                   .arg(nodesSeen).arg(nodesWithName)
@@ -525,7 +540,9 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
                                   .arg(clips.size())
                                   .arg(clipPairs.join(QStringLiteral(",")))
                                   .arg(nodeType)
-                                  .arg(nodeHex);
+                                  .arg(nodeHex)
+                                  .arg(seqTypeLen)
+                                  .arg(seqHex);
         }
 
         int chosenBlock = -1;

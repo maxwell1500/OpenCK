@@ -89,7 +89,7 @@ bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
         const QList<int> sequences = file.findBlocks(QStringLiteral("NiControllerSequence"));
         for (int sequenceIndex : sequences) {
             QList<QPair<quint32, QString>> entries;
-            if (!NifBlockFile::decodeControllerSequence(file.block(sequenceIndex).data, entries))
+            if (!file.decodeControllerSequence(file.block(sequenceIndex).data, entries))
                 continue;
             for (const auto& entry : entries) {
                 if (entry.second == clipName) {

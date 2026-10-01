@@ -592,69 +592,46 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
-### The node -> controller link is fixed; the clip link needs a version-aware parser
+### The clip link is structurally correct; only the name lookup is still open
 
-`nodeNetInfo` read the block name as a `u32` index into the string table:
-
-```cpp
-const quint32 nameIndex = c.u32();
-if (!c.ok() || nameIndex >= static_cast<quint32>(mStrings.size())) return false;
-```
-
-A `20.0.0.4` container has **no string table** - it arrived in `20.1.0.1` - so
-`mStrings` is empty and this returned false for *every* node in *every*
-pre-20.2.0.5 file. Before 20.1.0.1 the name is a length-prefixed inline
-string. Verified against a shipped Oblivion `NiNode`:
+`decodeControllerSequence` read offset 0 as the entry count. Offset 0 of a
+real `NiControllerSequence` is its **name**, and the entries are
+`ControlledBlock` records, not a ref/length run. It was reading the name's
+*length* (7) as the entry count and then walking nine bytes per entry out of a
+block holding one. The 20.0.0.4 layout, verified against shipped bytes:
 
 ```
-1b 00 00 00  "CastleIntNarrowSecretDoor02"  02 00 00 00 01 00 00 00 02 00 00 00
-^^ 0x1b = 27, the name length - not a table index
+07 00 00 00 "Forward"        name, a sized string
+03 00 00 00                 array_grow_by
+01 00 00 00                 num_controlled_blocks
+per ControlledBlock:
+  08 00 00 00               interpolator ref
+  04 00 00 00               controller ref
+  00                        priority
+  0a 00 00 00               string palette ref
+  5 x u32                   node/property/controller/interpolator name offsets
+...133 further bytes of playback parameters
 ```
 
-**Fixed.** `nodeNetInfo` now branches on the header version. Effect, measured
-over the base archive: nodes reported went from **0 to 91** per file, and
-**84 of 91** resolve to a real keyframe controller.
+**Fixed.** The decoder is now a version-aware member function, since every
+field is conditional on the header version. Measured effect: the controller
+refs in a sequence now decode (`clipKeys=[4=,5=]`, matching the `04 00 00 00`
+in the bytes above), where before the function returned an empty list for
+every file.
 
-`decodeControllerSequence` was wrong in a second, independent way, and is
-**still open**. It began by reading offset 0 as the entry count:
+**Still open:** the *name* is empty. `node_name_offset` indexes the
+`NiStringPalette` block the entry points at, and `stringAtPaletteOffset` does
+not yet resolve it. `NiStringPalette` yields two `SizedString`s and no leading
+count, so the palette is a plain run of sized strings; the first attempt read
+a count, consumed the first string's own length as that count, and then
+bailed. Removing the count is done, and the lookup still returns nothing, so
+the remaining question is which block the ref actually addresses - the value
+seen is `10`, and block 10 has not been confirmed to be the palette. Compare
+its type against `NiStringPalette` before going further.
 
-```cpp
-const quint32 numSequences = c.u32();
-```
-
-Offset 0 of a real `NiControllerSequence` is its **name**. The actual
-`20.0.0.4` layout, from nifgen, is:
-
-```
-NiSequence:  name (inline string)
-             num_controlled_blocks (u32)
-             array_grow_by (u32)                  [version >= 167837802]
-             controlled_blocks[num_controlled_blocks]:
-                 interpolator          (ref, 4)
-                 controller            (ref, 4)
-                 priority              (u8, 1)    [bs_version > 0]
-                 string_palette        (ref, 4)    [<= 335609856]
-                 node_name_offset          (StringOffset)
-                 property_type_offset      (StringOffset)
-                 controller_type_offset    (StringOffset)
-                 controller_id_offset      (StringOffset)
-                 interpolator_id_offset    (StringOffset)
-NiControllerSequence adds:
-             weight (f32), text_keys (ref), cycle_type (u32), frequency (f32)
-             start_time (f32), stop_time (f32), manager (ref)
-             accum_root_name (inline string)
-             string_palette (ref)               [167837809 .. 335609856]
-```
-
-So the clip name is a `node_name_offset` `StringOffset`, which for a file with
-no string table is itself an inline string, and every member is
-version-conditional. The decoder needs the header version, which it is not
-currently given: `decodeControllerSequence(const QByteArray&, ...)` has no
-version parameter. That is the change to make.
-
-`c.atEnd()` was also removed as a success condition, since every generation
-appends trailing playback parameters after the entry list and the check could
-never hold - it was silently guaranteeing zero clip names for all versions.
+Until the name resolves, the writer cannot filter by clip name, and the
+end-to-end write-back test still skips. The chain is now one lookup from
+closing.
 
 ### Real archive NIFs are still not loadable by `NifParser` (view layer, not writer)
 

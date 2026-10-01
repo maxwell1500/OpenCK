@@ -152,13 +152,21 @@ public:
     // result is only accepted when it is a known keyframe data type.
     int keyframeDataBlockFor(int controllerIndex) const;
 
-    // NiControllerSequence: (controller ref, clip name) pairs. This is the
-    // only place a clip name is stored, so it is what ties a controller to a
-    // named animation in the editor.
-    static bool decodeControllerSequence(const QByteArray& data,
-                                         QVector<QPair<quint32, QString>>& out);
+    // NiControllerSequence: (controller ref, animated node name) pairs. The
+    // entries are ControlledBlock records and every field of one is
+    // version-conditional, so this reads the header version rather than
+    // assuming a shape. A pre-20.1.0.1 container has no header string table, so
+    // the node name is an offset into the NiStringPalette block the entry
+    // points at; the name is empty when that lookup does not resolve, and
+    // callers able to work from a node name and a controller ref alone should
+    // not require it.
+    bool decodeControllerSequence(const QByteArray& data,
+                                  QList<QPair<quint32, QString>>& out) const;
 
 private:
+    // String at an offset within the NiStringPalette block a ControlledBlock
+    // refers to.
+    QString stringAtPaletteOffset(quint32 paletteRef, quint32 offset) const;
     void reset();
     bool parse(const QByteArray& raw, bool hasUnknownInt, QString& error);
     // Recover individual block boundaries in a container that has no size table,

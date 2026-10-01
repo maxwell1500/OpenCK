@@ -97,6 +97,25 @@ private:
     bool mOk = true;
 };
 
+// String is a sized string below 20.1.0.1 and a header-string-table index from
+// there on. The two cannot be told apart by trying both: in a file that does
+// have a table, reading a length always succeeds and silently yields a wrong
+// string, so the version decides.
+bool readStringAt(Cursor& c, quint32 version, const QStringList& strings, QString& out)
+{
+    if (version >= 335609859u) {
+        const quint32 index = c.u32();
+        if (!c.ok() || index >= static_cast<quint32>(strings.size())) return false;
+        out = strings.at(static_cast<int>(index));
+        return true;
+    }
+    const quint32 length = c.u32();
+    if (!c.ok() || length > 1024u || length > static_cast<quint32>(c.remaining()))
+        return false;
+    out = QString::fromLatin1(c.raw(static_cast<int>(length)));
+    return c.ok();
+}
+
 void appendU8(QByteArray& out, quint8 v) { out.append(static_cast<char>(v)); }
 
 void appendU16(QByteArray& out, quint16 v)
@@ -3526,27 +3545,111 @@ QHash<quint32, QString> NifBlockFile::clipNamesByController() const
     return names;
 }
 
+// NiControllerSequence, verified against a shipped Oblivion 20.0.0.4 block:
+//
+//   07 00 00 00 "Forward"      name, a sized string
+//   03 00 00 00               array_grow_by
+//   01 00 00 00               num_controlled_blocks
+//   per ControlledBlock:
+//     08 00 00 00             interpolator ref
+//     04 00 00 00             controller ref
+//     00                      priority
+//     0a 00 00 00             string palette ref
+//     5 x u32                 node/property/controller/interpolator name offsets
+//   ...133 further bytes of playback parameters
+//
+// The name is a sized string, not a table index, and the entry list is
+// ControlledBlock records rather than a ref/length run. The previous version
+// read offset 0 as the entry count - which is the name's *length*, 7 - so it
+// read seven nine-byte entries out of a block holding one. Every field is
+// version-conditional, so this reads the header version and cannot be a free
+// function over bytes.
+//
+// A pre-20.1.0.1 container has no header string table, so the animated node
+// name is an offset into the NiStringPalette block the entry points at. The
+// name is empty when that lookup does not resolve, and callers that can work
+// from a node name and a controller ref alone should not require it.
 bool NifBlockFile::decodeControllerSequence(const QByteArray& data,
-                                            QList<QPair<quint32, QString>>& out)
+                                            QList<QPair<quint32, QString>>& out) const
 {
     out.clear();
     Cursor c(data);
-    const quint32 numSequences = c.u32();
-    if (!c.ok() || numSequences > 100000u) return false;
-    for (quint32 i = 0; i < numSequences; ++i) {
+
+    QString sequenceName;
+    if (!readStringAt(c, mVersion, mStrings, sequenceName)) return false;
+    const quint32 numControlled = c.u32();
+    if (!c.ok() || numControlled > 100000u) return false;
+    if (mVersion >= 167837802u)
+        c.u32();                            // array_grow_by
+
+    const bool hasPaletteRef = mVersion >= 167903232u && mVersion <= 335609856u;
+    // 20.1.0.1 onwards keeps the entry names in the header string table.
+    const bool namesInStringTable = mVersion >= 335609857u;
+
+    for (quint32 i = 0; i < numControlled; ++i) {
+        if (mVersion >= 167837802u)
+            c.u32();                        // interpolator ref
         const quint32 controllerRef = c.u32();
-        const quint8 nameLen = c.u8();
-        if (!c.ok() || nameLen > 250) return false;
-        const QString name = QString::fromLatin1(c.raw(nameLen));
         if (!c.ok()) return false;
-        out.append(qMakePair(controllerRef, name));
+        if (mVersion >= 167837802u && mBsVersion > 0u)
+            c.u8();                         // priority
+        quint32 paletteRef = 0xFFFFFFFFu;
+        if (hasPaletteRef)
+            paletteRef = c.u32();
+        if (!c.ok()) return false;
+
+        quint32 nodeNameOffset = 0;
+        if (hasPaletteRef || namesInStringTable) {
+            nodeNameOffset = c.u32();       // node_name_offset
+            c.u32();                        // property_type_offset
+            c.u32();                        // controller_type_offset
+            c.u32();                        // controller_id_offset
+            c.u32();                        // interpolator_id_offset
+            if (!c.ok()) return false;
+        } else {
+            // A generation with neither a palette nor a table still carries the
+            // five names, as inline strings.
+            for (int k = 0; k < 5; ++k) {
+                QString ignored;
+                if (!readStringAt(c, mVersion, mStrings, ignored)) return false;
+            }
+        }
+
+        QString nodeName;
+        if (namesInStringTable) {
+            if (nodeNameOffset < static_cast<quint32>(mStrings.size()))
+                nodeName = mStrings.at(static_cast<int>(nodeNameOffset));
+        } else if (hasPaletteRef) {
+            nodeName = stringAtPaletteOffset(paletteRef, nodeNameOffset);
+        }
+        out.append(qMakePair(controllerRef, nodeName));
     }
-    // Trailing bytes here are the sequence's own playback parameters (weight,
-    // cycle type, frequency, start/stop time, manager, accumulated-root name),
-    // which every game generation appends after the entry list. They are not
-    // part of what this decodes, and requiring the block to end at the last
-    // entry meant this returned false for every real file - including the
-    // 20.2.0.7 ones it was written for - so clipNamesByController() could never
-    // return anything at all. Stop cleanly at the end of the list instead.
+
+    // Anything left is the sequence's own playback parameters (weight, cycle
+    // type, frequency, start and stop time, manager, accumulated-root name).
+    // Requiring the block to end at the last entry could never hold - every
+    // generation appends them - so that check was guaranteeing zero entries for
+    // all versions, the opposite of what a strictness check is for.
     return true;
+}
+
+// NiStringPalette: a run of sized strings, one per palette entry, with no
+// leading count. Reading a count here consumed the first string's own length
+// and then failed, which is why every name came back empty: the layout is a
+// plain sequence, and the offset in a ControlledBlock is a position in it.
+QString NifBlockFile::stringAtPaletteOffset(quint32 paletteRef, quint32 offset) const
+{
+    if (paletteRef == 0xFFFFFFFFu || paletteRef >= static_cast<quint32>(mBlocks.size()))
+        return QString();
+    const QByteArray& data = mBlocks.at(static_cast<int>(paletteRef)).data;
+    Cursor c(data);
+    if (offset > 4096u)
+        return QString();
+    for (quint32 i = 0; i < offset; ++i) {
+        QString ignored;
+        if (!readStringAt(c, mVersion, mStrings, ignored)) return QString();
+    }
+    QString result;
+    if (!readStringAt(c, mVersion, mStrings, result)) return QString();
+    return result;
 }
