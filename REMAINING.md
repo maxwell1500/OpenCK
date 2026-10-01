@@ -592,7 +592,46 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
-### The keyframe codec is wrong, measured against shipped data
+### The `NiKeyframeData` framing, narrowed to two candidates
+
+A shipped `NiTransformData` block is **136 bytes**, and its first two words are
+decisive: `num_rotation_keys = 1`, `rotation_type = 4`. Full bytes are captured
+by `testRealArchiveKeyframeCodecRoundTrip`, which dumps the first two blocks of
+each type under 256 bytes.
+
+That leaves 128 bytes after the two header words, and `rotation_type = 4` is
+the interpolation mode, which is why four `QuatKey`s appear for one rotation
+key - Bezier keeps four control points per key. So `quaternion_keys` is
+`rotation_type` entries, **not** `num_rotation_keys`. The existing decoder sizes
+it by `num_rotation_keys`; that alone makes it wrong.
+
+Only two framings divide 128 exactly:
+
+1. **4 x 24-byte QuatKey, then translations (20) and scales (12)**
+   4*24 + 20 + 12 = 128. A 24-byte QuatKey would be `time` + `Quaternion(16)` +
+   one more 4-byte field.
+2. **4 x 32-byte QuatKey and nothing after**
+   4*32 = 128, with no translations or scales at all.
+
+Candidate 2 fits a `Tbc` of three floats (`time` + `Quaternion` + `Tbc(12)` =
+32) and is the reading that needs no further fields; candidate 1 fits the
+`KeyGroup` framing nifgen implies, where `translations` and `scales` are each
+`{uint32 count, uint32 interpolation, values}`.
+
+The round-trip harness already discriminates between them - it re-encodes and
+compares bytes against 4,412 shipped blocks - so the deciding step is one
+implementation run, not more inspection. Candidate 2 is the one to try first: it
+accounts for every byte with no leftover, and the 8-byte stride between
+successive `02 00 00 00 02 00 00 00` markers in the dump is consistent with a
+32-byte QuatKey.
+
+What is already settled and does not need revisiting: the three channels are not
+interchangeable, scales are single floats rather than `Vector3`, the quaternion
+array is sized by `rotation_type`, and a self-consistent codec proves nothing
+because the existing pair agreed with itself and disagreed with the game on all
+4,412 blocks.
+
+### Why the codec is still gated off: 4,412 of 4,412 blocks disagree
 
 `decodeKeyframeData`/`encodeKeyframeData` handle `NiTransformData` as three
 independent channels - translations, rotations, scales - each with its own count

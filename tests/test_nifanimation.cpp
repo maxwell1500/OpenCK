@@ -224,7 +224,7 @@ void TestNifAnimation::testSlerpTakesShortPath()
     const TransformKeyframe& f = frames[0];
     QVERIFY(f.hasQuat);
     // Slerp midpoint of identity -> -10 deg is -5 deg about Y. An Euler lerp
-    // of 0 -> 350 deg would sit at 175 deg instead (the flip ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§8.2 kills).
+    // of 0 -> 350 deg would sit at 175 deg instead (the flip ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§8.2 kills).
     QVERIFY(qAbs(f.ry - static_cast<float>(qDegreesToRadians(-5.0))) < 0.01f);
     QVERIFY(qAbs(f.qw - 0.99905f) < 0.001f);
 }
@@ -752,6 +752,7 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
     };
 
     QMap<QString, int> examined;
+    QStringList hexSamples;
     QMap<QString, int> agreed;
     QString firstMismatch;
     QString firstFailure;
@@ -788,6 +789,13 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
             for (int index : indices) {
                 ++examined[type];
                 const QByteArray& original = file.block(index).data;
+                if (hexSamples.size() < 2 && original.size() <= 256) {
+                    QString h;
+                    for (int i = 0; i < original.size(); ++i)
+                        h += QStringLiteral("%1 ").arg(quint8(original.at(i)), 2, 16, QChar('0'));
+                    hexSamples << QStringLiteral("%1 size=%2 hex=[%3]")
+                                   .arg(type).arg(original.size()).arg(h);
+                }
                 QVector<Nif::TransformKeyframe> decoded;
                 if (!NifBlockFile::decodeKeyframeData(type, original, decoded)) {
                     if (firstFailure.isEmpty())
@@ -822,7 +830,9 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
                 marker.write(QStringLiteral("%1 examined=%2 byteExact=%3\n")
                                  .arg(type).arg(examined.value(type)).arg(agreed.value(type)).toUtf8());
             }
-            if (!firstFailure.isEmpty())
+                        for (const QString& hx : hexSamples)
+                marker.write(("HEX " + hx + QStringLiteral("\n")).toUtf8());
+if (!firstFailure.isEmpty())
                 marker.write(("FAILURE " + firstFailure + "\n").toUtf8());
             if (!firstMismatch.isEmpty())
                 marker.write(("MISMATCH " + firstMismatch + "\n").toUtf8());
