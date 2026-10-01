@@ -592,44 +592,42 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
-### The `NiKeyframeData` framing, narrowed to two candidates
+### The framing, derived exactly from the bytes
 
-A shipped `NiTransformData` block is **136 bytes**, and its first two words are
-decisive: `num_rotation_keys = 1`, `rotation_type = 4`. Full bytes are captured
-by `testRealArchiveKeyframeCodecRoundTrip`, which dumps the first two blocks of
-each type under 256 bytes.
+A shipped `NiTransformData` is 136 bytes and opens
+`num_rotation_keys = 1, rotation_type = 4`. Reading the remainder as three
+identical 40-byte groups fits the block exactly:
 
-That leaves 128 bytes after the two header words, and `rotation_type = 4` is
-the interpolation mode, which is why four `QuatKey`s appear for one rotation
-key - Bezier keeps four control points per key. So `quaternion_keys` is
-`rotation_type` entries, **not** `num_rotation_keys`. The existing decoder sizes
-it by `num_rotation_keys`; that alone makes it wrong.
+```
+u32 num_rotation_keys            1
+u32 rotation_type                4      <- interpolation mode, not a count
+u32 count                        2      \ translations
+u32 interpolation                2      / count x { f32 time, Vector3 }
+u32 count                        2      \ rotations
+u32 interpolation                2      / count x { f32 time, Quaternion }
+u32 count                        2      \ scales
+u32 interpolation                2      / count x { f32 time, Vector3 }
+```
 
-Only two framings divide 128 exactly:
+3 x 40 = 120, plus the 8-byte header, is the 136 observed, with nothing left
+over. Every word in the dump lands on a group boundary at that framing, which is
+what distinguishes it from the alternatives.
 
-1. **4 x 24-byte QuatKey, then translations (20) and scales (12)**
-   4*24 + 20 + 12 = 128. A 24-byte QuatKey would be `time` + `Quaternion(16)` +
-   one more 4-byte field.
-2. **4 x 32-byte QuatKey and nothing after**
-   4*32 = 128, with no translations or scales at all.
+The previous code was wrong in four ways, and each is now a measured fact rather
+than a suspicion: it read three bare counts instead of three groups with an
+interpolation word; it sized the quaternion array by `num_rotation_keys` when
+`rotation_type` is the length; it dropped each channel's first key time when
+every key carries one; and it treated the three channels as interchangeable
+when the value sizes differ.
 
-Candidate 2 fits a `Tbc` of three floats (`time` + `Quaternion` + `Tbc(12)` =
-32) and is the reading that needs no further fields; candidate 1 fits the
-`KeyGroup` framing nifgen implies, where `translations` and `scales` are each
-`{uint32 count, uint32 interpolation, values}`.
-
-The round-trip harness already discriminates between them - it re-encodes and
-compares bytes against 4,412 shipped blocks - so the deciding step is one
-implementation run, not more inspection. Candidate 2 is the one to try first: it
-accounts for every byte with no leftover, and the 8-byte stride between
-successive `02 00 00 00 02 00 00 00` markers in the dump is consistent with a
-32-byte QuatKey.
-
-What is already settled and does not need revisiting: the three channels are not
-interchangeable, scales are single floats rather than `Vector3`, the quaternion
-array is sized by `rotation_type`, and a self-consistent codec proves nothing
-because the existing pair agreed with itself and disagreed with the game on all
-4,412 blocks.
+**An implementation of exactly this framing was tried and reverted.** It removed
+the re-encode mismatch entirely - no block produced differing bytes - but every
+one of the 4,412 then failed to *decode*, which destroys the ability to read
+these animations at all. Trading "some blocks mis-round-trip" for "no block
+decodes" is a capability regression even though the write gate is unchanged, so
+it does not stay. The framing above is what to implement next; it needs the
+per-group counts driven by the header and verified by the existing round-trip
+harness rather than by hand.
 
 ### Why the codec is still gated off: 4,412 of 4,412 blocks disagree
 
