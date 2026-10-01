@@ -163,9 +163,11 @@ public:
     bool decodeControllerSequence(const QByteArray& data,
                                   QList<QPair<quint32, QString>>& out) const;
 
-private:
-    // String at an offset within the NiStringPalette block a ControlledBlock
-    // refers to.
+    // The palette string at a byte position inside an NiStringPalette block. A
+    // pre-20.1.0.1 container stores its palette as a NUL-terminated run inside
+    // one length-prefixed blob, and a ControlledBlock's name offset is a
+    // position in that blob. Empty when the block is absent or the position
+    // does not land on one.
     QString stringAtPaletteOffset(quint32 paletteRef, quint32 offset) const;
     void reset();
     bool parse(const QByteArray& raw, bool hasUnknownInt, QString& error);

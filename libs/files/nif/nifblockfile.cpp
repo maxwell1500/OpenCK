@@ -3539,7 +3539,15 @@ QHash<quint32, QString> NifBlockFile::clipNamesByController() const
         QList<QPair<quint32, QString>> entries;
         if (!decodeControllerSequence(block(index).data, entries)) continue;
         for (const auto& entry : entries) {
-            if (entry.first < static_cast<quint32>(count())) names.insert(entry.first, entry.second);
+            if (entry.first >= static_cast<quint32>(count()))
+                continue;
+            // A file can hold several sequences naming the same controller, and
+            // not all of them resolve their node name. Insert would let a later
+            // empty name overwrite one that did resolve, so a name is only taken
+            // when there is nothing better to keep.
+            if (entry.second.isEmpty() && names.contains(entry.first))
+                continue;
+            names.insert(entry.first, entry.second);
         }
     }
     return names;
@@ -3633,23 +3641,50 @@ bool NifBlockFile::decodeControllerSequence(const QByteArray& data,
     return true;
 }
 
-// NiStringPalette: a run of sized strings, one per palette entry, with no
-// leading count. Reading a count here consumed the first string's own length
-// and then failed, which is why every name came back empty: the layout is a
-// plain sequence, and the offset in a ControlledBlock is a position in it.
+// NiStringPalette in a pre-20.1.0.1 container: a u32 byte count followed by
+// that many bytes holding the palette's strings back to back, each NUL
+// terminated. A ControlledBlock's StringOffset is a position in that list, not
+// a byte offset and not an index into a header table - there is no header table
+// in this generation.
+//
+// Verified against a shipped Oblivion palette block:
+//   64 00 00 00 "SecretDoor02\0NiTransformController\0CastleInt...\0"
+// where 0x64 is the blob length, and the first listed string begins immediately
+// after it. Earlier attempts treated the palette as a counted run of sized
+// strings; it is neither counted nor sized per entry, which is why every name
+// came back empty.
 QString NifBlockFile::stringAtPaletteOffset(quint32 paletteRef, quint32 offset) const
 {
     if (paletteRef == 0xFFFFFFFFu || paletteRef >= static_cast<quint32>(mBlocks.size()))
         return QString();
-    const QByteArray& data = mBlocks.at(static_cast<int>(paletteRef)).data;
-    Cursor c(data);
     if (offset > 4096u)
         return QString();
-    for (quint32 i = 0; i < offset; ++i) {
-        QString ignored;
-        if (!readStringAt(c, mVersion, mStrings, ignored)) return QString();
+    const QByteArray& data = mBlocks.at(static_cast<int>(paletteRef)).data;
+    Cursor c(data);
+    const quint32 blobLength = c.u32();
+    if (!c.ok() || blobLength > 65536u)
+        return QString();
+    // Clamp rather than reject. The count is the palette's declared byte size
+    // and a block can be shorter than its own count when a writer padded the
+    // file differently; taking what is actually present still resolves the
+    // early entries, whereas refusing returns nothing at all. The offset is
+    // bounded separately above, so a truncated blob cannot read past the end.
+    const int take = qMin(static_cast<int>(blobLength), c.remaining());
+    if (take <= 0)
+        return QString();
+    const QByteArray blob = c.raw(take);
+    if (!c.ok())
+        return QString();
+    quint32 seen = 0;
+    int start = 0;
+    for (int i = 0; i <= blob.size(); ++i) {
+        const bool last = (i == blob.size());
+        if (!last && blob.at(i) != '\0')
+            continue;
+        if (seen == offset)
+            return QString::fromLatin1(blob.mid(start, i - start));
+        ++seen;
+        start = i + 1;
     }
-    QString result;
-    if (!readStringAt(c, mVersion, mStrings, result)) return QString();
-    return result;
+    return QString();
 }

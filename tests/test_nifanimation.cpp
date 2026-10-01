@@ -223,7 +223,7 @@ void TestNifAnimation::testSlerpTakesShortPath()
     const TransformKeyframe& f = frames[0];
     QVERIFY(f.hasQuat);
     // Slerp midpoint of identity -> -10 deg is -5 deg about Y. An Euler lerp
-    // of 0 -> 350 deg would sit at 175 deg instead (the flip Ã‚Â§8.2 kills).
+    // of 0 -> 350 deg would sit at 175 deg instead (the flip ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§8.2 kills).
     QVERIFY(qAbs(f.ry - static_cast<float>(qDegreesToRadians(-5.0))) < 0.01f);
     QVERIFY(qAbs(f.qw - 0.99905f) < 0.001f);
 }
@@ -421,7 +421,6 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
     int hasTransformData = 0;
     int hasSequence = 0;
     QStringList dataTypeSamples;
-    QStringList linkSamples;
 
     for (int i = 0; i < archive->fileCount() && target.isEmpty(); ++i) {
         const BsaFileEntry& entry = archive->entries()[i];
@@ -483,67 +482,6 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
         // and the two halves look fine in isolation. Recording how many nodes
         // report a controller ref, and what the clip map actually holds, says
         // which half is wrong instead of only that the join failed.
-        if (linkSamples.size() < 4) {
-            // Raw leading bytes of the first node block. Whether the name is a
-            // string-table index or an inline fixed-width string decides the
-            // whole fix, and the bytes settle it faster than reasoning about
-            // the header version does.
-            QString nodeHex;
-            QString nodeType;
-            // Raw bytes of the first NiControllerSequence too. Whether the
-            // per-entry names are 4-byte StringOffsets or fixed 32-byte strings
-            // decides the entry layout, and guessing wrong yields plausible-
-            // looking garbage rather than an obvious failure.
-            QString seqHex;
-            int seqTypeLen = 0;
-            for (int block = 0; block < file.count(); ++block) {
-                if (file.declaredBlockType(block) != QStringLiteral("NiControllerSequence"))
-                    continue;
-                const QByteArray d = file.block(block).data;
-                for (int i = 0; i < qMin(192, d.size()); ++i)
-                    seqHex += QStringLiteral("%1 ").arg(quint8(d.at(i)), 2, 16, QChar('0'));
-                seqTypeLen = d.size();
-                break;
-            }
-            for (int block = 0; block < file.count(); ++block) {
-                if (!NifBlockFile::isNodeBlockType(file.declaredBlockType(block))) continue;
-                nodeType = file.declaredBlockType(block);
-                const QByteArray d = file.block(block).data;
-                for (int i = 0; i < qMin(48, d.size()); ++i)
-                    nodeHex += QStringLiteral("%1 ").arg(quint8(d.at(i)), 2, 16, QChar('0'));
-                break;
-            }
-            int nodesSeen = 0, nodesWithName = 0, refsHittingController = 0;
-            QStringList refsSeen;
-            for (int block = 0; block < file.count(); ++block) {
-                QString name;
-                quint32 ref = 0xFFFFFFFFu;
-                if (!file.nodeNetInfo(block, name, ref)) continue;
-                ++nodesSeen;
-                if (name.isEmpty()) continue;
-                ++nodesWithName;
-                if (ref == 0xFFFFFFFFu) continue;
-                if (refsSeen.size() < 4) refsSeen << QStringLiteral("%1").arg(ref);
-                if (controllers.contains(ref)) ++refsHittingController;
-            }
-            QStringList clipPairs;
-            for (auto it = clips.begin(); it != clips.end() && clipPairs.size() < 4; ++it)
-                clipPairs << QStringLiteral("%1=%2").arg(it.key()).arg(it.value());
-            linkSamples << QStringLiteral("ctrl=%1 seq=%2 nodes=%3 named=%4 refHits=%5 "
-                                          "nodeRefs=[%6] clips=%7 clipKeys=[%8] nodeType=%9 "
-                                          "nodeHex=[%10] seqLen=%11 seqHex=[%12]")
-                                  .arg(controllers.size())
-                                  .arg(file.findBlocks(QStringLiteral("NiControllerSequence")).size())
-                                  .arg(nodesSeen).arg(nodesWithName)
-                                  .arg(refsHittingController)
-                                  .arg(refsSeen.join(QStringLiteral(",")))
-                                  .arg(clips.size())
-                                  .arg(clipPairs.join(QStringLiteral(",")))
-                                  .arg(nodeType)
-                                  .arg(nodeHex)
-                                  .arg(seqTypeLen)
-                                  .arg(seqHex);
-        }
 
         int chosenBlock = -1;
         quint32 chosenController = 0;
@@ -628,8 +566,6 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
                     marker.write(("SAMPLES " + dataTypeSamples.join(QStringLiteral(" | "))
                                   + QStringLiteral("\n")).toUtf8());
                 }
-                for (const QString& line : linkSamples)
-                    marker.write(("LINKS " + line + QStringLiteral("\n")).toUtf8());
             } else {
                 marker.write(QStringLiteral("EDITED\t%1\t%2\tkf=%3\tconsidered=%4\t"
                                             "splitRejected=%5\tnoController=%6\tnoClip=%7\t"

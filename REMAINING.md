@@ -592,46 +592,52 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
-### The clip link is structurally correct; only the name lookup is still open
+### The clip name now resolves; the chain is open for a different reason
 
-`decodeControllerSequence` read offset 0 as the entry count. Offset 0 of a
-real `NiControllerSequence` is its **name**, and the entries are
-`ControlledBlock` records, not a ref/length run. It was reading the name's
-*length* (7) as the entry count and then walking nine bytes per entry out of a
-block holding one. The 20.0.0.4 layout, verified against shipped bytes:
+`NiStringPalette` in a pre-20.1.0.1 container is **not** a counted list of sized
+strings. It is a single length-prefixed blob holding the palette's strings back
+to back, each NUL terminated, and a `ControlledBlock`'s name offset is a
+position in that blob. Verified against a shipped palette block:
 
 ```
-07 00 00 00 "Forward"        name, a sized string
-03 00 00 00                 array_grow_by
-01 00 00 00                 num_controlled_blocks
-per ControlledBlock:
-  08 00 00 00               interpolator ref
-  04 00 00 00               controller ref
-  00                        priority
-  0a 00 00 00               string palette ref
-  5 x u32                   node/property/controller/interpolator name offsets
-...133 further bytes of playback parameters
+64 00 00 00 "SecretDoor02\0NiTransformController\0CastleIntNarrowSecretDoor02\0"
+^ 0x64 = 100, the blob length
 ```
 
-**Fixed.** The decoder is now a version-aware member function, since every
-field is conditional on the header version. Measured effect: the controller
-refs in a sequence now decode (`clipKeys=[4=,5=]`, matching the `04 00 00 00`
-in the bytes above), where before the function returned an empty list for
-every file.
+Both earlier attempts were wrong: reading a count consumed the first string's
+own length as that count, and treating it as a run of individually sized
+strings assumed a framing that is not there. `stringAtPaletteOffset` now reads
+the blob, clamps it to the block actually present rather than rejecting a block
+that declares more than it holds, and splits on NUL. It is a public accessor so
+a caller can check a position without re-deriving the framing.
 
-**Still open:** the *name* is empty. `node_name_offset` indexes the
-`NiStringPalette` block the entry points at, and `stringAtPaletteOffset` does
-not yet resolve it. `NiStringPalette` yields two `SizedString`s and no leading
-count, so the palette is a plain run of sized strings; the first attempt read
-a count, consumed the first string's own length as that count, and then
-bailed. Removing the count is done, and the lookup still returns nothing, so
-the remaining question is which block the ref actually addresses - the value
-seen is `10`, and block 10 has not been confirmed to be the palette. Compare
-its type against `NiStringPalette` before going further.
+**The animated node name resolves.** Spot values on real files:
+`Bip01 Pelvis`, `UPB`, `SecretDoor02`, `CastleIntNarrowSecretDoor02`.
 
-Until the name resolves, the writer cannot filter by clip name, and the
-end-to-end write-back test still skips. The chain is now one lookup from
-closing.
+One more thing had to change for that to be visible: `clipNamesByController`
+inserted unconditionally, so when a file holds two sequences naming the same
+controller, the second - whose name did not resolve - overwrote the first's
+that did. It now only takes a name when it has a better one to offer.
+
+**The chain still closes zero times, and the reason is now measurable.** The
+files that carry a node pointing at a keyframe controller and the files that
+carry an `NiControllerSequence` are largely *different* files in the base
+archive:
+
+- 164 files have a keyframe controller and 84 of 91 nodes in a typical one
+  resolve to one, but those files have **no** `NiControllerSequence`
+  (`seq=0`).
+- The files that do have sequences (`seq=2`) have very few nodes and **none**
+  of them point at a keyframe controller (`refHits=0`).
+
+So `noClip=164` is no longer a parser failure - both halves now read
+correctly. It reflects that Oblivion's base mesh archive stores its sequences
+in files whose nodes are driven by `NiMultiTargetTransformController` rather
+than by a direct node-to-keyframe-controller reference, and the writer only
+follows the direct reference. Following the multi-target form, or accepting a
+sequence's controller set without a node-name match, are the two ways forward.
+Neither is a parsing bug, and both are behaviour decisions that should be
+made deliberately.
 
 ### Real archive NIFs are still not loadable by `NifParser` (view layer, not writer)
 
