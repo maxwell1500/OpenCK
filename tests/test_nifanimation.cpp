@@ -3,7 +3,9 @@
 #include <QFile>
 #include <QtMath>
 #include <memory>
+#include <functional>
 
+#include "../../libs/files/ba2/bsaarchive.hpp"
 #include "../../libs/files/nifanim/nifanimation.hpp"
 #include "../../libs/files/nifanim/nifanimationexporter.hpp"
 #include "../../libs/files/nifanim/nifanimationimporter.hpp"
@@ -26,6 +28,7 @@ private slots:
     void testEulerFallbackPreserved();
     void testBlendWithStoredQuats();
     void testNifKeyframeWriteBack();
+    void testRealArchiveKeyframeWriteBack();
 
 private:
     static NifAnimation sampleAnimation();
@@ -341,6 +344,226 @@ void TestNifAnimation::testNifKeyframeWriteBack()
     // A clip name that does not exist must be reported, not silently applied.
     QVERIFY(!NifAnimationWriter::writeKeyframesToNif(
         nifPath, QStringLiteral("Bip01 Head"), edited, QStringLiteral("Missing")));
+}
+
+// The write-back test above builds its NIF through NifParser, so it proves the
+// writer edits the model that the writer's own reader produces. It does not
+// prove the writer can edit a real game file, which is the case that actually
+// blocked it: the animated meshes in an archive are pre-20.2.0.5 containers
+// with no per-block size table, so the writer had to solve block boundaries
+// before it could find a controller at all. That path is only exercised by a
+// file the game shipped, so this test goes and gets one.
+void TestNifAnimation::testRealArchiveKeyframeWriteBack()
+{
+    // Same archive preference order as the layout fitter: Oblivion sits on a
+    // local drive and is always resident, and its NIFs are the same generation
+    // as Skyrim 1.5. The Skyrim archives are on-demand and often unreadable.
+    struct Source { const char* dir; const char* name; };
+    const QVector<Source> sources = {
+        { "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
+          "Oblivion - Meshes.bsa" },
+        { "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
+          "DLCShiveringIsles - Meshes.bsa" },
+    };
+    std::unique_ptr<BsaArchive> archive;
+    for (const Source& source : sources) {
+        const QString path = QString::fromLatin1(source.dir) + QString::fromLatin1(source.name);
+        QFile warm(path);
+        if (warm.open(QIODevice::ReadOnly)) {
+            warm.read(4096);
+            warm.close();
+        }
+        auto fresh = std::make_unique<BsaArchive>();
+        if (fresh->open(path)) {
+            archive = std::move(fresh);
+            break;
+        }
+    }
+    if (!archive) QSKIP("no reachable mesh archive");
+
+    // Count the NIFs the reader can actually turn into a tree. This is recorded
+    // whether or not an animated one is found, because the interesting outcome
+    // here is usually the opposite of a pass: a parser that only understands the
+    // dialect it writes itself rejects every file the game shipped, and that
+    // shows up only as a silent skip unless the count is written down.
+    int totalNifs = 0;
+    for (int i = 0; i < archive->fileCount(); ++i) {
+        const BsaFileEntry& entry = archive->entries()[i];
+        if (entry.fullPath.endsWith(".nif", Qt::CaseInsensitive))
+            ++totalNifs;
+    }
+
+    // Find a real NIF that carries both a named node and a transform controller,
+    // and record how it reads back before any edit. The node name and clip come
+    // from the file itself rather than being hardcoded, because shipping a NIF
+    // that a hand-written fixture could stand in for is exactly the gap here.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    QString written;
+    QString nodeName;
+    QString clipName;
+    int originalKeyframes = 0;
+    int filesConsidered = 0;
+    int readable = 0;
+    int readRejected = 0;
+    int parseRejected = 0;
+    int noRoot = 0;
+
+    for (int i = 0; i < archive->fileCount() && written.isEmpty(); ++i) {
+        const BsaFileEntry& entry = archive->entries()[i];
+        if (!entry.fullPath.endsWith(".nif", Qt::CaseInsensitive))
+            continue;
+        if (++filesConsidered > 4000)
+            break;
+
+        QByteArray bytes;
+        if (!archive->readData(i, bytes) || !bytes.startsWith("Gamebryo File Format")) {
+            ++readRejected;
+            continue;
+        }
+        ++readable;
+
+        const QString scratch = dir.filePath(QStringLiteral("scan.nif"));
+        {
+            QFile out(scratch);
+            if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
+                continue;
+            if (out.write(bytes) != bytes.size()) {
+                out.close();
+                continue;
+            }
+            out.close();
+        }
+        Nif::NifParser parser;
+        if (!parser.load(scratch)) {
+            ++parseRejected;
+            continue;
+        }
+        Nif::Node* root = parser.getRoot();
+        if (!root) {
+            ++noRoot;
+            continue;
+        }
+
+        std::function<Nif::Node*(Nif::Node*)> findAnimated = [&](Nif::Node* node) -> Nif::Node* {
+            if (!node->name.isEmpty() && !node->animations.isEmpty()
+                && !node->animations.first().keyframes.isEmpty())
+                return node;
+            for (Nif::Node* child : node->children) {
+                if (Nif::Node* hit = findAnimated(child))
+                    return hit;
+            }
+            return nullptr;
+        };
+        Nif::Node* animated = findAnimated(root);
+        if (!animated)
+            continue;
+
+        const Nif::NiKeyframeController& controller = animated->animations.first();
+        if (controller.keyframes.size() < 2)
+            continue;
+
+        const QString target = dir.filePath(QStringLiteral("real.nif"));
+        {
+            QFile out(target);
+            if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
+                continue;
+            const bool whole = out.write(bytes) == bytes.size();
+            out.close();
+            if (!whole)
+                continue;
+        }
+
+        nodeName = animated->name;
+        clipName = controller.clipName;
+        originalKeyframes = controller.keyframes.size();
+        written = target;
+    }
+
+    if (written.isEmpty()) {
+        {
+            QFile marker("C:/Users/max/AppData/Local/Temp/opencode/anim_realfiles.txt");
+            if (marker.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                marker.write(QStringLiteral("NOEDIT\tarchiveNifs=%1\tconsidered=%2\treadable=%3\t"
+                                            "readRejected=%4\tparseRejected=%5\tnoRoot=%6\n")
+                                 .arg(totalNifs).arg(filesConsidered).arg(readable).arg(readRejected)
+                                 .arg(parseRejected).arg(noRoot).toUtf8());
+                marker.close();
+            }
+        }
+        QSKIP("no animated NIF found in the reachable archives");
+    }
+
+    // QTest's own output is unreliable to read back in this environment, and a
+    // skip is indistinguishable from a pass on an exit code. Drop a marker so
+    // the difference is on disk, where a build log or a later run can see it.
+    {
+        QFile marker("C:/Users/max/AppData/Local/Temp/opencode/anim_realfiles.txt");
+        if (marker.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            marker.write(QStringLiteral("EDITED\t%1\t%2\tkf=%3\tconsidered=%4\n")
+                             .arg(nodeName, clipName)
+                             .arg(originalKeyframes)
+                             .arg(filesConsidered).toUtf8());
+            marker.close();
+        }
+    }
+
+    qInfo().noquote() << "editing" << nodeName << "clip" << clipName
+                      << "with" << originalKeyframes << "keyframes from" << filesConsidered
+                      << "files considered";
+
+    // Edit the time of every keyframe, keeping the count the file already had.
+    // Changing the count is exercised by the synthetic test; what this test is
+    // for is that a real file's controller is found, rewritten and still parses
+    // as the same tree afterwards.
+    Nif::NifParser before;
+    QVERIFY(before.load(written));
+    std::vector<float> newTimes;
+    for (int i = 0; i < originalKeyframes; ++i)
+        newTimes.push_back(0.5f * static_cast<float>(i));
+
+    QVector<Nif::TransformKeyframe> edited;
+    for (int i = 0; i < originalKeyframes; ++i) {
+        Nif::TransformKeyframe kf;
+        kf.time = newTimes[i];
+        kf.translation = {static_cast<float>(i), 0.0f, 0.0f};
+        kf.rotation = {newTimes[i], 0.0f, 0.0f, 0.0f, 1.0f};
+        kf.scale = {1.0f, 1.0f, 1.0f};
+        edited.append(kf);
+    }
+
+    QVERIFY2(NifAnimationWriter::writeKeyframesToNif(written, nodeName, edited, clipName),
+             qPrintable(QStringLiteral("write failed for %1 clip %2").arg(nodeName, clipName)));
+
+    // The edited file must still parse, keep its node and clip names, and now
+    // carry the new times. A writer that produced a file the reader cannot
+    // reopen has destroyed the user's mesh, which is the failure this guards.
+    Nif::NifParser after;
+    QVERIFY2(after.load(written), qPrintable(QStringLiteral("reparse failed: %1").arg(written)));
+    Nif::Node* newRoot = after.getRoot();
+    QVERIFY(newRoot);
+
+    std::function<Nif::Node*(Nif::Node*)> findNamed = [&](Nif::Node* node) -> Nif::Node* {
+        if (node->name == nodeName)
+            return node;
+        for (Nif::Node* child : node->children) {
+            if (Nif::Node* hit = findNamed(child))
+                return hit;
+        }
+        return nullptr;
+    };
+    Nif::Node* reloaded = findNamed(newRoot);
+    QVERIFY2(reloaded, qPrintable(QStringLiteral("node %1 vanished after write-back").arg(nodeName)));
+    QCOMPARE(reloaded->animations.size(), 1);
+    QCOMPARE(reloaded->animations.first().clipName, clipName);
+
+    const QVector<Nif::TransformKeyframe>& writtenKeys = reloaded->animations.first().keyframes;
+    QCOMPARE(writtenKeys.size(), originalKeyframes);
+    for (int i = 0; i < originalKeyframes; ++i)
+        QVERIFY2(qAbs(writtenKeys.at(i).time - newTimes[i]) < 0.0001f,
+                 qPrintable(QStringLiteral("keyframe %1 time %2, wanted %3")
+                                .arg(i).arg(writtenKeys.at(i).time).arg(newTimes[i])));
 }
 
 QTEST_MAIN(TestNifAnimation)

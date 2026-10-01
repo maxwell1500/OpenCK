@@ -557,11 +557,48 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      in-viewport 3D playback is scoped in §8 (it is further along than the
      old note below suggested).
 
-     **Status 2026-09-30:** the blocker on `NifAnimationWriter` is gone. The
-     writer refused to write because the animated meshes it needs could not be
-     block-split; all 321 files carrying `NiTransformData` are now addressable
-     and `test_ntdlayout` fits a layout instead of skipping. Writing still
-     needs an end-to-end keyframe-write test against a real archive file.
+   **Status 2026-09-30:** the blocker on `NifAnimationWriter` is gone. The
+   writer refused to write because the animated meshes it needs could not be
+   block-split; all 321 files carrying `NiTransformData` are now addressable
+   and `test_ntdlayout` fits a layout instead of skipping. The end-to-end
+   write-back test now exists
+   (`TestNifAnimation::testRealArchiveKeyframeWriteBack`) and it **skips**,
+   which is the finding: see the parser gap below.
+
+### Real archive NIFs are not loadable by `NifParser` (blocks animation write-back)
+
+`NifParser::load` reads real Gamebryo binaries through
+`Gamebryo::parseHeader`, whose first real check is an exact match on the
+magic line:
+
+```cpp
+if (magic != "Gamebryo File Format, Version 20.2.0.7") return false;
+```
+
+`parseHeaderVariant` also pins `bsVersion` handling to the Starfield-era
+header shape. Every NIF shipped in an **Oblivion** archive is version
+`20.0.0.4`, with no per-block size table, so the header check rejects the
+file before any block is read. Measured 2026-09-30 with the new test against
+`Oblivion - Meshes.bsa`: **8,032 NIFs in the archive, 3,980 read from the
+archive, 3,980 of those rejected by the parser, 0 loaded.**
+
+This is why `testRealNifSurvey`'s "8/8 shipped files load" is true and does
+not contradict this: that test reads loose `.nif` files from
+`OPENCK_DATA_DIR` (Starfield, `20.2.0.7`), not archive members. Two different
+container generations, and only the newer one is loadable.
+
+Consequences:
+- `NifAnimationWriter` cannot yet be exercised against a real archive file,
+  so its correctness on a real pre-20.2.0.5 container is still unproven.
+  Its blocker is no longer addressability, it is this header gate.
+- The 7,962/7,962 figure belongs to `NifBlockFile`, which walks blocks
+  without needing the header variant. It is unaffected by this and still
+  holds.
+
+The fix is a pre-20.2.0.5 header path in `parseHeader`, reusing the block
+boundary work already in `libs/files/nif/nifblockfile.cpp` (it already walks
+a version-less container end to end). Until that exists, the write-back test
+skips, and the skip is the honest outcome rather than a pass.
 3. **Particle FX.** The NIF particle block parser
     (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
     `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle
