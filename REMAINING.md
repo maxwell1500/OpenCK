@@ -799,28 +799,43 @@ sequence's controller set without a node-name match, are the two ways forward.
 Neither is a parsing bug, and both are behaviour decisions that should be
 made deliberately.
 
-### Real archive NIFs are still not loadable by `NifParser` (view layer, not writer)
+### `NifParser` reads the header now; the inline-string half is still open
 
-`Gamebryo::parseHeaderVariant` matches the magic line exactly:
+`Gamebryo::parseHeaderVariant` used to match the magic line exactly:
 
 ```cpp
 if (magic != "Gamebryo File Format, Version 20.2.0.7") return false;
 ```
 
-Every NIF in an Oblivion archive is `20.0.0.4`, so `NifParser` rejects it
+Every NIF in an Oblivion archive is `20.0.0.4`, so `NifParser` rejected it
 before reading a block: 3,980 of 3,980 archive members rejected, 0 loaded.
 
-This does not contradict `test_nifskilling`'s "8/8 shipped files load": that
-test reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield
-content (`20.2.0.7`). Two container generations, only the newer one loadable.
+**Done.** The magic line is matched against the version *shape* rather than one
+literal, and every version-dependent field in the header is now gated the way
+`NifBlockFile` already gated it: the endian byte from 20.0.0.3, the block-size
+table from 20.2.0.5, the header string table from 20.1.0.1. Where there is no
+size table the reader borrows `NifBlockFile`'s walk rather than reimplementing
+it - `walkedBlockOffset` plus the slice length, with the pre-10.1.0.107 inter-block
+zero tag added back to the length because the offset points at the tag while the
+slice excludes it. On a sampled Oblivion mesh the header parses
+(`version=335544324 text=20.0.0.4 numBlocks=12`), the split succeeds, and all 12
+blocks walk, including real `NiTriStrips` geometry.
 
-Fixing it is more than a version-tolerance tweak, which is why it was not done
-blind: pre-20.1.0.1 containers have **no string table**, so block names are
-inline fixed-length strings rather than indices into one. `parseAvPrefix` and
-every other block parser read `nameIdx` as a `u32` lookup into
-`Header::strings`, so a pre-20.2.0.5 header path must also give those parsers
-an inline-string form. `NifBlockFile` already handles both generations and its
-header parser is version-generic, so it is the natural model.
+**Still open, and it is the second half, not the version check.** `parseAvPrefix`
+reads a node name as a `u32` index into `Header::strings`, and a container below
+20.1.0.1 has no string table - names there are inline length-prefixed strings.
+So `h.strings` is empty, every node fails the prefix parse, `blocks.value(0)` is a
+plain `NifObject` rather than a `NifNode`, and the load ends at
+`"No NiNode root block"`. The view layer therefore still produces no Node tree for
+Oblivion meshes, and `test_nifblockfile::viewLayerParserOpensOblivionMeshes`
+asserts that count is zero rather than leaving it to be found later. Porting
+`readStringAt`'s version branch into the view layer's block parsers is the
+remaining work; `NifBlockFile` is the model, since it already handles both
+generations.
+
+This does not contradict `test_nifskinning`'s "8/8 shipped files load": that test
+reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
+(`20.2.0.7`). Two container generations, only the newer one fully loadable.
 3. **Particle FX.** The NIF particle block parser
     (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
     `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle

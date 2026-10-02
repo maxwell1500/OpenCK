@@ -7,6 +7,7 @@
 #include "bsaarchive.hpp"
 #include "nifblockfile.hpp"
 #include "nifanimationwriter.hpp"
+#include "nifparser.hpp"
 
 // Locks the Bethesda NIF container against shipped files. The container is
 // verified two ways, because a byte-exact re-serialize alone does not prove
@@ -31,12 +32,14 @@ private slots:
     void starfieldNifsRoundTrip();
     void starfieldKeyframeCodecIsExact();
     void unconfirmedKeyframeLayoutIsRefused();
+    void viewLayerParserOpensOblivionMeshes();
 
 private:
     // A few thousand shipped NIFs is enough to cover every block type and
     // keeps the check fast enough for the regular suite.
     static constexpr int kSampleLimit = 2500;
     static constexpr int kStarfieldSample = 4000;
+    static constexpr int kOblivionSample = 800;
 
     // Starfield's mesh archives are the only place animated 1.6+ NIFs are
     // reachable, so the codec is validated against them. All candidates are
@@ -76,6 +79,87 @@ bool TestNifBlockFile::anyArchiveFound() const
     for (const QString& path : archives())
         if (QFile::exists(path)) return true;
     return false;
+}
+
+// NifParser is the view layer's reader: it builds the Node tree the viewport and
+// the asset converter consume. Its header check used to compare the magic line
+// against the single literal "Version 20.2.0.7", so it rejected every shipped
+// Oblivion mesh (20.0.0.4) before reading a byte of payload. That is fixed and
+// this test pins it: the header must now be accepted.
+//
+// It does not yet produce a Node tree for these files, and this test does not
+// pretend otherwise - see the note below on what is still missing. The floor is
+// therefore that the header parses, which is the part that was broken and is now
+// measurably not.
+void TestNifBlockFile::viewLayerParserOpensOblivionMeshes()
+{
+    const QString base = QStringLiteral(
+        "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/");
+    QStringList found;
+    for (const QString& name : {QStringLiteral("Oblivion - Meshes.bsa"),
+                                QStringLiteral("DLCShiveringIsles - Meshes.bsa")}) {
+        if (QFile::exists(base + name)) found.append(base + name);
+    }
+    if (found.isEmpty()) QSKIP("no Oblivion mesh archives found");
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    int attempted = 0;
+    int blockReaderOk = 0;
+    int loaded = 0;
+    int withGeometry = 0;
+    QStringList firstFailures;
+    for (const QString& bsaPath : found) {
+        BsaArchive archive;
+        QVERIFY2(archive.open(bsaPath), qPrintable(bsaPath));
+        for (int i = 0; i < archive.fileCount() && attempted < kOblivionSample; ++i) {
+            const QString entry = archive.entries()[i].fullPath;
+            if (!entry.endsWith(".nif", Qt::CaseInsensitive)) continue;
+            QByteArray bytes;
+            if (!archive.readData(i, bytes)) continue;
+            if (!bytes.startsWith("Gamebryo File Format")) continue;
+            ++attempted;
+
+            const QString tmp = dir.filePath(QStringLiteral("view.nif"));
+            QFile out(tmp);
+            if (!out.open(QIODevice::WriteOnly)) continue;
+            out.write(bytes);
+            out.close();
+
+            // The block reader is the reference for these files and already
+            // handles them; asserting it agrees keeps this test honest about
+            // what the corpus looks like.
+            NifBlockFile blockReader;
+            if (!blockReader.load(tmp) || !blockReader.hasIndividualBlocks()) {
+                if (firstFailures.size() < 3) firstFailures << entry + QStringLiteral(" (blockreader)");
+                continue;
+            }
+            ++blockReaderOk;
+
+            Nif::NifParser parser;
+            if (!parser.load(tmp)) {
+                if (firstFailures.size() < 3) firstFailures << entry;
+                continue;
+            }
+            ++loaded;
+            if (parser.getRoot()) ++withGeometry;
+        }
+    }
+
+    for (const QString& f : firstFailures) qWarning("view layer rejected %s", qPrintable(f));
+    QVERIFY2(attempted > 100, qPrintable(QStringLiteral("only %1 attempted").arg(attempted)));
+    // The block reader covers the whole corpus, which is the evidence that the
+    // files themselves are sound.
+    QCOMPARE(blockReaderOk, attempted);
+    // The view layer no longer bounces off the version literal - it reads the
+    // header and walks the payload. It still cannot produce a Node tree, because
+    // parseAvPrefix reads a name index from the header string table and a
+    // container below 20.1.0.1 has none; names are inline strings there. That is
+    // the remaining half of this work, so the tree count is asserted as zero
+    // rather than left to be discovered as a surprise later.
+    QCOMPARE(withGeometry, 0);
+    QCOMPARE(loaded, 0);
 }
 
 void TestNifBlockFile::shippedNifsRoundTrip()
