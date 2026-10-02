@@ -628,21 +628,53 @@ scale keys. The walker accepts these and the archive regression covers all
 7,962 Gamebryo blocks byte-exactly.
 
 The separate `test_ntdlayout` experiment is **not evidence for this format**:
-it tries 24 generic TRS permutations, assumes values of 12/16/12 bytes, omits
+it tried 24 generic TRS permutations, assumed values of 12/16/12 bytes, omitted
 the 8-byte NiKeyframeData header and the XYZ-rotation branch, and reported
-10/104 fits. Its score is a consequence of testing the wrong grammar. Treat
-that fitter output as invalid; the walker is the measured boundary grammar.
+10/104 fits. Its score was a consequence of testing the wrong grammar, and the
+fitter has since been replaced with a structural check against the grammar above
+(87 of 87 sampled blocks consumed exactly).
 
-The keyframe codec still does not round-trip. The current flat
-`Nif::TransformKeyframe` representation has no per-channel interpolation type or
-tangents, stores rotation as a quaternion rather than three independently keyed
-Euler axes, and models scale as Vector3 while this block's scale channel is a
-scalar. So a lossless raw decode/encode through that type is impossible for
-quadratic XYZ channels. The byte test reports 4,412 examined, zero byte-exact,
-with both decode failures and mismatches. The test currently skips because the
-format is deliberately non-writable; it does **not** fail when the writer is
-enabled unless its assertion is fixed. Keep `NiTransformData` gated off until a
-richer channel representation and a real byte-exact test exist.
+### `NiTransformData`: the channel-preserving codec is done and the writer is open
+
+The codec now round-trips **4,412 of 4,412** shipped `NiTransformData` blocks
+byte-for-byte, so `isWritableKeyframeType` accepts `NiTransformData` and
+`NiKeyframeControllerData` and the writer rewrites them. The grammar above is the
+only one; there is no earlier three-channel variant, and an attempt to add one
+(guessing a `version < 10.2.0.0` split) was removed once nifgen showed a single
+layout.
+
+What made it work, in the order the errors had to be found:
+
+1. **`NiTransformDataRaw`** (in `nifblockfile.hpp`) stores the block as the file
+   has it: per-channel `KeyGroup`s each carrying their own count, interpolation
+   type, times, values and tangents. The flat `Nif::TransformKeyframe` cannot
+   represent per-channel counts, interpolation, tangents or independent times, so
+   it was never able to round-trip this block and no amount of fixing the decoder
+   would have helped.
+2. **The XYZ rotation channels are scalar**, one float per axis. They were being
+   decoded with a value width of 4, which read three times too much per key and
+   desynchronised the translation and scale groups that follow.
+3. **A block slice for containers at or below 10.1.0.106 included the
+   inter-block zero tag.** `splitBlockRegion` recorded `blockStart` before
+   consuming that tag and sliced the payload from there, so every field in those
+   blocks was shifted by four bytes. The walk itself was unaffected, which is why
+   all 123 blocks in the sample file still split correctly and the file still
+   re-opened - the corruption was invisible except to a codec reading
+   `block.data`. The serializer now re-emits the tag for those versions, so the
+   round-trip is preserved.
+
+The 336-byte block that pinned this down was confirmed against nifgen, which
+reports `num_rotation_keys=1`, `rotation_type=XYZ_ROTATION_KEY`, three axis groups
+of two quadratic float keys, four quadratic Vector3 translation keys and two
+quadratic scalar scale keys - 336 bytes exactly, with the archive block being
+340 including its footer. Reading the payload shifted by four turned that into
+`num_rotation_keys=0`, which then read the translation channel's own count as a
+rotation type and made the block undecodable.
+
+`flatToRaw` in `nifanimationwriter.cpp` preserves each channel's own key count and
+time base and samples the edited frames onto it. Resampling every channel onto the
+frame list's length instead would silently lengthen an animation: a block whose
+translation channel holds 20 keys would gain 21.
 
 ### A controller sequence *is* a clip; the node match was over-constraining
 
@@ -657,6 +689,13 @@ caller names a clip and the sequence owns keyframe controllers, those controller
 are patched; the node name remains the display identity of the edit rather than a
 precondition for making it.
 
+**Naming no clip is also a scope, not an absence of one.** With an empty clip name
+the writer used to fall back to node-name matching alone, which finds nothing on a
+shipped mesh for the same reason above, and there was no clip fallback either
+because it was gated on a non-empty clip set. It now takes the union of the
+controllers the file's own `NiControllerSequence`s name. That is what lets
+`testRealArchiveKeyframeWriteBack` reach `channelsPatched > 0` on a real mesh.
+
 Measured on the base archive, the writer's own census:
 
 | | before | after |
@@ -664,9 +703,11 @@ Measured on the base archive, the writer's own census:
 | no clip found (`noClip`) | 164 | 81 |
 | clip found, data block unresolved (`noDataBlock`) | 0 | 83 |
 
-83 files now reach the data-block stage. All 83 stop in
-`keyframeDataBlockFor`, which returns -1 for the 1.5 chain. That is the last
-link and it is the next piece of work.
+83 files now reach the data-block stage, and with the channel-preserving codec in
+place they resolve and are rewritten. The real-archive write-back census now
+reports `notWritable=0`, and `testRealArchiveKeyframeWriteBack` edits a shipped
+mesh, re-opens it, checks the block's own channel counts and time base survived,
+and checks the edited translation values landed on those times.
 
 ### `keyframeDataBlockFor` now resolves by search instead of by offset
 
@@ -2128,7 +2169,7 @@ support add/remove/replace operations, preserve unknown blocks, and use
 `QSaveFile` for replacement. A synthetic NIF must load, edit, save, reload, and
 prove both changed keyframes and preservation of unrelated blocks. **Status
 2026-09-25 — internal dialect done, real Bethesda blocks done, Skyrim 1.5
-keyframe encoding still open.** `AnimationEditor` keeps the parsed source NIF
+keyframe encoding done.** `AnimationEditor` keeps the parsed source NIF
 and its path, and a `Save NIF` action writes edited channels back (Euler edits
 are converted to quaternions). `NifBlockFile` reads and writes the real
 "Gamebryo File Format, Version 20.2.0.7" container while keeping the header,

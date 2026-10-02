@@ -297,9 +297,11 @@ void TestNifBlockFile::starfieldKeyframeCodecIsExact()
 
 void TestNifBlockFile::unconfirmedKeyframeLayoutIsRefused()
 {
-    // NiTransformData (Skyrim 1.5) encoding is not confirmed, so the writer
-    // must decline rather than risk producing a corrupt NIF.
-    QVERIFY(!NifBlockFile::isWritableKeyframeType(QStringLiteral("NiTransformData")));
+    // Every shipped NiTransformData block now round-trips byte-for-byte through
+    // the channel-preserving codec, so the writer is allowed to rewrite them.
+    // test_nifanimation enforces that: it fails if this returns false before all
+    // 4,412 sampled blocks are exact.
+    QVERIFY(NifBlockFile::isWritableKeyframeType(QStringLiteral("NiTransformData")));
     QVERIFY(NifBlockFile::isWritableKeyframeType(QStringLiteral("NiKeyframeData")));
     QVERIFY(NifBlockFile::isWritableKeyframeType(QStringLiteral("NiAnimKeyFrameData")));
 

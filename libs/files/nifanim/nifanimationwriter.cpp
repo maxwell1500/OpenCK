@@ -13,84 +13,103 @@
 
 namespace {
 
-// Convert a flat TransformKeyframe list to the channel-preserving raw
-// representation. This is lossy: the flat list has no interpolation or
-// tangent data, so all channels become linear. Rotation is converted from
-// quaternion to three Euler axes when the original block used XYZ rotation.
+// Convert a flat TransformKeyframe list into the channel-preserving raw
+// representation, keeping each channel's own key count and time base.
+//
+// A NiTransformData block's channels are independent: translation, scale and
+// each rotation axis carry their own counts, and on shipped meshes they
+// routinely differ. Resampling them all onto the frame list's length would
+// silently change the animation - a block whose translation channel holds 20
+// keys would gain 21 - so each channel keeps the count it had and takes its
+// values from the frame list sampled at that channel's own times. This is
+// lossy: the flat list carries no interpolation or tangent data, so every
+// channel becomes linear.
 NifBlockFile::NiTransformDataRaw flatToRaw(
     const QVector<Nif::TransformKeyframe>& keyframes,
     const NifBlockFile::NiTransformDataRaw& original)
 {
     NifBlockFile::NiTransformDataRaw raw;
-    const int n = keyframes.size();
-    raw.numRotationKeys = static_cast<quint32>(n);
-    raw.rotationType = original.rotationType;
+    if (keyframes.isEmpty()) return raw;
 
-    auto makeGroup = [&](int valueWidth) {
-        NifBlockFile::KeyGroup g;
-        g.count = static_cast<quint32>(n);
-        g.interpolation = 1; // linear
-        g.times.reserve(n);
-        g.values.reserve(n * valueWidth);
-        return g;
+    // Sample the edited animation at `time` by nearest earlier key, which for a
+    // monotonic time base is a step-free resample.
+    auto sampleAt = [&keyframes](float time) -> const Nif::TransformKeyframe& {
+        int best = 0;
+        for (int i = 1; i < keyframes.size(); ++i) {
+            if (keyframes.at(i).time <= time) best = i;
+            else break;
+        }
+        return keyframes.at(best);
     };
 
-    if (raw.rotationType == 4 && n > 0) {
-        // XYZ rotation: three scalar KeyGroups
+    auto quaternionToEuler = [](float w, float x, float y, float z, float* euler) {
+        euler[0] = qAtan2(2.0f * (w * x + y * z), 1.0f - 2.0f * (x * x + y * y));
+        const float sinp = 2.0f * (w * y - z * x);
+        euler[1] = (qAbs(sinp) >= 1.0f)
+                       ? ((sinp >= 0.0f) ? (M_PI / 2.0f) : -(M_PI / 2.0f))
+                       : qAsin(sinp);
+        euler[2] = qAtan2(2.0f * (w * z + x * y), 1.0f - 2.0f * (y * y + z * z));
+    };
+
+    const bool xyz = (original.rotationType == 4);
+    raw.rotationType = original.rotationType;
+    if (xyz && original.rotationGroups.size() == 3) {
+        raw.numRotationKeys = original.numRotationKeys;
         for (int axis = 0; axis < 3; ++axis) {
-            NifBlockFile::KeyGroup g = makeGroup(1);
-            for (int i = 0; i < n; ++i) {
-                const Nif::TransformKeyframe& k = keyframes.at(i);
-                g.times.append(k.time);
-                // Convert quaternion to Euler angles
-                const float w = k.rotation.w, x = k.rotation.x, y = k.rotation.y, z = k.rotation.z;
-                float euler[3];
-                // Roll (X)
-                const float sinr_cosp = 2.0f * (w * x + y * z);
-                const float cosr_cosp = 1.0f - 2.0f * (x * x + y * y);
-                euler[0] = qAtan2(sinr_cosp, cosr_cosp);
-                // Pitch (Y)
-                const float sinp = 2.0f * (w * y - z * x);
-                if (qAbs(sinp) >= 1.0f)
-                    euler[1] = (sinp >= 0.0f) ? (M_PI / 2.0f) : -(M_PI / 2.0f);
-                else
-                    euler[1] = qAsin(sinp);
-                // Yaw (Z)
-                const float siny_cosp = 2.0f * (w * z + x * y);
-                const float cosy_cosp = 1.0f - 2.0f * (y * y + z * z);
-                euler[2] = qAtan2(siny_cosp, cosy_cosp);
+            const NifBlockFile::KeyGroup& src = original.rotationGroups.at(axis);
+            NifBlockFile::KeyGroup g;
+            g.count = src.count;
+            g.interpolation = 1; // linear
+            for (int i = 0; i < static_cast<int>(src.count); ++i) {
+                const float t = src.times.value(i, 0.0f);
+                const Nif::TransformKeyframe& kf = sampleAt(t);
+                float euler[3] = { 0.0f, 0.0f, 0.0f };
+                quaternionToEuler(kf.rotation.w, kf.rotation.x, kf.rotation.y, kf.rotation.z,
+                                  euler);
+                g.times.append(t);
                 g.values.append(euler[axis]);
             }
             raw.rotationGroups.append(g);
         }
-    } else if (n > 0) {
-        // Quaternion rotation: one KeyGroup
-        NifBlockFile::KeyGroup g = makeGroup(4);
-        for (int i = 0; i < n; ++i) {
-            const Nif::TransformKeyframe& k = keyframes.at(i);
-            g.times.append(k.time);
-            g.values.append(k.rotation.w);
-            g.values.append(k.rotation.x);
-            g.values.append(k.rotation.y);
-            g.values.append(k.rotation.z);
+    } else if (!original.rotationGroups.isEmpty()) {
+        raw.numRotationKeys = original.numRotationKeys;
+        const NifBlockFile::KeyGroup& src = original.rotationGroups.first();
+        NifBlockFile::KeyGroup g;
+        g.count = src.count;
+        g.interpolation = 1;
+        for (int i = 0; i < static_cast<int>(src.count); ++i) {
+            const float t = src.times.value(i, 0.0f);
+            const Nif::TransformKeyframe& kf = sampleAt(t);
+            g.times.append(t);
+            g.values.append(kf.rotation.w);
+            g.values.append(kf.rotation.x);
+            g.values.append(kf.rotation.y);
+            g.values.append(kf.rotation.z);
         }
         raw.rotationGroups.append(g);
+    } else {
+        // The block carries no rotation keys at all, so it must not gain any.
+        raw.numRotationKeys = 0;
     }
 
-    raw.translation = makeGroup(3);
-    for (int i = 0; i < n; ++i) {
-        const Nif::TransformKeyframe& k = keyframes.at(i);
-        raw.translation.times.append(k.time);
-        raw.translation.values.append(k.translation.x);
-        raw.translation.values.append(k.translation.y);
-        raw.translation.values.append(k.translation.z);
+    raw.translation.count = original.translation.count;
+    raw.translation.interpolation = 1;
+    for (int i = 0; i < static_cast<int>(original.translation.count); ++i) {
+        const float t = original.translation.times.value(i, 0.0f);
+        const Nif::TransformKeyframe& kf = sampleAt(t);
+        raw.translation.times.append(t);
+        raw.translation.values.append(kf.translation.x);
+        raw.translation.values.append(kf.translation.y);
+        raw.translation.values.append(kf.translation.z);
     }
 
-    raw.scale = makeGroup(1);
-    for (int i = 0; i < n; ++i) {
-        const Nif::TransformKeyframe& k = keyframes.at(i);
-        raw.scale.times.append(k.time);
-        raw.scale.values.append(k.scale.x); // uniform scale
+    raw.scale.count = original.scale.count;
+    raw.scale.interpolation = 1;
+    for (int i = 0; i < static_cast<int>(original.scale.count); ++i) {
+        const float t = original.scale.times.value(i, 0.0f);
+        const Nif::TransformKeyframe& kf = sampleAt(t);
+        raw.scale.times.append(t);
+        raw.scale.values.append(kf.scale.x); // the block stores one scalar
     }
 
     return raw;
@@ -224,6 +243,21 @@ bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
             LOG_WARNING(QString("NifAnimationWriter: NIF has no clip named '%1'").arg(clipName));
             return false;
         }
+    } else {
+        // No clip was named, so the edit is not scoped to one. Take every
+        // controller any sequence owns: on shipped Oblivion meshes the animated
+        // nodes hang off a NiMultiTargetTransformController, so no node points
+        // directly at a keyframe controller and a node-only search finds
+        // nothing at all. Restricting to the union of the sequences' controllers
+        // still keeps the write inside the animation this file actually owns.
+        const QList<int> sequences = file.findBlocks(QStringLiteral("NiControllerSequence"));
+        for (int sequenceIndex : sequences) {
+            QList<QPair<quint32, QString>> entries;
+            if (!file.decodeControllerSequence(file.block(sequenceIndex).data, entries))
+                continue;
+            for (const auto& entry : entries)
+                clipControllers.insert(entry.first);
+        }
     }
 
     // Nodes point at their own controller. Going that direction avoids
@@ -276,9 +310,9 @@ bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
             matchedNode = true;
     }
 
-    if (!matchedNode) {
+if (!matchedNode) {
         LOG_WARNING(QString("NifAnimationWriter: target node '%1' not found in %2")
-                        .arg(nodeName, nifPath));
+                        .arg(nodeName).arg(nifPath));
         return false;
     }
     if (channelsPatched == 0) return false;

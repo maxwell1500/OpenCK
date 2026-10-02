@@ -3106,7 +3106,12 @@ bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString
         }
         Block block;
         block.type = type;
-        block.data = raw.mid(blockStart, c.pos() - blockStart);
+        // Slice from the walker's own start, not from before the dummy tag. The
+        // tag is a separator between blocks, not part of the payload, so keeping
+        // it shifts every field by four bytes for versions at or below
+        // kBlockDummyVersion - which the block walk tolerates (it reads past it)
+        // while any payload codec handed block.data sees garbage.
+        block.data = raw.mid(start, c.pos() - start);
         block.footer = QByteArray();
         blocks.append(block);
         sizes.append(static_cast<quint32>(block.data.size()));
@@ -3231,8 +3236,16 @@ QByteArray NifBlockFile::serialize() const
             out.append(mBlockRegion);
             return out;
         }
-        for (const Block& block : mBlocks)
+        // Up to and including 10.1.0.106 every non-bhk block is preceded by a
+        // zero word. The walk skips it and does not keep it in block.data, so
+        // it has to be re-emitted here or the file loses four bytes per block
+        // and no longer re-reads as the same file.
+        const bool needsDummy = mVersion <= kBlockDummyVersion;
+        for (const Block& block : mBlocks) {
+            if (needsDummy && !block.type.startsWith(QStringLiteral("bhk")))
+                appendU32(out, 0);
             out.append(block.data);
+        }
         out.append(mTrailing);
         return out;
     }
@@ -3371,7 +3384,9 @@ bool NifBlockFile::decodeKeyframeData(const QString& blockType, const QByteArray
 bool NifBlockFile::isWritableKeyframeType(const QString& blockType)
 {
     return blockType == QLatin1String("NiKeyframeData")
-        || blockType == QLatin1String("NiAnimKeyFrameData");
+        || blockType == QLatin1String("NiAnimKeyFrameData")
+        || blockType == QLatin1String("NiTransformData")
+        || blockType == QLatin1String("NiKeyframeControllerData");
 }
 
 bool NifBlockFile::encodeKeyframeData(const QString& blockType,
@@ -3500,61 +3515,10 @@ bool NifBlockFile::decodeNiTransformData(const QByteArray& data, quint32 version
     out = NiTransformDataRaw();
     Cursor c(data);
 
-    // Version 10.2.0.0 and later use the NiKeyframeData layout: rotation count,
-    // optional rotation type, then per-axis float KeyGroups for XYZ rotations,
-    // followed by translation and scale KeyGroups. Earlier versions use the
-    // original NiTransformData layout: three independent channels, each with
-    // its own count and key list, no interpolation words, no rotation type.
-    if (version < 0x0A020000u) {
-        const quint32 numTranslation = c.u32();
-        if (!c.ok() || numTranslation > 10'000'000u) return false;
-        KeyGroup tg;
-        tg.count = numTranslation;
-        tg.interpolation = 1; // linear
-        for (quint32 i = 0; i < numTranslation; ++i) {
-            if (i > 0) tg.times.append(c.f32());
-            tg.values.append(c.f32()); // x
-            tg.values.append(c.f32()); // y
-            tg.values.append(c.f32()); // z
-            if (!c.ok()) return false;
-        }
-        if (numTranslation > 0) tg.times.prepend(0.0f);
-        out.translation = tg;
-
-        const quint32 numRotation = c.u32();
-        if (!c.ok() || numRotation > 10'000'000u) return false;
-        KeyGroup rg;
-        rg.count = numRotation;
-        rg.interpolation = 1; // linear
-        for (quint32 i = 0; i < numRotation; ++i) {
-            if (i > 0) rg.times.append(c.f32());
-            rg.values.append(c.f32()); // w
-            rg.values.append(c.f32()); // x
-            rg.values.append(c.f32()); // y
-            rg.values.append(c.f32()); // z
-            if (!c.ok()) return false;
-        }
-        if (numRotation > 0) rg.times.prepend(0.0f);
-        out.numRotationKeys = numRotation;
-        out.rotationType = 0; // quaternion
-        out.rotationGroups.append(rg);
-
-        const quint32 numScale = c.u32();
-        if (!c.ok() || numScale > 10'000'000u) return false;
-        KeyGroup sg;
-        sg.count = numScale;
-        sg.interpolation = 1; // linear
-        for (quint32 i = 0; i < numScale; ++i) {
-            if (i > 0) sg.times.append(c.f32());
-            sg.values.append(c.f32()); // uniform scale
-            if (!c.ok()) return false;
-        }
-        if (numScale > 0) sg.times.prepend(0.0f);
-        out.scale = sg;
-
-        return c.atEnd();
-    }
-
+    // One layout for every version: a rotation count, then - when it is
+    // non-zero - a rotation type, then either three per-axis float KeyGroups
+    // (XYZ) or a run of quaternion keys, then the translation and scale
+    // KeyGroups. There is no earlier three-channel variant of this block.
     const quint32 numRotationKeys = c.u32();
     if (!c.ok() || numRotationKeys > 10'000'000u) return false;
     out.numRotationKeys = numRotationKeys;
@@ -3607,37 +3571,6 @@ bool NifBlockFile::encodeNiTransformData(const NiTransformDataRaw& raw, quint32 
                                          QByteArray& out)
 {
     out.clear();
-
-    // Version 10.2.0.0 and later use the NiKeyframeData layout. Earlier
-    // versions use the original NiTransformData layout: three independent
-    // channels, each with its own count and key list, no interpolation words,
-    // no rotation type.
-    if (version < 0x0A020000u) {
-        appendU32(out, raw.translation.count);
-        for (quint32 i = 0; i < raw.translation.count; ++i) {
-            if (i > 0) appendF32(out, raw.translation.times.at(i));
-            appendF32(out, raw.translation.values.at(i * 3 + 0));
-            appendF32(out, raw.translation.values.at(i * 3 + 1));
-            appendF32(out, raw.translation.values.at(i * 3 + 2));
-        }
-
-        appendU32(out, raw.numRotationKeys);
-        const KeyGroup& rg = raw.rotationGroups.at(0);
-        for (quint32 i = 0; i < raw.numRotationKeys; ++i) {
-            if (i > 0) appendF32(out, rg.times.at(i));
-            appendF32(out, rg.values.at(i * 4 + 0)); // w
-            appendF32(out, rg.values.at(i * 4 + 1)); // x
-            appendF32(out, rg.values.at(i * 4 + 2)); // y
-            appendF32(out, rg.values.at(i * 4 + 3)); // z
-        }
-
-        appendU32(out, raw.scale.count);
-        for (quint32 i = 0; i < raw.scale.count; ++i) {
-            if (i > 0) appendF32(out, raw.scale.times.at(i));
-            appendF32(out, raw.scale.values.at(i));
-        }
-        return true;
-    }
 
     appendU32(out, raw.numRotationKeys);
 

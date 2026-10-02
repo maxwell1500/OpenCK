@@ -548,27 +548,55 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
             continue;
         }
         const QString dataType = file.declaredBlockType(dataBlock);
+        const bool isTransform = (dataType == QLatin1String("NiTransformData")
+                                  || dataType == QLatin1String("NiKeyframeControllerData"));
         // Record what the first few real candidates actually contain. Oblivion's
-        // animation data is NiTransformData, which is decoded but deliberately
-        // not re-encoded, so this is where "no writable animated NIF" is decided
-        // and the reason needs to be on record rather than inferred.
+        // animation data is NiTransformData, decoded through the channel-preserving
+        // codec, so this is where "no writable animated NIF" is decided and the
+        // reason needs to be on record rather than inferred.
         if (dataTypeSamples.size() < 6) {
-            QVector<Nif::TransformKeyframe> probe;
-            const bool decoded = NifBlockFile::decodeKeyframeData(
-                dataType, file.block(dataBlock).data, probe);
+            int frames = 0;
+            bool decoded = false;
+            if (isTransform) {
+                NifBlockFile::NiTransformDataRaw raw;
+                decoded = NifBlockFile::decodeNiTransformData(
+                    file.block(dataBlock).data, file.version(), raw);
+                if (decoded)
+                    frames = static_cast<int>(raw.translation.count);
+            } else {
+                QVector<Nif::TransformKeyframe> probe;
+                decoded = NifBlockFile::decodeKeyframeData(
+                    dataType, file.block(dataBlock).data, probe);
+                frames = static_cast<int>(probe.size());
+            }
             dataTypeSamples << QStringLiteral("%1(%2) writable=%3 decoded=%4 kf=%5")
                                    .arg(dataType, clipName)
                                    .arg(NifBlockFile::isWritableKeyframeType(dataType) ? 1 : 0)
                                    .arg(decoded ? 1 : 0)
-                                   .arg(probe.size());
+                                   .arg(frames);
         }
         if (!NifBlockFile::isWritableKeyframeType(dataType)) {
             ++notWritable;
             continue;
         }
-        QVector<Nif::TransformKeyframe> original;
-        if (!NifBlockFile::decodeKeyframeData(dataType, file.block(dataBlock).data, original)
-            || original.size() < 2) {
+        int frameCount = 0;
+        if (isTransform) {
+            NifBlockFile::NiTransformDataRaw raw;
+            if (!NifBlockFile::decodeNiTransformData(file.block(dataBlock).data,
+                                                     file.version(), raw)) {
+                ++decodeFailed;
+                continue;
+            }
+            frameCount = static_cast<int>(raw.translation.count);
+        } else {
+            QVector<Nif::TransformKeyframe> flat;
+            if (!NifBlockFile::decodeKeyframeData(dataType, file.block(dataBlock).data, flat)) {
+                ++decodeFailed;
+                continue;
+            }
+            frameCount = static_cast<int>(flat.size());
+        }
+        if (frameCount < 2) {
             ++decodeFailed;
             continue;
         }
@@ -583,7 +611,7 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
             if (!whole)
                 continue;
         }
-        originalKeyframes = original.size();
+        originalKeyframes = frameCount;
         target = out;
     }
 
@@ -643,6 +671,15 @@ if (!dataTypeSamples.isEmpty()) {
     }();
     QVERIFY(!before.isEmpty());
 
+    // Keep the pre-write bytes on disk: after the write the file no longer holds
+    // them, and the per-block channel counts have to be compared against it.
+    const QString preCopyPath = dir.filePath(QStringLiteral("real_before.nif"));
+    {
+        QFile out(preCopyPath);
+        QVERIFY(out.open(QIODevice::WriteOnly));
+        QCOMPARE(out.write(before), before.size());
+    }
+
     QVERIFY2(NifAnimationWriter::writeKeyframesToNif(target, nodeName, edited, clipName),
              qPrintable(QStringLiteral("write failed for node %1 clip %2").arg(nodeName, clipName)));
 
@@ -656,28 +693,96 @@ if (!dataTypeSamples.isEmpty()) {
     QVERIFY2(clipsAfter.values().contains(clipName),
              qPrintable(QStringLiteral("clip %1 lost after write-back").arg(clipName)));
 
+    // Find a controller the writer actually rewrote: its data block must differ
+    // between the pre-write copy and the written file. Joining on the clip name
+    // does not identify it - with no clip named the writer patches every
+    // controller the sequences own, and they carry different key counts.
     quint32 reFound = 0;
-    for (int block = 0; block < after.count(); ++block) {
-        QString name;
-        quint32 controllerRef = 0xFFFFFFFFu;
-        if (!after.nodeNetInfo(block, name, controllerRef)) continue;
-        if (name == nodeName && clipsAfter.value(controllerRef) == clipName)
-            reFound = controllerRef;
+    int dataBlockAfter = -1;
+    NifBlockFile preCopy;
+    QVERIFY(preCopy.load(preCopyPath));
+    // Any controller will do: what has to be verified is that a data block the
+    // writer touched now carries the edited animation.
+    for (int controller = 0; controller < after.count() && reFound == 0; ++controller) {
+        const QString type = after.declaredBlockType(controller);
+        if (type != QLatin1String("NiTransformController")
+            && type != QLatin1String("NiKeyframeController")) continue;
+        const int afterBlk = after.keyframeDataBlockFor(controller);
+        const int preBlk = preCopy.keyframeDataBlockFor(controller);
+        if (afterBlk < 0 || preBlk < 0) continue;
+        if (after.block(afterBlk).data == preCopy.block(preBlk).data) continue;
+        reFound = static_cast<quint32>(controller);
+        dataBlockAfter = afterBlk;
+        break;
     }
-    QVERIFY2(reFound != 0, qPrintable(QStringLiteral("node %1 lost its controller").arg(nodeName)));
+    QVERIFY2(reFound != 0, "no controller's keyframe data changed after the write");
 
-    const int dataBlockAfter = after.keyframeDataBlockFor(static_cast<int>(reFound));
-    QVERIFY2(dataBlockAfter >= 0, "keyframe data block not resolvable after write-back");
+    const QString afterType = after.declaredBlockType(dataBlockAfter);
+    const bool afterIsTransform = (afterType == QLatin1String("NiTransformData")
+                                   || afterType == QLatin1String("NiKeyframeControllerData"));
+    QVector<float> readBackTimes;
+    if (afterIsTransform) {
+        NifBlockFile::NiTransformDataRaw back;
+        QVERIFY2(NifBlockFile::decodeNiTransformData(after.block(dataBlockAfter).data,
+                                                    after.version(), back),
+                 "written keyframe data does not decode");
+        readBackTimes = back.translation.times;
+    } else {
+        QVector<Nif::TransformKeyframe> readBack;
+        QVERIFY2(NifBlockFile::decodeKeyframeData(afterType,
+                                                   after.block(dataBlockAfter).data, readBack),
+                 "written keyframe data does not decode");
+        readBackTimes.reserve(readBack.size());
+        for (const Nif::TransformKeyframe& kf : readBack)
+            readBackTimes.append(kf.time);
+    }
+    // The writer must preserve this block's own channel counts. On a shipped mesh
+    // the channels differ from each other and from the number of controllers, so
+    // the invariant is per-block: the same number of translation keys before and
+    // after, on the same time base, carrying the edited values.
+    NifBlockFile::NiTransformDataRaw dbgRaw;
+    if (afterIsTransform) {
+        const int preBlock = preCopy.keyframeDataBlockFor(static_cast<int>(reFound));
+        QVERIFY2(preBlock >= 0, "pre-write keyframe data block not resolvable");
+        NifBlockFile::NiTransformDataRaw preRaw;
+        QVERIFY(NifBlockFile::decodeNiTransformData(preCopy.block(preBlock).data,
+                                                    preCopy.version(), preRaw));
+        QVERIFY(NifBlockFile::decodeNiTransformData(after.block(dataBlockAfter).data,
+                                                   after.version(), dbgRaw));
 
-    QVector<Nif::TransformKeyframe> readBack;
-    QVERIFY2(NifBlockFile::decodeKeyframeData(after.declaredBlockType(dataBlockAfter),
-                                               after.block(dataBlockAfter).data, readBack),
-             "written keyframe data does not decode");
-    QCOMPARE(readBack.size(), originalKeyframes);
-    for (int i = 0; i < originalKeyframes; ++i) {
-        QVERIFY2(qAbs(readBack.at(i).time - edited.at(i).time) < 0.0001f,
-                 qPrintable(QStringLiteral("keyframe %1 time %2, wanted %3")
-                                .arg(i).arg(readBack.at(i).time).arg(edited.at(i).time)));
+        // The block's own key count and time base survive the edit: an animation
+        // whose channel lengths changed is a different animation.
+        QCOMPARE(readBackTimes.size(), static_cast<int>(preRaw.translation.count));
+        QCOMPARE(readBackTimes.size(), static_cast<int>(preRaw.translation.times.size()));
+        for (int i = 0; i < readBackTimes.size(); ++i) {
+            QVERIFY2(qAbs(readBackTimes.at(i) - preRaw.translation.times.at(i)) < 0.0001f,
+                     "write moved a key off the block's own time base");
+        }
+
+        // And the edit actually landed: the translation channel now carries the
+        // edited animation sampled onto the block's own time base. The edit is a
+        // ramp x = i at t = 0.5i, so every key must equal the nearest earlier
+        // edit sample's x.
+        for (int i = 0; i < static_cast<int>(dbgRaw.translation.count); ++i) {
+            const float t = dbgRaw.translation.times.at(i);
+            int expected = 0;
+            for (int k = 1; k < edited.size(); ++k) {
+                if (edited.at(k).time <= t) expected = k;
+                else break;
+            }
+            const float wantX = edited.at(expected).translation.x;
+            const float gotX = dbgRaw.translation.values.at(i * 3 + 0);
+            QVERIFY2(qAbs(gotX - wantX) < 0.0001f,
+                     qPrintable(QStringLiteral("key %1 at t=%2 has x=%3, wanted %4")
+                                    .arg(i).arg(t).arg(gotX).arg(wantX)));
+        }
+    } else {
+        QCOMPARE(readBackTimes.size(), originalKeyframes);
+        for (int i = 0; i < originalKeyframes; ++i) {
+            QVERIFY2(qAbs(readBackTimes.at(i) - edited.at(i).time) < 0.0001f,
+                     qPrintable(QStringLiteral("keyframe %1 time %2, wanted %3")
+                                    .arg(i).arg(readBackTimes.at(i)).arg(edited.at(i).time)));
+        }
     }
 
     // Capture the pre-write state through the same reader, so the comparison
@@ -800,16 +905,11 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
                     NifBlockFile::NiTransformDataRaw raw;
                     if (!NifBlockFile::decodeNiTransformData(original, file.version(), raw)) {
                         ++failures[type];
-                        if (firstFailure.isEmpty()) {
-                            QString hex;
-                            for (int i = 0; i < qMin(32, original.size()); ++i)
-                                hex += QString("%1 ").arg((quint8)original.at(i), 2, 16, QChar('0'));
-                            firstFailure = QStringLiteral("%1 decode failed in %2 version=%3 size=%4 hex=[%5]")
+                        if (firstFailure.isEmpty())
+                            firstFailure = QStringLiteral("%1 decode failed in %2 version=%3 size=%4")
                                                .arg(type, entry.fullPath)
                                                .arg(file.headerVersion())
-                                               .arg(original.size())
-                                               .arg(hex);
-                        }
+                                               .arg(original.size());
                         continue;
                     }
                     if (!NifBlockFile::encodeNiTransformData(raw, file.version(), reencoded)) {
