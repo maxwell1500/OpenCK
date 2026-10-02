@@ -799,7 +799,7 @@ sequence's controller set without a node-name match, are the two ways forward.
 Neither is a parsing bug, and both are behaviour decisions that should be
 made deliberately.
 
-### `NifParser` reads the header now; the inline-string half is still open
+### `NifParser` loads pre-20.2.0.5 containers
 
 `Gamebryo::parseHeaderVariant` used to match the magic line exactly:
 
@@ -809,33 +809,48 @@ if (magic != "Gamebryo File Format, Version 20.2.0.7") return false;
 
 Every NIF in an Oblivion archive is `20.0.0.4`, so `NifParser` rejected it
 before reading a block: 3,980 of 3,980 archive members rejected, 0 loaded.
+The view layer - the reader the viewport and the asset converter use - could
+therefore not open a single shipped Oblivion mesh, even though `NifBlockFile`
+walked all of them.
 
-**Done.** The magic line is matched against the version *shape* rather than one
-literal, and every version-dependent field in the header is now gated the way
-`NifBlockFile` already gated it: the endian byte from 20.0.0.3, the block-size
-table from 20.2.0.5, the header string table from 20.1.0.1. Where there is no
-size table the reader borrows `NifBlockFile`'s walk rather than reimplementing
-it - `walkedBlockOffset` plus the slice length, with the pre-10.1.0.107 inter-block
-zero tag added back to the length because the offset points at the tag while the
-slice excludes it. On a sampled Oblivion mesh the header parses
-(`version=335544324 text=20.0.0.4 numBlocks=12`), the split succeeds, and all 12
-blocks walk, including real `NiTriStrips` geometry.
+**Done.** Four separate version assumptions were in the way, all fixed:
 
-**Still open, and it is the second half, not the version check.** `parseAvPrefix`
-reads a node name as a `u32` index into `Header::strings`, and a container below
-20.1.0.1 has no string table - names there are inline length-prefixed strings.
-So `h.strings` is empty, every node fails the prefix parse, `blocks.value(0)` is a
-plain `NifObject` rather than a `NifNode`, and the load ends at
-`"No NiNode root block"`. The view layer therefore still produces no Node tree for
-Oblivion meshes, and `test_nifblockfile::viewLayerParserOpensOblivionMeshes`
-asserts that count is zero rather than leaving it to be found later. Porting
-`readStringAt`'s version branch into the view layer's block parsers is the
-remaining work; `NifBlockFile` is the model, since it already handles both
-generations.
+1. *The header.* The magic line is matched against the version shape rather than
+   one literal, and every version-dependent header field is gated the way
+   `NifBlockFile` gates it: endian byte from 20.0.0.3, block-size table from
+   20.2.0.5, string table from 20.1.0.1. With no size table the reader borrows
+   `NifBlockFile`'s walk rather than reimplementing it.
+2. *Block names.* A name is a header-string-table index from 20.1.0.1 and an
+   inline length-prefixed string below it. `parseAvPrefix` now branches on the
+   version, mirroring `readStringAt`. Only the version can tell the two apart: in
+   a file that has a table, reading a length always succeeds and silently yields
+   the wrong name.
+3. *The AV prefix.* `parseAvPrefix` hardcoded `flags` as a `u32` and read no
+   `velocity`, no property list and no old-stream node effect list. All four are
+   version-gated in `walkNiAVObject`, and `bsVersion` - which comes from the
+   header and is *not* the same magnitude as the container version - is what
+   selects them. For Oblivion it reads 11, not 172, which turns out to decide
+   three of them at once: `flags` is a `u16`, the property list is present, and
+   the node effect list is present. That is 106 bytes for a one-child `NiNode`,
+   which is exactly what the byte-exact walker produces.
+4. *Block offsets.* `walkedBlockOffset` points at the block's slot in the region,
+   which on a pre-10.1.0.107 container is the inter-block zero tag, while the
+   slice length excludes that tag. So the offset moves past the tag and the
+   length stays the payload length; adding the tag to both would read the tag as
+   the first field.
+
+`test_nifblockfile::viewLayerParserOpensOblivionMeshes` samples 800 shipped
+Oblivion meshes: **800 attempted, 800 loaded, 800 built a Node tree**, up from 0.
+
+Note that (3) means the view layer's field layout deliberately follows the
+walker rather than nifgen for this generation, because the two disagree about
+the header `bs_version` and the walker is the one that splits all 7,962 archive
+members byte-exactly. See the note on the unexplained `extra_data_list` entries
+in `walkNiObjectNET` for the same shape of problem.
 
 This does not contradict `test_nifskinning`'s "8/8 shipped files load": that test
 reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
-(`20.2.0.7`). Two container generations, only the newer one fully loadable.
+(`20.2.0.7`). Both generations now load.
 3. **Particle FX.** The NIF particle block parser
     (`NifParticleSystem`/`NifPSysEmitter`, parse + write in
     `nifrecord.cpp`, dispatched in `nifparser.cpp`) is built, and particle

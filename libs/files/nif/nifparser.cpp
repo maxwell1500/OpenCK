@@ -489,7 +489,7 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
     // Map from NIF block ref to our Node* for animation linking
     QMap<quint32, Node*> refToNode;
     // Map from NiTriShape block ref to (our parent node, shape index) so the
-    // skin-link pass below can attach NiSkinInstance data (Â§8.1)
+    // skin-link pass below can attach NiSkinInstance data (Ã‚Â§8.1)
     QMap<quint32, QPair<Node*, int>> skinShapeTargets;
 
     // Walk all AVObjects to find NiTriShape nodes
@@ -812,7 +812,7 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
         targetNode->hasAnimation = true;
     }
 
-    // Link NiSkinInstance blocks to their shapes (per-vertex skinning, Â§8.1).
+    // Link NiSkinInstance blocks to their shapes (per-vertex skinning, Ã‚Â§8.1).
     // Shapes without a skin instance keep rigid owner-node deformation.
     for (auto it = blocks.constBegin(); it != blocks.constEnd(); ++it) {
         auto skinInst = dynamic_cast<NifSkinInstance*>(it.value());
@@ -888,7 +888,7 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
                      .arg(shape.name).arg(shape.skinBones.size()).arg(shape.skinWeights.size()));
     }
 
-    // Starfield BSSkin triplets (Â§8.3): [BSGeometry][extras]*[SkinAttach]
+    // Starfield BSSkin triplets (Ã‚Â§8.3): [BSGeometry][extras]*[SkinAttach]
     // [BSSkin::Instance][BSSkin::BoneData] (a BSClothExtraData may sit
     // between Attach and Instance). Populates TriShape bone names from the
     // attach block and per-vertex weights from the resolved external .mesh
@@ -973,7 +973,7 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
 }
 
 // ---------------------------------------------------------------------------
-// Gamebryo 20.2.0.7 reader (Â§8.3). Shipped Starfield NIFs are real Gamebryo
+// Gamebryo 20.2.0.7 reader (Ã‚Â§8.3). Shipped Starfield NIFs are real Gamebryo
 // binaries: index-based blocks (type table + per-block size table) whose
 // names live in a header string table. Layouts below are validated against
 // every loose shipped NIF (header grammar from nif.xml Header/BSStreamHeader,
@@ -1208,9 +1208,18 @@ static bool parseHeaderVariant(QFile& file, Header& h, bool hasUnknownInt)
 // Advances the reader past the prefix; name/flags out.
 bool parseAvPrefix(Reader& r, const Header& h, QString& nameOut, quint32& flagsOut)
 {
-    const quint32 nameIdx = r.u32();
-    if (!r.ok || nameIdx >= static_cast<quint32>(h.strings.size())) return false;
-    nameOut = h.strings.at(nameIdx);
+    // A name is a sized string below 20.1.0.1 and a header-string-table index
+    // from there on. Only the version can tell them apart: in a file that does
+    // have a table, reading a length always succeeds and silently yields a
+    // wrong name, so the two cannot be probed for.
+    if (h.version >= 335609859u) {
+        const quint32 nameIdx = r.u32();
+        if (!r.ok || nameIdx >= static_cast<quint32>(h.strings.size())) return false;
+        nameOut = h.strings.at(nameIdx);
+    } else {
+        nameOut = r.sizedString();
+        if (!r.ok) return false;
+    }
     const quint32 numExtra = r.u32();
     if (!r.ok || numExtra > 10000) return false;
     for (quint32 i = 0; i < numExtra; ++i) {
@@ -1218,9 +1227,28 @@ bool parseAvPrefix(Reader& r, const Header& h, QString& nameOut, quint32& flagsO
         if (!r.ok || ref < -1 || ref >= static_cast<qint32>(h.numBlocks)) return false;
     }
     r.i32();                       // controller
-    flagsOut = r.u32();
-    r.skip(12 + 36 + 4);           // translation, rotation, scale
-    r.i32();                       // collision object
+    // The AV body after the controller is version-gated in three places, and
+    // getting any of them wrong shifts every later field, so the gates mirror
+    // NifBlockFile's walkNiAVObject, which splits these containers byte-exactly:
+    // flags narrows to u16 on the old stream versions, velocity only exists in
+    // the oldest, the property list only exists while bsVersion is low, and the
+    // collision ref appears later. Note bsVersion comes from the header and is
+    // not the same magnitude as the container version.
+    if (h.bsVersion > 26) {
+        flagsOut = r.u32();
+    } else if (h.version >= 50331648u) {
+        flagsOut = r.u16();
+    } else {
+        return false;
+    }
+    r.skip(12 + 36 + 4);           // translation, rotation (Matrix33), scale
+    if (h.version <= 67240448u) r.skip(12);          // velocity
+    if (h.bsVersion <= 34) {                         // properties
+        const quint32 n = r.u32();
+        if (!r.ok || n > 100000u) return false;
+        for (quint32 i = 0; i < n; ++i) r.i32();
+    }
+    if (h.version >= 167772416u) r.i32();            // collision object
     return r.ok;
 }
 
@@ -1248,13 +1276,22 @@ NifNode* parseNode(QFile& file, const Header& h, quint32 index, qint64& consumed
             node->children.append(static_cast<quint32>(ref));
     }
     if (!r.ok) { delete node; return nullptr; }
+    // The node effect list exists only on the old streams, after the children.
+    if (h.bsVersion < 130) {
+        const quint32 numEffects = r.u32();
+        if (!r.ok || numEffects > 100000) { delete node; return nullptr; }
+        for (quint32 i = 0; i < numEffects; ++i) {
+            if (!r.ok) { delete node; return nullptr; }
+            r.i32();
+        }
+    }
     consumed = file.pos() - start;
     return node;
 }
 
 // Starfield BSGeometry shell (NifSkope's #STF# definition): bounds, box,
 // skin/shader/alpha refs, then 4 mesh slots. Slots either carry an external
-// .mesh path (Flags & 512 == 0, the shipped case â€” meshes live in BA2s) or
+// .mesh path (Flags & 512 == 0, the shipped case Ã¢â‚¬â€ meshes live in BA2s) or
 // inline BSMeshData (Flags & 512; not decoded here). Returns a vert-less
 // NifTriShape shell plus any external paths. consumed must equal the
 // declared block size or the block is rejected.
@@ -1302,7 +1339,7 @@ NifTriShape* parseGeometry(QFile& file, const Header& h, quint32 index,
     return shape;
 }
 
-// Starfield skin blocks (Â§8.3): SkinAttach (bone names), BSSkin::Instance
+// Starfield skin blocks (Ã‚Â§8.3): SkinAttach (bone names), BSSkin::Instance
 // (target/bonedata refs, per-bone 16B opaque payloads), BSSkin::BoneData
 // (per-bone 4x4 matrix + scale). Strict counts (bones < 100000); the
 // caller verifies exact block-size consumption.
@@ -1887,15 +1924,16 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
             return false;
         }
         header.offsets.reserve(header.numBlocks);
-        // walkedBlockOffset points at the block's slot in the region, which on
-        // pre-10.1.0.107 containers is the zero tag that precedes it, while the
-        // walker's slice deliberately excludes that tag. So the slot length has
-        // to include it, or every block reads four bytes short.
+        // walkedBlockOffset points at the block's slot in the region, which on a
+        // pre-10.1.0.107 container is a zero tag sitting in front of the
+        // payload, while the walker's slice starts after that tag. So the offset
+        // moves past the tag and the length stays the payload length: consumed is
+        // measured from the offset, and adding the tag to both would read the
+        // tag as the first field.
         const bool hasTag = header.version <= 0x0A01006Au;
         for (quint32 i = 0; i < header.numBlocks && i < static_cast<quint32>(probe.count()); ++i) {
-            header.offsets.append(probe.walkedBlockOffset(i));
-            header.blockSize.append(static_cast<quint32>(probe.block(i).data.size())
-                                    + (hasTag ? 4u : 0u));
+            header.offsets.append(probe.walkedBlockOffset(i) + (hasTag ? 4 : 0));
+            header.blockSize.append(static_cast<quint32>(probe.block(i).data.size()));
         }
         if (header.offsets.size() != header.numBlocks) {
             LOG_INFO(QString("block split covers %1 of %2 blocks in %3")
@@ -2477,7 +2515,7 @@ void NifParser::writeNodeTree(QDataStream& stream, const Node* node) const
         writeNodeTree(stream, child);
     }
 
-    // Animation controllers targeting this node (Â§9). Keyframes are stored
+    // Animation controllers targeting this node (Ã‚Â§9). Keyframes are stored
     // as flat transform samples so the writer round-trips edited key times.
     stream << static_cast<quint32>(node->animations.size());
     for (const auto& anim : node->animations) {

@@ -148,18 +148,19 @@ void TestNifBlockFile::viewLayerParserOpensOblivionMeshes()
     }
 
     for (const QString& f : firstFailures) qWarning("view layer rejected %s", qPrintable(f));
+    qInfo(qPrintable(QStringLiteral("view layer: %1 attempted, %2 loaded, %3 built a tree")
+                         .arg(attempted).arg(loaded).arg(withGeometry)));
     QVERIFY2(attempted > 100, qPrintable(QStringLiteral("only %1 attempted").arg(attempted)));
     // The block reader covers the whole corpus, which is the evidence that the
-    // files themselves are sound.
+    // files themselves are sound rather than malformed.
     QCOMPARE(blockReaderOk, attempted);
-    // The view layer no longer bounces off the version literal - it reads the
-    // header and walks the payload. It still cannot produce a Node tree, because
-    // parseAvPrefix reads a name index from the header string table and a
-    // container below 20.1.0.1 has none; names are inline strings there. That is
-    // the remaining half of this work, so the tree count is asserted as zero
-    // rather than left to be discovered as a surprise later.
-    QCOMPARE(withGeometry, 0);
-    QCOMPARE(loaded, 0);
+    // The view layer is the thing under test: it has to turn these bytes into a
+    // Node tree, because that is what the viewport and the asset converter read.
+    QVERIFY2(loaded > attempted / 2,
+             qPrintable(QStringLiteral("view layer loaded %1 of %2").arg(loaded).arg(attempted)));
+    QVERIFY2(withGeometry > attempted / 2,
+             qPrintable(QStringLiteral("view layer built %1 trees from %2 loads")
+                            .arg(withGeometry).arg(loaded)));
 }
 
 void TestNifBlockFile::shippedNifsRoundTrip()
