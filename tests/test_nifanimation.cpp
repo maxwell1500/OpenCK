@@ -425,6 +425,8 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
     int hasSequence = 0;
     QStringList dataTypeSamples;
     QStringList chainSamples;
+    QStringList decodeSamples;
+
 
     for (int i = 0; i < archive->fileCount() && target.isEmpty(); ++i) {
         const BsaFileEntry& entry = archive->entries()[i];
@@ -517,34 +519,25 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
         const int dataBlock = file.keyframeDataBlockFor(static_cast<int>(chosenController));
         if (dataBlock < 0) {
             ++noDataBlock;
-            // Show the controller's own words and what they point at. The chain
-            // NiTransformController -> NiBlendTransformInterpolator ->
-            // NiTransformInterpolator -> NiTransformData is present in the file,
-            // so a -1 means a field is being read from the wrong offset rather
-            // than that the chain is missing.
-            if (chainSamples.size() < 3) {
+            // Show the controller's block-type and which existing blocks its
+            // u32 words reference. A -1 from keyframeDataBlockFor then says
+            // which link in the controller -> interpolator -> data chain is
+            // invisible to the resolver, rather than leaving it to a guess.
+            if (chainSamples.size() <= 11) {
                 const int ci = static_cast<int>(chosenController);
                 const QByteArray cd = file.block(ci).data;
-                auto word = [&](int off) -> quint32 {
-                    if (off + 4 > cd.size()) return 0xFFFFFFFFu;
+                QStringList refs;
+                for (int off = 0; off + 4 <= cd.size(); off += 4) {
                     quint32 v = 0;
                     for (int k = 0; k < 4; ++k)
-                        v |= static_cast<quint32>(static_cast<quint8>(cd.at(off + k))) << (8 * k);
-                    return v;
-                };
-                auto describe = [&](int off) {
-                    const quint32 r = word(off);
-                    if (r >= static_cast<quint32>(file.count())) return QStringLiteral("-");
-                    return file.declaredBlockType(static_cast<int>(r));
-                };
-                QString hex;
-                for (int k = 0; k < cd.size(); ++k)
-                    hex += QStringLiteral("%1 ").arg(quint8(cd.at(k)), 2, 16, QChar('0'));
-                chainSamples << QStringLiteral("ctrl%1 size=%2 hex=[%3] interp6=%4 tinterp8=%5 tdata9=%6")
-                                 .arg(ci).arg(cd.size()).arg(hex)
-                                 .arg(file.declaredBlockType(6))
-                                 .arg(file.declaredBlockType(8))
-                                 .arg(file.declaredBlockType(9));
+                        v |= static_cast<quint32>(static_cast<quint8>(cd.at(off + k)))
+                             << (8 * k);
+                    if (v < static_cast<quint32>(file.count()))
+                        refs << QStringLiteral("@%1=%2").arg(off).arg(file.declaredBlockType(static_cast<int>(v)));
+                }
+                chainSamples << QStringLiteral("%1 -> %2 (size=%3) refs: %4")
+                                  .arg(file.declaredBlockType(ci), entry.fullPath)
+                                  .arg(cd.size()).arg(refs.join(QLatin1Char(',')));
             }
             continue;
         }
@@ -586,6 +579,15 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
             if (!NifBlockFile::decodeNiTransformData(file.block(dataBlock).data,
                                                      file.version(), raw)) {
                 ++decodeFailed;
+                if (decodeSamples.size() < 3) {
+                    const QByteArray d = file.block(dataBlock).data;
+                    QString hex;
+                    for (int k = 0; k < qMin(d.size(), 16); ++k)
+                        hex += QStringLiteral("%1 ").arg(quint8(d.at(k)), 2, 16, QChar('0'));
+                    decodeSamples << QStringLiteral("%1 %2 version=%3 size=%4 hex=[%5]")
+                                         .arg(dataType, entry.fullPath)
+                                         .arg(file.headerVersion()).arg(d.size()).arg(hex);
+                }
                 continue;
             }
             frameCount = static_cast<int>(raw.translation.count);
@@ -593,12 +595,30 @@ void TestNifAnimation::testRealArchiveKeyframeWriteBack()
             QVector<Nif::TransformKeyframe> flat;
             if (!NifBlockFile::decodeKeyframeData(dataType, file.block(dataBlock).data, flat)) {
                 ++decodeFailed;
+                if (decodeSamples.size() < 3) {
+                    const QByteArray d = file.block(dataBlock).data;
+                    QString hex;
+                    for (int k = 0; k < qMin(d.size(), 16); ++k)
+                        hex += QStringLiteral("%1 ").arg(quint8(d.at(k)), 2, 16, QChar('0'));
+                    decodeSamples << QStringLiteral("%1 %2 version=%3 size=%4 hex=[%5]")
+                                         .arg(dataType, entry.fullPath)
+                                         .arg(file.headerVersion()).arg(d.size()).arg(hex);
+                }
                 continue;
             }
             frameCount = static_cast<int>(flat.size());
         }
         if (frameCount < 2) {
             ++decodeFailed;
+            if (decodeSamples.size() < 3) {
+                const QByteArray d = file.block(dataBlock).data;
+                QString hex;
+                for (int k = 0; k < qMin(d.size(), 20); ++k)
+                    hex += QStringLiteral("%1 ").arg(quint8(d.at(k)), 2, 16, QChar('0'));
+                decodeSamples << QStringLiteral("%1 %2 version=%3 frames=%4 head=[%5]")
+                                      .arg(dataType, entry.fullPath)
+                                      .arg(file.headerVersion()).arg(frameCount).arg(hex);
+            }
             continue;
         }
 
@@ -645,6 +665,14 @@ if (!dataTypeSamples.isEmpty()) {
                                  .arg(filesConsidered).arg(splitRejected).arg(noController)
                                  .arg(noClip).arg(noDataBlock).arg(notWritable)
                                  .arg(decodeFailed).toUtf8());
+                for (const QString& c : chainSamples)
+                    marker.write(("CHAIN " + c + QStringLiteral("\n")).toUtf8());
+                for (const QString& d : decodeSamples)
+                    marker.write(("DECODE " + d + QStringLiteral("\n")).toUtf8());
+                if (!dataTypeSamples.isEmpty()) {
+                    marker.write(("SAMPLES " + dataTypeSamples.join(QStringLiteral(" | "))
+                                  + QStringLiteral("\n")).toUtf8());
+                }
             }
             marker.close();
         }

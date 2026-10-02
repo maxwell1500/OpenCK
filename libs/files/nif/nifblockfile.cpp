@@ -397,7 +397,7 @@ bool skipKeyframeGroup(Cursor& c, quint32 valueBytes)
     if (!c.ok() || numKeys > 10000000u) return false;
     if (numKeys == 0) return true;              // no interpolation, no keys
     const quint32 interpolation = c.u32();
-    if (!c.ok() || interpolation > kKeyTypeMax) return false;
+    if (!c.ok() || interpolation > kKeyTypeMax || interpolation == 0u) return false;
     // A quadratic key carries a forward and a backward tangent, each as wide as
     // the value; a TBC key carries a tension, bias and continuity triple instead,
     // which is twelve bytes whatever the value is.
@@ -3444,7 +3444,7 @@ bool decodeKeyframeGroup(Cursor& c, quint32 valueWidth, NifBlockFile::KeyGroup& 
     if (count == 0) return true;
 
     const quint32 interpolation = c.u32();
-    if (!c.ok() || interpolation > kKeyTypeMax) return false;
+    if (!c.ok() || interpolation > kKeyTypeMax || interpolation == 0u) return false;
     out.interpolation = interpolation;
 
     const quint32 valueCount = (interpolation == kKeyTypeQuadratic)

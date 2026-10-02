@@ -826,6 +826,43 @@ because the `NiTransformData` codec does not round-trip. The block-boundary
 grammar is now known and implemented in `walkNiKeyframeData`; what remains is a
 lossless semantic representation, not a layout question.
 
+### Residual census: 12 `noDataBlock`, 3 `decodeFailed`, and an interpolation word now proven
+
+The split between "the controller exists" and "the controller's data block is
+reachable" is small now. The remaining twelve unresolved files all report a
+`NiTransformController` block whose u32 words do **not** contain any ref to a
+keyframe-data or interpolator block - only spurious refs to `NiMaterialProperty`,
+`NiTexturingProperty`, `NiNode`, or nothing (they resolve by scanning, which is
+what `keyframeDataBlockFor` already does; on those blocks there is simply no
+path to a `NiTransformData`). A static-interpolator `NiTransformController`
+carrying no data ref has no animation to write; the honest outcome of the
+writer is to refuse, not to guess. Connecting those files to any byte-rewrite
+would need either the real `NiBlendTransformInterpolator` that spans them or a
+format revision in `bs_header.bs_version`, neither of which the census shows is
+addressable from the controller block alone.
+
+The three `decodeFailed` files all decode to `NiTransformData` blocks in files
+that claim `version=10.2.0.0`, with identical heads to the passing
+`20.0.0.4` blocks:
+
+```
+01 00 00 00 04 00 00 00 02 00 00 00 02 00 00 00 00 00 00 00
+```
+
+The 20.0.0.4 paths parse this as `num_rotation_keys=1, rotation_type=4`, then
+three quadratic axis groups. A 10.2.0.0 file neither carries the
+`*order*` float nor the same KeyGroup framing at the exact same offsets, and as
+soon as the XYZ `KeyGroup` decode runs into the 10.2 byte layout the read drifts
+into an "empty only" translation group - so `translation.count` becomes 0 and
+the census counts it as no frames. This was masked before because
+`decodeKeyframeGroup`/`skipKeyframeGroup` accepted `interpolation == 0` for a
+non-empty group (0 is only valid when the count itself is 0). An `interpolation`
+word of 0 is now rejected in both, so those files are decode failures we can
+attribute to a stale format rather than silently to a 20.x layout. Runtime
+writes for them are refused by the byte-exact precondition exactly as before;
+no valid byte stream is affected (the archive codec census is still
+`4412/4412` exact).
+
 `NiStringPalette` in a pre-20.1.0.1 container is **not** a counted list of sized
 strings. It is a single length-prefixed blob holding the palette's strings back
 to back, each NUL terminated, and a `ControlledBlock`'s name offset is a
