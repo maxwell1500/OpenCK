@@ -111,6 +111,20 @@ NifAnimation* loadAnimationFromNif(const QString& path)
                 kf.tx = tk.translation.x;
                 kf.ty = tk.translation.y;
                 kf.tz = tk.translation.z;
+                // Scale has to come across or saving would write a constant 1.0
+                // over the node's real scale channel.
+                kf.sx = tk.scale.x;
+                kf.sy = tk.scale.y;
+                kf.sz = tk.scale.z;
+                // Carry the quaternion the file actually stores. The Euler
+                // angles are what the timeline edits, but they are derived and
+                // going back through them is not the identity, so a rotation
+                // the user never touched has to be able to come out unchanged.
+                kf.qw = tk.rotation.w;
+                kf.qx = tk.rotation.x;
+                kf.qy = tk.rotation.y;
+                kf.qz = tk.rotation.z;
+                kf.hasQuat = true;
                 quaternionToEuler(tk.rotation.w, tk.rotation.x,
                                   tk.rotation.y, tk.rotation.z,
                                   kf.rx, kf.ry, kf.rz);
@@ -887,6 +901,7 @@ void AnimationEditor::onSaveNif()
 
     int saved = 0;
     int failed = 0;
+    int downgraded = 0;
     for (const auto& clip : mAnimation->clips) {
         for (const auto& channel : clip.channels) {
             QVector<Nif::TransformKeyframe> keyframes;
@@ -896,7 +911,21 @@ void AnimationEditor::onSaveNif()
                 output.time = keyframe.time;
                 output.translation = {keyframe.tx, keyframe.ty, keyframe.tz};
                 output.scale = {keyframe.sx, keyframe.sy, keyframe.sz};
-                if (keyframe.hasQuat) {
+                // Prefer the quaternion the NIF stored. It is bit-exact, and
+                // rebuilding it from Euler angles is not, so re-deriving it for
+                // a rotation nobody edited would rewrite every key. The Euler
+                // angles are the user-facing control, so they are only trusted
+                // once they stop matching what that quaternion implies - which
+                // is what happens when the timeline moves the node.
+                float fromStored = 0.0f, fy = 0.0f, fz = 0.0f;
+                quaternionToEuler(keyframe.qw, keyframe.qx,
+                                  keyframe.qy, keyframe.qz,
+                                  fromStored, fy, fz);
+                const bool rotationEdited =
+                    !qFuzzyCompare(fromStored + 1.0f, keyframe.rx + 1.0f) ||
+                    !qFuzzyCompare(fy + 1.0f, keyframe.ry + 1.0f) ||
+                    !qFuzzyCompare(fz + 1.0f, keyframe.rz + 1.0f);
+                if (keyframe.hasQuat && !rotationEdited) {
                     output.rotation = {keyframe.time, keyframe.qw, keyframe.qx,
                         keyframe.qy, keyframe.qz};
                 } else {
@@ -909,17 +938,25 @@ void AnimationEditor::onSaveNif()
             }
             const QString clipName = channel.type == QStringLiteral("NiKeyframeData")
                 ? QString() : channel.type;
+            bool channelDowngraded = false;
             if (NifAnimationWriter::writeKeyframesToNif(mSourceNifPath,
-                    channel.boneName, keyframes, clipName))
+                    channel.boneName, keyframes, clipName, &channelDowngraded))
                 ++saved;
             else
                 ++failed;
+            if (channelDowngraded) ++downgraded;
         }
     }
 
-    if (failed == 0)
+    if (failed == 0 && downgraded == 0)
         QMessageBox::information(this, tr("Save NIF"),
             tr("Saved %1 animation channel(s) to the source NIF.").arg(saved));
+    else if (failed == 0)
+        QMessageBox::warning(this, tr("Save NIF"),
+            tr("Saved %1 channel(s). %2 of them were edited, and an edited "
+               "channel cannot keep a non-linear interpolation mode, so those "
+               "curves are now straight lines.")
+                .arg(saved).arg(downgraded));
     else
         QMessageBox::warning(this, tr("Save NIF"),
             tr("Saved %1 channel(s); %2 could not be written.").arg(saved).arg(failed));

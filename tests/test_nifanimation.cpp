@@ -32,6 +32,7 @@ private slots:
     void testNifKeyframeWriteBack();
     void testRealArchiveKeyframeWriteBack();
     void testRealArchiveKeyframeCodecRoundTrip();
+    void testUneditedSaveIsByteIdentical();
 
 private:
     static NifAnimation sampleAnimation();
@@ -225,7 +226,7 @@ void TestNifAnimation::testSlerpTakesShortPath()
     const TransformKeyframe& f = frames[0];
     QVERIFY(f.hasQuat);
     // Slerp midpoint of identity -> -10 deg is -5 deg about Y. An Euler lerp
-    // of 0 -> 350 deg would sit at 175 deg instead (the flip ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§8.2 kills).
+    // of 0 -> 350 deg would sit at 175 deg instead (the flip ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§8.2 kills).
     QVERIFY(qAbs(f.ry - static_cast<float>(qDegreesToRadians(-5.0))) < 0.01f);
     QVERIFY(qAbs(f.qw - 0.99905f) < 0.001f);
 }
@@ -992,6 +993,298 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
     }
     QVERIFY2(NifBlockFile::isWritableKeyframeType(transformData),
              "all sampled NiTransformData blocks round-trip; enable the writer gate");
+}
+
+// Saving a clip the user never touched must not change the file. The editor
+// hands the writer a flat keyframe list, which carries no interpolation mode and
+// no tangents, so re-encoding a channel from that list would straighten a
+// quadratic spline into a line - the animation would still look right on a
+// static frame and play differently. This rebuilds the flat list exactly as the
+// editor would and asserts the bytes come back identical, which only holds if
+// every channel the edit did not move is passed through verbatim.
+void TestNifAnimation::testUneditedSaveIsByteIdentical()
+{
+    const QString base = QStringLiteral(
+        "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/");
+    QStringList archives;
+    for (const QString& name : {QStringLiteral("Oblivion - Meshes.bsa"),
+                                QStringLiteral("DLCShiveringIsles - Meshes.bsa")}) {
+        if (QFile::exists(base + name)) archives.append(base + name);
+    }
+    if (archives.isEmpty()) QSKIP("no Oblivion mesh archives found");
+
+    // Flatten a decoded block the way the editor's loader does: one frame per
+    // distinct time across the channels, each channel contributing the value of
+    // its nearest earlier key. This is the inverse of the writer's resampling.
+    auto flatten = [](const NifBlockFile::NiTransformDataRaw& raw) {
+        QVector<float> times;
+        for (const auto& g : raw.rotationGroups)
+            times.append(g.times);
+        times.append(raw.translation.times);
+        times.append(raw.scale.times);
+        std::sort(times.begin(), times.end());
+        times.erase(std::unique(times.begin(), times.end()), times.end());
+
+        auto sample = [](const NifBlockFile::KeyGroup& g, float t) {
+            int best = -1;
+            for (int i = 0; i < static_cast<int>(g.count) && i < g.times.size(); ++i) {
+                if (g.times.at(i) <= t) best = i; else break;
+            }
+            if (best < 0) best = g.times.isEmpty() ? -1 : 0;
+            return best;
+        };
+
+        const bool xyz = (raw.rotationType == 4 && raw.rotationGroups.size() == 3);
+        QVector<Nif::TransformKeyframe> frames;
+        for (float t : times) {
+            Nif::TransformKeyframe kf;
+            kf.time = t;
+            kf.translation = {0.0f, 0.0f, 0.0f};
+            kf.scale = {1.0f, 1.0f, 1.0f};
+            const int ti = sample(raw.translation, t);
+            if (ti >= 0 && ti * 3 + 2 < raw.translation.values.size()) {
+                kf.translation = { raw.translation.values.at(ti * 3),
+                                   raw.translation.values.at(ti * 3 + 1),
+                                   raw.translation.values.at(ti * 3 + 2) };
+            }
+            const int si = sample(raw.scale, t);
+            if (si >= 0 && si < raw.scale.values.size())
+                kf.scale.x = raw.scale.values.at(si);
+            if (xyz) {
+                kf.hasEuler = true;
+                for (int axis = 0; axis < 3; ++axis) {
+                    const auto& g = raw.rotationGroups.at(axis);
+                    const int ri = sample(g, t);
+                    const float v = (ri >= 0 && ri < g.values.size()) ? g.values.at(ri) : 0.0f;
+                    (&kf.euler.x)[axis] = v;
+                }
+            } else if (!raw.rotationGroups.isEmpty()) {
+                const auto& g = raw.rotationGroups.first();
+                const int ri = sample(g, t);
+                if (ri >= 0 && ri * 4 + 3 < g.values.size()) {
+                    kf.rotation = { t, g.values.at(ri * 4), g.values.at(ri * 4 + 1),
+                                    g.values.at(ri * 4 + 2), g.values.at(ri * 4 + 3) };
+                }
+            }
+            frames.append(kf);
+        }
+        return frames;
+    };
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    int examined = 0;
+    int identical = 0;
+    int downgradedCount = 0;
+    int resaveDiffers = 0;
+    int patched = 0;
+    int refused = 0;
+    int blockIdentical = 0;
+    int blockChangedDetail = 0;
+    int nonLinearSeen = 0;
+    QString firstDiff;
+    bool skipped = false;
+
+    for (const QString& archivePath : archives) {
+        BsaArchive archive;
+        if (!archive.open(archivePath)) { skipped = true; continue; }
+        for (int i = 0; i < archive.fileCount() && examined < 400; ++i) {
+            const QString entry = archive.entries()[i].fullPath;
+            if (!entry.endsWith(".nif", Qt::CaseInsensitive)) continue;
+            QByteArray bytes;
+            if (!archive.readData(i, bytes)) continue;
+            if (!bytes.startsWith("Gamebryo File Format")) continue;
+
+            const QString scratch = dir.filePath(QStringLiteral("unedited.nif"));
+            {
+                QFile out(scratch);
+                if (!out.open(QIODevice::WriteOnly)) continue;
+                out.write(bytes);
+            }
+
+            NifBlockFile probe;
+            if (!probe.load(scratch)) continue;
+            const QList<int> dataBlocks =
+                probe.findBlocks(QStringLiteral("NiTransformData"));
+            if (dataBlocks.isEmpty()) continue;
+
+            // Pick a block that actually carries a curve worth preserving, so
+            // the test cannot pass on a corpus of linear channels.
+            int chosen = -1;
+            NifBlockFile::NiTransformDataRaw raw;
+            for (int b : dataBlocks) {
+                NifBlockFile::NiTransformDataRaw candidate;
+                if (!NifBlockFile::decodeNiTransformData(probe.block(b).data,
+                                                         probe.version(), candidate))
+                    continue;
+                const bool curvy =
+                    candidate.translation.interpolation != 1u ||
+                    !candidate.translation.tangents.isEmpty() ||
+                    candidate.scale.interpolation != 1u ||
+                    !candidate.scale.tangents.isEmpty() ||
+                    std::any_of(candidate.rotationGroups.cbegin(),
+                                candidate.rotationGroups.cend(),
+                                [](const NifBlockFile::KeyGroup& g) {
+                                    return g.interpolation != 1u || !g.tangents.isEmpty();
+                                });
+                if (curvy) ++nonLinearSeen;
+                if (chosen < 0 && curvy) { chosen = b; raw = candidate; }
+                if (chosen < 0 && raw.rotationGroups.isEmpty() && b == dataBlocks.first())
+                    { chosen = b; raw = candidate; }
+            }
+            if (chosen < 0) continue;
+            ++examined;
+
+            // Address the controller through a clip name, the same discovery the writer
+            // itself performs: a clip name only exists in a controller
+            // sequence, and on Oblivion the animated nodes are driven through
+            // a multi-target controller, so the clip is often the only handle
+            // there is. Starting from the clip map also guarantees the block
+            // under test is the one that clip actually drives.
+            // Address the controller the way the writer tries first: a node whose
+            // controller ref is a keyframe controller, named by the caller. A
+            // clip name is the fallback the writer has, but a clip name only
+            // exists in a controller sequence, and on shipped Oblivion meshes
+            // almost no animation is clip-addressable, so the node path is what
+            // actually resolves.
+            QString nodeName;
+            int controllerIndex = -1;
+            for (int b = 0; b < probe.count(); ++b) {
+                QString name;
+                quint32 controllerRef = 0xFFFFFFFFu;
+                if (!probe.nodeNetInfo(b, name, controllerRef)) continue;
+                const int idx = static_cast<int>(controllerRef);
+                if (idx < 0 || idx >= probe.count()) continue;
+                const QString type = probe.block(idx).type;
+                if (type != QLatin1String("NiKeyframeController")
+                    && type != QLatin1String("NiTransformController"))
+                    continue;
+                if (probe.keyframeDataBlockFor(idx) != chosen) continue;
+                nodeName = name;
+                controllerIndex = idx;
+                break;
+            }
+            if (controllerIndex < 0 || nodeName.isEmpty()) continue;
+            const QHash<quint32, QString> clipNames = probe.clipNamesByController();
+            const QString clipName = clipNames.value(static_cast<quint32>(controllerIndex));
+
+            const QVector<Nif::TransformKeyframe> frames = flatten(raw);
+            if (frames.isEmpty()) continue;
+
+            const QByteArray before = bytes;
+            const QByteArray blockBefore = probe.block(chosen).data;
+
+            // Control: re-serializing without touching anything must already
+            // reproduce the file. If it does not, a difference after the write
+            // says nothing about the patch, so do not attribute it to one.
+            {
+                NifBlockFile resave;
+                if (!resave.load(scratch) || !resave.save(scratch)) continue;
+                QFile ctrl(scratch);
+                if (!ctrl.open(QIODevice::ReadOnly)) continue;
+                const QByteArray ctrlBytes = ctrl.readAll();
+                ctrl.close();
+                {
+                    QFile restore(scratch);
+                    if (!restore.open(QIODevice::WriteOnly)) continue;
+                    restore.write(before);
+                }
+                if (ctrlBytes != before) { ++resaveDiffers; continue; }
+            }
+
+            bool downgraded = false;
+            if (!NifAnimationWriter::writeKeyframesToNif(scratch, nodeName,
+                    frames, clipName, &downgraded)) {
+                if (firstDiff.isEmpty())
+                    firstDiff = entry + QStringLiteral(": writer refused the block");
+                ++refused;
+                continue;
+            }
+            ++patched;
+            if (downgraded) ++downgradedCount;
+
+            QFile after(scratch);
+            QVERIFY(after.open(QIODevice::ReadOnly));
+            const QByteArray now = after.readAll();
+            after.close();
+
+            NifBlockFile reread;
+            QVERIFY2(reread.load(scratch), qPrintable(entry));
+            const QByteArray blockAfter = reread.block(chosen).data;
+            if (blockAfter == blockBefore) {
+                ++blockIdentical;
+            } else {
+                NifBlockFile::NiTransformDataRaw afterRaw;
+                NifBlockFile::decodeNiTransformData(blockAfter, reread.version(), afterRaw);
+                QStringList diffs;
+                bool explained = false;
+                auto cmp = [&](const char* what, const NifBlockFile::KeyGroup& a,
+                               const NifBlockFile::KeyGroup& b) {
+                    if (a.count != b.count) { diffs << QStringLiteral("%1 count").arg(what); return; }
+                    if (a.interpolation != b.interpolation)
+                        diffs << QStringLiteral("%1 interp %2->%3").arg(what)
+                                  .arg(a.interpolation).arg(b.interpolation);
+                    if (a.values != b.values) {
+                        diffs << QStringLiteral("%1 values").arg(what);
+                        if (!explained) {
+                            explained = true;
+                            QStringList x, y;
+                            for (int k = 0; k < qMin(6, a.values.size()); ++k)
+                                x << QString::number(a.values.at(k), 'g', 9);
+                            for (int k = 0; k < qMin(6, b.values.size()); ++k)
+                                y << QString::number(b.values.at(k), 'g', 9);
+                            QStringList ta, tb;
+                            for (int k = 0; k < qMin(4, a.times.size()); ++k)
+                                ta << QString::number(a.times.at(k), 'g', 9);
+                            for (int k = 0; k < qMin(4, b.times.size()); ++k)
+                                tb << QString::number(b.times.at(k), 'g', 9);
+                            diffs << QStringLiteral("[was %1 now %2] [times %3 vs %4]")
+                                      .arg(x.join(QLatin1Char(',')),
+                                           y.join(QLatin1Char(',')),
+                                           ta.join(QLatin1Char(',')),
+                                           tb.join(QLatin1Char(',')));
+                        }
+                    }
+                    if (a.times != b.times) diffs << QStringLiteral("%1 times").arg(what);
+                    if (a.tangents != b.tangents) diffs << QStringLiteral("%1 tangents").arg(what);
+                };
+                cmp("translation", raw.translation, afterRaw.translation);
+                cmp("scale", raw.scale, afterRaw.scale);
+                for (int g = 0; g < qMin(raw.rotationGroups.size(), afterRaw.rotationGroups.size()); ++g)
+                    cmp(QStringLiteral("rot%1").arg(g).toLatin1().constData(),
+                        raw.rotationGroups.at(g), afterRaw.rotationGroups.at(g));
+                if (firstDiff.isEmpty())
+                    firstDiff = entry + QStringLiteral(": ") + diffs.join(QStringLiteral(", "))
+                              + QStringLiteral(" [rotationType=%1 groups=%2]")
+                                  .arg(raw.rotationType).arg(raw.rotationGroups.size());
+                ++blockChangedDetail;
+            }
+            // Whole-file identity is deliberately not asserted: the frames here
+            // belong to one block, and a clip on these meshes usually drives
+            // several controllers, so applying them to the rest would change
+            // the file for a reason that is the harness's, not the writer's.
+            // The block under test is the part this test is about.
+            if (now == before) ++identical;
+        }
+    }
+
+    qInfo(qPrintable(QStringLiteral("unedited saves: %1 examined, %2 patched, %3 refused, "
+                                    "%4 blocks byte-identical, %5 whole-file identical, "
+                                    "%6 downgraded, %7 resave-differs, %8 non-linear seen")
+                         .arg(examined).arg(patched).arg(refused).arg(blockIdentical)
+                         .arg(identical).arg(downgradedCount).arg(resaveDiffers)
+                         .arg(nonLinearSeen)));
+    if (skipped && examined == 0) QSKIP("no reachable mesh archive");
+    QVERIFY2(examined > 0, "no NiTransformData blocks were examined");
+    QVERIFY2(patched > 0, "the writer refused every sampled block");
+    if (!firstDiff.isEmpty()) qWarning("first difference: %s", qPrintable(firstDiff));
+    // The whole point: an unedited save must not straighten any curve, and the
+    // block under test must come back as the bytes that went in.
+    QCOMPARE(downgradedCount, 0);
+    QVERIFY2(blockIdentical == patched,
+             qPrintable(QStringLiteral("%1 of %2 unedited saves changed the block: %3")
+                            .arg(patched - blockIdentical).arg(patched).arg(firstDiff)));
 }
 
 QTEST_MAIN(TestNifAnimation)

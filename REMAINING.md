@@ -676,6 +676,54 @@ time base and samples the edited frames onto it. Resampling every channel onto t
 frame list's length instead would silently lengthen an animation: a block whose
 translation channel holds 20 keys would gain 21.
 
+### An unedited save is now byte-identical; an edited channel is reported
+
+Two bugs sat on the path between the timeline and the writer.
+
+**Scale was never loaded.** `loadAnimationFromNif` copied translation and rotation
+from the parsed keyframe and left `sx`/`sy`/`sz` at their defaults of 1.0, so
+saving a clip the user had merely opened wrote a constant 1.0 over the node's real
+scale channel. It now copies the scale.
+
+**Every rotation went through Euler angles.** The loader converted the stored
+quaternion to Euler angles and never set `hasQuat`, so the writer rebuilt a
+quaternion from those angles. That conversion is not the identity, so a rotation
+nobody had touched came back slightly different on every save. The loader now
+carries the quaternion the file actually stores, and `onSaveNif` uses it unless the
+Euler angles no longer match what it implies - which is what happens when the
+timeline moves the node.
+
+**Unedited channels kept their curves anyway.** `flatToRaw` rebuilt every channel
+from the flat frame list, which carries values only, so every channel came out
+linear: a quadratic spline became a straight line and the animation played
+differently while still looking right on a static frame. Each channel is now
+compared against the decoded original and passed through whole - interpolation mode
+and tangents intact - when the edit did not move it. The comparison is bit
+equality, not a tolerance, so a small real edit is not mistaken for no edit.
+
+An XYZ-keyed rotation stores one float per axis, and a quaternion round trip is not
+the identity there either, so `Nif::TransformKeyframe` carries the axis values
+alongside (`euler` + `hasEuler`) and the writer uses them when they are present.
+
+`writeKeyframesToNif` reports whether any channel had to be straightened, and the
+editor says so rather than letting it pass: a channel that actually moved cannot
+keep a non-linear mode, because the edited keyframe list has nowhere to put one.
+That is a real limitation of the flat edit format, not a bug, and it is now visible
+instead of silent.
+
+`test_nifanimation::testUneditedSaveIsByteIdentical` covers this over shipped
+Oblivion meshes: **37 patched, 37 blocks byte-identical, 0 downgraded**, against a
+corpus where 5,107 non-linear channels are in reach. Whole-file identity is not
+asserted, because these clips drive several controllers and the harness holds frames
+for one block.
+
+**Still open.** The editor's loader reads animation through `NifParser`, whose
+`NifTransformData` is the internal dialect and does not even read the rotation type
+before the keys - so an XYZ-keyed block is misparsed there even though the writer
+now round-trips it exactly. The editor therefore cannot yet show or edit XYZ
+rotation faithfully; it needs to read animation through `NifBlockFile`'s strict
+codec, which is the same split the writer already uses.
+
 ### A controller sequence *is* a clip; the node match was over-constraining
 
 The writer required a controller to be reachable two ways at once: named by an

@@ -13,6 +13,43 @@
 
 namespace {
 
+// Bit equality, not a tolerance: an unedited channel is passed through
+// verbatim, and an epsilon would let a small real edit pass as unchanged.
+bool valuesUnchanged(const NifBlockFile::KeyGroup& src, const QVector<float>& values)
+{
+    if (src.values.size() != values.size())
+        return false;
+    for (int i = 0; i < values.size(); ++i) {
+        if (qIsNaN(src.values.at(i)) || qIsNaN(values.at(i)))
+            return false;
+        if (memcmp(&src.values.at(i), &values.at(i), sizeof(float)) != 0)
+            return false;
+    }
+    return true;
+}
+
+// Re-encode one channel, but only if the edit actually moved it. The flat frame
+// list cannot carry an interpolation mode or tangents, so re-encoding a channel
+// the user never touched would silently straighten a quadratic spline into a
+// line. When the values come back identical the original group is returned
+// whole, tangents and all; otherwise the channel has to be linear, which is
+// reported so the UI can say so rather than losing it quietly.
+NifBlockFile::KeyGroup mergeGroup(const NifBlockFile::KeyGroup& src,
+                                  const QVector<float>& values,
+                                  bool& downgraded)
+{
+    if (valuesUnchanged(src, values))
+        return src;
+    if (src.interpolation != 1u || !src.tangents.isEmpty())
+        downgraded = true;
+    NifBlockFile::KeyGroup g;
+    g.count = src.count;
+    g.interpolation = 1;
+    g.times = src.times;
+    g.values = values;
+    return g;
+}
+
 // Convert a flat TransformKeyframe list into the channel-preserving raw
 // representation, keeping each channel's own key count and time base.
 //
@@ -26,10 +63,12 @@ namespace {
 // channel becomes linear.
 NifBlockFile::NiTransformDataRaw flatToRaw(
     const QVector<Nif::TransformKeyframe>& keyframes,
-    const NifBlockFile::NiTransformDataRaw& original)
+    const NifBlockFile::NiTransformDataRaw& original,
+    bool* downgraded)
 {
     NifBlockFile::NiTransformDataRaw raw;
     if (keyframes.isEmpty()) return raw;
+    bool lost = false;
 
     // Sample the edited animation at `time` by nearest earlier key, which for a
     // monotonic time base is a step-free resample.
@@ -57,68 +96,81 @@ NifBlockFile::NiTransformDataRaw flatToRaw(
         raw.numRotationKeys = original.numRotationKeys;
         for (int axis = 0; axis < 3; ++axis) {
             const NifBlockFile::KeyGroup& src = original.rotationGroups.at(axis);
-            NifBlockFile::KeyGroup g;
-            g.count = src.count;
-            g.interpolation = 1; // linear
+            QVector<float> values;
+            values.reserve(int(src.count));
             for (int i = 0; i < static_cast<int>(src.count); ++i) {
                 const float t = src.times.value(i, 0.0f);
                 const Nif::TransformKeyframe& kf = sampleAt(t);
-                float euler[3] = { 0.0f, 0.0f, 0.0f };
-                quaternionToEuler(kf.rotation.w, kf.rotation.x, kf.rotation.y, kf.rotation.z,
-                                  euler);
-                g.times.append(t);
-                g.values.append(euler[axis]);
+                // An XYZ-keyed block stores the axis values directly, so use
+                // them when the caller has them: a quaternion round trip would
+                // perturb every key by a few ulp and mark the channel changed.
+                if (kf.hasEuler) {
+                    const float axisValue =
+                        (axis == 0) ? kf.euler.x : (axis == 1) ? kf.euler.y : kf.euler.z;
+                    values.append(axisValue);
+                } else {
+                    float euler[3] = { 0.0f, 0.0f, 0.0f };
+                    quaternionToEuler(kf.rotation.w, kf.rotation.x, kf.rotation.y,
+                                      kf.rotation.z, euler);
+                    values.append(euler[axis]);
+                }
             }
-            raw.rotationGroups.append(g);
+            raw.rotationGroups.append(mergeGroup(src, values, lost));
         }
     } else if (!original.rotationGroups.isEmpty()) {
         raw.numRotationKeys = original.numRotationKeys;
         const NifBlockFile::KeyGroup& src = original.rotationGroups.first();
-        NifBlockFile::KeyGroup g;
-        g.count = src.count;
-        g.interpolation = 1;
+        QVector<float> values;
+        values.reserve(int(src.count) * 4);
         for (int i = 0; i < static_cast<int>(src.count); ++i) {
             const float t = src.times.value(i, 0.0f);
             const Nif::TransformKeyframe& kf = sampleAt(t);
-            g.times.append(t);
-            g.values.append(kf.rotation.w);
-            g.values.append(kf.rotation.x);
-            g.values.append(kf.rotation.y);
-            g.values.append(kf.rotation.z);
+            values.append(kf.rotation.w);
+            values.append(kf.rotation.x);
+            values.append(kf.rotation.y);
+            values.append(kf.rotation.z);
         }
-        raw.rotationGroups.append(g);
+        raw.rotationGroups.append(mergeGroup(src, values, lost));
     } else {
         // The block carries no rotation keys at all, so it must not gain any.
         raw.numRotationKeys = 0;
     }
 
-    raw.translation.count = original.translation.count;
-    raw.translation.interpolation = 1;
-    for (int i = 0; i < static_cast<int>(original.translation.count); ++i) {
-        const float t = original.translation.times.value(i, 0.0f);
-        const Nif::TransformKeyframe& kf = sampleAt(t);
-        raw.translation.times.append(t);
-        raw.translation.values.append(kf.translation.x);
-        raw.translation.values.append(kf.translation.y);
-        raw.translation.values.append(kf.translation.z);
+    {
+        const NifBlockFile::KeyGroup& src = original.translation;
+        QVector<float> values;
+        values.reserve(int(src.count) * 3);
+        for (int i = 0; i < static_cast<int>(src.count); ++i) {
+            const float t = src.times.value(i, 0.0f);
+            const Nif::TransformKeyframe& kf = sampleAt(t);
+            values.append(kf.translation.x);
+            values.append(kf.translation.y);
+            values.append(kf.translation.z);
+        }
+        raw.translation = mergeGroup(src, values, lost);
     }
 
-    raw.scale.count = original.scale.count;
-    raw.scale.interpolation = 1;
-    for (int i = 0; i < static_cast<int>(original.scale.count); ++i) {
-        const float t = original.scale.times.value(i, 0.0f);
-        const Nif::TransformKeyframe& kf = sampleAt(t);
-        raw.scale.times.append(t);
-        raw.scale.values.append(kf.scale.x); // the block stores one scalar
+    {
+        const NifBlockFile::KeyGroup& src = original.scale;
+        QVector<float> values;
+        values.reserve(int(src.count));
+        for (int i = 0; i < static_cast<int>(src.count); ++i) {
+            const float t = src.times.value(i, 0.0f);
+            const Nif::TransformKeyframe& kf = sampleAt(t);
+            values.append(kf.scale.x); // the block stores one scalar
+        }
+        raw.scale = mergeGroup(src, values, lost);
     }
 
+    if (downgraded) *downgraded = lost;
     return raw;
 }
 
 // Patch the keyframe data block a controller drives, rejecting refs that do
 // not index a block we know how to re-encode.
 bool patchControllerData(NifBlockFile& file, int controllerIndex,
-                         const QVector<Nif::TransformKeyframe>& keyframes)
+                         const QVector<Nif::TransformKeyframe>& keyframes,
+                         bool* downgraded = nullptr)
 {
     const int dataIndex = file.keyframeDataBlockFor(controllerIndex);
     if (dataIndex < 0) {
@@ -159,7 +211,7 @@ bool patchControllerData(NifBlockFile& file, int controllerIndex,
             return false;
         }
 
-        NifBlockFile::NiTransformDataRaw newRaw = flatToRaw(keyframes, raw);
+        NifBlockFile::NiTransformDataRaw newRaw = flatToRaw(keyframes, raw, downgraded);
         QByteArray encoded;
         if (!NifBlockFile::encodeNiTransformData(newRaw, file.version(), encoded)) {
             LOG_WARNING(QString("NifAnimationWriter: failed to encode keyframes for block '%1'")
@@ -217,7 +269,8 @@ bool patchControllerData(NifBlockFile& file, int controllerIndex,
 // controllers a named clip sequence points at.
 bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
                       const QVector<Nif::TransformKeyframe>& keyframes,
-                      const QString& clipName, int& channelsPatched)
+                      const QString& clipName, int& channelsPatched,
+                      bool* downgraded = nullptr)
 {
     NifBlockFile file;
     if (!file.load(nifPath)) return false;
@@ -286,7 +339,7 @@ bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
         if (!clipControllers.isEmpty() && !clipControllers.contains(controllerRef)) continue;
 
         matchedNode = true;
-        if (patchControllerData(file, static_cast<int>(controllerRef), keyframes))
+        if (patchControllerData(file, static_cast<int>(controllerRef), keyframes, downgraded))
             ++channelsPatched;
     }
 
@@ -303,7 +356,7 @@ bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
     if (channelsPatched == 0 && !clipControllers.isEmpty()) {
         for (quint32 controllerRef : clipControllers) {
             if (!wantedControllers.contains(controllerRef)) continue;
-            if (patchControllerData(file, static_cast<int>(controllerRef), keyframes))
+            if (patchControllerData(file, static_cast<int>(controllerRef), keyframes, downgraded))
                 ++channelsPatched;
         }
         if (channelsPatched > 0)
@@ -324,16 +377,21 @@ if (!matchedNode) {
 bool NifAnimationWriter::writeKeyframesToNif(const QString& nifPath,
                                              const QString& nodeName,
                                              const QVector<Nif::TransformKeyframe>& keyframes,
-                                             const QString& clipName)
+                                             const QString& clipName,
+                                             bool* downgraded)
 {
     if (keyframes.isEmpty()) {
         LOG_ERROR("NifAnimationWriter: refusing to write an empty keyframe list");
         return false;
     }
 
+    if (downgraded) *downgraded = false;
+
     if (NifBlockFile::isBethesdaNif(nifPath)) {
         int patched = 0;
-        if (!patchBethesdaNif(nifPath, nodeName, keyframes, clipName, patched)) return false;
+        if (!patchBethesdaNif(nifPath, nodeName, keyframes, clipName, patched,
+                              downgraded))
+            return false;
         LOG_INFO(QString("NifAnimationWriter: patched %1 controller(s) in %2")
                      .arg(patched).arg(nifPath));
         return true;

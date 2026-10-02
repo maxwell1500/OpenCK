@@ -47,6 +47,11 @@ struct TransformKeyframe {
     Vector3 translation;
     QuaternionKeyframe rotation;
     Vector3 scale;
+    // A NiTransformData block keyed as XYZ stores one float per rotation axis.
+    // Turning that into a quaternion and back is not the identity, so for those
+    // blocks the axis values travel here instead and `rotation` is ignored.
+    Vector3 euler;
+    bool hasEuler = false;
 };
 
 struct AnimationClip {
