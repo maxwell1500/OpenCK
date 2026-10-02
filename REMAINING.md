@@ -1401,6 +1401,19 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     hardcoded to `C:/XboxGames/Starfield/Content/Data`); skip cleanly when
     absent.
 
+   Content install roots on this machine (verified 2026-10-02):
+   - Starfield: `C:/XboxGames/Starfield/Content` and a Steam copy at
+     `C:/Program Files (x86)/Steam/steamapps/common/Starfield/Data`
+   - Skyrim Special Edition: `C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content`
+   - Morrowind: `C:/XboxGames/The Elder Scrolls III- Morrowind (PC)/Content`
+   - Oblivion GOTY (legacy): `F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content`
+   - Oblivion Remastered: `D:/XboxGames/The Elder Scrolls IV- Oblivion Remastered/Content`
+   - Fallout 4: `G:/New folder/Fallout 4/Content` (a second copy at `H:/New folder/Fallout 4/Content`)
+
+   NOTE: an earlier version of this note claimed Skyrim/Fallout content was not
+   present on the machine; that was wrong - the installs were in `C:/XboxGames`
+   and `G:/H:\New folder`, outside the single `F:` root that was being checked.
+
     **Status 2026-09-08:** `editor.cpp` now checks `OPENCK_DATA_DIR` env var
     (takes priority over config file, before auto-detection). All real-data
     tests now read the env var with fallback to the hardcoded path.
