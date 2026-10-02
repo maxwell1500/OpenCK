@@ -676,6 +676,30 @@ time base and samples the edited frames onto it. Resampling every channel onto t
 frame list's length instead would silently lengthen an animation: a block whose
 translation channel holds 20 keys would gain 21.
 
+### Quaternion rotation keys are covered, byte-exact, on the shipped corpus
+
+`NiTransformData` was previously described as having its XYZ (rotType 4) branch
+exercised but not the quaternion branch. That is no longer true; the census in
+`testRealArchiveKeyframeCodecRoundTrip` now records the rotation layout of every
+sampled block and asserts both shapes are present and exact:
+
+    NiTransformData rotType=0 groups=0 729    (no rotation keys)
+    NiTransformData rotType=1 groups=1 606    (quaternion keys)
+    NiTransformData rotType=3 groups=1 3      (quaternion keys with T/B/C)
+    NiTransformData rotType=4 groups=3 3074   (XYZ axis KeyGroups)
+    examined=4412 byteExact=4412 failures=0 mismatches=0
+
+All 4,412 sampled shipped blocks round-trip byte-exact, which includes the 609
+quaternion-keyed ones - the quaternion decode/encode branch is verified against
+real files, not just the fixture. The writer path has the same coverage:
+`testUneditedSaveIsByteIdentical` samples clips whose rotation channel is
+quaternion-keyed as well as XYZ-keyed (rotTypes on shipped meshes: 0:13, 1:2,
+3:2, 4:19 unedited saves, 36/36 byte-identical, 0 downgraded).
+
+One nuance on the grammar: `rotation_type` is only read when
+`num_rotation_keys != 0`, which is why 729 blocks are recorded as rotType 0 with
+no groups - that is a tag default, not an actual type field in the file.
+
 ### An unedited save is now byte-identical; an edited channel is reported
 
 Two bugs sat on the path between the timeline and the writer.

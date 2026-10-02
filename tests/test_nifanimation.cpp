@@ -864,6 +864,7 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
     QMap<QString, int> agreed;
     QMap<QString, int> failures;
     QMap<QString, int> mismatches;
+    QMap<QString, int> hist;
     QString firstMismatch;
     QString firstFailure;
 
@@ -920,6 +921,8 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
                                                .arg(type, entry.fullPath);
                         continue;
                     }
+                    ++hist[QStringLiteral("%1 rotType=%2 groups=%3")
+                                 .arg(type).arg(raw.rotationType).arg(raw.rotationGroups.size())];
                 } else {
                     QVector<Nif::TransformKeyframe> decoded;
                     if (!NifBlockFile::decodeKeyframeData(type, original, decoded)) {
@@ -967,6 +970,8 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
                 marker.write(("FAILURE " + firstFailure + "\n").toUtf8());
             if (!firstMismatch.isEmpty())
                 marker.write(("MISMATCH " + firstMismatch + "\n").toUtf8());
+            for (auto it = hist.cbegin(); it != hist.cend(); ++it)
+                marker.write(QStringLiteral("%1 %2\n").arg(it.key()).arg(it.value()).toUtf8());
             marker.close();
         }
     }
@@ -993,6 +998,17 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
     }
     QVERIFY2(NifBlockFile::isWritableKeyframeType(transformData),
              "all sampled NiTransformData blocks round-trip; enable the writer gate");
+    // Coverage means both rotation layouts were exercised, not just the
+    // XYZ-keyed majority: the quaternion branch (any rotation type other than
+    // 4) must have appeared in the corpus and passed through byte-exact.
+    QVERIFY2(hist.value(QStringLiteral("NiTransformData rotType=4 groups=3")) > 0,
+             "no XYZ-keyed NiTransformData block was sampled");
+    int quaternion = 0;
+    for (const QString& type : {QStringLiteral("1"), QStringLiteral("3")}) {
+        quaternion += hist.value(QStringLiteral("NiTransformData rotType=%1 groups=1").arg(type));
+    }
+    QVERIFY2(quaternion > 0,
+             "no quaternion-keyed NiTransformData block was sampled; the quaternion codec is unverified");
 }
 
 // Saving a clip the user never touched must not change the file. The editor
@@ -1083,6 +1099,7 @@ void TestNifAnimation::testUneditedSaveIsByteIdentical()
     int blockIdentical = 0;
     int blockChangedDetail = 0;
     int nonLinearSeen = 0;
+    QMap<quint32, int> patchedRotType;
     QString firstDiff;
     bool skipped = false;
 
@@ -1113,6 +1130,8 @@ void TestNifAnimation::testUneditedSaveIsByteIdentical()
             // the test cannot pass on a corpus of linear channels.
             int chosen = -1;
             NifBlockFile::NiTransformDataRaw raw;
+            int chosenQuaternion = -1;
+            NifBlockFile::NiTransformDataRaw rawQuaternion;
             for (int b : dataBlocks) {
                 NifBlockFile::NiTransformDataRaw candidate;
                 if (!NifBlockFile::decodeNiTransformData(probe.block(b).data,
@@ -1129,19 +1148,32 @@ void TestNifAnimation::testUneditedSaveIsByteIdentical()
                                     return g.interpolation != 1u || !g.tangents.isEmpty();
                                 });
                 if (curvy) ++nonLinearSeen;
-                if (chosen < 0 && curvy) { chosen = b; raw = candidate; }
-                if (chosen < 0 && raw.rotationGroups.isEmpty() && b == dataBlocks.first())
-                    { chosen = b; raw = candidate; }
+                // Prefer a block whose rotation channel is quaternion keys
+                // (rotationType other than 4), since that is the branch the
+                // writer has to preserve through an edit, and it is the
+                // one this test would not otherwise exercise on Oblivion
+                // meshes, where most blocks key rotation as XYZ.
+                const bool quaternion = candidate.rotationType != 4u;
+                if (curvy && quaternion && chosenQuaternion < 0) {
+                    chosenQuaternion = b;
+                    rawQuaternion = candidate;
+                } else if (curvy && chosen < 0) {
+                    chosen = b;
+                    raw = candidate;
+                } else if (chosen < 0 && chosenQuaternion < 0
+                           && raw.rotationGroups.isEmpty() && b == dataBlocks.first()) {
+                    chosen = b;
+                    raw = candidate;
+                }
             }
+            // A quaternion-keyed block, when the clip has one, wins: that is the
+            // branch the writer has to carry through an edit, and Oblivion
+            // meshes would otherwise never exercise it here. XYZ stays the
+            // fallback.
+            if (chosenQuaternion >= 0) { chosen = chosenQuaternion; raw = rawQuaternion; }
             if (chosen < 0) continue;
             ++examined;
 
-            // Address the controller through a clip name, the same discovery the writer
-            // itself performs: a clip name only exists in a controller
-            // sequence, and on Oblivion the animated nodes are driven through
-            // a multi-target controller, so the clip is often the only handle
-            // there is. Starting from the clip map also guarantees the block
-            // under test is the one that clip actually drives.
             // Address the controller the way the writer tries first: a node whose
             // controller ref is a keyframe controller, named by the caller. A
             // clip name is the fallback the writer has, but a clip name only
@@ -1202,6 +1234,7 @@ void TestNifAnimation::testUneditedSaveIsByteIdentical()
                 continue;
             }
             ++patched;
+            ++patchedRotType[raw.rotationType];
             if (downgraded) ++downgradedCount;
 
             QFile after(scratch);
@@ -1271,10 +1304,13 @@ void TestNifAnimation::testUneditedSaveIsByteIdentical()
 
     qInfo(qPrintable(QStringLiteral("unedited saves: %1 examined, %2 patched, %3 refused, "
                                     "%4 blocks byte-identical, %5 whole-file identical, "
-                                    "%6 downgraded, %7 resave-differs, %8 non-linear seen")
+                                    "%6 downgraded, %7 resave-differs, %8 non-linear seen, "
+                                    "rotTypes 0:%9 1:%10 3:%11 4:%12")
                          .arg(examined).arg(patched).arg(refused).arg(blockIdentical)
                          .arg(identical).arg(downgradedCount).arg(resaveDiffers)
-                         .arg(nonLinearSeen)));
+                         .arg(nonLinearSeen)
+                         .arg(patchedRotType.value(0u)).arg(patchedRotType.value(1u))
+                         .arg(patchedRotType.value(3u)).arg(patchedRotType.value(4u))));
     if (skipped && examined == 0) QSKIP("no reachable mesh archive");
     QVERIFY2(examined > 0, "no NiTransformData blocks were examined");
     QVERIFY2(patched > 0, "the writer refused every sampled block");
