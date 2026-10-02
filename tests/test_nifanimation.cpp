@@ -794,21 +794,47 @@ void TestNifAnimation::testRealArchiveKeyframeCodecRoundTrip()
                                    .arg(type).arg(original.size()).arg(h);
                     sampledBlocks.insert(original);
                 }
-                QVector<Nif::TransformKeyframe> decoded;
-                if (!NifBlockFile::decodeKeyframeData(type, original, decoded)) {
-                    ++failures[type];
-                    if (firstFailure.isEmpty())
-                        firstFailure = QStringLiteral("%1 decode failed in %2")
-                                           .arg(type, entry.fullPath);
-                    continue;
-                }
                 QByteArray reencoded;
-                if (!NifBlockFile::encodeKeyframeData(type, decoded, reencoded)) {
-                    ++failures[type];
-                    if (firstFailure.isEmpty())
-                        firstFailure = QStringLiteral("%1 encode refused in %2")
-                                           .arg(type, entry.fullPath);
-                    continue;
+                if (type == QLatin1String("NiTransformData")
+                    || type == QLatin1String("NiKeyframeControllerData")) {
+                    NifBlockFile::NiTransformDataRaw raw;
+                    if (!NifBlockFile::decodeNiTransformData(original, file.version(), raw)) {
+                        ++failures[type];
+                        if (firstFailure.isEmpty()) {
+                            QString hex;
+                            for (int i = 0; i < qMin(32, original.size()); ++i)
+                                hex += QString("%1 ").arg((quint8)original.at(i), 2, 16, QChar('0'));
+                            firstFailure = QStringLiteral("%1 decode failed in %2 version=%3 size=%4 hex=[%5]")
+                                               .arg(type, entry.fullPath)
+                                               .arg(file.headerVersion())
+                                               .arg(original.size())
+                                               .arg(hex);
+                        }
+                        continue;
+                    }
+                    if (!NifBlockFile::encodeNiTransformData(raw, file.version(), reencoded)) {
+                        ++failures[type];
+                        if (firstFailure.isEmpty())
+                            firstFailure = QStringLiteral("%1 encode refused in %2")
+                                               .arg(type, entry.fullPath);
+                        continue;
+                    }
+                } else {
+                    QVector<Nif::TransformKeyframe> decoded;
+                    if (!NifBlockFile::decodeKeyframeData(type, original, decoded)) {
+                        ++failures[type];
+                        if (firstFailure.isEmpty())
+                            firstFailure = QStringLiteral("%1 decode failed in %2")
+                                               .arg(type, entry.fullPath);
+                        continue;
+                    }
+                    if (!NifBlockFile::encodeKeyframeData(type, decoded, reencoded)) {
+                        ++failures[type];
+                        if (firstFailure.isEmpty())
+                            firstFailure = QStringLiteral("%1 encode refused in %2")
+                                               .arg(type, entry.fullPath);
+                        continue;
+                    }
                 }
                 if (reencoded == original) {
                     ++agreed[type];

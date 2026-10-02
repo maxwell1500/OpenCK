@@ -3418,11 +3418,266 @@ bool NifBlockFile::encodeKeyframeData(const QString& blockType,
     return false;
 }
 
+namespace {
+
+bool decodeKeyframeGroup(Cursor& c, quint32 valueWidth, NifBlockFile::KeyGroup& out)
+{
+    out = NifBlockFile::KeyGroup();
+    const quint32 count = c.u32();
+    if (!c.ok() || count > 10'000'000u) return false;
+    out.count = count;
+    if (count == 0) return true;
+
+    const quint32 interpolation = c.u32();
+    if (!c.ok() || interpolation > kKeyTypeMax) return false;
+    out.interpolation = interpolation;
+
+    const quint32 valueCount = (interpolation == kKeyTypeQuadratic)
+        ? valueWidth * 3u
+        : (interpolation == kKeyTypeTbc)
+            ? valueWidth + 3u
+            : valueWidth;
+
+    out.times.reserve(static_cast<int>(count));
+    out.values.reserve(static_cast<int>(count * valueCount));
+    if (interpolation == kKeyTypeQuadratic)
+        out.tangents.reserve(static_cast<int>(count * valueWidth * 2u));
+    else if (interpolation == kKeyTypeTbc)
+        out.tangents.reserve(static_cast<int>(count * 3u));
+
+    for (quint32 i = 0; i < count; ++i) {
+        out.times.append(c.f32());
+        for (quint32 v = 0; v < valueWidth; ++v)
+            out.values.append(c.f32());
+        if (interpolation == kKeyTypeQuadratic) {
+            for (quint32 v = 0; v < valueWidth; ++v)
+                out.tangents.append(c.f32());
+            for (quint32 v = 0; v < valueWidth; ++v)
+                out.tangents.append(c.f32());
+        } else if (interpolation == kKeyTypeTbc) {
+            out.tangents.append(c.f32());
+            out.tangents.append(c.f32());
+            out.tangents.append(c.f32());
+        }
+        if (!c.ok()) return false;
+    }
+    return true;
+}
+
+bool encodeKeyframeGroup(QByteArray& out, const NifBlockFile::KeyGroup& g)
+{
+    appendU32(out, g.count);
+    if (g.count == 0) return true;
+    if (g.interpolation == 0) return true; // quaternion keys have no interpolation word
+
+    appendU32(out, g.interpolation);
+
+    const quint32 valueWidth = g.values.size() / g.count;
+
+    for (quint32 i = 0; i < g.count; ++i) {
+        appendF32(out, g.times.at(i));
+        for (quint32 v = 0; v < valueWidth; ++v)
+            appendF32(out, g.values.at(i * valueWidth + v));
+        if (g.interpolation == kKeyTypeQuadratic) {
+            for (quint32 v = 0; v < valueWidth; ++v)
+                appendF32(out, g.tangents.at((i * 2 + 0) * valueWidth + v));
+            for (quint32 v = 0; v < valueWidth; ++v)
+                appendF32(out, g.tangents.at((i * 2 + 1) * valueWidth + v));
+        } else if (g.interpolation == kKeyTypeTbc) {
+            appendF32(out, g.tangents.at(i * 3 + 0));
+            appendF32(out, g.tangents.at(i * 3 + 1));
+            appendF32(out, g.tangents.at(i * 3 + 2));
+        }
+    }
+    return true;
+}
+
+} // namespace
+
+bool NifBlockFile::decodeNiTransformData(const QByteArray& data, quint32 version,
+                                         NiTransformDataRaw& out)
+{
+    out = NiTransformDataRaw();
+    Cursor c(data);
+
+    // Version 10.2.0.0 and later use the NiKeyframeData layout: rotation count,
+    // optional rotation type, then per-axis float KeyGroups for XYZ rotations,
+    // followed by translation and scale KeyGroups. Earlier versions use the
+    // original NiTransformData layout: three independent channels, each with
+    // its own count and key list, no interpolation words, no rotation type.
+    if (version < 0x0A020000u) {
+        const quint32 numTranslation = c.u32();
+        if (!c.ok() || numTranslation > 10'000'000u) return false;
+        KeyGroup tg;
+        tg.count = numTranslation;
+        tg.interpolation = 1; // linear
+        for (quint32 i = 0; i < numTranslation; ++i) {
+            if (i > 0) tg.times.append(c.f32());
+            tg.values.append(c.f32()); // x
+            tg.values.append(c.f32()); // y
+            tg.values.append(c.f32()); // z
+            if (!c.ok()) return false;
+        }
+        if (numTranslation > 0) tg.times.prepend(0.0f);
+        out.translation = tg;
+
+        const quint32 numRotation = c.u32();
+        if (!c.ok() || numRotation > 10'000'000u) return false;
+        KeyGroup rg;
+        rg.count = numRotation;
+        rg.interpolation = 1; // linear
+        for (quint32 i = 0; i < numRotation; ++i) {
+            if (i > 0) rg.times.append(c.f32());
+            rg.values.append(c.f32()); // w
+            rg.values.append(c.f32()); // x
+            rg.values.append(c.f32()); // y
+            rg.values.append(c.f32()); // z
+            if (!c.ok()) return false;
+        }
+        if (numRotation > 0) rg.times.prepend(0.0f);
+        out.numRotationKeys = numRotation;
+        out.rotationType = 0; // quaternion
+        out.rotationGroups.append(rg);
+
+        const quint32 numScale = c.u32();
+        if (!c.ok() || numScale > 10'000'000u) return false;
+        KeyGroup sg;
+        sg.count = numScale;
+        sg.interpolation = 1; // linear
+        for (quint32 i = 0; i < numScale; ++i) {
+            if (i > 0) sg.times.append(c.f32());
+            sg.values.append(c.f32()); // uniform scale
+            if (!c.ok()) return false;
+        }
+        if (numScale > 0) sg.times.prepend(0.0f);
+        out.scale = sg;
+
+        return c.atEnd();
+    }
+
+    const quint32 numRotationKeys = c.u32();
+    if (!c.ok() || numRotationKeys > 10'000'000u) return false;
+    out.numRotationKeys = numRotationKeys;
+
+    if (numRotationKeys == 0) {
+        if (!decodeKeyframeGroup(c, 3, out.translation)) return false;
+        if (!decodeKeyframeGroup(c, 1, out.scale)) return false;
+        return c.atEnd();
+    }
+
+    const quint32 rotationType = c.u32();
+    if (!c.ok()) return false;
+    out.rotationType = rotationType;
+
+    if (rotationType == kRotationTypeXyz) {
+        if (version <= 167837696u) c.f32(); // order
+        for (int axis = 0; axis < 3; ++axis) {
+            KeyGroup g;
+            if (!decodeKeyframeGroup(c, 1, g)) return false;
+            out.rotationGroups.append(g);
+        }
+    } else {
+        KeyGroup g;
+        g.count = numRotationKeys;
+        g.interpolation = 0; // quaternion keys have no per-group interpolation word
+        const bool hasTime = (version <= 167837696u || version >= 167837802u);
+        const bool hasTbc = (rotationType == 3u);
+        for (quint32 i = 0; i < numRotationKeys; ++i) {
+            if (hasTime) g.times.append(c.f32());
+            g.values.append(c.f32()); // w
+            g.values.append(c.f32()); // x
+            g.values.append(c.f32()); // y
+            g.values.append(c.f32()); // z
+            if (hasTbc) {
+                g.tangents.append(c.f32()); // tension
+                g.tangents.append(c.f32()); // bias
+                g.tangents.append(c.f32()); // continuity
+            }
+            if (!c.ok()) return false;
+        }
+        out.rotationGroups.append(g);
+    }
+
+    if (!decodeKeyframeGroup(c, 3, out.translation)) return false;
+    if (!decodeKeyframeGroup(c, 1, out.scale)) return false;
+    return c.atEnd();
+}
+
+bool NifBlockFile::encodeNiTransformData(const NiTransformDataRaw& raw, quint32 version,
+                                         QByteArray& out)
+{
+    out.clear();
+
+    // Version 10.2.0.0 and later use the NiKeyframeData layout. Earlier
+    // versions use the original NiTransformData layout: three independent
+    // channels, each with its own count and key list, no interpolation words,
+    // no rotation type.
+    if (version < 0x0A020000u) {
+        appendU32(out, raw.translation.count);
+        for (quint32 i = 0; i < raw.translation.count; ++i) {
+            if (i > 0) appendF32(out, raw.translation.times.at(i));
+            appendF32(out, raw.translation.values.at(i * 3 + 0));
+            appendF32(out, raw.translation.values.at(i * 3 + 1));
+            appendF32(out, raw.translation.values.at(i * 3 + 2));
+        }
+
+        appendU32(out, raw.numRotationKeys);
+        const KeyGroup& rg = raw.rotationGroups.at(0);
+        for (quint32 i = 0; i < raw.numRotationKeys; ++i) {
+            if (i > 0) appendF32(out, rg.times.at(i));
+            appendF32(out, rg.values.at(i * 4 + 0)); // w
+            appendF32(out, rg.values.at(i * 4 + 1)); // x
+            appendF32(out, rg.values.at(i * 4 + 2)); // y
+            appendF32(out, rg.values.at(i * 4 + 3)); // z
+        }
+
+        appendU32(out, raw.scale.count);
+        for (quint32 i = 0; i < raw.scale.count; ++i) {
+            if (i > 0) appendF32(out, raw.scale.times.at(i));
+            appendF32(out, raw.scale.values.at(i));
+        }
+        return true;
+    }
+
+    appendU32(out, raw.numRotationKeys);
+
+    if (raw.numRotationKeys == 0) {
+        if (!encodeKeyframeGroup(out, raw.translation)) return false;
+        if (!encodeKeyframeGroup(out, raw.scale)) return false;
+        return true;
+    }
+
+    appendU32(out, raw.rotationType);
+
+    if (raw.rotationType == kRotationTypeXyz) {
+        if (version <= 167837696u) appendF32(out, 0.0f); // order
+        for (int axis = 0; axis < 3; ++axis) {
+            if (!encodeKeyframeGroup(out, raw.rotationGroups.at(axis))) return false;
+        }
+    } else {
+        const bool hasTime = (version <= 167837696u || version >= 167837802u);
+        const bool hasTbc = (raw.rotationType == 3u);
+        const KeyGroup& g = raw.rotationGroups.at(0);
+        for (quint32 i = 0; i < raw.numRotationKeys; ++i) {
+            if (hasTime) appendF32(out, g.times.at(i));
+            appendF32(out, g.values.at(i * 4 + 0)); // w
+            appendF32(out, g.values.at(i * 4 + 1)); // x
+            appendF32(out, g.values.at(i * 4 + 2)); // y
+            appendF32(out, g.values.at(i * 4 + 3)); // z
+            if (hasTbc) {
+                appendF32(out, g.tangents.at(i * 3 + 0)); // tension
+                appendF32(out, g.tangents.at(i * 3 + 1)); // bias
+                appendF32(out, g.tangents.at(i * 3 + 2)); // continuity
+            }
+        }
+    }
+    if (!encodeKeyframeGroup(out, raw.translation)) return false;
+    if (!encodeKeyframeGroup(out, raw.scale)) return false;
+    return true;
+}
 
 bool NifBlockFile::isNodeBlockType(const QString& blockType)
 {
-    // NiObjectNET descendants seen in shipped files. Matching on the type is
-    // what stops a data block from being mistaken for a node.
     static const QStringList kNodeTypes = {
         QStringLiteral("NiNode"),
         QStringLiteral("NiLODNode"),

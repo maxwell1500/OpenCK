@@ -9,7 +9,92 @@
 
 #include "logger.hpp"
 
+#include <QtMath>
+
 namespace {
+
+// Convert a flat TransformKeyframe list to the channel-preserving raw
+// representation. This is lossy: the flat list has no interpolation or
+// tangent data, so all channels become linear. Rotation is converted from
+// quaternion to three Euler axes when the original block used XYZ rotation.
+NifBlockFile::NiTransformDataRaw flatToRaw(
+    const QVector<Nif::TransformKeyframe>& keyframes,
+    const NifBlockFile::NiTransformDataRaw& original)
+{
+    NifBlockFile::NiTransformDataRaw raw;
+    const int n = keyframes.size();
+    raw.numRotationKeys = static_cast<quint32>(n);
+    raw.rotationType = original.rotationType;
+
+    auto makeGroup = [&](int valueWidth) {
+        NifBlockFile::KeyGroup g;
+        g.count = static_cast<quint32>(n);
+        g.interpolation = 1; // linear
+        g.times.reserve(n);
+        g.values.reserve(n * valueWidth);
+        return g;
+    };
+
+    if (raw.rotationType == 4 && n > 0) {
+        // XYZ rotation: three scalar KeyGroups
+        for (int axis = 0; axis < 3; ++axis) {
+            NifBlockFile::KeyGroup g = makeGroup(1);
+            for (int i = 0; i < n; ++i) {
+                const Nif::TransformKeyframe& k = keyframes.at(i);
+                g.times.append(k.time);
+                // Convert quaternion to Euler angles
+                const float w = k.rotation.w, x = k.rotation.x, y = k.rotation.y, z = k.rotation.z;
+                float euler[3];
+                // Roll (X)
+                const float sinr_cosp = 2.0f * (w * x + y * z);
+                const float cosr_cosp = 1.0f - 2.0f * (x * x + y * y);
+                euler[0] = qAtan2(sinr_cosp, cosr_cosp);
+                // Pitch (Y)
+                const float sinp = 2.0f * (w * y - z * x);
+                if (qAbs(sinp) >= 1.0f)
+                    euler[1] = (sinp >= 0.0f) ? (M_PI / 2.0f) : -(M_PI / 2.0f);
+                else
+                    euler[1] = qAsin(sinp);
+                // Yaw (Z)
+                const float siny_cosp = 2.0f * (w * z + x * y);
+                const float cosy_cosp = 1.0f - 2.0f * (y * y + z * z);
+                euler[2] = qAtan2(siny_cosp, cosy_cosp);
+                g.values.append(euler[axis]);
+            }
+            raw.rotationGroups.append(g);
+        }
+    } else if (n > 0) {
+        // Quaternion rotation: one KeyGroup
+        NifBlockFile::KeyGroup g = makeGroup(4);
+        for (int i = 0; i < n; ++i) {
+            const Nif::TransformKeyframe& k = keyframes.at(i);
+            g.times.append(k.time);
+            g.values.append(k.rotation.w);
+            g.values.append(k.rotation.x);
+            g.values.append(k.rotation.y);
+            g.values.append(k.rotation.z);
+        }
+        raw.rotationGroups.append(g);
+    }
+
+    raw.translation = makeGroup(3);
+    for (int i = 0; i < n; ++i) {
+        const Nif::TransformKeyframe& k = keyframes.at(i);
+        raw.translation.times.append(k.time);
+        raw.translation.values.append(k.translation.x);
+        raw.translation.values.append(k.translation.y);
+        raw.translation.values.append(k.translation.z);
+    }
+
+    raw.scale = makeGroup(1);
+    for (int i = 0; i < n; ++i) {
+        const Nif::TransformKeyframe& k = keyframes.at(i);
+        raw.scale.times.append(k.time);
+        raw.scale.values.append(k.scale.x); // uniform scale
+    }
+
+    return raw;
+}
 
 // Patch the keyframe data block a controller drives, rejecting refs that do
 // not index a block we know how to re-encode.
@@ -37,6 +122,43 @@ bool patchControllerData(NifBlockFile& file, int controllerIndex,
     // Precondition: our codec must reproduce the untouched block exactly.
     // If it cannot, this build does not actually understand this game's
     // keyframe layout, and rewriting it would corrupt the NIF. Refuse.
+    if (dataType == QLatin1String("NiTransformData")
+        || dataType == QLatin1String("NiKeyframeControllerData")) {
+        NifBlockFile::NiTransformDataRaw raw;
+        if (!NifBlockFile::decodeNiTransformData(original, file.version(), raw)) {
+            LOG_WARNING(QString("NifAnimationWriter: keyframe data block %1 ('%2') is in an "
+                                "unrecognised layout; refusing to rewrite it")
+                            .arg(dataIndex).arg(dataType));
+            return false;
+        }
+        QByteArray reencoded;
+        if (!NifBlockFile::encodeNiTransformData(raw, file.version(), reencoded)
+            || reencoded != original) {
+            LOG_WARNING(QString("NifAnimationWriter: keyframe data block %1 ('%2') does not "
+                                "round-trip; refusing to rewrite it")
+                            .arg(dataIndex).arg(dataType));
+            return false;
+        }
+
+        NifBlockFile::NiTransformDataRaw newRaw = flatToRaw(keyframes, raw);
+        QByteArray encoded;
+        if (!NifBlockFile::encodeNiTransformData(newRaw, file.version(), encoded)) {
+            LOG_WARNING(QString("NifAnimationWriter: failed to encode keyframes for block '%1'")
+                            .arg(dataType));
+            return false;
+        }
+
+        NifBlockFile::NiTransformDataRaw verify;
+        if (!NifBlockFile::decodeNiTransformData(encoded, file.version(), verify)
+            || verify.rotationGroups.size() != newRaw.rotationGroups.size()) {
+            LOG_ERROR("NifAnimationWriter: keyframe encoder failed its own round-trip check");
+            return false;
+        }
+
+        file.setBlockData(dataIndex, encoded);
+        return true;
+    }
+
     QVector<Nif::TransformKeyframe> decoded;
     if (!NifBlockFile::decodeKeyframeData(dataType, original, decoded)) {
         LOG_WARNING(QString("NifAnimationWriter: keyframe data block %1 ('%2') is in an "
