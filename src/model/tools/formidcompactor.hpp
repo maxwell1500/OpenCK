@@ -37,6 +37,17 @@ public:
     /// and component-held FormIDs).
     int rewrittenReferences() const { return mRewritten; }
 
+    /// Allow the compatibility fallback that rewrites any u32 word in an
+    /// opaque raw subrecord when it exactly equals an old owned FormID
+    /// (default: on). Disable only when every FormID-bearing subrecord of
+    /// interest has an explicit rewrite rule; implied FormIDs would be
+    /// left stale otherwise.
+    void setAllowGenericFallback(bool allow) { mAllowGenericFallback = allow; }
+    bool allowGenericFallback() const { return mAllowGenericFallback; }
+
+    /// Count of words rewritten by the generic fallback alone.
+    int genericFallbackRewrites() const { return mGenericFallbackRewrites; }
+
     /// Always empty (retained for API compatibility; compaction no longer
     /// refuses on unhandled subrecords).
     QString refusalMessage() const { return mRefusalMessage; }
@@ -46,6 +57,8 @@ private:
     int mOwned = 0;
     int mRemapped = 0;
     int mRewritten = 0;
+    int mGenericFallbackRewrites = 0;
+    bool mAllowGenericFallback = true;
     QString mRefusalMessage;
 };
 

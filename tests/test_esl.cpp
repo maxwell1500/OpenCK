@@ -62,6 +62,7 @@ private slots:
     void testCompactorLeavesXprmByteIdentical();
     void testCompactorTooManyRecords();
     void testCompactorFixesUnhandledOpaqueReference();
+    void testCompactorGenericFallbackCanBeDisabled();
     void testLightMasterFlagRoundTrip();
 };
 
@@ -528,6 +529,42 @@ void TestEsl::testCompactorFixesUnhandledOpaqueReference()
         (quint8)raws[0].data[0] | (quint8)raws[0].data[1] << 8
         | (quint8)raws[0].data[2] << 16 | (quint8)raws[0].data[3] << 24),
         newTarget);
+}
+
+void TestEsl::testCompactorGenericFallbackCanBeDisabled()
+{
+    FilePaths paths(QCoreApplication::applicationName());
+    Data data(QStringList(), paths);
+    auto& statCol = data.getStatCollection();
+
+    StatRecord target;
+    target.editorId = "targetstat";
+    target.formId = 0x00100100;
+    statCol.add(target);
+
+    StatRecord holder;
+    holder.editorId = "holderstat";
+    holder.formId = 0x00100200;
+    {
+        RawSubRecord raw;
+        raw.name = NAME('XTST');
+        raw.data = rawFormId(0x00100100);
+        holder.rawSubRecords.push_back(raw);
+    }
+    statCol.add(holder);
+
+    FormIdCompactor compactor(data);
+    compactor.setAllowGenericFallback(false);
+    QCOMPARE(compactor.compact(), 2);
+    // Record IDs were remapped, but no opaque payload was touched.
+    QVERIFY(statCol.searchId("targetstat") >= 0);
+    QCOMPARE(compactor.genericFallbackRewrites(), 0);
+    const auto raws = statCol.rawSubRecordsAt(statCol.searchId("holderstat"));
+    QCOMPARE(raws.size(), 1);
+    QCOMPARE(static_cast<quint32>(
+        (quint8)raws[0].data[0] | (quint8)raws[0].data[1] << 8
+        | (quint8)raws[0].data[2] << 16 | (quint8)raws[0].data[3] << 24),
+        0x00100100u);
 }
 
 void TestEsl::testLightMasterFlagRoundTrip()

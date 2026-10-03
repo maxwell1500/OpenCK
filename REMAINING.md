@@ -368,6 +368,13 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     offset) FormID reference layouts for future explicit-rule additions.
     Verification is covered by the nightly gate; the generic fallback remains
     the compatibility path and explicit rules are an optimization.
+    **Status 2026-10-02:** Added a kill switch for the fallback.
+    `FormIdCompactor::setAllowGenericFallback(false)` disables the
+    compatibility pass while keeping typed/raw/component rewrites, and
+    `genericFallbackRewrites()` reports how many opaque words the fallback
+    alone rewrote - which tells the caller exactly how much it is relying on
+    the heuristic. `testCompactorGenericFallbackCanBeDisabled` enables and
+    disables the fallback for the same fixture and compares the outcomes.
      **Status 2026-09-19:** Verified. `tools/nightly-roundtrip.ps1` passes
      end to end: Starfield.esm untouched round-trip 3,829,246/3,829,246
      payload-identical, plus FormIdCompactor `--compact` reload-clean on

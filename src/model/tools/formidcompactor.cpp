@@ -46,18 +46,32 @@ void rewriteRawFormId(QByteArray& data, int offset, const QHash<quint32, quint32
 
 // Generic fallback: after the type-specific rewrites ran, scan every raw
 // subrecord for u32 values that match the old->new map and rewrite them.
-// The false-positive risk is negligible: only values equal to one of the
-// plugin's own records' FormIDs are affected (same high-16-bits range).
+// The false-positive risk is non-zero: a word that happens to equal an old
+// own FormID but is really a count or flag would be rewritten too. It is the
+// compatibility path for payloads without explicit rewrite rules; callers
+// that want explicit rules only can turn it off.Returns the number of words
+// rewritten.
 template <typename Rec>
-void genericRawFormIdFix(Rec& rec, const QHash<quint32, quint32>& map)
+int genericRawFormIdFix(Rec& rec, const QHash<quint32, quint32>& map)
 {
+    int rewritten = 0;
     for (RawSubRecord& raw : rec.rawSubRecords)
     {
         if (raw.name == static_cast<quint32>(NAME('XPRM')))
             continue;
         for (int off = 0; off + 4 <= raw.data.size(); off += 4)
-            rewriteRawFormId(raw.data, off, map);
+        {
+            quint32 id;
+            std::memcpy(&id, raw.data.constData() + off, 4);
+            const quint32 mapped = map.value(id, id);
+            if (mapped != id)
+            {
+                std::memcpy(raw.data.data() + off, &mapped, 4);
+                ++rewritten;
+            }
+        }
     }
+    return rewritten;
 }
 
 // KWDA carries a plain array of keyword FormIDs, one per 4 bytes.
@@ -449,7 +463,8 @@ struct HasComponents<T, std::void_t<decltype(std::declval<T>().components)>> : s
 // Visit every record in the concrete Collection<T> and rewrite typed fields,
 // raw-subrecord payloads, and component-held FormIDs.
 template <typename Rec>
-void rewriteTyped(IRecordCollection* col, const QHash<quint32, quint32>& map, int& rewritten)
+void rewriteTyped(IRecordCollection* col, const QHash<quint32, quint32>& map, int& rewritten,
+                  int& genericFallbackRewrites, bool allowGenericFallback)
 {
     auto* typed = dynamic_cast<Collection<Rec>*>(col);
     if (!typed) return;
@@ -459,7 +474,8 @@ void rewriteTyped(IRecordCollection* col, const QHash<quint32, quint32>& map, in
         const Rec before = rec;
         rewriteReferences(rec, map);
         rewriteRawSubRecords(rec, map);
-        genericRawFormIdFix(rec, map);
+        if (allowGenericFallback)
+            genericFallbackRewrites += genericRawFormIdFix(rec, map);
         if constexpr (HasComponents<Rec>::value)
             rewriteComponentFormIds(rec.components, map);
         if (!(rec == before))
@@ -513,6 +529,7 @@ int FormIdCompactor::compact()
 
     mRemapped = 0;
     mRewritten = 0;
+    mGenericFallbackRewrites = 0;
 
     // Rewrite typed reference fields, raw-subrecord payloads, and component
     // FormIDs for the record types that carry them. Runs before any FormID
@@ -521,49 +538,49 @@ int FormIdCompactor::compact()
     for (const auto& tc : mData.allCollectionsWithTypes())
     {
         IRecordCollection* col = tc.collection;
-        rewriteTyped<RelaRecord>(col, map, mRewritten);
-        rewriteTyped<EcznRecord>(col, map, mRewritten);
-        rewriteTyped<IpdsRecord>(col, map, mRewritten);
-        rewriteTyped<IpctRecord>(col, map, mRewritten);
-        rewriteTyped<HazdRecord>(col, map, mRewritten);
-        rewriteTyped<ShouRecord>(col, map, mRewritten);
-        rewriteTyped<CellRecord>(col, map, mRewritten);
-        rewriteTyped<RefrRecord>(col, map, mRewritten);
-        rewriteTyped<NpcRecord>(col, map, mRewritten);
-        rewriteTyped<DialRecord>(col, map, mRewritten);
-        rewriteTyped<QuestRecord>(col, map, mRewritten);
-        rewriteTyped<AlchRecord>(col, map, mRewritten);
-        rewriteTyped<IngrRecord>(col, map, mRewritten);
-        rewriteTyped<EnchRecord>(col, map, mRewritten);
-        rewriteTyped<SpellRecord>(col, map, mRewritten);
-        rewriteTyped<MagicRecord>(col, map, mRewritten);
-        rewriteTyped<ArmorRecord>(col, map, mRewritten);
-        rewriteTyped<WeaponRecord>(col, map, mRewritten);
-        rewriteTyped<ActiRecord>(col, map, mRewritten);
-        rewriteTyped<DoorRecord>(col, map, mRewritten);
-        rewriteTyped<FlorRecord>(col, map, mRewritten);
-        rewriteTyped<LocationRecord>(col, map, mRewritten);
-        rewriteTyped<CreatureRecord>(col, map, mRewritten);
-        rewriteTyped<StatRecord>(col, map, mRewritten);
-        rewriteTyped<InfoRecord>(col, map, mRewritten);
-        rewriteTyped<LvliRecord>(col, map, mRewritten);
-        rewriteTyped<FormListRecord>(col, map, mRewritten);
-        rewriteTyped<MsttRecord>(col, map, mRewritten);
-        rewriteTyped<SounRecord>(col, map, mRewritten);
-        rewriteTyped<ProjRecord>(col, map, mRewritten);
-        rewriteTyped<MiscRecord>(col, map, mRewritten);
-        rewriteTyped<BookRecord>(col, map, mRewritten);
-        rewriteTyped<ContRecord>(col, map, mRewritten);
-        rewriteTyped<LtexRecord>(col, map, mRewritten);
-        rewriteTyped<MaterialRecord>(col, map, mRewritten);
-        rewriteTyped<WorldspaceRecord>(col, map, mRewritten);
-        rewriteTyped<PndRecord>(col, map, mRewritten);
-        rewriteTyped<RaceRecord>(col, map, mRewritten);
-        rewriteTyped<CstyRecord>(col, map, mRewritten);
-        rewriteTyped<PerkRecord>(col, map, mRewritten);
-        rewriteTyped<PackageRecord>(col, map, mRewritten);
-        rewriteTyped<LighRecord>(col, map, mRewritten);
-        rewriteTyped<AmmoRecord>(col, map, mRewritten);
+        rewriteTyped<RelaRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<EcznRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<IpdsRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<IpctRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<HazdRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<ShouRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<CellRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<RefrRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<NpcRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<DialRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<QuestRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<AlchRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<IngrRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<EnchRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<SpellRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<MagicRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<ArmorRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<WeaponRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<ActiRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<DoorRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<FlorRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<LocationRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<CreatureRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<StatRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<InfoRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<LvliRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<FormListRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<MsttRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<SounRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<ProjRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<MiscRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<BookRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<ContRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<LtexRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<MaterialRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<WorldspaceRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<PndRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<RaceRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<CstyRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<PerkRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<PackageRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<LighRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
+        rewriteTyped<AmmoRecord>(col, map, mRewritten, mGenericFallbackRewrites, mAllowGenericFallback);
     }
 
     // The generic fallback in rewriteTyped already fixed any remaining
