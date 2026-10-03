@@ -1883,6 +1883,22 @@ this section is documentation of findings, per the §3 review).
      `OPENCK_TEST_FACEFX_DIR`). Deeper `FxCompiledFaceGraph` evaluation
      remains out of scope with the runtime reimplementation above.
 
+     **`.ffxanim` container parse 2026-10-02:** `libs/files/facefx/facefxanim.*`
+     now decodes the `.ffxanim` blob structurally: magic `__ffx\0`, a u16
+     format word, u32 size (checked against the file), a 20-byte entry id
+     (last 8 bytes observed constant per entry type), u32 record count,
+     then `count` 12-byte records
+     `{ f32 channelValue, u16 field0..field3 }`.
+     `test_facefxanim` validates that 36 + count*12 == size on synthetic
+     payloads and on five real entries extracted from
+     `Starfield - FaceAnimation01.ba2`, with no slack. The four u16 fields
+     are stored raw because their semantics are still unpinned: the
+     sample shows one value alternating with a fixed template pair per
+     channel (`{0,0,i,time}` vs `{94,3,65528,time}`), but the mapping to
+     bone tracks needs the actor graph. A FaceFX runtime remains out of
+     scope; what now exists is a strict container reader that stops
+     drift at the parse boundary instead of letting telemetry through.
+
 ## 9. Series items — Creation Kit parity audit
 
 **Audit date:** 2026-09-25. This section records nine concrete series of

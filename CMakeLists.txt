@@ -602,6 +602,7 @@ set(FILES_SOURCES
     libs/files/audio/fuzparser.cpp
     libs/files/audio/xwmadecoder.cpp
     libs/files/facefx/facefxactor.cpp
+    libs/files/facefx/facefxanim.cpp
 )
 
 set(FILES_HEADERS
@@ -630,6 +631,7 @@ set(FILES_HEADERS
     libs/files/audio/fuzparser.hpp
     libs/files/audio/xwmadecoder.hpp
     libs/files/facefx/facefxactor.hpp
+    libs/files/facefx/facefxanim.hpp
 )
 
 add_library(openck_files STATIC

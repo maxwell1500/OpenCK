@@ -998,6 +998,12 @@ target_link_libraries(test_facefxactor PRIVATE openck_files test_stubs Qt6::Test
 target_include_directories(test_facefxactor PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_facefxactor)
 
+# Partial .ffxanim container parser (magic + header + record table)
+add_executable(test_facefxanim test_facefxanim.cpp)
+target_link_libraries(test_facefxanim PRIVATE openck_files test_stubs Qt6::Test)
+target_include_directories(test_facefxanim PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_facefxanim)
+
 # TES3 record data widget + tes3MappedCodes round-trip + T3: factory key
 add_executable(test_tes3recorddatawidget test_tes3recorddatawidget.cpp)
 target_link_libraries(test_tes3recorddatawidget PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
