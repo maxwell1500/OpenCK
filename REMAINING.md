@@ -1441,9 +1441,16 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
 
 ## 4. Test infrastructure
 
-1. **`OPENCK_DATA_DIR`** env var honored by all real-data tests (currently
-    hardcoded to `C:/XboxGames/Starfield/Content/Data`); skip cleanly when
-    absent.
+1. **`OPENCK_DATA_DIR`** env var honored by all real-data tests (default
+   `C:/XboxGames/Starfield/Content/Data`); skip cleanly when absent.
+
+   **Status 2026-10-02:** every remaining real-data test now reads
+   `OPENCK_DATA_DIR` (either as the directory itself or to derive
+   `Starfield.esm`), and the two gaps - `test_bsaarchive`'s Btdx half and
+   `test_editor_writeback`'s game-detection check - now skip with a
+   missing-fixture message instead of failing when it is unset/bogus.
+   Verified: a bogus `OPENCK_DATA_DIR` yields 6 passed / 0 failed / 2
+   skipped and exit 0.
 
    Content install roots on this machine (verified 2026-10-02):
    - Starfield: `C:/XboxGames/Starfield/Content` and a Steam copy at

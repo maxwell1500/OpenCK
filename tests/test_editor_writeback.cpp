@@ -345,9 +345,12 @@ void TestEditorWriteback::testDialAddInfoUndoable()
 
 void TestEditorWriteback::testCurrentGameDetection()
 {
+    const QString dataDir = qEnvironmentVariable(
+            "OPENCK_DATA_DIR",
+            QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
     const QString starfield = qEnvironmentVariable(
         "OPENCK_TEST_STARFIELD_ESM",
-        QStringLiteral("C:/XboxGames/Starfield/Content/Data/Starfield.esm"));
+        dataDir + QStringLiteral("/Starfield.esm"));
     if (!QFile::exists(starfield))
     {
         QSKIP("Starfield.esm fixture not available (set OPENCK_TEST_STARFIELD_ESM)");

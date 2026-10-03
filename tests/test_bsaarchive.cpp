@@ -117,19 +117,26 @@ void TestBsaArchive::testOpenMorrowindArchive()
 // Starfield's 'BTDX' container is a different layout from the classic BSA
 // family: a 32-byte header, fixed 36-byte file declarations, the data, then a
 // trailing u16-length name table. Version 2 is zlib, version 3 a raw LZ4 block.
-static const char* kStarfieldData = "C:/XboxGames/Starfield/Content/Data/";
+static QString starfieldDataDir()
+{
+    return qEnvironmentVariable("OPENCK_DATA_DIR",
+            QStringLiteral("C:/XboxGames/Starfield/Content/Data"))
+        + QLatin1Char('/');
+}
 static const char* kStarfieldArchive = "Starfield - LODMeshes.ba2";
 
 static bool starfieldInstalled()
 {
-    return QFile::exists(QString::fromLatin1(kStarfieldData) + QLatin1String(kStarfieldArchive));
+    return QFile::exists(starfieldDataDir() + QLatin1String(kStarfieldArchive));
 }
 
 
 void TestBsaArchive::testOpenStarfieldBtdx()
 {
+    if (!starfieldInstalled())
+        QSKIP("Starfield - LODMeshes.ba2 not found; set OPENCK_DATA_DIR to the local Content/Data");
     BsaArchive archive;
-    const QString sfPath = QString::fromLatin1(kStarfieldData) + QLatin1String(kStarfieldArchive);
+    const QString sfPath = starfieldDataDir() + QLatin1String(kStarfieldArchive);
     QVERIFY2(openWithWarmup(sfPath, [&] { return archive.open(sfPath); }), qPrintable(sfPath));
     QVERIFY(archive.fileCount() > 1000);
 
@@ -151,8 +158,10 @@ void TestBsaArchive::testOpenStarfieldBtdx()
 
 void TestBsaArchive::testStarfieldBtdxExtractsNif()
 {
+    if (!starfieldInstalled())
+        QSKIP("Starfield - LODMeshes.ba2 not found; set OPENCK_DATA_DIR to the local Content/Data");
     BsaArchive archive;
-    const QString sfPath = QString::fromLatin1(kStarfieldData) + QLatin1String(kStarfieldArchive);
+    const QString sfPath = starfieldDataDir() + QLatin1String(kStarfieldArchive);
     QVERIFY2(openWithWarmup(sfPath, [&] { return archive.open(sfPath); }), qPrintable(sfPath));
 
     int checked = 0;

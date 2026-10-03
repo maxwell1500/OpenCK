@@ -362,6 +362,16 @@ void TestStructuredFidelity::testStructuredFidelity()
     // Calibration: MISC structured save is already order-exact.
     QCOMPARE(mismatched.value("MISC", 0), 0);
     QVERIFY(matched.value("MISC", 0) > 0);
+
+    // Every examined type, not only MISC: an ENTIRE mismatch class elsewhere
+    // prints but does not fail without this, and the table above is only
+    // informational.
+    for (const QString& t : types)
+        QCOMPARE(mismatched.value(t, 0), 0);
+    int totalMismatched = 0;
+    for (auto it = mismatched.cbegin(); it != mismatched.cend(); ++it)
+        totalMismatched += it.value();
+    QCOMPARE(totalMismatched, 0);
 }
 
 namespace
