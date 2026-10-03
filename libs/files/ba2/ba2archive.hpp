@@ -67,6 +67,11 @@ public:
     // Backs extract(); used by the NIF mesh resolver to avoid temp files.
     bool extractToBytes(quint32 index, QByteArray& out) const;
 
+    // Extract a DX10 texture by index into memory as a DDS blob (DDS_HEADER
+    // reconstructed from the 48-byte record + the full mip chain from the
+    // chunk records). Same as extractTexture() without touching the disk.
+    bool extractTextureToBytes(quint32 index, QByteArray& out) const;
+
     // Get the archive name.
     QString name() const { return mName; }
 

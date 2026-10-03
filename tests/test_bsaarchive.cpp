@@ -4,6 +4,7 @@
 #include <QFile>
 
 #include "bsaarchive.hpp"
+#include "ba2archive.hpp"
 #include "fuzparser.hpp"
 #include "logger.hpp"
 
@@ -37,6 +38,7 @@ private slots:
     void testOpenMorrowindArchive();
     void testOpenStarfieldBtdx();
     void testStarfieldBtdxExtractsNif();
+    void testOpenStarfieldDx10ArchiveExtractsValidDds();
     void testExtractFuzRoundTrip();
 };
 
@@ -128,6 +130,39 @@ static const char* kStarfieldArchive = "Starfield - LODMeshes.ba2";
 static bool starfieldInstalled()
 {
     return QFile::exists(starfieldDataDir() + QLatin1String(kStarfieldArchive));
+}
+
+static bool textureArchivesInstalled()
+{
+    return QFile::exists(starfieldDataDir() + QStringLiteral("Starfield - Textures01.ba2"));
+}
+
+void TestBsaArchive::testOpenStarfieldDx10ArchiveExtractsValidDds()
+{
+    if (!textureArchivesInstalled())
+        QSKIP("Starfield - Textures01.ba2 not found; set OPENCK_DATA_DIR to the local Content/Data");
+    Ba2Archive archive;
+    const QString sfPath = starfieldDataDir() + QStringLiteral("Starfield - Textures01.ba2");
+    QVERIFY2(archive.open(sfPath), qPrintable(sfPath));
+    QVERIFY(archive.isTexture());
+    QVERIFY(archive.fileCount() > 0);
+
+    const auto& textures = archive.textureEntries();
+    QVERIFY(!textures.isEmpty());
+    for (int i = 0; i < qMin(4, textures.size()); ++i)
+    {
+        const Ba2Dx10Entry& e = textures[i];
+        QByteArray dds;
+        QVERIFY2(archive.extractTextureToBytes(static_cast<quint32>(i), dds),
+                 qPrintable(e.relativePath));
+        QCOMPARE(dds.mid(0, 4), QByteArray("DDS ", 4));
+        // The DDS payload is exactly the 148-byte reconstructed header plus
+        // the decompressed bytes of every chunk in e.chunks.
+        quint64 expected = 148u;
+        for (const auto& chunk : e.chunks) expected += chunk.unpackedSize;
+        QCOMPARE(static_cast<quint64>(dds.size()), expected);
+        QVERIFY(dds.size() > 148);
+    }
 }
 
 

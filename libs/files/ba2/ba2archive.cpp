@@ -722,6 +722,43 @@ bool Ba2Archive::extractTexture(quint32 index, const QString& outputPath) const
     return true;
 }
 
+bool Ba2Archive::extractTextureToBytes(quint32 index, QByteArray& ddsOut) const
+{
+    if (index >= mDx10Entries.size())
+    {
+        LOG_ERROR(QString("BA2 texture extract: index %1 out of range").arg(index));
+        return false;
+    }
+    const auto& entry = mDx10Entries[index];
+    if (entry.width == 0 || entry.height == 0 || entry.chunks.isEmpty() || entry.tileMode != 8)
+    {
+        LOG_ERROR(QString("BA2 texture extract: %1 has no linear chunk payload")
+            .arg(entry.relativePath));
+        return false;
+    }
+
+    const bool cubemap = (entry.flags & 0x1) != 0;
+    QByteArray dds = buildDdsHeader(entry.width, entry.height, entry.numMips,
+                                    entry.format, cubemap);
+    for (const auto& chunk : entry.chunks)
+    {
+        const quint64 stored = (chunk.packedSize != 0) ? chunk.packedSize : chunk.unpackedSize;
+        if (chunk.fileOffset + stored > static_cast<quint64>(mFileSize))
+        {
+            LOG_ERROR(QString("BA2 texture extract: chunk data out of range for %1")
+                .arg(entry.relativePath));
+            return false;
+        }
+        QByteArray data;
+        if (!decompressChunk(mMappedData + static_cast<qint64>(chunk.fileOffset),
+                             chunk.packedSize, chunk.unpackedSize, data, mUseLz4))
+            return false;
+        dds.append(data);
+    }
+    ddsOut = dds;
+    return true;
+}
+
 bool Ba2Archive::create(const QStringList& filePaths, const QString& outputPath,
                         bool compress, const QString& archiveType, const QString& sourceRoot)
 {

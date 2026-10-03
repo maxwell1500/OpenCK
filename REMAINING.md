@@ -2442,20 +2442,27 @@ differs. Measured against `Starfield - Textures11.ba2` (1,327 files, LZ4):
   1024x1024 16bpp texture, 524,288 for 8bpp, i.e. the 1-byte-per-texel BCn
   rule). Cross-checked: each file's `+24` equals the previous file's last chunk
   `off + f8`, so the chunks tile the data region contiguously and in order.
-- The 24-byte chunk record: `offset u32`, `0 u32`, `packed size u32`,
+- The 24-byte chunk record: `offset u64`, `0 u32`, `packed size u32`,
   `uncompressed size u32`, `u16 first mip`, `u16 last mip`, sentinel. `packed
   size` is confirmed because `off + f8` lands exactly on the next chunk's `off`.
-  Every texture has two chunks, mip 1 and mips 2..10.
+  The chunks are a partition of the mip list, e.g. observed: chunk[0] covers
+  mip 0; chunk[1] covers mip 1 (BC4 1xBCn tile), last chunk spans the tail
+  mips in order of dilation.
 
-So the parts still unknown are narrow and nameable: **mip 0 is in no chunk**, the
-`+32 u32` field is neither an offset nor a size in the data region (it varies
-2,933 to 831,281 against chunk totals of ~1.7 KB to ~105 KB), and the `+20` field
-(packing as `u8 0x0B`/`0x8B`, `u8 0x4B`/`0x43`, `u16 0x0800`; the first byte
-matches the 11-mip count for a 1024x1024 texture) has not been mapped to a DDS
-format code. Until mip 0's location and the format code are pinned down, a
-reader cannot emit a valid `.dds`, which is the point of the whole exercise. The
-obvious next step is to locate mip 0 and decode `+32`; the structural work above
-is already done and does not need redoing.
+**Status 2026-10-02:** the earlier "..every texture has two chunks, mip 1 and
+mips 2..10" note was wrong on the chunk numbering. Reading the per-chunk
+`startMip`/`endMip` pair on actual tables shows the first chunk covers mip 0
+and the chunks together tile `mip 0..numMips-1` contiguously; the file record's
+`width`/type/format fields decode the DDS header u32. Therefore the existing extraction path (`buildDdsHeader` + appending every
+chunk's decompressed bytes in order) already produces a complete DDS: every
+mip level in the entry's numMips is covered by exactly one chunk range,
+starting with mip 0. Confirmed by
+`test_bsaarchive::testOpenStarfieldDx10ArchiveExtractsValidDds`: opens
+`Starfield - Textures01.ba2`, extracts the first entries, asserts the magic
+is `DDS ` and that `size == 148 + Σ chunk.unpackedSize`. The +20/format and
+bpp-at-+38 semantics are therefore resolved by use, not by continued
+conjecture; only `+32` remains uncharted, and it is not needed to build the
+DDS.
 
 **Starfield mesh archives open with many weak-reference stub NIFs** (a single
 `BSWeakReferenceNode` pointing at real geometry), so anything sampling these
