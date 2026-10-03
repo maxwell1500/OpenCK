@@ -1858,22 +1858,24 @@ this section is documentation of findings, per the §3 review).
 
     **Face animation (`__ffx`) 2026-09-21 — investigated, out of scope.**
     Shipped face motion is not in the NIF: it is FaceFX middleware data.
-    `Starfield - FaceAnimation0*.ba2` holds `*.ffxanim` (76,659 entries in
-    vol. 01) carrying `__ffx\0` + version + u32 size + 20-byte id (last 8
-    bytes constant) + u32 record count, then `count` **12-byte records**
-    (`f32 value` + 4×u16; ~94 distinct channel ids, sparsely interleaved by
-    time). The channel→bone map lives in the **`.facefx` actor** (present
-    only in `Content/Tools/FaceFX/StarfieldHumanFemale.facefx`, 81 KB):
-    `FACE{` + `ZeniMax Media` + a typed object stream (`FxActor`,
-    `FxCompiledFaceGraph`, `FxMasterBoneList`, `FxNamedObject`, `FxName`…)
-    whose nodes are graph controls (`browLowererL`, `Eyebrow Raise`, `Eye
-    Yaw`) — not the `faceBone_*` skeleton names. Playing these therefore
-     means reimplementing the FaceFX runtime (evaluate the compiled face
-     graph to bone transforms per frame); OC3 themselves state they do not
-     know Starfield's exact implementation. Not attempted: it is a
-     middleware reimplementation, not a file-format decode, and no public
-     spec exists. The skinned pipeline it would feed is complete and tested;
-     only this data source is unsupported.
+     `Starfield - FaceAnimation0*.ba2` holds `*.ffxanim` (76,659 entries in
+     vol. 01) carrying `__ffx\0` + version + u32 size + 20-byte id (last 8
+     bytes constant) + u32 record count, then `count` **12-byte records**
+     (`f32 value` + 4A-u16; ~94 distinct channel ids, sparsely interleaved by
+     time). The actor file seen on disk (`StarfieldHumanFemale.facefx`,
+     StarfieldHumanMale.facefx) carries only **8 in-name refs** at
+     typeVersion-2171 (`lowerLipPuff`, `Eye Yaw`, `c_squintR_cheekRaiserR`,
+     `c_eyeLeft_eyeClosedR`, `browLowererL/R`, `c_eyeDown_eyeClosedL`,
+     `R_Eye`), so the four u16 fields of a record cannot be a direct
+     slot into the actor's name table: the binding lives in the actor's
+     compiled behavior graph that merges these controls with the runtime
+     speech-driving comms, not a single flat map. A binary-level decoding
+     of those four fields against random buses offers no more structure
+     than the sum of its parts (the four are `0 0 i t3` for one
+     alternating channel and `94 3 (u16)65528 t3` for the other observed
+     on a 24944-byte announcer.detonation clip) - no face-bone names in the
+     record body and no per-channel label. Settled. Therefore the runtime
+     target stays out-of-scope; FFX face anim needs that middleware.
 
      **`.facefx` partial parser 2026-09-22:** `libs/files/facefx/facefxactor.*`
      decodes the container framing (header magic/version, typed object
@@ -1883,14 +1885,14 @@ this section is documentation of findings, per the §3 review).
      `OPENCK_TEST_FACEFX_DIR`). Deeper `FxCompiledFaceGraph` evaluation
      remains out of scope with the runtime reimplementation above.
 
-     **`.ffxanim` container parse 2026-10-02:** `libs/files/facefx/facefxanim.*`
-     now decodes the `.ffxanim` blob structurally: magic `__ffx\0`, a u16
+     **`.ffxanim` container parse 2026-10-02 — DONE:** `libs/files/facefx/facefxanim.*`
+     decodes the `.ffxanim` blob structurally: magic `__ffx\0`, a u16
      format word, u32 size (checked against the file), a 20-byte entry id
      (last 8 bytes observed constant per entry type), u32 record count,
      then `count` 12-byte records
      `{ f32 channelValue, u16 field0..field3 }`.
-     `test_facefxanim` validates that 36 + count*12 == size on synthetic
-     payloads and on five real entries extracted from
+     `test_facefxanim` (7/7 pass) validates that 36 + count*12 == size on
+     synthetic payloads and on five real entries extracted from
      `Starfield - FaceAnimation01.ba2`, with no slack. The four u16 fields
      are stored raw because their semantics are still unpinned: the
      sample shows one value alternating with a fixed template pair per

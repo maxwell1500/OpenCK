@@ -207,6 +207,9 @@ void TestFaceFxActor::testRealActors()
             QVERIFY2(!n.name.isEmpty(), qPrintable(f + ": empty name"));
         qDebug() << f << "types=" << a.types().size() << "names=" << a.names().size()
                  << "ver=" << a.header().version;
+        for (const auto& n : a.names())
+            qDebug() << "  name:" << n.name << "payload:" << n.payload[0]
+                     << n.payload[1] << n.payload[2];
     }
 }
 
