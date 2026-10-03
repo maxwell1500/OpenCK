@@ -14,6 +14,7 @@
 
 #include "../../libs/files/nif/nifparser.hpp"
 #include "../../libs/files/nif/nifskinning.hpp"
+#include "../../libs/files/nif/nifblockfile.hpp"
 #include "../../libs/files/ba2/ba2archive.hpp"
 #include "nifrecord.hpp"
 #include "logger.hpp"
@@ -43,6 +44,7 @@ private slots:
     void testExternalMeshData();
     void testFaceSkinBlocks();
     void testSkeletonLink();
+    void testSkinnedAnimationStateGate();
     void testGpuSkinPacking();
     void testGpuSkinMatchesCpu();
     void testSyntheticSkinnedFileLoad();
@@ -572,8 +574,18 @@ void TestNifSkinning::testRealNifSurvey()
     int totalVerts = 0;
     int totalMeshRefs = 0;
     int namedNodes = 0;
+    int stubs = 0;
     for (const QString& path : files)
     {
+        // Weak-reference stubs carry no inline geometry; a survey that
+        // counted them as models would simply see less information, so the
+        // guard is at the ingester rather than every consumer.
+        NifBlockFile guard;
+        if (guard.load(path) && guard.allWeakReferenceStub()) {
+            ++stubs;
+            continue;
+        }
+
         Nif::NifParser parser;
         if (!parser.load(path))
             continue;
@@ -589,7 +601,7 @@ void TestNifSkinning::testRealNifSurvey()
     }
     qDebug() << "survey:" << loaded << "loaded," << namedNodes
              << "named nodes," << totalMeshRefs << "external meshes,"
-             << totalVerts << "verts";
+             << totalVerts << "verts," << stubs << "stubs skipped";
     QVERIFY2(loaded == files.size(), "A shipped NIF failed the Gamebryo reader");
     QVERIFY2(totalMeshRefs > 0, "No external mesh references resolved");
     QVERIFY2(namedNodes > 0, "No scene-graph nodes extracted");
@@ -968,6 +980,313 @@ void TestNifSkinning::testSkeletonLink()
     }
     QVERIFY(affectedVerts > 0);
     QCOMPARE(movedVerts, affectedVerts);
+}
+
+void TestNifSkinning::testSkinnedAnimationStateGate()
+{
+    const QString dataDir =
+        qEnvironmentVariable("OPENCK_DATA_DIR",
+                             QStringLiteral("C:/XboxGames/Starfield/Content/Data"));
+    const QString archivePath = dataDir + QStringLiteral("/Starfield - Meshes01.ba2");
+    if (!QFileInfo::exists(archivePath))
+        QSKIP("No Meshes01.ba2; set OPENCK_DATA_DIR");
+
+    auto extractEntry = [&](Ba2Archive& ba2, const QString& wanted, const QString& dest) -> bool {
+        int found = -1;
+        for (quint32 i = 0; i < ba2.fileCount(); ++i)
+            if (ba2.entries().at(i).relativePath == wanted) { found = static_cast<int>(i); break; }
+        return found >= 0 && ba2.extract(static_cast<quint32>(found), dest);
+    };
+
+    Ba2Archive faceBa2;
+    QVERIFY2(faceBa2.open(dataDir + QStringLiteral("/Starfield - FaceMeshes.ba2")), "FaceMeshes");
+    Ba2Archive meshBa2;
+    QVERIFY2(meshBa2.open(archivePath), "Meshes01");
+
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString faceNif = tmp.filePath(QStringLiteral("face.nif"));
+    QVERIFY(extractEntry(faceBa2,
+        QStringLiteral("meshes/actors/character/facegendata/facegeom/starfield.esm/000124ac.nif"),
+        faceNif));
+    const QString skelNif = tmp.filePath(QStringLiteral("skel.nif"));
+    QVERIFY(extractEntry(meshBa2,
+        QStringLiteral("meshes/actors/human/characterassets/female/skeleton_facebones.nif"),
+        skelNif));
+
+    Nif::NifParser parser;
+    QVERIFY2(parser.load(faceNif, skelNif), "Face NIF + skeleton did not load");
+    const Nif::TriShape* head = nullptr;
+    QStack<const Nif::Node*> stack;
+    stack.push(parser.getRoot());
+    while (!stack.isEmpty()) {
+        const Nif::Node* n = stack.pop();
+        for (const Nif::TriShape& sh : n->shapes)
+            if (sh.name == QStringLiteral("Human_Female_Head")) head = &sh;
+        for (const Nif::Node* c : n->children) stack.push(c);
+    }
+    QVERIFY(head != nullptr);
+    const int nb = head->skinBones.size();
+    QCOMPARE(nb, 50);
+
+    // Bone indices live in the skinWeights list by ->bone field.
+    QMap<const Nif::Node*, QMatrix4x4> world;
+    std::function<void(const Nif::Node*, const QMatrix4x4&)> walk =
+        [&](const Nif::Node* n, const QMatrix4x4& p) {
+            if (!n) return;
+            QMatrix4x4 local;
+            local.translate(n->position.x, n->position.y, n->position.z);
+            local.rotate(n->rotation.z * 180.0f / 3.14159265f, 0, 0, 1);
+            local.rotate(n->rotation.y * 180.0f / 3.14159265f, 0, 1, 0);
+            local.rotate(n->rotation.x * 180.0f / 3.14159265f, 1, 0, 0);
+            const QMatrix4x4 w = p * local;
+            world.insert(n, w);
+            for (const Nif::Node* c : n->children) walk(c, w);
+        };
+    walk(parser.getRoot(), QMatrix4x4());
+
+    QVector<QMatrix4x4> bindInv(nb);
+    for (int b = 0; b < nb; ++b) {
+        bool ok = false;
+        bindInv[b] = world.value(head->skinBones[b].boneNode).inverted(&ok);
+        QVERIFY(ok);
+    }
+
+    auto blendWith = [&](const QMap<const Nif::Node*, QMatrix4x4>& w,
+                         QVector<QVector3D>& outPos) {
+        const int vc = head->vertices.size();
+        QVector<float> restPos(vc * 3), restNrm(vc * 3);
+        for (int i = 0; i < vc; ++i) {
+            restPos[i * 3 + 0] = head->vertices[i].x;
+            restPos[i * 3 + 1] = head->vertices[i].y;
+            restPos[i * 3 + 2] = head->vertices[i].z;
+            restNrm[i * 3 + 0] = head->normals[i].x;
+            restNrm[i * 3 + 1] = head->normals[i].y;
+            restNrm[i * 3 + 2] = head->normals[i].z;
+        }
+        QVector<float> pal(nb * 16, 0.0f), npal(nb * 9, 0.0f);
+        for (int b = 0; b < nb; ++b) {
+            const QMatrix4x4 pal4 = w.value(head->skinBones[b].boneNode) * bindInv[b];
+            const float* cm = pal4.constData();
+            float* rm = pal.data() + b * 16;
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j) rm[i * 4 + j] = cm[j * 4 + i];
+            const QMatrix3x3 nm = pal4.normalMatrix();
+            const float* ncm = nm.constData();
+            float* nrm = npal.data() + b * 9;
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j) nrm[i * 3 + j] = ncm[j * 3 + i];
+        }
+        QVector<float> outPosF(vc * 3, 0.0f), outNrmF(vc * 3, 0.0f);
+        Nif::blendSkinnedLocal(
+            restPos.constData(), restNrm.constData(), vc,
+            reinterpret_cast<const float(*)[16]>(pal.constData()),
+            reinterpret_cast<const float(*)[9]>(npal.constData()),
+            nb, head->skinWeights.constData(), head->skinWeights.size(),
+            outPosF.data(), outNrmF.data());
+        outPos.resize(vc);
+        for (int i = 0; i < vc; ++i)
+            outPos[i] = QVector3D(outPosF[i * 3], outPosF[i * 3 + 1], outPosF[i * 3 + 2]);
+    };
+
+    // Bind-pose: blend through identity palettes must reproduce rest,
+    // exercising the same path the animated gate will use.
+    QVector<QVector3D> pos0;
+    blendWith(world, pos0);
+    for (int i = 0; i < head->vertices.size(); ++i) {
+        QVERIFY(qAbs(pos0[i].x() - head->vertices[i].x) < 1e-4f);
+        QVERIFY(qAbs(pos0[i].y() - head->vertices[i].y) < 1e-4f);
+        QVERIFY(qAbs(pos0[i].z() - head->vertices[i].z) < 1e-4f);
+    }
+
+    // Build an animation channel on the most-weighted bone, the same object
+    // `NifAnimationState` consumes for playback. One linear translation from
+    // the rest pose at 0 to a shifted pose at 4 s. Key channel 0 = rest,
+    // so at 0 the state-driven world must match rest exactly.
+    QVector<int> weightCount(nb, 0);
+    for (const Nif::SkinVertexWeight& w : head->skinWeights)
+        weightCount[w.bone] += 1;
+    int bone = 0;
+    for (int b = 0; b < nb; ++b)
+        if (weightCount[b] > weightCount[bone]) bone = b;
+    const Nif::Node* boneNode = head->skinBones[bone].boneNode;
+    QVERIFY(boneNode != nullptr);
+
+    AnimKeyframe rest;
+    rest.time = 0.0f;
+    rest.tx = boneNode->position.x;
+    rest.ty = boneNode->position.y;
+    rest.tz = boneNode->position.z;
+    rest.rx = boneNode->rotation.x;
+    rest.ry = boneNode->rotation.y;
+    rest.rz = boneNode->rotation.z;
+    rest.sx = rest.sy = rest.sz = 1.0f;
+    rest.hasQuat = false;
+    AnimKeyframe shifted;
+    shifted.time = 4.0f;
+    shifted.tx = rest.tx + 0.5f;
+    shifted.ty = rest.ty;
+    shifted.tz = rest.tz;
+    shifted.rx = rest.rx;
+    shifted.ry = rest.ry;
+    shifted.rz = rest.rz;
+    shifted.sx = rest.sx;
+    shifted.sy = rest.sy;
+    shifted.sz = rest.sz;
+    shifted.hasQuat = false;
+
+    AnimChannel ch;
+    ch.boneName = boneNode->name;
+    ch.type = QStringLiteral("NiKeyframeController");
+    ch.duration = 4.0f;
+    ch.keyframes = { rest, shifted };
+    AnimClip clip;
+    clip.name = QStringLiteral("Gate");
+    clip.duration = 4.0f;
+    clip.channels = { ch };
+    NifAnimation anim;
+    anim.name = QStringLiteral(" Gate");
+    anim.clips = { clip };
+
+    NifAnimationState state;
+    state.setAnimation(&anim);
+    QCOMPARE(state.getCurrentFrame().size(), 1);
+
+    // At time 0 the animation channel reproduces the rest local transform,
+    // so every bone has its rest world matrix and skinning returns rest.
+    state.setCurrentTime(0.0f);
+    QVector<TransformKeyframe> frames0 = state.getCurrentFrame();
+
+    QMap<QString, TransformKeyframe> byName0;
+    for (const auto& f : frames0) byName0[f.nodeName] = f;
+
+    QMap<const Nif::Node*, QMatrix4x4> world0;
+    std::function<void(const Nif::Node*, const QMatrix4x4&)> walkAnim0 =
+        [&](const Nif::Node* n, const QMatrix4x4& p) {
+            if (!n) return;
+            QMatrix4x4 localTransform;
+            localTransform.translate(n->position.x, n->position.y, n->position.z);
+            float rx = n->rotation.x * 180.0f / 3.14159265f;
+            float ry = n->rotation.y * 180.0f / 3.14159265f;
+            float rz = n->rotation.z * 180.0f / 3.14159265f;
+            localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
+            localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
+            localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+            const auto it = byName0.find(n->name);
+            if (it != byName0.end()) {
+                const TransformKeyframe& f = it.value();
+                QMatrix4x4 animLocal;
+                animLocal.translate(f.tx, f.ty, f.tz);
+                if (f.hasQuat) {
+                    animLocal.rotate(QQuaternion(f.qw, f.qx, f.qy, f.qz));
+                } else {
+                    animLocal.rotate(f.rz * 180.0f / 3.14159265f, 0, 0, 1);
+                    animLocal.rotate(f.ry * 180.0f / 3.14159265f, 0, 1, 0);
+                    animLocal.rotate(f.rx * 180.0f / 3.14159265f, 1, 0, 0);
+                }
+                animLocal.scale(f.sx, f.sy, f.sz);
+                localTransform = animLocal;
+            }
+            const QMatrix4x4 w = p * localTransform;
+            world0.insert(n, w);
+            for (const Nif::Node* c : n->children) walkAnim0(c, w);
+        };
+    walkAnim0(parser.getRoot(), QMatrix4x4());
+
+    QVector<QVector3D> posAnim0;
+    blendWith(world0, posAnim0);
+    for (int i = 0; i < head->vertices.size(); ++i) {
+        QVERIFY(qAbs(posAnim0[i].x() - head->vertices[i].x) < 1e-3f);
+        QVERIFY(qAbs(posAnim0[i].y() - head->vertices[i].y) < 1e-3f);
+        QVERIFY(qAbs(posAnim0[i].z() - head->vertices[i].z) < 1e-3f);
+    }
+
+    // At time 4 the channel shift has taken effect. Importantly, that shift
+    // must translate *every vertex weighted to the bone or its subtree in
+    // the scene hierarchy* and leave every other vertex alone. A direct
+    // local-position perturb must produce the same post-blend positions,
+    // proving the state path feeds the same matrices the renderer would.
+    state.setCurrentTime(4.0f);
+    QVector<TransformKeyframe> frames = state.getCurrentFrame();
+    QMap<QString, TransformKeyframe> byNameF;
+    for (const auto& f : frames) byNameF[f.nodeName] = f;
+
+    QMap<const Nif::Node*, QMatrix4x4> worldAnim;
+    std::function<void(const Nif::Node*, const QMatrix4x4&)> walkAnim =
+        [&](const Nif::Node* n, const QMatrix4x4& p) {
+            if (!n) return;
+            QMatrix4x4 localTransform;
+            localTransform.translate(n->position.x, n->position.y, n->position.z);
+            float rx = n->rotation.x * 180.0f / 3.14159265f;
+            float ry = n->rotation.y * 180.0f / 3.14159265f;
+            float rz = n->rotation.z * 180.0f / 3.14159265f;
+            localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
+            localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
+            localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+            const auto it = byNameF.find(n->name);
+            if (it != byNameF.end()) {
+                const TransformKeyframe& f = it.value();
+                QMatrix4x4 animLocal;
+                animLocal.translate(f.tx, f.ty, f.tz);
+                if (f.hasQuat) {
+                    animLocal.rotate(QQuaternion(f.qw, f.qx, f.qy, f.qz));
+                } else {
+                    animLocal.rotate(f.rz * 180.0f / 3.14159265f, 0, 0, 1);
+                    animLocal.rotate(f.ry * 180.0f / 3.14159265f, 0, 1, 0);
+                    animLocal.rotate(f.rx * 180.0f / 3.14159265f, 1, 0, 0);
+                }
+                animLocal.scale(f.sx, f.sy, f.sz);
+                localTransform = animLocal;
+            }
+            const QMatrix4x4 w = p * localTransform;
+            worldAnim.insert(n, w);
+            for (const Nif::Node* c : n->children) walkAnim(c, w);
+        };
+    walkAnim(parser.getRoot(), QMatrix4x4());
+
+    QVector<QVector3D> posAnim;
+    blendWith(worldAnim, posAnim);
+
+    // Direct local perturb gives the expected result of the the same animation.
+    const_cast<Nif::Node*>(boneNode)->position.x += 0.5f;
+    world.clear();
+    walk(parser.getRoot(), QMatrix4x4());
+    QVector<QVector3D> expected;
+    blendWith(world, expected);
+    const_cast<Nif::Node*>(boneNode)->position.x -= 0.5f;
+    world.clear();
+    walk(parser.getRoot(), QMatrix4x4());
+
+    QSet<const Nif::Node*> subtree;
+    std::function<void(const Nif::Node*)> collectSubtree = [&](const Nif::Node* n) {
+        subtree.insert(n);
+        for (const Nif::Node* c : n->children) collectSubtree(c);
+    };
+    collectSubtree(boneNode);
+    QSet<int> affectedBones;
+    for (int b = 0; b < nb; ++b)
+        if (subtree.contains(head->skinBones[b].boneNode)) affectedBones.insert(b);
+
+    QVector<char> affected(head->vertices.size(), 0);
+    for (const Nif::SkinVertexWeight& w : head->skinWeights)
+        if (affectedBones.contains(static_cast<int>(w.bone)))
+            affected[static_cast<int>(w.vertex)] = 1;
+
+    int movedVerts = 0; float maxPosErr = 0.0f;
+    for (int i = 0; i < head->vertices.size(); ++i) {
+        const float d = (posAnim[i] - expected[i]).length();
+        maxPosErr = qMax(maxPosErr, d);
+        if (affected[i]) {
+            const float move = (posAnim[i] - pos0[i]).length();
+            QVERIFY2(move > 1e-3f, "vertex bound to animated bone stayed at rest");
+            ++movedVerts;
+        } else {
+            const float move = (posAnim[i] - pos0[i]).length();
+            QVERIFY2(move < 1e-4f, "vertex outside the animated subtree moved");
+        }
+    }
+    QVERIFY(movedVerts > 0);
+    QVERIFY2(maxPosErr < 1e-3f, "state-driven path diverges from direct");
 }
 
 void TestNifSkinning::testGpuSkinPacking()

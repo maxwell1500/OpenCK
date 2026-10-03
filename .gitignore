@@ -85,7 +85,6 @@ new_*.txt
 
 # Large vendored binaries — not suitable for git
 external/blender/
-external/pynifly/
 
 # Visual Studio build output directories
 x64/

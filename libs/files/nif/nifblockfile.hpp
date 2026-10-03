@@ -48,6 +48,28 @@ public:
     const Block& block(int index) const { return mBlocks.at(index); }
     void setBlockData(int index, const QByteArray& data);
 
+    // Some packed BA2 assets carry "stub" NIFs: a lone BSWeakReferenceNode
+    // node whose payload points at real geometry shipped elsewhere, never
+    // inline. Sampling those as if they were real geometry is what made an
+    // earlier survey conclude no vertices existed. Returns true when the
+    // block list contains a BSWeakReferenceNode type and no inline
+    // geometry-bearing type (BSGeometry/NiTriSh*/BSFaceGen/skin blocks).
+    bool allWeakReferenceStub() const {
+        if (mBlocks.isEmpty()) return false;
+        bool sawWeak = false;
+        for (const Block& b : mBlocks) {
+            const QString& t = b.type;
+            if (t == QLatin1String("BSWeakReferenceNode")) { sawWeak = true; continue; }
+            if (t.contains(QLatin1String("Geometry"), Qt::CaseInsensitive)
+                || t.contains(QLatin1String("TriSh"), Qt::CaseInsensitive)
+                || t.contains(QLatin1String("TriStrip"), Qt::CaseInsensitive)
+                || t.contains(QLatin1String("FaceGen"), Qt::CaseInsensitive)
+                || t.contains(QLatin1String("Skin"), Qt::CaseInsensitive))
+                return false;
+        }
+        return sawWeak;
+    }
+
     // First block whose resolved type equals typeName, or -1.
     int findBlock(const QString& typeName) const;
 

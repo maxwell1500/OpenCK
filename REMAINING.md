@@ -2714,8 +2714,9 @@ creation kit is installed on this machine
 it turns out not to be needed. Its NIF I/O is the `nifpy`/`pyffi` library, and
 that same library is vendored inside the Blender addon already in the tree, at
 `build/blender/.../io_scene_niftools/dependencies` (nifgen + pyffi, Python 3.12
-is on `PATH`). Note that `external/pynifly` is an empty placeholder despite what
-`AGENTS.md` says about it.
+is on `PATH`). `external/pynifly` referenced by earlier docs no longer exists:
+the empty placeholder has been removed, and reader/decoder is the C++
+`NifBlockFile` (with the bundled Blender nifgen still the byte-exact oracle).
 
 The authoritative reader is three lines of Python:
 
@@ -2731,7 +2732,11 @@ It parses pre-20.2.0.5 containers - the ones with no size table - and reports
 every block's start and length. That is exactly the thing hand-decoding could
 only guess at, so the remaining work is a diff against ground truth rather than a
 grind. `AGENTS.md`'s claim that `external/pynifly` provides NIF I/O should be
-corrected to point at where the code actually is.
+corrected to point at where the code actually is (reader/decoder is the C++
+`NifBlockFile`; the ground-truth oracle is the bundled Blender nifgen under
+`build/blender/.../io_scene_niftools/dependencies`, which remains the only
+place matching old nifly semantics byte-for-byte). `external/pynifly` was an
+empty placeholder only; it has since been removed.
 
 **The "surplus word" was a misread byte, not a format quirk.** This entry
 previously recorded an unexplained 4-byte surplus in `NiObjectNET`, and three

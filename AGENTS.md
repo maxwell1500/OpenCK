@@ -96,7 +96,7 @@ canonical pattern.
 |---|---|---|
 | Qt6 (5.5–6.5 tested, 6.5.3 used in CI) | UI framework | External, system Qt6 |
 | QtAdvancedDocking (ADS) | Tear-off / tabbed / redockable windows | `external/ads/` (vendored) |
-| NifTools nifly | NIF file I/O - **ground truth for block boundaries** | `build/blender/blender-*/4.2/scripts/addons/io_scene_niftools/dependencies/` (nifgen + pyffi). `external/pynifly/` is an empty placeholder. Parse with `nifgen.formats.nif.NifFile.from_stream(handle)` and read `block.io_start` / `block.io_size` per block; the class is `NifFile`, not `NIFFile`. It reads pre-20.2.0.5 containers, which have no size table, so it answers the question the C++ cannot. |
+| NifTools nifly | NIF file I/O - **ground truth for block boundaries** | `build/blender/blender-*/4.2/scripts/addons/io_scene_niftools/dependencies/` (nifgen + pyffi). Parse with `nifgen.formats.nif.NifFile.from_stream(handle)` and read `block.io_start` / `block.io_size` per block; the class is `NifFile`, not `NIFFile`. It reads pre-20.2.0.5 containers, which have no size table, so it answers the question the C++ cannot. (The former `external/pynifly` placeholder has been removed.) |
 | libogg, libvorbis | OGG encoding | `external/ogg/`, `external/vorbis/` (vendored) |
 | DbgHelp | Crash stack traces (Windows only) | system, linked via `dbghelp.lib` |
 
