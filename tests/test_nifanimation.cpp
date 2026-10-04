@@ -29,6 +29,7 @@ private slots:
     void testEulerFlagJsonRoundTrip();
     void testEulerFlagXmlRoundTrip();
     void testFlattenNiTransformData();
+    void testTextKeyExtraDataRoundTrip();
     void testSlerpTakesShortPath();
     void testEulerFallbackPreserved();
     void testBlendWithStoredQuats();
@@ -386,6 +387,27 @@ void TestNifAnimation::testFlattenNiTransformData()
     QVERIFY(!quatFrames[1].hasEuler);
     QCOMPARE(quatFrames[1].rotation.w, 0.0f);
     QCOMPARE(quatFrames[1].rotation.x, 1.0f);
+}
+
+void TestNifAnimation::testTextKeyExtraDataRoundTrip()
+{
+    NifBlockFile bf;
+    bf.mVersion = 0x14000004u; // 20.0.0.4: an integer version, not a string
+    QVector<NifBlockFile::TextKey> keys;
+    keys.append({0.0f, QStringLiteral("Start")});
+    keys.append({0.5f, QStringLiteral("Idle")});
+
+    const QByteArray encoded = bf.encodeTextKeys(QStringLiteral("EventKeys"), keys);
+    QString decodedExtra;
+    QVector<NifBlockFile::TextKey> decoded;
+    QVERIFY2(bf.decodeTextKeys(encoded, decodedExtra, decoded),
+             "encoded NiTextKeyExtraData did not decode");
+    QCOMPARE(decoded.size(), keys.size());
+    QCOMPARE(decodedExtra, QStringLiteral("EventKeys"));
+    QCOMPARE(decoded[0].time, 0.0f);
+    QCOMPARE(decoded[0].text, QStringLiteral("Start"));
+    QCOMPARE(decoded[1].time, 0.5f);
+    QCOMPARE(decoded[1].text, QStringLiteral("Idle"));
 }
 
 void TestNifAnimation::testSlerpTakesShortPath()

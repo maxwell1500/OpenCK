@@ -2369,7 +2369,14 @@ controller field layout changed between game generations) and follows the
 1.5 `controller -> interpolator -> data` and 1.6+ `controller -> data` chains.
 The writer refuses to touch any keyframe block it cannot reproduce byte for
 byte, so an unconfirmed layout is declined instead of corrupting the file.
-Remaining: keyed/idle event round-trips.
+
+**Status 2026-10-04 — keyed/idle event round-trips done at the model level.**
+The clip marker list is no longer an editor-only decoration: a load merges the
+`NiTextKeyExtraData` keys from each controller sequence's `text_keys` ref, and
+a save writes `AnimMarker`s back through
+`NifAnimationWriter::setClipMarkersToNif()` to the matching NiControllerSequence.
+There is no UI tree for authoring a schedule beyond adding/removing markers;
+when the marker set must survive, the save path serializes it as NIF text keys.
 
 **Status 2026-10-04 — channel-preserving editor payload done.** The flat
 `TransformKeyframe` write path is no longer the only edit representation. The

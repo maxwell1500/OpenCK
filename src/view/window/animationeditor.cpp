@@ -9,6 +9,7 @@
 #include <QGroupBox>
 #include <QTimer>
 #include <QSplitter>
+#include <QSet>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -143,6 +144,23 @@ NifAnimation* loadAnimationFromNif(const QString& path)
     if (clip.channels.isEmpty()) {
         delete anim;
         return nullptr;
+    }
+
+    QSet<QString> seenMarkers;
+    for (const auto& source : sources) {
+        if (source.clipName.isEmpty())
+            continue;
+        const auto keys = file.textKeysForClip(source.clipName);
+        for (const auto& key : keys) {
+            const QString signature = QString::number(key.time, 'f', 6) + '\x01' + key.text;
+            if (seenMarkers.contains(signature))
+                continue;
+            seenMarkers.insert(signature);
+            AnimMarker marker;
+            marker.time = key.time;
+            marker.name = key.text;
+            anim->markers.append(marker);
+        }
     }
 
     float maxDuration = 0.0f;
@@ -992,6 +1010,22 @@ void AnimationEditor::onSaveNif()
             else
                 ++failed;
             if (channelDowngraded) ++downgraded;
+        }
+    }
+
+    if (!mAnimation->markers.isEmpty()) {
+        QSet<QString> markerClips;
+        for (const auto& clip : mAnimation->clips) {
+            for (const auto& channel : clip.channels) {
+                if (channel.type != QStringLiteral("NiKeyframeData"))
+                    markerClips.insert(channel.type);
+            }
+        }
+        for (const QString& markerClipName : markerClips) {
+            if (!NifAnimationWriter::setClipMarkersToNif(mSourceNifPath, markerClipName, mAnimation->markers)) {
+                QMessageBox::warning(this, tr("Save NIF"),
+                    tr("Could not write markers to clip '%1'.").arg(markerClipName));
+            }
         }
     }
 

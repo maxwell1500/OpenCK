@@ -844,6 +844,30 @@ bool NifAnimationWriter::writeKeyframesToNif(const QString& nifPath,
     return writeKeyframesToNif(nifPath, nodeName, keyframes, clipName, downgraded);
 }
 
+bool NifAnimationWriter::setClipMarkersToNif(const QString& nifPath,
+                                             const QString& clipName,
+                                             const QVector<AnimMarker>& markers)
+{
+    if (markers.isEmpty()) return true;
+
+    NifBlockFile file;
+    if (!file.load(nifPath)) {
+        LOG_WARNING(QString("NifAnimationWriter: cannot load %1 to write markers").arg(nifPath));
+        return false;
+    }
+
+    QVector<NifBlockFile::TextKey> keys;
+    keys.reserve(markers.size());
+    for (const AnimMarker& marker : markers) {
+        keys.append({ static_cast<float>(marker.time), marker.name });
+    }
+    if (!file.setTextKeysForClip(clipName, keys)) {
+        LOG_WARNING(QString("NifAnimationWriter: no text key block for clip '%1'").arg(clipName));
+        return false;
+    }
+    return file.save(nifPath);
+}
+
 void NifAnimationWriter::refreshChannelKeyframes(AnimChannel& channel)
 {
     refreshChannelKeyframesImpl(channel);

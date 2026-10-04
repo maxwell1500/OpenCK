@@ -3903,6 +3903,100 @@ bool NifBlockFile::decodeControllerSequence(const QByteArray& data,
     return true;
 }
 
+bool NifBlockFile::decodeTextKeys(const QByteArray& data,
+                                  QString& extraNameOut,
+                                  QVector<TextKey>& out) const
+{
+    extraNameOut.clear();
+    out.clear();
+    Cursor c(data);
+    if (!readStringAt(c, mVersion, mStrings, extraNameOut)) return false;
+    const quint32 numKeys = c.u32();
+    if (!c.ok() || numKeys > 100000u) return false;
+    out.reserve(static_cast<int>(numKeys));
+    for (quint32 i = 0; i < numKeys; ++i) {
+        TextKey key;
+        key.time = c.f32();
+        if (!readStringAt(c, mVersion, mStrings, key.text)) return false;
+        if (!c.ok()) return false;
+        out.append(key);
+    }
+    return c.atEnd();
+}
+
+QByteArray NifBlockFile::encodeTextKeys(const QString& extraName,
+                                        const QVector<TextKey>& keys) const
+{
+    QByteArray out;
+    if (mVersion >= 335609859u) {  // string-table sized strings need an index
+        LOG_WARNING("NifBlockFile: cannot encode text keys with a string table");
+        return out;
+    }
+
+    const QByteArray nameBytes = extraName.toLatin1();
+    appendU32(out, static_cast<quint32>(nameBytes.size()));
+    out.append(nameBytes);
+    appendU32(out, static_cast<quint32>(keys.size()));
+    for (const TextKey& key : keys) {
+        appendF32(out, key.time);
+        const QByteArray textBytes = key.text.toLatin1();
+        appendU32(out, static_cast<quint32>(textBytes.size()));
+        out.append(textBytes);
+    }
+    return out;
+}
+
+int NifBlockFile::textKeysBlockForClip(const QString& clipName) const
+{
+    const QList<int> sequences = findBlocks(QStringLiteral("NiControllerSequence"));
+    for (int seqIndex : sequences) {
+        Cursor c(block(seqIndex).data);
+        QString sequenceName;
+        if (!readStringAt(c, mVersion, mStrings, sequenceName)) continue;
+        if (sequenceName != clipName) continue;
+
+        const quint32 numControlled = c.u32();
+        if (!c.ok() || numControlled > 100000u) continue;
+        if (mVersion >= kSequencePlaybackVersion) c.u32();  // array_grow_by
+        for (quint32 i = 0; i < numControlled; ++i) {
+            if (!skipControlledBlock(c, mVersion, mBsVersion)) break;
+        }
+        if (mVersion < kSequencePlaybackVersion || !c.ok()) continue;
+        c.f32();  // weight
+        const quint32 textKeysRef = c.u32();
+        if (!c.ok() || textKeysRef == 0xFFFFFFFFu ||
+            textKeysRef >= static_cast<quint32>(mBlocks.size())) continue;
+        if (mBlocks.at(static_cast<int>(textKeysRef)).type ==
+            QLatin1String("NiTextKeyExtraData"))
+            return static_cast<int>(textKeysRef);
+    }
+    return -1;
+}
+
+QVector<NifBlockFile::TextKey> NifBlockFile::textKeysForClip(const QString& clipName) const
+{
+    QVector<TextKey> keys;
+    const int blockIndex = textKeysBlockForClip(clipName);
+    if (blockIndex < 0) return keys;
+    QString extraName;
+    if (!decodeTextKeys(block(blockIndex).data, extraName, keys)) return {};
+    return keys;
+}
+
+bool NifBlockFile::setTextKeysForClip(const QString& clipName,
+                                      const QVector<TextKey>& keys)
+{
+    const int blockIndex = textKeysBlockForClip(clipName);
+    if (blockIndex < 0) return false;
+    QString extraName;
+    QVector<TextKey> existing;
+    decodeTextKeys(block(blockIndex).data, extraName, existing);
+    const QByteArray encoded = encodeTextKeys(extraName, keys);
+    if (encoded.isEmpty()) return false;
+    setBlockData(blockIndex, encoded);
+    return true;
+}
+
 // NiStringPalette in a pre-20.1.0.1 container: a u32 byte count followed by
 // that many bytes holding the palette's strings back to back, each NUL
 // terminated. A ControlledBlock's StringOffset is a position in that list, not

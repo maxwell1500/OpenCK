@@ -246,6 +246,23 @@ public:
     // position in that blob. Empty when the block is absent or the position
     // does not land on one.
     QString stringAtPaletteOffset(quint32 paletteRef, quint32 offset) const;
+
+    // NiTextKeyExtraData is the NIF's event/keyframe marker list attached to a
+    // NiControllerSequence. The first string in the block is the NiExtraData
+    // name; each key is (time, event name).
+    struct TextKey {
+        float time = 0.0f;
+        QString text;
+    };
+    bool decodeTextKeys(const QByteArray& data, QString& extraNameOut,
+                        QVector<TextKey>& out) const;
+    QByteArray encodeTextKeys(const QString& extraName,
+                              const QVector<TextKey>& keys) const;
+    int textKeysBlockForClip(const QString& clipName) const;
+    QVector<TextKey> textKeysForClip(const QString& clipName) const;
+    bool setTextKeysForClip(const QString& clipName,
+                            const QVector<TextKey>& keys);
+
     void reset();
     bool parse(const QByteArray& raw, bool hasUnknownInt, QString& error);
     // Recover individual block boundaries in a container that has no size table,

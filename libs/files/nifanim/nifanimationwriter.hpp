@@ -32,6 +32,10 @@ public:
                                      const QString& clipName = QString(),
                                      bool* downgraded = nullptr);
 
+    static bool setClipMarkersToNif(const QString& nifPath,
+                                    const QString& clipName,
+                                    const QVector<AnimMarker>& markers);
+
     // Channel payload editing helpers. These mutate channel.raw and rebuild the
     // flat keyframes the timeline shows, so keyframe add/remove/move and
     // property edits survive as per-channel data instead of a sampled transform
