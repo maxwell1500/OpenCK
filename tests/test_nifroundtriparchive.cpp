@@ -130,6 +130,12 @@ private slots:
         int failedToParse = 0;
         int gamebryo = 0;
         int netImmerse = 0;
+        int netImmerseRoundTripped = 0;
+        int netImmerseMismatch = 0;
+        int netImmerseFailed = 0;
+        QMap<QString, int> netVersionCounts;
+        QMap<QString, int> netFailureReasons;
+        QMap<QString, QString> netFirstFailure;
         int smallestNifSize = 0;
         QMap<QString, int> versionCounts;
         QMap<QString, int> typeCensus;
@@ -181,8 +187,54 @@ private slots:
             // NifBlockFile reads; the NetImmerse one is a different format from
             // the Morrowind era and is counted separately rather than being
             // allowed to hide inside a general failure count.
+            // Two containers share the .nif extension. Both are now read, and
+            // both have to re-save byte for byte; they are counted separately
+            // because their fidelity stories differ — a NetImmerse file is kept
+            // as one opaque region, a Gamebryo one may be split into blocks.
             if (bytes.startsWith("NetImmerse File Format")) {
                 ++netImmerse;
+                const QByteArray netTarget = qgetenv("OPENCK_TEST_NIF_DUMP_NETIMMERSE");
+                const QByteArray netWanted = qgetenv("OPENCK_TEST_NIF_DUMP_NAME");
+                if (!netTarget.isEmpty()
+                    && (netWanted.isEmpty()
+                        || entry.fullPath.contains(QString::fromLocal8Bit(netWanted)))) {
+                    QFile netOut(QString::fromLocal8Bit(netTarget));
+                    if (netOut.open(QIODevice::WriteOnly)) {
+                        netOut.write(bytes);
+                        netOut.close();
+                    }
+                }
+
+                QFile netProbe(probe);
+                if (!netProbe.open(QIODevice::WriteOnly))
+                    QFAIL("could not write the NetImmerse probe file");
+                netProbe.write(bytes);
+                netProbe.close();
+
+                NifBlockFile netFile;
+                if (!netFile.load(probe)) {
+                    ++netImmerseFailed;
+                    const QString reason =
+                        netFile.lastError().section(';', 0, 0).trimmed();
+                    netFailureReasons[reason] += 1;
+                    if (!netFirstFailure.contains(reason))
+                        netFirstFailure[reason] = entry.fullPath;
+                    continue;
+                }
+                if (!netFile.isNetImmerse()) {
+                    ++netImmerseFailed;
+                    netFailureReasons[QStringLiteral("not reported as NetImmerse")] += 1;
+                    continue;
+                }
+                netVersionCounts[netFile.headerVersion()] += 1;
+                if (netFile.serialize() != bytes) {
+                    ++netImmerseMismatch;
+                    if (!netFirstFailure.contains(QStringLiteral("not byte-identical")))
+                        netFirstFailure[QStringLiteral("not byte-identical")] =
+                            entry.fullPath;
+                    continue;
+                }
+                ++netImmerseRoundTripped;
                 continue;
             }
             ++gamebryo;
@@ -460,10 +512,30 @@ private slots:
                                     ? QString()
                                     : firstFailure.value(failureReasons.firstKey()))));
 
-        // The NetImmerse files are a separate, older container that is not
-        // supported yet. They are reported, not asserted on, so that this test
-        // says plainly which of the two formats is covered.
-        qInfo().noquote() << "NetImmerse NIFs not covered by this test:" << netImmerse;
+        // Every NetImmerse file must also survive a load and save byte for byte.
+        // The container records no block lengths, so what is being asserted here
+        // is read-and-save fidelity, not block addressability: no codec is offered
+        // for these files and none should be inferred from this passing.
+        qInfo().noquote() << "NetImmerse NIFs:" << netImmerse
+                          << "byte-identical:" << netImmerseRoundTripped
+                          << "mismatched:" << netImmerseMismatch
+                          << "failed to parse:" << netImmerseFailed;
+        for (auto it = netVersionCounts.begin(); it != netVersionCounts.end(); ++it)
+            qInfo().noquote() << "  NetImmerse" << it.key() << it.value();
+        for (auto it = netFailureReasons.begin(); it != netFailureReasons.end(); ++it)
+            qInfo().noquote() << "  netimmerse failure:" << it.key() << it.value()
+                              << "first:" << netFirstFailure.value(it.key());
+        QVERIFY2(netImmerseMismatch == 0,
+            qPrintable(QStringLiteral("%1 NetImmerse NIFs did not re-save byte-identically; "
+                                      "first was %2")
+                           .arg(netImmerseMismatch)
+                           .arg(netFirstFailure.value(QStringLiteral("not byte-identical")))));
+        QVERIFY2(netImmerseFailed == 0,
+            qPrintable(QStringLiteral("%1 NetImmerse NIFs failed to parse; first was %2")
+                           .arg(netImmerseFailed)
+                           .arg(netFailureReasons.isEmpty()
+                                    ? QString()
+                                    : netFirstFailure.value(netFailureReasons.firstKey()))));
     }
 };
 

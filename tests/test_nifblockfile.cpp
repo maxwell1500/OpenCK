@@ -32,6 +32,7 @@ private slots:
     void starfieldNifsRoundTrip();
     void starfieldKeyframeCodecIsExact();
     void unconfirmedKeyframeLayoutIsRefused();
+    void netImmerseContainersRoundTrip();
     void viewLayerParserOpensOblivionMeshes();
 
 private:
@@ -405,6 +406,151 @@ void TestNifBlockFile::unconfirmedKeyframeLayoutIsRefused()
 
     // An unknown block type is never encodable.
     QVERIFY(!NifBlockFile::encodeKeyframeData(QStringLiteral("NiSomethingElse"), keys, encoded));
+}
+
+namespace {
+
+void put32(QByteArray& out, quint32 value)
+{
+    out.append(static_cast<char>(value & 0xFF));
+    out.append(static_cast<char>((value >> 8) & 0xFF));
+    out.append(static_cast<char>((value >> 16) & 0xFF));
+    out.append(static_cast<char>((value >> 24) & 0xFF));
+}
+
+void put16(QByteArray& out, quint16 value)
+{
+    out.append(static_cast<char>(value & 0xFF));
+    out.append(static_cast<char>((value >> 8) & 0xFF));
+}
+
+void putSizedString(QByteArray& out, const QByteArray& text)
+{
+    put32(out, static_cast<quint32>(text.size()));
+    out.append(text);
+}
+
+// ExportString: a u8 length that includes the NUL. The header tables use
+// SizedString instead, and mixing the two up is what made an earlier reader
+// reject every 10.0.1.2 file, so both forms are built here on purpose.
+void putExportString(QByteArray& out, const QByteArray& text)
+{
+    const int len = text.size() + 1;
+    out.append(static_cast<char>(len));
+    out.append(text);
+    out.append('\0');
+}
+
+// Builds a minimal NetImmerse container. Two shapes exist and both ship:
+// `withExportHeader` covers 10.0.1.2, which carries one, and 10.0.1.0, which
+// does not. Below 5.0.0.1 there is no type table at all and each block carries
+// its own sized type name inline, which `inlineTypes` selects.
+QByteArray buildNetImmerse(const QByteArray& versionLine, quint32 version,
+                           bool withExportHeader, bool inlineTypes)
+{
+    QByteArray out;
+    out.append(versionLine);
+    out.append('\n');
+    put32(out, version);
+    put32(out, 1); // num_blocks
+
+    if (withExportHeader) {
+        put32(out, 3); // bs_version
+        putExportString(out, "someone");
+        putExportString(out, "Default Process Script");
+        putExportString(out, "Default Export Script");
+    }
+
+    if (!inlineTypes) {
+        put16(out, 1); // num_block_types
+        putSizedString(out, "NiNode");
+        put16(out, 0); // block_type_index[0]
+        put32(out, 0); // num_groups
+    }
+
+    // One block payload. The inline-type shape names the block first; the other
+    // takes the type from the header table and opens with the payload, behind
+    // the zero word every pre-10.1.0.107 block carries.
+    if (inlineTypes)
+        putSizedString(out, "NiNode");
+    else
+        put32(out, 0);
+    putSizedString(out, "SomeNodeName");
+    put32(out, 0xFFFFFFFFu);
+    return out;
+}
+
+} // namespace
+
+void TestNifBlockFile::netImmerseContainersRoundTrip()
+{
+    struct Case {
+        const char* versionLine;
+        quint32 version;
+        bool withExportHeader;
+        bool inlineTypes;
+    };
+    // One case per shape that ships. The header field set is gated differently at
+    // every step, so a reader that handles one and not the other rejects a valid
+    // file rather than misreading it — which is what this pins.
+    const QVector<Case> cases = {
+        {"NetImmerse File Format, Version 10.0.1.0", 0x0A000100u, false, false},
+        {"NetImmerse File Format, Version 10.0.1.2", 0x0A000102u, true, false},
+        {"NetImmerse File Format, Version 4.2.1.0", 0x04020100u, false, true},
+        {"NetImmerse File Format, Version 3.3.0.13", 0x0303000Du, false, true},
+    };
+
+    QTemporaryDir temp;
+    QVERIFY(temp.isValid());
+
+    for (const Case& c : cases) {
+        const QByteArray bytes = buildNetImmerse(c.versionLine, c.version,
+                                                 c.withExportHeader, c.inlineTypes);
+        const QString version = QString::fromLatin1(c.versionLine + 32);
+        const QString path = temp.filePath(version + QStringLiteral(".nif"));
+        QFile out(path);
+        QVERIFY(out.open(QIODevice::WriteOnly));
+        out.write(bytes);
+        out.close();
+
+        QVERIFY2(NifBlockFile::isBethesdaNif(path), c.versionLine);
+
+        NifBlockFile file;
+        QVERIFY2(file.load(path), qPrintable(QStringLiteral("%1: %2")
+                                                 .arg(version, file.lastError())));
+        QVERIFY(file.isNetImmerse());
+        QCOMPARE(file.headerVersion(), version);
+        QCOMPARE(file.version(), c.version);
+        // The block payloads are not walked: the container records no block
+        // lengths, so there is nothing to address a block by. A codec must not be
+        // inferred from the file loading.
+        QVERIFY(!file.hasIndividualBlocks());
+        QCOMPARE(file.count(), 0);
+        QVERIFY(file.findBlocks(QStringLiteral("NiNode")).isEmpty());
+        // And the read-and-save claim has to actually hold byte for byte.
+        QCOMPARE(file.serialize(), bytes);
+    }
+
+    // A header line that is not a NetImmerse version line is rejected rather than
+    // guessed at, and so is a version field that disagrees with the line: both are
+    // how a wrong-offset read announces itself, and continuing past one would
+    // misparse every field after it.
+    QByteArray badLine = "NetImmerse File Format, Version ten";
+    badLine.append('\n');
+    put32(badLine, 0x0A000100u);
+    put32(badLine, 1);
+    put16(badLine, 0);
+    QString error;
+    NifBlockFile rejected;
+    QVERIFY(!rejected.parseNetImmerse(badLine, error));
+
+    QByteArray mismatch = "NetImmerse File Format, Version 10.0.1.0";
+    mismatch.append('\n');
+    put32(mismatch, 0x0A000102u); // the field disagrees with the line
+    put32(mismatch, 1);
+    QVERIFY(!rejected.parseNetImmerse(mismatch, error));
+    QVERIFY2(error.contains(QStringLiteral("version field")),
+             qPrintable(QStringLiteral("unhelpful error: %1").arg(error)));
 }
 
 QTEST_MAIN(TestNifBlockFile)

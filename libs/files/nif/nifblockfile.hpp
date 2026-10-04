@@ -82,6 +82,14 @@ public:
     QString headerVersion() const { return mHeaderVersion; }
     int stringCount() const { return mStrings.size(); }
 
+    /// True when the file is the pre-Gamebryo "NetImmerse File Format"
+    /// container. Its header is read (version, block count, and the type table
+    /// when the generation has one) but its blocks are not: the container records
+    /// no block lengths, so the payload region is kept whole and re-emitted
+    /// verbatim. count() is therefore 0 for these files even though the header
+    /// declares blocks.
+    bool isNetImmerse() const { return mIsNetImmerse; }
+
     // False for the pre-20.2.0.5 container, which carries no per-block size
     // table. Those files load and re-save byte for byte, but the block region
     // cannot be split into individual blocks: the file simply does not record
@@ -263,8 +271,9 @@ public:
     bool setTextKeysForClip(const QString& clipName,
                             const QVector<TextKey>& keys);
 
-    void reset();
+void reset();
     bool parse(const QByteArray& raw, bool hasUnknownInt, QString& error);
+    bool parseNetImmerse(const QByteArray& raw, QString& error);
     // Recover individual block boundaries in a container that has no size table,
     // by walking each block's fields. Fails unless every block type is
     // understood and the walk lands exactly on the trailing root table, so a
@@ -313,6 +322,13 @@ public:
     QByteArray mBlockRegion;
     bool mHasFooter = false;
     bool mHasUnknownInt = false;
+    bool mIsNetImmerse = false;
+    /// The complete header of a container whose field set this class does not
+    /// model field-by-field (NetImmerse), kept verbatim. Emitting it unchanged
+    /// is what makes such a file round-trip byte for byte; rebuilding it from
+    /// parsed pieces would drop whichever conditional field this build does not
+    /// know about, which is exactly the failure mode the Gamebryo path had.
+    QByteArray mContainerHeader;
     QByteArray mTrailing;  // bytes after the block footer, preserved verbatim
     QString mLastError;
     QString mWalkError;

@@ -2546,13 +2546,35 @@ Measured result over the archive (7,962 `Gamebryo` files, **0** failures):
 The `10.x` files are what the `unsupported byte order 10` failures were: 580 of
 them, and the whole group is now explained by the missing `endian_type` byte.
 
-**Still not covered: the 70 `NetImmerse File Format` files** in the same archive
+**Status 2026-10-04 — the 70 `NetImmerse File Format` files now load and
+re-save byte for byte.** They are the Morrowind-era container, not a
+`Gamebryo` variant, so `NifBlockFile::parseNetImmerse()` reads them instead of
+`parse()`, and `isBethesdaNif()` matches both header lines. All 70 are covered
 (41 at `10.0.1.0`, 23 at `10.0.1.2`, 4 at `4.0.0.2`, 1 at `3.3.0.13`, 1 at
-`4.2.1.0`). Those are the Morrowind-era container, not a `Gamebryo` variant — a
-different header shape entirely, with copyright lines and a `Top Level Object`
-block marker instead of a root table. The test counts them separately and reports
-them rather than letting them hide in a general failure count, so the two formats
-are never confused again. Supporting them is untouched remaining work.
+`4.2.1.0`), and `test_nifroundtriparchive` now *asserts* the round-trip instead
+of counting them.
+
+Three things about this container are worth recording, because each one is a way
+to reject a file that is perfectly valid:
+
+- **The export header is not derivable from the version.** A shipped `10.0.1.0`
+  has no `bs_header`; a shipped `10.0.1.2` has one (`bs_version` 1 or 3). Both
+  readings are tried and the one that lands on a recognisable first block wins,
+  which is the same "try it, then prove it" rule `load()` already uses for
+  Gamebryo's `unknown_int`.
+- **Its strings are `ExportString` (a u8 length including the NUL), not
+  `SizedString` (u32).** Reading a u8 length as a u32 picks up the first three
+  characters of the text as the length; that one mistake is what made an earlier
+  reader reject all 23 `10.0.1.2` files while accepting the 41 `10.0.1.0` ones.
+- **Below `5.0.0.1` there is no type table at all** — each block carries its own
+  sized type name inline, so the header ends right after `num_blocks`.
+
+What this deliberately does *not* claim is block addressability. The container
+records no block lengths, no NetImmerse payload walkers exist, and so
+`hasIndividualBlocks()` is false and `count()` is 0 for these files: they are
+read-and-save only, exactly like the pre-20.2.0.5 `Gamebryo` opaque region.
+`NifAnimationWriter` says so in the log and declines rather than falling through
+to a generic "no controller blocks" complaint that would read as a parse failure.
 
 **Oblivion is installed and reachable, which changes what is knowable — and
 immediately exposed a second gap.** `test_ntdlayout` prefers

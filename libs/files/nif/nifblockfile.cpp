@@ -2840,7 +2840,8 @@ bool NifBlockFile::isBethesdaNif(const QString& path)
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return false;
     const QByteArray head = file.read(40);
-    return head.startsWith("Gamebryo File Format");
+    return head.startsWith("Gamebryo File Format")
+        || head.startsWith("NetImmerse File Format");
 }
 
 bool NifBlockFile::load(const QString& path)
@@ -2857,6 +2858,18 @@ bool NifBlockFile::load(const QString& path)
     const QByteArray raw = file.readAll();
     file.close();
     if (raw.size() < 64) return fail(QStringLiteral("file too small to be a NIF"));
+
+    // NetImmerse is a different container, not an older Gamebryo: its header
+    // carries neither user_version nor a bs_header in some generations, and it
+    // has no type table at all before 5.0.0.1. Routing it through parse() would
+    // consume the wrong fields and fail on a file that is perfectly valid, so it
+    // gets its own reader.
+    if (raw.startsWith("NetImmerse File Format")) {
+        reset();
+        if (parseNetImmerse(raw, mLastError)) return true;
+        LOG_ERROR(QString("NifBlockFile: %1 (%2)").arg(mLastError, path));
+        return false;
+    }
 
     // The header gained a trailing u32 after the author string in the
     // Starfield-era headers, and older games (Skyrim 1.5, bsVersion 100) do
@@ -2888,6 +2901,8 @@ void NifBlockFile::reset()
     mBlockRegion.clear();
     mTrailing.clear();
     mWalkError.clear();
+    mContainerHeader.clear();
+    mIsNetImmerse = false;
 }
 
 bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& error)
@@ -3061,6 +3076,281 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
     return true;
 }
 
+// --- NetImmerse -------------------------------------------------------------
+//
+// NetImmerse is the container that predates Gamebryo and is still what the
+// Morrowind-era meshes in the Oblivion archive are written in. It shares the
+// .nif extension and nothing else with Gamebryo: the header field set is gated
+// differently at every step, and before 5.0.0.1 there is no type table at all —
+// each block carries its own sized type name inline.
+//
+// Every threshold here is the vendored nifgen `Header`/`BSStreamHeader` field
+// list, which is the byte-exact oracle the Gamebryo path was fitted against.
+namespace {
+
+constexpr quint32 kNetImmerseCopyrightVersion = 0x03000C00u;
+constexpr quint32 kNetImmerseVersionField = 0x03000C01u;
+constexpr quint32 kNetImmerseUserVersion = 0x0A010008u;
+constexpr quint32 kNetImmerseMetadataVersion = 0x1E020000u;
+constexpr quint32 kNetImmerseTypeTableVersion = 0x05000001u;
+constexpr quint32 kNetImmerseGroupVersion = 0x05000006u;
+
+bool readSizedStringChecked(Cursor& c)
+{
+    const quint32 len = c.u32();
+    if (!c.ok() || len > 128u) return false;
+    c.raw(static_cast<int>(len));
+    return c.ok();
+}
+
+bool readLineChecked(Cursor& c)
+{
+    while (true) {
+        const quint8 ch = c.u8();
+        if (!c.ok()) return false;
+        if (ch == '\n') return true;
+    }
+}
+
+// The first block has to be recognisable as one, which is what makes the landing
+// offset trustworthy rather than merely plausible. Before 5.0.0.1 the block
+// type is an inline sized string; from 5.0.0.1 the type comes from the header's
+// table and the block instead opens with its own payload, except that up to
+// 10.1.0.106 every non-bhk block is preceded by a zero word.
+bool looksLikeNetImmerseBlockStart(const QByteArray& raw, int pos, bool inlineTypes)
+{
+    if (pos < 0 || pos >= raw.size()) return false;
+    auto sizedStringAt = [&](int at) {
+        if (at < 0 || at + 4 > raw.size()) return false;
+        const quint32 len = static_cast<quint8>(raw.at(at))
+            | (static_cast<quint32>(static_cast<quint8>(raw.at(at + 1))) << 8)
+            | (static_cast<quint32>(static_cast<quint8>(raw.at(at + 2))) << 16)
+            | (static_cast<quint32>(static_cast<quint8>(raw.at(at + 3))) << 24);
+        // A block type name is a short identifier; anything longer means this is
+        // not the start of a block.
+        return len > 0 && len <= 128 && at + 4 + static_cast<int>(len) <= raw.size();
+    };
+    if (inlineTypes) return sizedStringAt(pos);
+    if (sizedStringAt(pos)) return true;
+    // A zero word followed by a sized string: the per-block tag then a payload
+    // that opens with its own first sized string.
+    if (pos + 8 > raw.size()) return false;
+    for (int i = 0; i < 4; ++i)
+        if (raw.at(pos + i) != '\0') return false;
+    return sizedStringAt(pos + 4);
+}
+
+} // namespace
+
+bool NifBlockFile::parseNetImmerse(const QByteArray& raw, QString& error)
+{
+    error.clear();
+    auto bad = [&error](const QString& reason) {
+        error = reason;
+        return false;
+    };
+
+    Cursor c(raw);
+    QByteArray magic;
+    while (magic.size() < 128) {
+        const quint8 ch = c.u8();
+        if (!c.ok() || ch == '\n') break;
+        magic.append(static_cast<char>(ch));
+    }
+    static const QRegularExpression kVersionPattern(
+        QStringLiteral("^NetImmerse File Format, Version "
+                       "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,5})$"));
+    const QRegularExpressionMatch match = kVersionPattern.match(QString::fromLatin1(magic));
+    if (!match.hasMatch())
+        return bad(QStringLiteral("unrecognised NetImmerse header line '%1'")
+                       .arg(QString::fromLatin1(magic.left(60))));
+    mHeaderVersion = QStringLiteral("%1.%2.%3.%4")
+                          .arg(match.captured(1), match.captured(2),
+                               match.captured(3), match.captured(4));
+    mVersion = (match.captured(1).toUInt() << 24) | (match.captured(2).toUInt() << 16)
+        | (match.captured(3).toUInt() << 8) | match.captured(4).toUInt();
+    mHeaderLine = raw.left(c.pos());
+
+    // Three copyright lines sit between the version line and everything else
+    // before 3.0.12, and there is no version field to corroborate them.
+    if (mVersion <= kNetImmerseCopyrightVersion) {
+        for (int i = 0; i < 3; ++i) {
+            if (!readLineChecked(c))
+                return bad(QStringLiteral("truncated NetImmerse copyright lines"));
+        }
+    }
+
+    if (mVersion >= kNetImmerseVersionField) {
+        const quint32 fileVersion = c.u32();
+        if (!c.ok()) return bad(QStringLiteral("truncated NetImmerse version field"));
+        // The line and the field have to agree. When they do not, the field was
+        // read at the wrong offset, and continuing would silently misparse every
+        // later field rather than fail here.
+        if (fileVersion != mVersion)
+            return bad(QStringLiteral("NetImmerse header line says %1 but the version "
+                                      "field says 0x%2")
+                           .arg(mHeaderVersion)
+                           .arg(fileVersion, 8, 16, QChar('0')));
+    }
+    if (mVersion >= kEndianFieldVersion) {
+        const quint8 endian = c.u8();
+        if (!c.ok() || endian != 1)
+            return bad(QStringLiteral("unsupported byte order %1").arg(endian));
+    }
+    if (mVersion >= kNetImmerseUserVersion) mUserVersion = c.u32();
+
+    quint32 numBlocks = 0;
+    if (mVersion >= kNetImmerseVersionField) {
+        numBlocks = c.u32();
+        if (!c.ok() || numBlocks == 0 || numBlocks > static_cast<quint32>(kMaxBlocks))
+            return bad(QStringLiteral("implausible NetImmerse block count %1").arg(numBlocks));
+    }
+    if (!c.ok()) return bad(QStringLiteral("truncated NetImmerse header"));
+
+    // Whether the generation carries the export header is not derivable from the
+    // version: a shipped 10.0.1.0 has none and a shipped 10.0.1.2 has one, both
+    // from the same exporter era. So both readings are tried and the one that
+    // lands on a recognisable first block wins — the same "try it, then prove it"
+    // rule the Gamebryo path uses for its own unknown_int variant.
+    const bool inlineTypes = mVersion < kNetImmerseTypeTableVersion;
+
+    struct Tail {
+        bool ok = false;
+        int landing = -1;
+        bool withExportHeader = false;
+        quint32 bsVersion = 0;
+        QStringList blockTypes;
+        QVector<quint16> typeIndex;
+    };
+
+    auto readTail = [&](bool withExportHeader, Tail& out, QString& why) {
+        Cursor t = c;
+        out = Tail();
+        out.withExportHeader = withExportHeader;
+        why.clear();
+        auto no = [&why](const char* reason) {
+            why = QString::fromLatin1(reason);
+            return;
+        };
+
+        if (withExportHeader) {
+            const quint32 bs = t.u32();
+            if (!t.ok() || bs > 100000u) return no("truncated or implausible bs_version");
+            out.bsVersion = bs;
+            if (bs > 130u) t.u32();                       // unknown_int
+            // The export header's strings are ExportStrings — a u8 length that
+            // includes the NUL — not the SizedStrings the header tables use.
+            // Reading a u8 length as a u32 picks up the first three characters
+            // of the text as the length, which is how a reader that gets this
+            // wrong rejects every 10.0.1.2 file in the archive.
+            readExportString(t);                          // author
+            if (!t.ok()) return no("bad author string");
+            if (bs < 131u) {                              // process_script
+                readExportString(t);
+                if (!t.ok()) return no("bad process_script string");
+            }
+            readExportString(t);                          // export_script
+            if (!t.ok()) return no("bad export_script string");
+            if (bs >= 103u) {                             // max_filepath
+                readExportString(t);
+                if (!t.ok()) return no("bad max_filepath string");
+            }
+        }
+        if (mVersion >= kNetImmerseMetadataVersion) {
+            const quint32 len = t.u32();
+            if (!t.ok() || len > raw.size()) return no("bad metadata run");
+            t.raw(static_cast<int>(len));
+        }
+        if (!inlineTypes) {
+            const quint16 numTypes = t.u16();
+            if (!t.ok() || numTypes == 0 || numTypes > kMaxBlockTypes)
+                return no("bad block type count");
+            for (quint16 i = 0; i < numTypes; ++i) {
+                const quint32 len = t.u32();
+                if (!t.ok() || len > 128u) return no("bad block type name");
+                out.blockTypes.append(QString::fromLatin1(t.raw(static_cast<int>(len))));
+            }
+            for (quint32 i = 0; i < numBlocks; ++i) {
+                const quint16 ti = t.u16();
+                if (!t.ok() || ti >= numTypes) return no("block type index out of range");
+                out.typeIndex.append(ti);
+            }
+            if (mVersion >= kBlockSizeTableVersion) {
+                for (quint32 i = 0; i < numBlocks; ++i) t.u32();
+            }
+            if (mVersion >= kStringTableVersion) {
+                const quint32 numStrings = t.u32();
+                const quint32 maxLen = t.u32();
+                if (!t.ok() || numStrings > static_cast<quint32>(kMaxStrings)
+                    || maxLen > static_cast<quint32>(kMaxStringLength))
+                    return no("implausible string table");
+                for (quint32 i = 0; i < numStrings; ++i) {
+                    const quint32 len = t.u32();
+                    if (!t.ok() || len > maxLen + 1) return no("bad string length");
+                    t.raw(static_cast<int>(len));
+                }
+            }
+            if (mVersion >= kNetImmerseGroupVersion) {
+                const quint32 numGroups = t.u32();
+                if (!t.ok() || numGroups > static_cast<quint32>(kMaxGroups))
+                    return no("implausible group count");
+                for (quint32 i = 0; i < numGroups; ++i) t.u32();
+            }
+        }
+        if (!t.ok()) return no("truncated header tables");
+        out.landing = t.pos();
+        out.ok = true;
+    };
+
+    // The generation without the export header is the one nifgen itself expects
+    // for this version range, so it is tried first and the other is the fallback.
+    Tail chosen;
+    QString whyNoHeader;
+    QString whyWithHeader;
+    for (int attempt = 0; attempt < 2 && !chosen.ok; ++attempt) {
+        Tail candidate;
+        QString why;
+        readTail(attempt == 1, candidate, why);
+        if (attempt == 0) whyNoHeader = why; else whyWithHeader = why;
+        // Both a rejected read and a wrong landing disqualify the attempt, so
+        // neither being chosen can leave the loop in a half-applied state.
+        if (candidate.ok
+            && looksLikeNetImmerseBlockStart(raw, candidate.landing, inlineTypes)) {
+            chosen = candidate;
+        } else if (candidate.ok) {
+            why = QStringLiteral("landed on offset %1, which is not a block start")
+                      .arg(candidate.landing);
+            if (attempt == 0) whyNoHeader = why; else whyWithHeader = why;
+        }
+    }
+    if (!chosen.ok)
+        return bad(QStringLiteral("cannot locate the NetImmerse block region "
+                                  "[without export header: %1 / with export header: %2]")
+                       .arg(whyNoHeader, whyWithHeader));
+
+    mBsVersion = chosen.bsVersion;
+    mBlockTypes = chosen.blockTypes;
+    mTypeIndex = chosen.typeIndex;
+    // The whole header, verbatim. The blocks are not walked and the header is not
+    // rebuilt from the pieces above: this container carries no block lengths, so
+    // there is nothing to address a block by, and re-emitting the parsed fields
+    // would lose whichever conditional one this build guessed wrong about. Kept
+    // as bytes, a re-save is the same file.
+    mContainerHeader = raw.left(chosen.landing);
+    mBlockRegion = raw.mid(chosen.landing);
+    mBlocks.clear();
+    mBlockSize.clear();
+    mHasFooter = false;
+    mTrailing.clear();
+    mIsNetImmerse = true;
+
+    LOG_INFO(QString("NifBlockFile: NetImmerse %1, %2 block(s) declared, %3 type(s), "
+                     "bsVersion %4, %5 bytes kept whole")
+                 .arg(mHeaderVersion).arg(numBlocks).arg(mBlockTypes.size())
+                 .arg(mBsVersion).arg(mBlockRegion.size()));
+    return true;
+}
+
 bool NifBlockFile::splitBlockRegion(const QByteArray& raw, int startPos, QString& error)
 {
     error.clear();
@@ -3191,6 +3481,13 @@ QList<int> NifBlockFile::findBlocks(const QString& typeName) const
 
 QByteArray NifBlockFile::serialize() const
 {
+    // A NetImmerse header is not the Gamebryo field set, so none of the field
+    // emission below applies to it. The header and the block region are both
+    // kept as bytes and the file is reassembled from exactly those, which is
+    // what makes an unedited save byte-identical.
+    if (mIsNetImmerse)
+        return mContainerHeader + mBlockRegion;
+
     QByteArray out;
     out.append(mHeaderLine);
     appendU32(out, mVersion);

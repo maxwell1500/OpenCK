@@ -611,6 +611,18 @@ bool patchBethesdaNif(const QString& nifPath, const QString& nodeName,
     NifBlockFile file;
     if (!file.load(nifPath)) return false;
 
+    // A NetImmerse container loads and re-saves byte for byte, but its blocks are
+    // not addressable: it records no block lengths and this build walks no
+    // NetImmerse payload layouts. Say so plainly rather than letting the write
+    // fall through to the generic "no controller blocks" complaint below, which
+    // would read as a parsing failure instead of an unsupported format.
+    if (file.isNetImmerse()) {
+        LOG_WARNING(QString("NifAnimationWriter: %1 is a NetImmerse %2 container; its "
+                            "blocks are not addressable, so no animation was written")
+                        .arg(nifPath, file.headerVersion()));
+        return false;
+    }
+
     // Clip names only exist in a controller sequence, so resolve the set of
     // controller refs the requested clip owns up front.
     QSet<quint32> clipControllers;
