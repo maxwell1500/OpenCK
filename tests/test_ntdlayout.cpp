@@ -31,6 +31,23 @@ void TestNtdLayout::initTestCase()
 
 namespace {
 
+// How many NiTransformData blocks the fitter examines. 400 was chosen when
+// Oblivion was the only corpus and it was generous; Fallout 4 holds 20,397 in one
+// archive, so the cap is now a named constant that OPENCK_TEST_NIF_BLOCK_SAMPLE
+// can raise. A full sweep is worth running before trusting the codec on a
+// generation, because a layout assumption that holds for the first few hundred
+// blocks can still break on a shape that only appears later in an archive.
+constexpr int kBlockSampleCap = 400;
+
+int blockSampleCap()
+{
+    const QByteArray override = qgetenv("OPENCK_TEST_NIF_BLOCK_SAMPLE");
+    if (override.isEmpty()) return kBlockSampleCap;
+    bool ok = false;
+    const int requested = override.toInt(&ok);
+    return (ok && requested > 0) ? requested : kBlockSampleCap;
+}
+
 struct Cursor {
     const QByteArray& d;
     int p = 0;
@@ -153,8 +170,9 @@ void TestNtdLayout::fit()
     QString firstFramingFailure;
     QMap<int, int> sizeHistogram;
     QMap<QString, int> versionCounts;
+    const int cap = blockSampleCap();
 
-    for (int i = 0; i < archive->fileCount() && blocksSeen < 400; ++i) {
+    for (int i = 0; i < archive->fileCount() && blocksSeen < cap; ++i) {
         const BsaFileEntry& e = archive->entries()[i];
         if (!e.fullPath.endsWith(".nif", Qt::CaseInsensitive)) continue;
         QByteArray bytes;

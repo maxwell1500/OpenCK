@@ -2460,9 +2460,15 @@ Effect, both measured:
 - The default corpus went from 87 blocks at one version to **104 across three**
   (10.1.0.106, 10.2.0.0, 20.0.0.4), all byte-exact.
 - Fallout 4 (`OPENCK_TEST_NIF_ARCHIVE` pointed at `Fallout4 - Meshes.ba2`)
-  samples 400 blocks at **20.2.0.7**, all byte-exact, in about four seconds. The
-  archive holds 20,397 such blocks; 400 is the fitter's existing sample cap, not
-  a limit of the corpus.
+  reaches **9,392 blocks at 20.2.0.7 across 429 distinct block sizes, every one
+  byte-exact**, in about three and a half minutes. The archive holds 20,397
+  `NiTransformData` blocks; 9,392 is what is reachable through a
+  `NiTransformController` chain, the rest being driven by some other controller
+  type. The sample cap is a named constant that `OPENCK_TEST_NIF_BLOCK_SAMPLE`
+  can raise, and 400 — the value this originally used — was far too small to
+  trust, since it saw 25 of those 429 sizes. Nothing failed at the larger sweep,
+  but the point of running it is that a layout assumption can hold for the first
+  few hundred blocks and break on a shape that only appears later.
 
 The skip message was also wrong in a way worth recording: it claimed the archive
 was "pre-20.2.0.5 containers with no block size table", which described the
