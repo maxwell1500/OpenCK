@@ -4,6 +4,8 @@
 #include <QString>
 #include <QVector>
 
+#include "../nif/nifblockfile.hpp"
+
 struct AnimKeyframe {
     float time = 0.0f;
     float tx = 0.0f, ty = 0.0f, tz = 0.0f;
@@ -16,6 +18,9 @@ struct AnimKeyframe {
     // present so a clip round-trips without Euler degradation.
     float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
     bool hasQuat = false;
+    // XYZ-keyed NIF rotation channels store axis values directly. A quaternion
+    // round trip would perturb them, so those channels carry hasEuler instead.
+    bool hasEuler = false;
 };
 
 struct AnimChannel {
@@ -23,6 +28,10 @@ struct AnimChannel {
     QString type;
     QVector<AnimKeyframe> keyframes;
     float duration = 0.0f;
+    // Channel-preserving NIF payload for NiTransformData. Present when the
+    // channel was loaded from a Bethesda NIF; JSON/XML imports leave it
+    // invalid and the flat keyframes are authoritative.
+    NifBlockFile::NiTransformDataRaw raw;
 };
 
 struct AnimClip {

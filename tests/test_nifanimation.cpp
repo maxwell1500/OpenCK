@@ -26,6 +26,9 @@ private slots:
     void testImportMissingFile();
     void testQuatJsonRoundTrip();
     void testQuatXmlRoundTrip();
+    void testEulerFlagJsonRoundTrip();
+    void testEulerFlagXmlRoundTrip();
+    void testFlattenNiTransformData();
     void testSlerpTakesShortPath();
     void testEulerFallbackPreserved();
     void testBlendWithStoredQuats();
@@ -212,6 +215,177 @@ void TestNifAnimation::testQuatXmlRoundTrip()
     QCOMPARE(kf.qw, -0.9961947f);
     QCOMPARE(kf.qy, 0.0871557f);
     delete loaded;
+}
+
+namespace {
+
+NifAnimation eulerAnimation()
+{
+    NifAnimation anim;
+    anim.name = QStringLiteral("EulerAnim");
+
+    AnimClip clip;
+    clip.name = QStringLiteral("Euler");
+    clip.duration = 1.0f;
+
+    AnimChannel channel;
+    channel.boneName = QStringLiteral("Bip01 Spine");
+    channel.type = QStringLiteral("NiKeyframeData");
+    channel.duration = 1.0f;
+
+    AnimKeyframe kf0;
+    kf0.time = 0.0f;
+    kf0.rx = 10.0f;
+    kf0.ry = 20.0f;
+    kf0.rz = 30.0f;
+    kf0.hasEuler = true;
+    channel.keyframes.append(kf0);
+
+    AnimKeyframe kf1;
+    kf1.time = 1.0f;
+    kf1.rx = -10.0f;
+    kf1.ry = 5.0f;
+    kf1.rz = 7.0f;
+    kf1.hasEuler = true;
+    channel.keyframes.append(kf1);
+
+    clip.channels.append(channel);
+    anim.clips.append(clip);
+    return anim;
+}
+
+} // namespace
+
+void TestNifAnimation::testEulerFlagJsonRoundTrip()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.path() + "/euler.json";
+
+    const NifAnimation original = eulerAnimation();
+    QVERIFY(NifAnimationExporter::exportToJson(&original, path));
+
+    NifAnimation* loaded = NifAnimationImporter::importFromJson(path);
+    QVERIFY(loaded != nullptr);
+    QCOMPARE(loaded->totalKeyframeCount(), 2);
+    const AnimKeyframe& kf0 = loaded->clips[0].channels[0].keyframes[0];
+    const AnimKeyframe& kf1 = loaded->clips[0].channels[0].keyframes[1];
+    QVERIFY(kf0.hasEuler);
+    QVERIFY(!kf0.hasQuat);
+    QVERIFY(kf1.hasEuler);
+    QVERIFY(!kf1.hasQuat);
+    QCOMPARE(kf0.rx, 10.0f);
+    QCOMPARE(kf0.ry, 20.0f);
+    QCOMPARE(kf0.rz, 30.0f);
+    QCOMPARE(kf1.rx, -10.0f);
+    QCOMPARE(kf1.ry, 5.0f);
+    QCOMPARE(kf1.rz, 7.0f);
+    delete loaded;
+}
+
+void TestNifAnimation::testEulerFlagXmlRoundTrip()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    const QString path = tmp.path() + "/euler.xml";
+
+    const NifAnimation original = eulerAnimation();
+    QVERIFY(NifAnimationExporter::exportToXml(&original, path));
+
+    NifAnimation* loaded = NifAnimationImporter::importFromXml(path);
+    QVERIFY(loaded != nullptr);
+    QCOMPARE(loaded->totalKeyframeCount(), 2);
+    const AnimKeyframe& kf0 = loaded->clips[0].channels[0].keyframes[0];
+    const AnimKeyframe& kf1 = loaded->clips[0].channels[0].keyframes[1];
+    QVERIFY(kf0.hasEuler);
+    QVERIFY(!kf0.hasQuat);
+    QVERIFY(kf1.hasEuler);
+    QVERIFY(!kf1.hasQuat);
+    QCOMPARE(kf0.rx, 10.0f);
+    QCOMPARE(kf0.ry, 20.0f);
+    QCOMPARE(kf0.rz, 30.0f);
+    QCOMPARE(kf1.rx, -10.0f);
+    QCOMPARE(kf1.ry, 5.0f);
+    QCOMPARE(kf1.rz, 7.0f);
+    delete loaded;
+}
+
+void TestNifAnimation::testFlattenNiTransformData()
+{
+    NifBlockFile::KeyGroup translation;
+    translation.count = 2;
+    translation.interpolation = 0;
+    translation.times = {0.0f, 1.0f};
+    translation.values = {0.0f, 0.0f, 0.0f, 1.0f, 2.0f, 3.0f};
+
+    NifBlockFile::KeyGroup scale;
+    scale.count = 2;
+    scale.interpolation = 0;
+    scale.times = {0.0f, 1.0f};
+    scale.values = {1.0f, 2.0f};
+
+    NifBlockFile::KeyGroup rx;
+    rx.count = 2;
+    rx.interpolation = 0;
+    rx.times = {0.0f, 1.0f};
+    rx.values = {10.0f, 20.0f};
+
+    NifBlockFile::KeyGroup ry;
+    ry.count = 2;
+    ry.interpolation = 0;
+    ry.times = {0.0f, 1.0f};
+    ry.values = {30.0f, 40.0f};
+
+    NifBlockFile::KeyGroup rz;
+    rz.count = 1;
+    rz.interpolation = 0;
+    rz.times = {0.0f};
+    rz.values = {50.0f};
+
+    NifBlockFile::NiTransformDataRaw xyzRaw;
+    xyzRaw.translation = translation;
+    xyzRaw.scale = scale;
+    xyzRaw.rotationType = 4;
+    xyzRaw.rotationGroups = {rx, ry, rz};
+
+    const auto xyzFrames = NifBlockFile::flattenNiTransformData(xyzRaw);
+    QCOMPARE(xyzFrames.size(), 2);
+    QCOMPARE(xyzFrames[0].time, 0.0f);
+    QCOMPARE(xyzFrames[0].translation.x, 0.0f);
+    QCOMPARE(xyzFrames[0].scale.x, 1.0f);
+    QVERIFY(xyzFrames[0].hasEuler);
+    QCOMPARE(xyzFrames[0].euler.x, 10.0f);
+    QCOMPARE(xyzFrames[0].euler.y, 30.0f);
+    QCOMPARE(xyzFrames[0].euler.z, 50.0f);
+    QCOMPARE(xyzFrames[1].time, 1.0f);
+    QCOMPARE(xyzFrames[1].translation.z, 3.0f);
+    QCOMPARE(xyzFrames[1].scale.x, 2.0f);
+    QVERIFY(xyzFrames[1].hasEuler);
+    QCOMPARE(xyzFrames[1].euler.x, 20.0f);
+    QCOMPARE(xyzFrames[1].euler.y, 40.0f);
+    // The Z channel has no key at t=1; the writer's convention samples the
+    // nearest earlier key, which is the one at t=0.
+    QCOMPARE(xyzFrames[1].euler.z, 50.0f);
+
+    NifBlockFile::KeyGroup quaternion;
+    quaternion.count = 2;
+    quaternion.interpolation = 0;
+    quaternion.times = {0.0f, 1.0f};
+    quaternion.values = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+
+    NifBlockFile::NiTransformDataRaw quatRaw;
+    quatRaw.translation = translation;
+    quatRaw.scale = scale;
+    quatRaw.rotationType = 0;
+    quatRaw.rotationGroups = {quaternion};
+
+    const auto quatFrames = NifBlockFile::flattenNiTransformData(quatRaw);
+    QCOMPARE(quatFrames.size(), 2);
+    QVERIFY(!quatFrames[0].hasEuler);
+    QCOMPARE(quatFrames[0].rotation.w, 1.0f);
+    QVERIFY(!quatFrames[1].hasEuler);
+    QCOMPARE(quatFrames[1].rotation.w, 0.0f);
+    QCOMPARE(quatFrames[1].rotation.x, 1.0f);
 }
 
 void TestNifAnimation::testSlerpTakesShortPath()

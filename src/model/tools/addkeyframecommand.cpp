@@ -1,4 +1,5 @@
 #include "addkeyframecommand.hpp"
+#include "../../libs/files/nifanim/nifanimationwriter.hpp"
 
 AddKeyframeCommand::AddKeyframeCommand(NifAnimation* animation, const QString& clipName,
                                        const QString& boneName, const AnimKeyframe& keyframe,
@@ -90,7 +91,7 @@ void AddKeyframeCommand::execute()
     if (m_insertIndex < 0 || m_insertIndex > channel.keyframes.size())
         return;
 
-    channel.keyframes.insert(m_insertIndex, m_keyframe);
+    NifAnimationWriter::channelAddKeyframe(channel, m_keyframe);
     updateChannelDuration();
 }
 
@@ -103,7 +104,7 @@ void AddKeyframeCommand::undo()
     if (m_insertIndex >= channel.keyframes.size())
         return;
 
-    channel.keyframes.remove(m_insertIndex);
+    NifAnimationWriter::channelRemoveKeyframe(channel, m_keyframe.time);
     updateChannelDuration();
 
     if (m_channelCreated && channel.keyframes.isEmpty()) {

@@ -53,6 +53,7 @@ bool NifAnimationExporter::exportToJson(const NifAnimation* animation, const QSt
                     kfObj["qy"] = static_cast<double>(kf.qy);
                     kfObj["qz"] = static_cast<double>(kf.qz);
                 }
+                kfObj["hasEuler"] = kf.hasEuler;
                 kfObj["sx"] = static_cast<double>(kf.sx);
                 kfObj["sy"] = static_cast<double>(kf.sy);
                 kfObj["sz"] = static_cast<double>(kf.sz);
@@ -140,6 +141,7 @@ bool NifAnimationExporter::exportToXml(const NifAnimation* animation, const QStr
                     xml.writeAttribute("qy", QString::number(static_cast<double>(kf.qy)));
                     xml.writeAttribute("qz", QString::number(static_cast<double>(kf.qz)));
                 }
+                xml.writeAttribute("hasEuler", QString::number(kf.hasEuler ? 1 : 0));
                 xml.writeAttribute("sx", QString::number(static_cast<double>(kf.sx)));
                 xml.writeAttribute("sy", QString::number(static_cast<double>(kf.sy)));
                 xml.writeAttribute("sz", QString::number(static_cast<double>(kf.sz)));

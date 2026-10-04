@@ -19,6 +19,7 @@ class TestNtdLayout : public QObject
 private slots:
     void initTestCase();
     void fit();
+    void animationChannelsMatchRawChannels();
 };
 
 void TestNtdLayout::initTestCase()
@@ -192,6 +193,133 @@ void TestNtdLayout::fit()
     if (!firstFailure.isEmpty()) say("  first failure: " + firstFailure);
     QVERIFY2(blocksSeen > 0, "no addressable NiTransformData blocks sampled");
     QCOMPARE(exact, blocksSeen);
+}
+
+namespace {
+
+bool transformKeyframesEqual(const QVector<Nif::TransformKeyframe>& a,
+                             const QVector<Nif::TransformKeyframe>& b)
+{
+    if (a.size() != b.size())
+        return false;
+    for (int i = 0; i < a.size(); ++i) {
+        const Nif::TransformKeyframe& x = a.at(i);
+        const Nif::TransformKeyframe& y = b.at(i);
+        if (x.time != y.time
+            || x.translation.x != y.translation.x
+            || x.translation.y != y.translation.y
+            || x.translation.z != y.translation.z
+            || x.scale.x != y.scale.x
+            || x.scale.y != y.scale.y
+            || x.scale.z != y.scale.z
+            || x.hasEuler != y.hasEuler)
+            return false;
+        if (x.hasEuler) {
+            if (x.euler.x != y.euler.x || x.euler.y != y.euler.y
+                || x.euler.z != y.euler.z)
+                return false;
+        } else {
+            if (x.rotation.w != y.rotation.w
+                || x.rotation.x != y.rotation.x
+                || x.rotation.y != y.rotation.y
+                || x.rotation.z != y.rotation.z)
+                return false;
+        }
+    }
+    return true;
+}
+
+} // namespace
+
+void TestNtdLayout::animationChannelsMatchRawChannels()
+{
+    struct Source { const char* dir; const char* name; };
+    const QVector<Source> sources = {
+        { "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
+          "Oblivion - Meshes.bsa" },
+        { "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
+          "Oblivion - Misc.bsa" },
+        { "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/",
+          "Skyrim - Meshes1.ba2" },
+        { "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/",
+          "Skyrim - Meshes0.ba2" },
+    };
+
+    std::unique_ptr<BsaArchive> archive;
+    for (const Source& source : sources) {
+        const QString path = QString::fromLatin1(source.dir)
+            + QString::fromLatin1(source.name);
+        if (!QFile::exists(path))
+            continue;
+        auto fresh = std::make_unique<BsaArchive>();
+        if (fresh->open(path)) {
+            archive = std::move(fresh);
+            break;
+        }
+    }
+    if (!archive)
+        QSKIP("no reachable mesh archive");
+
+    QTemporaryDir tmpDir;
+    int filesWithChannels = 0;
+    int sourcesChecked = 0;
+    for (int i = 0; i < archive->fileCount() && filesWithChannels < 20; ++i) {
+        const BsaFileEntry& entry = archive->entries()[i];
+        if (!entry.fullPath.endsWith(".nif", Qt::CaseInsensitive))
+            continue;
+        QByteArray bytes;
+        if (!archive->readData(static_cast<quint32>(i), bytes))
+            continue;
+        if (!bytes.startsWith("Gamebryo"))
+            continue;
+
+        const QString tmp = tmpDir.filePath(QStringLiteral("probe.nif"));
+        QFile out(tmp);
+        if (!out.open(QIODevice::WriteOnly))
+            continue;
+        out.write(bytes);
+        out.close();
+
+        NifBlockFile file;
+        if (!file.load(tmp) || !file.hasIndividualBlocks())
+            continue;
+        if (file.findBlocks(QStringLiteral("NiTransformController")).isEmpty())
+            continue;
+
+        const auto sourcesOut = file.animationChannels();
+        if (sourcesOut.isEmpty())
+            continue;
+
+        QVector<QVector<Nif::TransformKeyframe>> flattened;
+        for (int dataBlockIndex : file.findBlocks(QStringLiteral("NiTransformData"))) {
+            NifBlockFile::NiTransformDataRaw raw;
+            if (!NifBlockFile::decodeNiTransformData(
+                    file.block(dataBlockIndex).data, file.version(), raw))
+                continue;
+            flattened.append(NifBlockFile::flattenNiTransformData(raw));
+        }
+
+        ++filesWithChannels;
+        for (const auto& source : sourcesOut) {
+            QVERIFY(!source.nodeName.isEmpty());
+            QVERIFY(!source.keyframes.isEmpty());
+            bool matched = false;
+            for (const auto& candidate : flattened) {
+                if (transformKeyframesEqual(source.keyframes, candidate)) {
+                    matched = true;
+                    break;
+                }
+            }
+            QVERIFY2(matched,
+                     qPrintable(QStringLiteral("channel %1 does not match any decoded NiTransformData block in %2")
+                                    .arg(source.nodeName)
+                                    .arg(entry.fullPath)));
+            ++sourcesChecked;
+        }
+    }
+
+    QVERIFY2(filesWithChannels > 0, "no shipped NIF produced animation channels");
+    QVERIFY2(sourcesChecked > 0, "no animation channel was checked");
 }
 
 QTEST_MAIN(TestNtdLayout)

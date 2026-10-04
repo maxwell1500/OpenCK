@@ -75,6 +75,7 @@ NifAnimation* NifAnimationImporter::importFromJson(const QString& filePath)
                     kf.qz = static_cast<float>(kfObj["qz"].toDouble(0.0));
                     kf.hasQuat = true;
                 }
+                kf.hasEuler = kfObj["hasEuler"].toBool();
                 kf.sx = static_cast<float>(kfObj["sx"].toDouble(1.0));
                 kf.sy = static_cast<float>(kfObj["sy"].toDouble(1.0));
                 kf.sz = static_cast<float>(kfObj["sz"].toDouble(1.0));
@@ -162,6 +163,8 @@ NifAnimation* NifAnimationImporter::importFromXml(const QString& filePath)
                     kf.qz = xml.attributes().value("qz").toFloat();
                     kf.hasQuat = true;
                 }
+                kf.hasEuler = xml.attributes().hasAttribute("hasEuler")
+                                 && xml.attributes().value("hasEuler").toInt() != 0;
                 if (xml.attributes().hasAttribute("sx"))
                     kf.sx = xml.attributes().value("sx").toFloat();
                 if (xml.attributes().hasAttribute("sy"))

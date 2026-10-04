@@ -90,6 +90,47 @@ public:
     // want individual blocks must check this before asking for them.
     bool hasIndividualBlocks() const { return mBlockRegion.isEmpty(); }
 
+    struct KeyGroup {
+        quint32 count = 0;
+        quint32 interpolation = 0; // 0 if count==0, else 1=linear, 2=quadratic, 3=TBC
+        QVector<float> times;
+        QVector<float> values;   // count * valueWidth floats
+        QVector<float> tangents; // quadratic: count*2*valueWidth, TBC: count*3
+    };
+
+    struct NiTransformDataRaw {
+        bool valid = false;
+        quint32 numRotationKeys = 0;
+        quint32 rotationType = 0; // only present if numRotationKeys > 0
+        QVector<KeyGroup> rotationGroups; // 3 for XYZ, 1 for quaternion
+        KeyGroup translation;             // Vector3 values
+        KeyGroup scale;                   // scalar values
+    };
+
+    // A keyframe controller's animation as one flat channel list. `nodeName`
+    // is the node the controller animates, and `clipName` is the name a
+    // NiControllerSequence gives the controller when it has one. `keyframes`
+    // follows the writer's flat convention: one entry at the sorted union of
+    // every channel's times, each channel sampled at its own nearest earlier
+    // key.
+    struct AnimationChannelSource {
+        QString clipName;
+        QString nodeName;
+        QVector<Nif::TransformKeyframe> keyframes;
+        // The original channel-preserving payload this source was flattened
+        // from. Present for NiTransformData; other layouts set hasRaw false.
+        bool hasRaw = false;
+        NiTransformDataRaw raw;
+    };
+
+    // The flat keyframe list a NiTransformData channel set becomes. XYZ
+    // rotation blocks set hasEuler; quaternion blocks set rotation.
+    static QVector<Nif::TransformKeyframe> flattenNiTransformData(
+        const NiTransformDataRaw& raw);
+
+    // Every keyframe controller whose data block resolves and decodes.
+    QVector<AnimationChannelSource> animationChannels() const;
+
     // How many blocks the header declares. This is known even for a container
     // with no size table, where count() is 0 because the payloads could not be
     // split: declaredBlockCount() is the number of blocks in the file,
@@ -150,22 +191,6 @@ public:
     // Oblivion). The flat TransformKeyframe cannot represent per-channel key
     // counts, interpolation types, tangents, or independent times, so this
     // struct stores the raw block structure exactly as it appears on disk.
-    struct KeyGroup {
-        quint32 count = 0;
-        quint32 interpolation = 0; // 0 if count==0, else 1=linear, 2=quadratic, 3=TBC
-        QVector<float> times;
-        QVector<float> values;   // count * valueWidth floats
-        QVector<float> tangents; // quadratic: count*2*valueWidth, TBC: count*3
-    };
-
-    struct NiTransformDataRaw {
-        quint32 numRotationKeys = 0;
-        quint32 rotationType = 0; // only present if numRotationKeys > 0
-        QVector<KeyGroup> rotationGroups; // 3 for XYZ, 1 for quaternion
-        KeyGroup translation;             // Vector3 values
-        KeyGroup scale;                   // scalar values
-    };
-
     static bool decodeNiTransformData(const QByteArray& data, quint32 version,
                                       NiTransformDataRaw& out);
     static bool encodeNiTransformData(const NiTransformDataRaw& raw, quint32 version,
@@ -193,6 +218,10 @@ public:
 
     // Block types that derive from NiObjectNET and therefore carry the prefix.
     static bool isNodeBlockType(const QString& blockType);
+
+    // The node name a controller's target ref points at, found by search because
+    // the target field moves between game generations.
+    QString controllerTargetName(int controllerIndex) const;
 
     // Resolve the keyframe data block a controller drives. Both the 1.5
     // (controller -> interpolator -> data) and 1.6+ (controller -> data)

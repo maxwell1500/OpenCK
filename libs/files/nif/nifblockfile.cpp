@@ -4,8 +4,11 @@
 
 #include <QFile>
 #include <QSaveFile>
+#include <QSet>
 
+#include <algorithm>
 #include <cstring>
+#include <functional>
 
 #include "logger.hpp"
 
@@ -3521,6 +3524,7 @@ bool NifBlockFile::decodeNiTransformData(const QByteArray& data, quint32 version
     // KeyGroups. There is no earlier three-channel variant of this block.
     const quint32 numRotationKeys = c.u32();
     if (!c.ok() || numRotationKeys > 10'000'000u) return false;
+    out.valid = true;
     out.numRotationKeys = numRotationKeys;
 
     if (numRotationKeys == 0) {
@@ -3767,6 +3771,28 @@ int NifBlockFile::keyframeDataBlockFor(int controllerIndex) const
     }
     return -1;
 }
+
+QString NifBlockFile::controllerTargetName(int controllerIndex) const
+{
+    if (controllerIndex < 0 || controllerIndex >= mBlocks.size())
+        return QString();
+    const QByteArray& data = mBlocks.at(controllerIndex).data;
+    for (int offset = 0; offset + 4 <= data.size(); ++offset) {
+        quint32 ref = 0xFFFFFFFFu;
+        if (!refAt(data, offset, ref))
+            continue;
+        if (ref >= static_cast<quint32>(mBlocks.size()))
+            continue;
+        if (!isNodeBlockType(mBlocks.at(static_cast<int>(ref)).type))
+            continue;
+        QString name;
+        quint32 controllerRef = 0xFFFFFFFFu;
+        if (nodeNetInfo(static_cast<int>(ref), name, controllerRef) && !name.isEmpty())
+            return name;
+    }
+    return QString();
+}
+
 QHash<quint32, QString> NifBlockFile::clipNamesByController() const
 {
     QHash<quint32, QString> names;
@@ -3923,4 +3949,166 @@ QString NifBlockFile::stringAtPaletteOffset(quint32 paletteRef, quint32 offset) 
         start = i + 1;
     }
     return QString();
+}
+
+QVector<Nif::TransformKeyframe> NifBlockFile::flattenNiTransformData(
+    const NiTransformDataRaw& raw)
+{
+    QVector<Nif::TransformKeyframe> out;
+
+    QVector<float> times;
+    auto addTimes = [&times](const KeyGroup& group) {
+        for (float time : group.times)
+            times.append(time);
+    };
+    addTimes(raw.translation);
+    addTimes(raw.scale);
+    for (const KeyGroup& group : raw.rotationGroups)
+        addTimes(group);
+
+    if (times.isEmpty())
+        return out;
+
+    std::sort(times.begin(), times.end());
+    times.erase(std::unique(times.begin(), times.end()), times.end());
+
+    auto sample = [](const KeyGroup& group, int offset, float time, int width,
+                     const std::function<void(int, float)>& set) {
+        if (group.count == 0 ||
+            group.values.size() < static_cast<int>(group.count) * width)
+            return;
+        int best = 0;
+        for (int i = 1; i < group.count; ++i) {
+            if (group.times.size() <= i)
+                break;
+            if (group.times.at(i) <= time)
+                best = i;
+            else
+                break;
+        }
+        for (int value = 0; value < width; ++value)
+            set(value, group.values.at(best * width + offset + value));
+    };
+
+    for (float time : times) {
+        Nif::TransformKeyframe key;
+        key.time = time;
+        key.translation = {0.0f, 0.0f, 0.0f};
+        key.scale = {1.0f, 1.0f, 1.0f};
+        key.rotation = {time, 1.0f, 0.0f, 0.0f, 0.0f};
+        key.hasEuler = false;
+
+        sample(raw.translation, 0, time, 3, [&key](int i, float value) {
+            switch (i) {
+            case 0: key.translation.x = value; break;
+            case 1: key.translation.y = value; break;
+            case 2: key.translation.z = value; break;
+            }
+        });
+        sample(raw.scale, 0, time, 1, [&key](int, float value) {
+            key.scale.x = value;
+            key.scale.y = value;
+            key.scale.z = value;
+        });
+
+        if (raw.rotationType == 4u && raw.rotationGroups.size() == 3) {
+            key.hasEuler = true;
+            for (int axis = 0; axis < 3; ++axis) {
+                const KeyGroup& group = raw.rotationGroups.at(axis);
+                sample(group, 0, time, 1, [&key, axis](int, float value) {
+                    switch (axis) {
+                    case 0: key.euler.x = value; break;
+                    case 1: key.euler.y = value; break;
+                    case 2: key.euler.z = value; break;
+                    }
+                });
+            }
+        } else if (!raw.rotationGroups.isEmpty()) {
+            sample(raw.rotationGroups.first(), 0, time, 4,
+                   [&key](int i, float value) {
+                       switch (i) {
+                       case 0: key.rotation.w = value; break;
+                       case 1: key.rotation.x = value; break;
+                       case 2: key.rotation.y = value; break;
+                       case 3: key.rotation.z = value; break;
+                       }
+                   });
+        }
+
+        out.append(key);
+    }
+
+    return out;
+}
+
+QVector<NifBlockFile::AnimationChannelSource>
+NifBlockFile::animationChannels() const
+{
+    QVector<AnimationChannelSource> sources;
+    if (!hasIndividualBlocks())
+        return sources;
+
+    const QHash<quint32, QString> clips = clipNamesByController();
+
+    QHash<quint32, QString> controllerNodeNames;
+    for (int blockIndex = 0; blockIndex < mBlocks.size(); ++blockIndex) {
+        QString nodeName;
+        quint32 controllerRef = 0xFFFFFFFFu;
+        if (!nodeNetInfo(blockIndex, nodeName, controllerRef))
+            continue;
+        if (nodeName.isEmpty() || controllerRef == 0xFFFFFFFFu)
+            continue;
+        controllerNodeNames.insert(controllerRef, nodeName);
+    }
+
+    const QList<QString> controllerTypes = {
+        QStringLiteral("NiTransformController"),
+        QStringLiteral("NiKeyframeController")
+    };
+    QSet<quint32> seenControllers;
+    for (const QString& controllerType : controllerTypes) {
+        for (int controllerIndex : findBlocks(controllerType)) {
+            const quint32 controllerRef =
+                static_cast<quint32>(controllerIndex);
+            if (seenControllers.contains(controllerRef))
+                continue;
+            const int dataBlockIndex = keyframeDataBlockFor(controllerIndex);
+            if (dataBlockIndex < 0)
+                continue;
+            seenControllers.insert(controllerRef);
+
+            const Block& dataBlock = block(dataBlockIndex);
+            QVector<Nif::TransformKeyframe> keyframes;
+            if (dataBlock.type == QLatin1String("NiTransformData") ||
+                dataBlock.type == QLatin1String("NiKeyframeControllerData")) {
+                NiTransformDataRaw raw;
+                if (!decodeNiTransformData(dataBlock.data, mVersion, raw))
+                    continue;
+                keyframes = flattenNiTransformData(raw);
+            } else {
+                if (!decodeKeyframeData(dataBlock.type, dataBlock.data, keyframes))
+                    continue;
+            }
+            if (keyframes.isEmpty())
+                continue;
+
+            AnimationChannelSource source;
+            source.clipName = clips.value(controllerRef);
+            source.nodeName = controllerNodeNames.value(controllerRef);
+            if (source.nodeName.isEmpty())
+                source.nodeName = controllerTargetName(controllerIndex);
+            source.keyframes = keyframes;
+            if (dataBlock.type == QLatin1String("NiTransformData") ||
+                dataBlock.type == QLatin1String("NiKeyframeControllerData")) {
+                NifBlockFile::NiTransformDataRaw raw;
+                if (decodeNiTransformData(dataBlock.data, mVersion, raw)) {
+                    source.hasRaw = true;
+                    source.raw = raw;
+                }
+            }
+            sources.append(source);
+        }
+    }
+
+    return sources;
 }

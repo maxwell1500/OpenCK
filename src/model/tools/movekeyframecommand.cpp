@@ -1,4 +1,5 @@
 #include "movekeyframecommand.hpp"
+#include "../../libs/files/nifanim/nifanimationwriter.hpp"
 
 #include <cmath>
 
@@ -74,26 +75,10 @@ void MoveKeyframeCommand::execute()
     if (m_keyframeIndex >= channel.keyframes.size())
         return;
 
-    // Remove from old position
+    // Capture the old key, then apply the move through the payload editor.
     m_keyframe = channel.keyframes[m_keyframeIndex];
-    channel.keyframes.remove(m_keyframeIndex);
-
-    // Update time
+    NifAnimationWriter::channelMoveKeyframe(channel, m_oldTime, m_newTime, m_keyframe);
     m_keyframe.time = m_newTime;
-
-    // Re-insert at sorted position
-    int insertPos = channel.keyframes.size();
-    for (int i = 0; i < channel.keyframes.size(); ++i)
-    {
-        if (m_keyframe.time < channel.keyframes[i].time)
-        {
-            insertPos = i;
-            break;
-        }
-    }
-    channel.keyframes.insert(insertPos, m_keyframe);
-    m_keyframeIndex = insertPos;
-
     updateChannelDuration(clipIndex);
 }
 
@@ -118,13 +103,11 @@ void MoveKeyframeCommand::undo()
     if (m_keyframeIndex >= channel.keyframes.size())
         return;
 
-    // Remove from current position (at newTime)
-    channel.keyframes.remove(m_keyframeIndex);
+    // Restore the raw time base the same way it was changed.
+    m_keyframe = channel.keyframes[m_keyframeIndex];
+    NifAnimationWriter::channelMoveKeyframe(channel, m_newTime, m_oldTime, m_keyframe);
 
-    // Restore old time
-    m_keyframe.time = m_oldTime;
-
-    // Re-insert at sorted position
+    // Re-insert the moved key in the flat list.
     int insertPos = channel.keyframes.size();
     for (int i = 0; i < channel.keyframes.size(); ++i)
     {

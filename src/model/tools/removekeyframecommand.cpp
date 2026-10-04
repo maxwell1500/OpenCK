@@ -1,4 +1,5 @@
 #include "removekeyframecommand.hpp"
+#include "../../libs/files/nifanim/nifanimationwriter.hpp"
 
 #include <cmath>
 
@@ -85,7 +86,7 @@ void RemoveKeyframeCommand::execute()
         return;
 
     m_keyframe = channel.keyframes[m_keyframeIndex];
-    channel.keyframes.remove(m_keyframeIndex);
+    NifAnimationWriter::channelRemoveKeyframe(channel, m_time);
     updateChannelDuration();
 }
 
@@ -95,9 +96,8 @@ void RemoveKeyframeCommand::undo()
         return;
 
     AnimChannel& channel = m_animation->clips[m_clipIndex].channels[m_channelIndex];
-    int insertPos = findInsertPosition();
-    channel.keyframes.insert(insertPos, m_keyframe);
-    m_keyframeIndex = insertPos;
+    NifAnimationWriter::channelAddKeyframe(channel, m_keyframe);
+    m_keyframeIndex = findInsertPosition();
     updateChannelDuration();
 }
 

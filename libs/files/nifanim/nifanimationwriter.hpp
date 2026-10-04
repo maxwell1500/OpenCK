@@ -3,6 +3,8 @@
 #include <QString>
 #include <QVector>
 
+#include "nifanimation.hpp"
+
 namespace Nif { struct TransformKeyframe; }
 
 class NifAnimationWriter
@@ -19,4 +21,31 @@ public:
                                      const QVector<Nif::TransformKeyframe>& keyframes,
                                      const QString& clipName = QString(),
                                      bool* downgraded = nullptr);
+
+    // NIF-loaded channels carry their original channel-preserving payload. The
+    // flat keyframe list is the edited view of that payload, so a save uses the
+    // payload's own counts/times/interpolation rather than resampling every
+    // channel onto the display frame list.
+    static bool writeKeyframesToNif(const QString& nifPath,
+                                     const QString& nodeName,
+                                     const AnimChannel& channel,
+                                     const QString& clipName = QString(),
+                                     bool* downgraded = nullptr);
+
+    // Channel payload editing helpers. These mutate channel.raw and rebuild the
+    // flat keyframes the timeline shows, so keyframe add/remove/move and
+    // property edits survive as per-channel data instead of a sampled transform
+    // list.
+    static bool channelAddKeyframe(AnimChannel& channel,
+                                   const AnimKeyframe& keyframe,
+                                   bool* downgraded = nullptr);
+    static bool channelRemoveKeyframe(AnimChannel& channel, float time,
+                                      bool* downgraded = nullptr);
+    static bool channelMoveKeyframe(AnimChannel& channel, float oldTime,
+                                    float newTime, const AnimKeyframe& values,
+                                    bool* downgraded = nullptr);
+    static bool channelSetKeyframeValue(AnimChannel& channel, float time,
+                                        const AnimKeyframe& values,
+                                        bool* downgraded = nullptr);
+    static void refreshChannelKeyframes(AnimChannel& channel);
 };

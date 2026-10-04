@@ -19,6 +19,7 @@
 #include <cmath>
 
 #include "../../libs/files/nifanim/nifanimation.hpp"
+#include "../../libs/files/nif/nifblockfile.hpp"
 #include "../../libs/files/nif/nifparser.hpp"
 #include "../../libs/files/nifanim/nifanimationwriter.hpp"
 #include "../../model/tools/movekeyframecommand.hpp"
@@ -54,6 +55,11 @@ void quaternionToEuler(float w, float x, float y, float z,
 void eulerToQuaternion(float rx, float ry, float rz, float& qw, float& qx,
                         float& qy, float& qz)
 {
+    const float degToRad = 3.14159265358979323846f / 180.0f;
+    rx *= degToRad;
+    ry *= degToRad;
+    rz *= degToRad;
+
     const float cr = std::cos(rx * 0.5f), sr = std::sin(rx * 0.5f);
     const float cp = std::cos(ry * 0.5f), sp = std::sin(ry * 0.5f);
     const float cy = std::cos(rz * 0.5f), sy = std::sin(rz * 0.5f);
@@ -63,32 +69,47 @@ void eulerToQuaternion(float rx, float ry, float rz, float& qw, float& qx,
     qz = cr * cp * sy - sr * sp * cy;
 }
 
-void collectNodeAnimations(const Nif::Node* node,
-                           QVector<QPair<QString, QVector<Nif::NiKeyframeController>>>& out)
+AnimKeyframe transformKeyframeToAnimKeyframe(const Nif::TransformKeyframe& source)
 {
-    if (!node) return;
-    if (!node->animations.isEmpty()) {
-        out.append({node->name, node->animations});
+    AnimKeyframe key;
+    key.time = source.time;
+    key.tx = source.translation.x;
+    key.ty = source.translation.y;
+    key.tz = source.translation.z;
+    key.sx = source.scale.x;
+    key.sy = source.scale.y;
+    key.sz = source.scale.z;
+    key.hasQuat = false;
+    key.hasEuler = false;
+
+    if (source.hasEuler) {
+        key.hasEuler = true;
+        const float degPerRad = 180.0f / 3.14159265358979323846f;
+        key.rx = source.euler.x * degPerRad;
+        key.ry = source.euler.y * degPerRad;
+        key.rz = source.euler.z * degPerRad;
+    } else {
+        key.hasQuat = true;
+        key.qw = source.rotation.w;
+        key.qx = source.rotation.x;
+        key.qy = source.rotation.y;
+        key.qz = source.rotation.z;
+        quaternionToEuler(source.rotation.w, source.rotation.x,
+                         source.rotation.y, source.rotation.z,
+                         key.rx, key.ry, key.rz);
     }
-    for (const auto* child : node->children) {
-        collectNodeAnimations(child, out);
-    }
+
+    return key;
 }
 
 NifAnimation* loadAnimationFromNif(const QString& path)
 {
-    Nif::NifParser parser;
-    if (!parser.load(path))
+    NifBlockFile file;
+    if (!file.load(path))
         return nullptr;
 
-    Nif::Node* root = parser.getRoot();
-    if (!root)
-        return nullptr;
-
-    QVector<QPair<QString, QVector<Nif::NiKeyframeController>>> nodeAnims;
-    collectNodeAnimations(root, nodeAnims);
-
-    if (nodeAnims.isEmpty())
+    const auto sources = file.animationChannels();
+    if (sources.isEmpty())
         return nullptr;
 
     auto* anim = new NifAnimation();
@@ -97,44 +118,25 @@ NifAnimation* loadAnimationFromNif(const QString& path)
     AnimClip clip;
     clip.name = anim->name;
 
-    for (const auto& [nodeName, controllers] : nodeAnims) {
-        for (const auto& ctrl : controllers) {
-            if (ctrl.keyframes.isEmpty()) continue;
+    for (const auto& source : sources) {
+        if (source.nodeName.isEmpty())
+            continue;
 
-            AnimChannel ch;
-            ch.boneName = nodeName;
-            ch.type = ctrl.clipName.isEmpty() ? "NiKeyframeData" : ctrl.clipName;
+        AnimChannel channel;
+        channel.boneName = source.nodeName;
+        channel.type = source.clipName.isEmpty()
+                           ? QStringLiteral("NiKeyframeData")
+                           : source.clipName;
+        if (source.hasRaw)
+            channel.raw = source.raw;
 
-            for (const auto& tk : ctrl.keyframes) {
-                AnimKeyframe kf;
-                kf.time = tk.time;
-                kf.tx = tk.translation.x;
-                kf.ty = tk.translation.y;
-                kf.tz = tk.translation.z;
-                // Scale has to come across or saving would write a constant 1.0
-                // over the node's real scale channel.
-                kf.sx = tk.scale.x;
-                kf.sy = tk.scale.y;
-                kf.sz = tk.scale.z;
-                // Carry the quaternion the file actually stores. The Euler
-                // angles are what the timeline edits, but they are derived and
-                // going back through them is not the identity, so a rotation
-                // the user never touched has to be able to come out unchanged.
-                kf.qw = tk.rotation.w;
-                kf.qx = tk.rotation.x;
-                kf.qy = tk.rotation.y;
-                kf.qz = tk.rotation.z;
-                kf.hasQuat = true;
-                quaternionToEuler(tk.rotation.w, tk.rotation.x,
-                                  tk.rotation.y, tk.rotation.z,
-                                  kf.rx, kf.ry, kf.rz);
-                ch.keyframes.append(kf);
-            }
+        for (const auto& sourceKey : source.keyframes) {
+            channel.keyframes.append(transformKeyframeToAnimKeyframe(sourceKey));
+        }
 
-            if (!ch.keyframes.isEmpty()) {
-                ch.duration = ch.keyframes.last().time;
-                clip.channels.append(ch);
-            }
+        if (!channel.keyframes.isEmpty()) {
+            channel.duration = channel.keyframes.last().time;
+            clip.channels.append(channel);
         }
     }
 
@@ -143,11 +145,12 @@ NifAnimation* loadAnimationFromNif(const QString& path)
         return nullptr;
     }
 
-    float maxDur = 0.0f;
-    for (const auto& ch : clip.channels) {
-        if (ch.duration > maxDur) maxDur = ch.duration;
+    float maxDuration = 0.0f;
+    for (const auto& channel : clip.channels) {
+        if (channel.duration > maxDuration)
+            maxDuration = channel.duration;
     }
-    clip.duration = maxDur;
+    clip.duration = maxDuration;
 
     anim->clips.append(clip);
     return anim;
@@ -637,13 +640,14 @@ void AnimationEditor::onPropertyChanged()
         if (ch.boneName != mSelectedBone) continue;
         for (auto& kf : ch.keyframes) {
             if (qFuzzyCompare(kf.time, mSelectedTime)) {
-                kf.tx = static_cast<float>(mPropTxSpin->value());
-                kf.ty = static_cast<float>(mPropTySpin->value());
-                kf.tz = static_cast<float>(mPropTzSpin->value());
-                kf.rx = static_cast<float>(mPropRxSpin->value());
-                kf.ry = static_cast<float>(mPropRySpin->value());
-                kf.rz = static_cast<float>(mPropRzSpin->value());
-
+                AnimKeyframe edited = kf;
+                edited.tx = static_cast<float>(mPropTxSpin->value());
+                edited.ty = static_cast<float>(mPropTySpin->value());
+                edited.tz = static_cast<float>(mPropTzSpin->value());
+                edited.rx = static_cast<float>(mPropRxSpin->value());
+                edited.ry = static_cast<float>(mPropRySpin->value());
+                edited.rz = static_cast<float>(mPropRzSpin->value());
+                NifAnimationWriter::channelSetKeyframeValue(ch, kf.time, edited);
                 Q_UNUSED(clipName)
                 return;
             }
@@ -765,6 +769,16 @@ void AnimationEditor::onExportAnimation()
                 kfObj["rx"] = kf.rx;
                 kfObj["ry"] = kf.ry;
                 kfObj["rz"] = kf.rz;
+                kfObj["sx"] = kf.sx;
+                kfObj["sy"] = kf.sy;
+                kfObj["sz"] = kf.sz;
+                if (kf.hasQuat) {
+                    kfObj["qw"] = kf.qw;
+                    kfObj["qx"] = kf.qx;
+                    kfObj["qy"] = kf.qy;
+                    kfObj["qz"] = kf.qz;
+                }
+                kfObj["hasEuler"] = kf.hasEuler;
                 kfArray.append(kfObj);
             }
             chObj["keyframes"] = kfArray;
@@ -845,6 +859,17 @@ void AnimationEditor::onImportAnimation()
                 kf.rx = static_cast<float>(kfObj["rx"].toDouble());
                 kf.ry = static_cast<float>(kfObj["ry"].toDouble());
                 kf.rz = static_cast<float>(kfObj["rz"].toDouble());
+                kf.sx = static_cast<float>(kfObj["sx"].toDouble(1.0));
+                kf.sy = static_cast<float>(kfObj["sy"].toDouble(1.0));
+                kf.sz = static_cast<float>(kfObj["sz"].toDouble(1.0));
+                if (kfObj.contains("qw")) {
+                    kf.hasQuat = true;
+                    kf.qw = static_cast<float>(kfObj["qw"].toDouble(1.0));
+                    kf.qx = static_cast<float>(kfObj["qx"].toDouble(0.0));
+                    kf.qy = static_cast<float>(kfObj["qy"].toDouble(0.0));
+                    kf.qz = static_cast<float>(kfObj["qz"].toDouble(0.0));
+                }
+                kf.hasEuler = kfObj["hasEuler"].toBool();
                 ch.keyframes.append(kf);
             }
 
@@ -904,6 +929,19 @@ void AnimationEditor::onSaveNif()
     int downgraded = 0;
     for (const auto& clip : mAnimation->clips) {
         for (const auto& channel : clip.channels) {
+            const QString clipName = channel.type == QStringLiteral("NiKeyframeData")
+                ? QString() : channel.type;
+            bool channelDowngraded = false;
+            if (channel.raw.valid) {
+                if (NifAnimationWriter::writeKeyframesToNif(mSourceNifPath,
+                        channel.boneName, channel, clipName, &channelDowngraded))
+                    ++saved;
+                else
+                    ++failed;
+                if (channelDowngraded) ++downgraded;
+                continue;
+            }
+
             QVector<Nif::TransformKeyframe> keyframes;
             keyframes.reserve(channel.keyframes.size());
             for (const auto& keyframe : channel.keyframes) {
@@ -911,34 +949,43 @@ void AnimationEditor::onSaveNif()
                 output.time = keyframe.time;
                 output.translation = {keyframe.tx, keyframe.ty, keyframe.tz};
                 output.scale = {keyframe.sx, keyframe.sy, keyframe.sz};
-                // Prefer the quaternion the NIF stored. It is bit-exact, and
-                // rebuilding it from Euler angles is not, so re-deriving it for
-                // a rotation nobody edited would rewrite every key. The Euler
-                // angles are the user-facing control, so they are only trusted
-                // once they stop matching what that quaternion implies - which
-                // is what happens when the timeline moves the node.
-                float fromStored = 0.0f, fy = 0.0f, fz = 0.0f;
-                quaternionToEuler(keyframe.qw, keyframe.qx,
-                                  keyframe.qy, keyframe.qz,
-                                  fromStored, fy, fz);
-                const bool rotationEdited =
-                    !qFuzzyCompare(fromStored + 1.0f, keyframe.rx + 1.0f) ||
-                    !qFuzzyCompare(fy + 1.0f, keyframe.ry + 1.0f) ||
-                    !qFuzzyCompare(fz + 1.0f, keyframe.rz + 1.0f);
-                if (keyframe.hasQuat && !rotationEdited) {
-                    output.rotation = {keyframe.time, keyframe.qw, keyframe.qx,
-                        keyframe.qy, keyframe.qz};
+                output.hasEuler = false;
+
+                if (keyframe.hasEuler) {
+                    const float degToRad = 3.14159265358979323846f / 180.0f;
+                    output.hasEuler = true;
+                    output.euler = {keyframe.rx * degToRad,
+                                    keyframe.ry * degToRad,
+                                    keyframe.rz * degToRad};
                 } else {
-                    float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
-                    eulerToQuaternion(keyframe.rx, keyframe.ry, keyframe.rz,
-                        qw, qx, qy, qz);
-                    output.rotation = {keyframe.time, qw, qx, qy, qz};
+                    // Prefer the quaternion the NIF stored. It is bit-exact, and
+                    // rebuilding it from Euler angles is not, so re-deriving it
+                    // for a rotation nobody edited would rewrite every key. The
+                    // Euler angles are the user-facing control, so they are only
+                    // trusted once they stop matching what that quaternion
+                    // implies - which is what happens when the timeline moves
+                    // the node.
+                    float fromStored = 0.0f, fy = 0.0f, fz = 0.0f;
+                    quaternionToEuler(keyframe.qw, keyframe.qx,
+                                      keyframe.qy, keyframe.qz,
+                                      fromStored, fy, fz);
+                    const bool rotationEdited =
+                        !qFuzzyCompare(fromStored + 1.0f, keyframe.rx + 1.0f) ||
+                        !qFuzzyCompare(fy + 1.0f, keyframe.ry + 1.0f) ||
+                        !qFuzzyCompare(fz + 1.0f, keyframe.rz + 1.0f);
+                    if (keyframe.hasQuat && !rotationEdited) {
+                        output.rotation = {keyframe.time, keyframe.qw, keyframe.qx,
+                            keyframe.qy, keyframe.qz};
+                    } else {
+                        float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
+                        eulerToQuaternion(keyframe.rx, keyframe.ry, keyframe.rz,
+                            qw, qx, qy, qz);
+                        output.rotation = {keyframe.time, qw, qx, qy, qz};
+                    }
                 }
+
                 keyframes.append(output);
             }
-            const QString clipName = channel.type == QStringLiteral("NiKeyframeData")
-                ? QString() : channel.type;
-            bool channelDowngraded = false;
             if (NifAnimationWriter::writeKeyframesToNif(mSourceNifPath,
                     channel.boneName, keyframes, clipName, &channelDowngraded))
                 ++saved;

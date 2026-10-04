@@ -599,7 +599,7 @@ like a real blocker.
 to the render/view layer (it cannot build a `Node` tree for an Oblivion file),
 not to animation write-back.
 
-### `NiTransformData`: block framing is known; lossless animation codec is not
+### `NiTransformData`: block framing is known and the writer is available
 
 The previous two paragraphs in this section incorrectly treated
 `rotation_type = 4` as either a quaternion-array count or a generic interpolation
@@ -748,12 +748,12 @@ corpus where 5,107 non-linear channels are in reach. Whole-file identity is not
 asserted, because these clips drive several controllers and the harness holds frames
 for one block.
 
-**Still open.** The editor's loader reads animation through `NifParser`, whose
-`NifTransformData` is the internal dialect and does not even read the rotation type
-before the keys - so an XYZ-keyed block is misparsed there even though the writer
-now round-trips it exactly. The editor therefore cannot yet show or edit XYZ
-rotation faithfully; it needs to read animation through `NifBlockFile`'s strict
-codec, which is the same split the writer already uses.
+**Resolved.** The editor's loader now reads animation through `NifBlockFile`'s
+strict codec via `animationChannels()`. `NifBlockFile::controllerTargetName()`
+resolves a controller's target node by searching the controller data for a node
+ref, covering chained or non-direct controller references. `test_nifanimation`
+passes 18 tests, and `test_ntdlayout` passes 4 tests, including the real-archive
+`animationChannelsMatchRawChannels()` check.
 
 ### A controller sequence *is* a clip; the node match was over-constraining
 
@@ -828,10 +828,9 @@ Effect on the base archive:
 | `noDataBlock` | 83 | 78 |
 | reach the writability gate (`notWritable`) | 0 | 5 |
 
-The 5 that now reach the gate are refused by `isWritableKeyframeType`, correctly,
-because the `NiTransformData` codec does not round-trip. The block-boundary
-grammar is now known and implemented in `walkNiKeyframeData`; what remains is a
-lossless semantic representation, not a layout question.
+The 5 that now reach the gate are accepted by `isWritableKeyframeType`. The
+`NiTransformData` codec round-trips byte-for-byte, and the editor writes the
+channel-preserving raw payload instead of the flat keyframe list.
 
 ### Residual census: 12 `noDataBlock`, 3 `decodeFailed`, and an interpolation word now proven
 
@@ -2370,13 +2369,17 @@ controller field layout changed between game generations) and follows the
 1.5 `controller -> interpolator -> data` and 1.6+ `controller -> data` chains.
 The writer refuses to touch any keyframe block it cannot reproduce byte for
 byte, so an unconfirmed layout is declined instead of corrupting the file.
-Remaining: the Skyrim 1.5 / Oblivion `NiTransformData` encoding is still
-unconfirmed (the 1.6+ `NiKeyframeData` flat 44-byte-per-key layout is
-confirmed), so those blocks are read-only for now; the confirmed evidence is
-that a 1.5 block is a count followed by three channels whose keys are stored
-with the first key carrying no time, but the channel ordering and grouping
-observed in shipped files do not yet match a single consistent fit. Also
-outstanding: keyed/idle event round-trips.
+Remaining: keyed/idle event round-trips.
+
+**Status 2026-10-04 — channel-preserving editor payload done.** The flat
+`TransformKeyframe` write path is no longer the only edit representation. The
+loader attaches `NiTransformDataRaw` to each animation channel, the timeline
+undo commands update that raw payload through `NifAnimationWriter`, and Save
+NIF encodes the raw payload for channels that have one. The flat keyframe
+list remains the display model, but a channel added/removed/moved from it is
+upsert/remove/insert against the raw per-channel groups. Edited grouped
+channels still become linear when the GUI moved keys; unchanged channels keep
+their original interpolation and tangents through the bit-exact payload.
 
 **Open evidence gaps (measured, not assumed).** Three things are known to be
 unverified and are worth recording precisely rather than as a single "needs
@@ -2394,8 +2397,8 @@ testing" line:
   non-conformant exporter is a separate decision.
 - The 1.5 `NiTransformData` block grammar is implemented and measured in
   `walkNiKeyframeData`; there is ample same-generation data (Skyrim SE 1.5
-  supplied 4,533 blocks, Oblivion thousands more). What is missing is a
-  semantic representation that preserves interpolation types and tangents.
+  supplied 4,533 blocks, Oblivion thousands more). A channel-preserving
+  semantic representation now exists at the writer/editor level.
 
 **Starfield BA2 — done, and it changed the animation target.** `BsaArchive`
 now reads the Starfield `BTDX` container. Layout (verified against the shipped
@@ -2798,16 +2801,14 @@ the Skyrim masters did. The GOTY install does not help the SCEN editor; the
 Shivering Isles content is dialogue rather than phase data. Persisting scene
 phases still needs a real PHDA sample from a mod.
 
-**`NiTransformData` (Skyrim 1.5 / Oblivion) remains the only reachable NIF
-keyframe format refused for writing.** `test_ntdlayout`'s 24 generic TRS layouts
-were the wrong grammar and its 10/104 score was not evidence about the real
-format. `walkNiKeyframeData` now consumes the measured format: rotation count,
-optional rotation type, three per-axis float KeyGroups for XYZ rotations, then
-translation Vector3 and scalar scale KeyGroups; interpolation determines key
-width and tangents. Full-archive round-trip coverage confirms block boundaries,
-but the editor's flat `TransformKeyframe` cannot preserve per-channel times,
-interpolation or tangents. A channel-preserving animation payload is still
-needed before write-back is safe.
+**Update 2026-10-04 — the channel-preserving payload is done.** The
+`NiTransformData` codec round-trips shipped files byte-for-byte, the editor now
+keeps `NiTransformDataRaw` on each `AnimChannel`, and keyframe edits go through
+`channelAddKeyframe`/`channelRemoveKeyframe`/`channelMoveKeyframe`/
+`channelSetKeyframeValue` before Save NIF encodes that raw payload. The flat
+`TransformKeyframe` path is still available to callers that do not need to
+preserve per-channel times or interpolation, but it is no longer the only write
+model.
 
 **The game folders are on-demand installs, and that makes the archive tests
 flaky.** Individual `.ba2` files flip between resident and evicted between runs
