@@ -145,10 +145,14 @@ void TestNtdLayout::fit()
     if (!archive) QSKIP("no reachable mesh archive");
 
     QTemporaryDir tmpDir;
-    int exact = 0;
-    QString firstFailure;
-    QMap<int, int> sizeHistogram;
     int blocksSeen = 0;
+    int codecExact = 0;
+    QString firstCodecFailure;
+    int framed20Blocks = 0;
+    int framed20 = 0;
+    QString firstFramingFailure;
+    QMap<int, int> sizeHistogram;
+    QMap<QString, int> versionCounts;
 
     for (int i = 0; i < archive->fileCount() && blocksSeen < 400; ++i) {
         const BsaFileEntry& e = archive->entries()[i];
@@ -168,14 +172,37 @@ void TestNtdLayout::fit()
         for (int c : file.findBlocks(QStringLiteral("NiTransformController"))) {
             const int dataIndex = file.keyframeDataBlockFor(c);
             if (dataIndex < 0) continue;
-            if (file.headerVersion() != QStringLiteral("20.0.0.4")) continue;
             const QByteArray& block = file.block(dataIndex).data;
             if (block.isEmpty()) continue;
             ++blocksSeen;
+            versionCounts[file.headerVersion()] += 1;
             sizeHistogram[block.size()] += 1;
-            if (tryNiTransformData20(block)) ++exact;
-            else if (firstFailure.isEmpty())
-                firstFailure = QStringLiteral("%1 (%2 bytes)").arg(e.fullPath).arg(block.size());
+
+            // The channel-preserving codec has to consume a shipped block exactly
+            // and put it back byte for byte, and it is told the file's version
+            // rather than assuming one. That is the assertion that generalises
+            // across generations, so it is the one run on every block.
+            NifBlockFile::NiTransformDataRaw raw;
+            QByteArray reencoded;
+            if (NifBlockFile::decodeNiTransformData(block, file.version(), raw)
+                && NifBlockFile::encodeNiTransformData(raw, file.version(), reencoded)
+                && reencoded == block) {
+                ++codecExact;
+            } else if (firstCodecFailure.isEmpty()) {
+                firstCodecFailure = QStringLiteral("%1 (%2 bytes, %3)")
+                    .arg(e.fullPath).arg(block.size()).arg(file.headerVersion());
+            }
+
+            // The hand-written framer below is a deliberately independent check on
+            // the 20.0.0.4 layout, so it still runs there and only there. It is not
+            // version-aware and would report false failures on 20.2.x data, whose
+            // quaternion keys carry a different set of fields.
+            if (file.headerVersion() == QStringLiteral("20.0.0.4")) {
+                ++framed20Blocks;
+                if (tryNiTransformData20(block)) ++framed20;
+                else if (firstFramingFailure.isEmpty())
+                    firstFramingFailure = QStringLiteral("%1 (%2 bytes)").arg(e.fullPath).arg(block.size());
+            }
         }
     }
 
@@ -189,22 +216,32 @@ void TestNtdLayout::fit()
     say("  sizes: " + sizeText.join(' '));
 
     say(QStringLiteral("  archive: %1").arg(opened));
+    for (auto it = versionCounts.begin(); it != versionCounts.end(); ++it)
+        say(QStringLiteral("  header version %1: %2 blocks").arg(it.key()).arg(it.value()));
 
     // Zero sampled blocks means the archive opened but no block was addressable,
-    // not that no data was there. The header now parses, but Oblivion's meshes
-    // are all pre-20.2.0.5 containers, which carry no per-block size table, so
-    // their block region is one opaque run and no individual block can be
-    // handed to the fitter. Say so and skip rather than reporting a meaningless
-    // verdict.
+    // not that no data was there. The usual cause is a container with no per-block
+    // size table, whose block region is then one opaque run that cannot be handed
+    // to the fitter. Say so and skip rather than reporting a meaningless verdict.
     if (blocksSeen == 0)
-        QSKIP("the archive opened and its NIF headers parse, but these are "
-              "pre-20.2.0.5 containers with no block size table, so no "
-              "individual block is addressable yet");
+        QSKIP("the archive opened and its NIF headers parse, but none of its "
+              "NiTransformController blocks resolved to an addressable data block");
 
-    say(QString("  exact 20.0.0.4 framing: %1/%2").arg(exact).arg(blocksSeen));
-    if (!firstFailure.isEmpty()) say("  first failure: " + firstFailure);
+    say(QStringLiteral("  codec byte-exact: %1/%2").arg(codecExact).arg(blocksSeen));
+    if (!firstCodecFailure.isEmpty()) say("  first codec failure: " + firstCodecFailure);
     QVERIFY2(blocksSeen > 0, "no addressable NiTransformData blocks sampled");
-    QCOMPARE(exact, blocksSeen);
+    // Every shipped block must round-trip. This is the assertion that carries
+    // across generations, so it is strict: one block the codec cannot reproduce
+    // exactly means the codec would corrupt that file on save.
+    QCOMPARE(codecExact, blocksSeen);
+
+    // The independent framer only ran on 20.0.0.4 blocks, so it is asserted
+    // against the number of those rather than against every block.
+    if (framed20Blocks > 0) {
+        say(QStringLiteral("  20.0.0.4 framing: %1/%2").arg(framed20).arg(framed20Blocks));
+        if (!firstFramingFailure.isEmpty()) say("  first framing failure: " + firstFramingFailure);
+        QCOMPARE(framed20, framed20Blocks);
+    }
 }
 
 namespace {

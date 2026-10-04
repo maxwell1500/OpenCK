@@ -2444,19 +2444,31 @@ Two smaller things this turned up, both left alone deliberately:
 `Fallout4 - Textures*.ba2` are `DX10` rather than `GNRL` and still do not open
 (that layout is the separate texture-archive item above).
 
-**The obvious next step here, and why it is not done yet.** Fallout 4 supplies
-**20,397 `NiTransformData` blocks** — a corpus roughly five times Skyrim's, at
-the same 1.5 generation, and the largest validation set available for the
-channel-preserving codec. `test_ntdlayout` cannot use it yet: it hard-filters on
-`headerVersion() == "20.0.0.4"` and then validates with `tryNiTransformData20()`, a
-version-blind framer for that one layout. Fallout 4 is 20.2.0.7, so every one of
-its blocks is skipped and the test skips with a message about pre-20.2.0.5
-containers that is true of the archive it actually fell back to but misleading
-when the override is used. The fix is to gate on the archive's real version and
-validate with the version-aware `NifBlockFile::decodeNiTransformData()` /
-`encodeNiTransformData()` pair rather than the 20.0.0.4-only framer.
-`OPENCK_TEST_NIF_ARCHIVE` (matching `test_nifroundtriparchive`) now lets that
-corpus be pointed at, so the change is mechanical when it is made.
+**The channel-preserving codec is now validated on Fallout 4 as well.** The
+fitter used to hard-filter `headerVersion() == "20.0.0.4"` and check blocks with
+`tryNiTransformData20()`, a version-blind framer for that one layout, so every
+other generation was silently untested — Fallout 4's 20,397 `NiTransformData`
+blocks included. It now runs the version-aware
+`NifBlockFile::decodeNiTransformData()` / `encodeNiTransformData()` pair on
+**every** block, passing the file's own version, and requires the re-encode to be
+byte-identical. The independent 20.0.0.4 framer is kept and still runs on the
+20.0.0.4 blocks, asserted against that subset rather than against all of them, so
+the test keeps an independent check as well as a version-generic one.
+
+Effect, both measured:
+
+- The default corpus went from 87 blocks at one version to **104 across three**
+  (10.1.0.106, 10.2.0.0, 20.0.0.4), all byte-exact.
+- Fallout 4 (`OPENCK_TEST_NIF_ARCHIVE` pointed at `Fallout4 - Meshes.ba2`)
+  samples 400 blocks at **20.2.0.7**, all byte-exact, in about four seconds. The
+  archive holds 20,397 such blocks; 400 is the fitter's existing sample cap, not
+  a limit of the corpus.
+
+The skip message was also wrong in a way worth recording: it claimed the archive
+was "pre-20.2.0.5 containers with no block size table", which described the
+archive the test had silently fallen back to rather than the one requested. It
+now names the actual condition — no `NiTransformController` block resolved to an
+addressable data block.
 
 Measured after the fix: the whole `Fallout4 - Meshes.ba2` archive opens and
 **34,995 of 34,995 NIFs round-trip byte for byte, every one walked**, in about
