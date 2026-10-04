@@ -2956,15 +2956,26 @@ bool NifBlockFile::parse(const QByteArray& raw, bool hasUnknownInt, QString& err
         return bad(QStringLiteral("implausible header: blocks=%1 bsVersion=%2")
                        .arg(numBlocks).arg(mBsVersion));
 
-    // bs_header holds bs_version (already read) then a run of ExportStrings
-    // whose membership depends on bs_version: unknown_int only above 130,
-    // max_filepath only from 103. Both variants are tried by the caller, so
-    // guessing wrong here only costs one retry.
+    // bs_header holds bs_version (already read) then a run of ExportStrings whose
+    // membership depends on bs_version, in this order (the vendored nifgen
+    // BSStreamHeader field list): unknown_int above 130, process_script below
+    // 131, export_script always, max_filepath from 103.
+    //
+    // The two conditional words are mutually exclusive — no bs_version is both
+    // above 130 and below 131 — so the whole run is determined by bs_version and
+    // needs no guessing. This matters because reading a fixed three strings is
+    // right for most files *by accident*: at bs_version 100 and below the three
+    // present strings are author/process_script/export_script with no
+    // max_filepath, so dropping process_script and reading max_filepath instead
+    // consumes the same number of bytes and only the labels differ. Fallout 4
+    // ships bs_version 130, where all four are present, and the fixed read then
+    // lands six bytes early — every one of its 34,995 meshes is rejected.
     mAuthor = readExportString(c);
     mHasUnknownInt = hasUnknownInt;
     if (hasUnknownInt) mUnknownInt = c.u32();
+    if (mBsVersion < 131u) mProcessScript = readExportString(c);   // process_script
     mExportScript = readExportString(c);
-    mMaxFilepath = readExportString(c);
+    if (mBsVersion >= 103u) mMaxFilepath = readExportString(c);
     if (!c.ok()) return bad(QStringLiteral("truncated export strings"));
 
     const quint16 numTypes = c.u16();
@@ -3497,8 +3508,10 @@ QByteArray NifBlockFile::serialize() const
     appendU32(out, mBsVersion);
     out.append(mAuthor);
     if (mHasUnknownInt) appendU32(out, mUnknownInt);
+    // The same bs_version-conditional pair the reader used, so the two agree.
+    if (mBsVersion < 131u) out.append(mProcessScript);
     out.append(mExportScript);
-    out.append(mMaxFilepath);
+    if (mBsVersion >= 103u) out.append(mMaxFilepath);
 
     appendU16(out, static_cast<quint16>(mBlockTypes.size()));
     for (const QString& type : mBlockTypes) {

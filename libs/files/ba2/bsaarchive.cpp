@@ -463,13 +463,21 @@ BsaArchive::~BsaArchive()
     }
 }
 
-// Starfield 'BTDX' general (GNRL) archives. Layout, verified against the
-// shipped archives and matching the community format notes:
+// 'BTDX' general (GNRL) archives come in two header shapes, and the version word
+// does not tell them apart: Starfield writes 2 (zlib) and 3 (LZ4), while Fallout
+// 4 writes 1 and 8 for a shorter header. The shape is therefore settled by
+// measurement, not by the version number.
 //
-//   header (32 bytes, or 36 for the LZ4 texture variant)
+//   header, 32 bytes (Starfield v2), or 36 (v3, LZ4)
 //     magic "BTDX", version u32, type "GNRL",
 //     file count u32, name table offset u64, unknown u64 (1; v3 adds a u32
 //     compression method)
+//   header, 24 bytes (Fallout 4; measured across all 34 GNRL archives present
+//     on this machine, at versions 1 and 8)
+//     magic "BTDX", version u32, type "GNRL",
+//     file count u32, name table offset u64
+//
+// then, identically in both shapes:
 //   file count declarations of 36 bytes each
 //     file hash u32, extension char[4], directory hash u32,
 //     0 u8, 1 u8, 0x0010 u16, data offset u64,
@@ -477,8 +485,9 @@ BsaArchive::~BsaArchive()
 //   the file data
 //   the name table: file count x (u16 length + path bytes)
 //
-// Version 2 compresses with zlib, version 3 with a raw LZ4 block. Starfield
-// writes paths with forward slashes.
+// The trailing u64 is the only difference, and assuming it is always present
+// reads the first file declaration as header tail — so every Fallout 4 archive
+// fails to open. Both shapes are tried and the one that validates wins.
 bool BsaArchive::readBtdx()
 {
     const auto fail = [this]() {
@@ -496,15 +505,8 @@ bool BsaArchive::readBtdx()
     ds.readRawData(type.data(), 4);
     const quint32 fileCount = readU32(ds);
     const quint64 nameTableOffset = readU64(ds);
-    // Starfield appends a trailing u64 to the classic 24-byte header, plus a
-    // u32 compression method on the v3 (LZ4) variant. Declarations start after
-    // it, so the tail must be consumed even when its value is unused.
-    readU64(ds);
-    if (mVersion >= 3) readU32(ds);
     if (ds.status() != QDataStream::Ok)
         return fail();
-    mBtdx = true;
-    mBtdxLz4 = (mVersion >= 3);
 
     if (type != QByteArrayLiteral("GNRL")) {
         LOG_ERROR(QString("BsaArchive: BTDX type '%1' is not supported (only GNRL)")
@@ -524,74 +526,117 @@ bool BsaArchive::readBtdx()
         quint32 unpacked = 0;
         QString extension;
     };
-    QVector<Declaration> declarations;
-    declarations.reserve(static_cast<int>(fileCount));
-    for (quint32 i = 0; i < fileCount; ++i) {
-        Declaration decl;
-        const quint32 fileHash = readU32(ds);
-        QByteArray extension(4, 0);
-        ds.readRawData(extension.data(), 4);
-        const quint32 dirHash = readU32(ds);
-        char flags[2] = {0, 0};
-        ds.readRawData(flags, 2);   // 0, 1
-        readU16(ds);                // declaration header size
-        decl.offset = readU64(ds);
-        decl.packed = readU32(ds);
-        decl.unpacked = readU32(ds);
-        const quint32 sentinel = readU32(ds);
-        if (ds.status() != QDataStream::Ok)
-            return fail();
-        if (sentinel != 0xBAADF00Du) {
-            LOG_ERROR(QString("BsaArchive: BTDX declaration %1 missing 0xBAADF00D marker (got 0x%2)")
-                          .arg(i).arg(sentinel, 8, 16, QChar('0')));
-            return fail();
-        }
-        if (decl.offset > static_cast<quint64>(mFileSize)
-            || (decl.packed ? decl.packed : decl.unpacked) > mFileSize - static_cast<qint64>(decl.offset)) {
-            LOG_ERROR(QString("BsaArchive: BTDX declaration %1 points outside the archive")
-                          .arg(i));
-            return fail();
-        }
-        // The extension is stored without a NUL; the full path comes from the
-        // name table, so this is only a fallback for archives without one.
-        decl.extension = QString::fromLatin1(extension).trimmed();
-        Q_UNUSED(fileHash);
-        Q_UNUSED(dirHash);
-        declarations.append(decl);
-    }
 
-    if (!mFile->seek(static_cast<qint64>(nameTableOffset)))
+    // Reads the declarations and the name table for one candidate header size.
+    // Nothing is recorded on the object until the whole shape has proved itself,
+    // so a failed attempt cannot leave a half-read archive behind for the caller
+    // to mistake for a successful one.
+    const auto tryHeader = [&](int headerSize, bool lz4) {
+        QVector<Declaration> declarations;
+        declarations.reserve(static_cast<int>(fileCount));
+        if (!mFile->seek(headerSize))
+            return false;
+        for (quint32 i = 0; i < fileCount; ++i) {
+            Declaration decl;
+            readU32(ds);                                // file hash
+            QByteArray extension(4, 0);
+            ds.readRawData(extension.data(), 4);
+            readU32(ds);                                // directory hash
+            char flags[2] = {0, 0};
+            ds.readRawData(flags, 2);                   // 0, 1
+            readU16(ds);                                // declaration header size
+            decl.offset = readU64(ds);
+            decl.packed = readU32(ds);
+            decl.unpacked = readU32(ds);
+            const quint32 sentinel = readU32(ds);
+            if (ds.status() != QDataStream::Ok)
+                return false;
+            if (sentinel != 0xBAADF00Du) {
+                LOG_DEBUG(QString("BsaArchive: BTDX declaration %1 has no 0xBAADF00D "
+                                  "marker (got 0x%2) at header size %3")
+                              .arg(i).arg(sentinel, 8, 16, QChar('0')).arg(headerSize));
+                return false;
+            }
+            if (decl.offset > static_cast<quint64>(mFileSize)
+                || (decl.packed ? decl.packed : decl.unpacked)
+                       > mFileSize - static_cast<qint64>(decl.offset)) {
+                LOG_DEBUG(QString("BsaArchive: BTDX declaration %1 points outside the "
+                                  "archive at header size %2").arg(i).arg(headerSize));
+                return false;
+            }
+            // The extension is stored without a NUL; the full path comes from the
+            // name table, so this is only a fallback for archives without one.
+            decl.extension = QString::fromLatin1(extension).trimmed();
+            declarations.append(decl);
+        }
+
+        // The name table must hold exactly fileCount names. Demanding the count
+        // agree is what makes this a proof rather than a guess: a misjudged header
+        // size puts the declarations in the wrong place and cannot also yield a
+        // clean run of names at the declared offset.
+        if (!mFile->seek(static_cast<qint64>(nameTableOffset)))
+            return false;
+        QStringList paths;
+        paths.reserve(static_cast<int>(fileCount));
+        for (quint32 i = 0; i < fileCount; ++i) {
+            bool ok = true;
+            const QString path = readU16LenString(ds, ok);
+            if (!ok || path.isEmpty()) {
+                LOG_DEBUG(QString("BsaArchive: BTDX name table entry %1 is unreadable at "
+                                  "header size %2").arg(i).arg(headerSize));
+                return false;
+            }
+            paths.append(path);
+        }
+
+        mBtdx = true;
+        mBtdxLz4 = lz4;
+        mEntries.clear();
+        mEntries.reserve(static_cast<int>(fileCount));
+        for (int i = 0; i < declarations.size(); ++i) {
+            const Declaration& decl = declarations.at(i);
+            const QString& path = paths.at(i);
+            BsaFileEntry entry;
+            entry.fileName = path.section(QLatin1Char('/'), -1);
+            entry.folderName = path.contains(QLatin1Char('/'))
+                ? path.left(path.lastIndexOf(QLatin1Char('/')))
+                : QString();
+            entry.fullPath = path;
+            entry.offset = decl.offset;
+            entry.size = decl.unpacked;
+            entry.packedSize = decl.packed;
+            // A zero packed length means the file is stored uncompressed.
+            entry.compressed = decl.packed != 0;
+            if (entry.fileName.isEmpty())
+                entry.fileName = decl.extension;
+            mEntries.append(entry);
+        }
+        return true;
+    };
+
+    // Starfield's shape first, then the shorter Fallout 4 one. A wrong guess is
+    // cheap to disprove: the first declaration read from the wrong place carries
+    // the wrong sentinel.
+    const int starfieldHeader = (mVersion >= 3) ? 36 : 32;
+    int headerSize = 0;
+    bool lz4 = false;
+    if (tryHeader(starfieldHeader, mVersion >= 3)) {
+        headerSize = starfieldHeader;
+        lz4 = mVersion >= 3;
+    } else if (tryHeader(24, false)) {
+        headerSize = 24;
+    } else {
+        LOG_ERROR(QString("BsaArchive: BTDX v%1 header matches neither the %2-byte nor the "
+                          "24-byte shape (%3 files declared)")
+                      .arg(mVersion).arg(starfieldHeader).arg(fileCount));
         return fail();
-    ds.device()->seek(static_cast<qint64>(nameTableOffset));
-    for (int i = 0; i < declarations.size(); ++i) {
-        bool ok = true;
-        const QString path = readU16LenString(ds, ok);
-        if (!ok) {
-            LOG_ERROR(QString("BsaArchive: BTDX name table entry %1 is unreadable").arg(i));
-            return fail();
-        }
-        Declaration& decl = declarations[i];
-        BsaFileEntry entry;
-        entry.fileName = path.section(QLatin1Char('/'), -1);
-        entry.folderName = path.contains(QLatin1Char('/'))
-            ? path.left(path.lastIndexOf(QLatin1Char('/')))
-            : QString();
-        entry.fullPath = path;
-        entry.offset = decl.offset;
-        entry.size = decl.unpacked;
-        entry.packedSize = decl.packed;
-        // A zero packed length means the file is stored uncompressed.
-        entry.compressed = decl.packed != 0;
-        if (entry.fileName.isEmpty())
-            entry.fileName = decl.extension;
-        mEntries.append(entry);
     }
 
-    LOG_INFO(QString("BsaArchive: BTDX v%1 %2 files, %3 compression, name table at %4")
+    LOG_INFO(QString("BsaArchive: BTDX v%1 %2 files, %3, %4-byte header, name table at %5")
                  .arg(mVersion).arg(mEntries.size())
-                 .arg(mBtdxLz4 ? QStringLiteral("LZ4") : QStringLiteral("zlib"))
-                 .arg(nameTableOffset));
-    return !mEntries.isEmpty();
+                 .arg(lz4 ? QStringLiteral("LZ4") : QStringLiteral("zlib"))
+                 .arg(headerSize).arg(nameTableOffset));
+    return !mEntries.empty();
 }
 
 bool BsaArchive::open(const QString& path)

@@ -2407,6 +2407,46 @@ testing" line:
   supplied 4,533 blocks, Oblivion thousands more). A channel-preserving
   semantic representation now exists at the writer/editor level.
 
+**Status 2026-10-04 — Fallout 4 archives and meshes now read, and the
+`NiKeyframeData` gap is now measured rather than assumed.** Two independent
+blockers were in the way, both found by measuring real archives rather than by
+reading a format description:
+
+1. **`BTDX` has two header shapes and the version word does not tell them
+   apart.** Starfield writes a 32-byte header (36 for v3); Fallout 4 writes 24.
+   `readBtdx()` unconditionally consumed a trailing `u64`, which reads the first
+   file declaration as header tail, so **every** Fallout 4 archive failed to
+   open. Both shapes are now tried and the one that validates wins — validated by
+   every declaration carrying `0xBAADF00D` *and* the name table yielding exactly
+   `fileCount` names. Measured across all 34 Fallout 4 `GNRL` archives present
+   (versions 1 and 8, all stored uncompressed). Nothing is recorded on the object
+   until a shape has fully proved itself.
+2. **The `bs_header` export strings are four, not three, at `bs_version` 130.**
+   Their membership is `unknown_int` above 130, `process_script` below 131,
+   `export_script` always, `max_filepath` from 103 — and the two conditional
+   words are mutually exclusive, so the run is fully determined by `bs_version`.
+   The old fixed three-string read was right for Skyrim and Oblivion *by
+   accident*: at `bs_version` 100 and below the three present strings are
+   author/process_script/export_script with no `max_filepath`, so omitting
+   `process_script` and reading `max_filepath` instead consumes the same number
+   of bytes and only the labels differ. Fallout 4 ships `bs_version` 130, where
+   all four are present, and the fixed read landed six bytes early — rejecting
+   all 34,995 meshes. `process_script` is now read and re-emitted.
+
+With both fixed, Fallout 4 reads: 34,995 meshes parse, and the sampled archives
+round-trip byte for byte with every block walked. Fallout 4's meshes turn out to
+carry `NiTransformData` with the 1.5 `controller -> interpolator -> data` chain,
+**not** `NiKeyframeData` — so they do not supply the missing sample either. That
+closes the question rather than the gap: `NiKeyframeData` (1.6+) is still
+confirmed only against its own encoder, and no installed archive carries one.
+
+Two smaller things this turned up, both left alone deliberately:
+`Fallout4 - Textures*.ba2` are `DX10` rather than `GNRL` and still do not open
+(that layout is the separate texture-archive item above), and
+`test_nifroundtriparchive` overruns QTest's five-minute watchdog when
+`OPENCK_TEST_NIF_ARCHIVE` points at a 35,000-file archive. The default archive is
+unaffected.
+
 **Starfield BA2 — done, and it changed the animation target.** `BsaArchive`
 now reads the Starfield `BTDX` container. Layout (verified against the shipped
 archives): a 32-byte header (magic, version, `GNRL` tag, file count u32, name

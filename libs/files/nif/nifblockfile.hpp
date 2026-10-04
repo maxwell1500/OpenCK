@@ -292,6 +292,7 @@ void reset();
     QByteArray mHeaderLine;
     quint32 mUnknownInt = 0;
     QByteArray mAuthor;
+    QByteArray mProcessScript;
     QByteArray mExportScript;
     QByteArray mMaxFilepath;
     QStringList mBlockTypes;
