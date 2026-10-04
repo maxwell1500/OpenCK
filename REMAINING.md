@@ -2442,10 +2442,29 @@ confirmed only against its own encoder, and no installed archive carries one.
 
 Two smaller things this turned up, both left alone deliberately:
 `Fallout4 - Textures*.ba2` are `DX10` rather than `GNRL` and still do not open
-(that layout is the separate texture-archive item above), and
-`test_nifroundtriparchive` overruns QTest's five-minute watchdog when
-`OPENCK_TEST_NIF_ARCHIVE` points at a 35,000-file archive. The default archive is
-unaffected.
+(that layout is the separate texture-archive item above).
+
+**The obvious next step here, and why it is not done yet.** Fallout 4 supplies
+**20,397 `NiTransformData` blocks** — a corpus roughly five times Skyrim's, at
+the same 1.5 generation, and the largest validation set available for the
+channel-preserving codec. `test_ntdlayout` cannot use it yet: it hard-filters on
+`headerVersion() == "20.0.0.4"` and then validates with `tryNiTransformData20()`, a
+version-blind framer for that one layout. Fallout 4 is 20.2.0.7, so every one of
+its blocks is skipped and the test skips with a message about pre-20.2.0.5
+containers that is true of the archive it actually fell back to but misleading
+when the override is used. The fix is to gate on the archive's real version and
+validate with the version-aware `NifBlockFile::decodeNiTransformData()` /
+`encodeNiTransformData()` pair rather than the 20.0.0.4-only framer.
+`OPENCK_TEST_NIF_ARCHIVE` (matching `test_nifroundtriparchive`) now lets that
+corpus be pointed at, so the change is mechanical when it is made.
+
+Measured after the fix: the whole `Fallout4 - Meshes.ba2` archive opens and
+**34,995 of 34,995 NIFs round-trip byte for byte, every one walked**, in about
+six minutes. That run needs `QTEST_FUNCTION_TIMEOUT` set, because the test is
+already registered with `openck_add_heavy_test()` — which supplies that variable
+through the CTest environment but not to a directly-launched executable. An
+earlier revision of this note called the bare-exe watchdog a limitation; it is
+only an artefact of running the exe without the variable ctest sets.
 
 **Starfield BA2 — done, and it changed the animation target.** `BsaArchive`
 now reads the Starfield `BTDX` container. Layout (verified against the shipped

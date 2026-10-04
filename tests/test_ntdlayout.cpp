@@ -103,21 +103,33 @@ void TestNtdLayout::fit()
     // Skyrim 1.5, so a layout fitted here applies to both. The Skyrim archives
     // are an on-demand install and frequently refuse to be read at all.
     struct Source { const char* dir; const char* name; };
-    const QVector<Source> sources = {
-        { "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
-          "Oblivion - Meshes.bsa" },
-        { "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
-          "Oblivion - Misc.bsa" },
-        { "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/",
-          "Skyrim - Meshes1.ba2" },
-        { "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/",
-          "Skyrim - Meshes0.ba2" },
-    };
+    // OPENCK_TEST_NIF_ARCHIVE points the same assertions at another mesh archive,
+    // matching test_nifroundtriparchive. This is how a layout fitted against one
+    // game's corpus gets checked against another's instead of assumed to carry
+    // over — Fallout 4 supplies a NiTransformData corpus tens of times larger
+    // than Skyrim's, at the same 1.5 generation.
+    const QByteArray override = qgetenv("OPENCK_TEST_NIF_ARCHIVE");
+    const QString overridePath = QString::fromLocal8Bit(override);
+    // Kept as a named value, not a temporary: Source holds a const char*, and a
+    // temporary QByteArray would dangle before the loop ever read it.
+    const QByteArray overrideUtf8 = overridePath.toUtf8();
+    QVector<Source> sources;
+    if (!overridePath.isEmpty())
+        sources.append(Source{ nullptr, overrideUtf8.constData() });
+    sources.append(Source{ "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
+          "Oblivion - Meshes.bsa" });
+    sources.append(Source{ "F:/XboxGames/The Elder Scrolls IV- Oblivion (PC)/Content/Oblivion GOTY English/Data/",
+          "Oblivion - Misc.bsa" });
+    sources.append(Source{ "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/",
+          "Skyrim - Meshes1.ba2" });
+    sources.append(Source{ "C:/XboxGames/The Elder Scrolls V- Skyrim Special Edition (PC)/Content/Data/",
+          "Skyrim - Meshes0.ba2" });
     std::unique_ptr<BsaArchive> archive;
     QString opened;
     for (const Source& source : sources) {
-        const QString path = QString::fromLatin1(source.dir)
-            + QString::fromLatin1(source.name);
+        const QString path = source.dir
+            ? QString::fromLatin1(source.dir) + QString::fromLatin1(source.name)
+            : overridePath;
         QFile warm(path);
         if (warm.open(QIODevice::ReadOnly)) {
             warm.read(4096);
