@@ -274,6 +274,26 @@ void TestArchiveBrowser::testPluginHandleAndToolIniLookup()
     ArchiveBrowserDialog noDir;
     noDir.setPluginProvider([]() -> Data* { return nullptr; });
     QVERIFY(noDir.toolIniPath().isEmpty());
+
+    // A configured path wins over the guess beside the data directory. This is
+    // the whole point of the setting: a tool installed somewhere other than the
+    // game's own folder would otherwise be reported as "not configured" and the
+    // resource-archive list silently ignored.
+    const QString configured = install.path() + QStringLiteral("/custom/CK.ini");
+    QVERIFY(QDir().mkpath(install.path() + QStringLiteral("/custom")));
+    QFile custom(configured);
+    QVERIFY(custom.open(QIODevice::WriteOnly));
+    custom.write("[Wwise]\niDefaultExternalCodecID = 9\n");
+    custom.close();
+    dlg.setToolIniPath(configured);
+    QCOMPARE(QDir::fromNativeSeparators(dlg.toolIniPath()),
+             QDir::fromNativeSeparators(configured));
+
+    // Clearing it hands the decision back to the derived path, so removing the
+    // preference restores the old behaviour rather than disabling the feature.
+    dlg.setToolIniPath(QString());
+    QCOMPARE(QDir::fromNativeSeparators(dlg.toolIniPath()),
+             QDir::fromNativeSeparators(iniPath));
 }
 
 void TestArchiveBrowser::testOpenBsaAndList()

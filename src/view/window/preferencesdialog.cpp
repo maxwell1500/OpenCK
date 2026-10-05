@@ -272,6 +272,20 @@ QWidget* PreferencesDialog::createArchivePage()
     hint->setWordWrap(true);
     vlay->addWidget(hint);
 
+    // The game tool's own INI names which archives belong to the game rather
+    // than to a mod, which is what tells external-data collection a referenced
+    // file is already covered by the game. Left blank, the collection window
+    // falls back to guessing the file beside the data directory.
+    mToolIniEdit = new QLineEdit();
+    mToolIniEdit->setPlaceholderText("Path to CreationKit.ini...");
+    form->addRow("Tool INI:", mToolIniEdit);
+
+    // The Creation Kit opens the archive browser and immediately gathers the
+    // assets a plugin references but does not carry. Off keeps collection
+    // manual via the browser's own button.
+    mAutoCollectCheck = new QCheckBox("Collect external data when the archive browser opens");
+    form->addRow("Auto-collect:", mAutoCollectCheck);
+
     form->addRow(group);
     return page;
 }
@@ -408,6 +422,8 @@ void PreferencesDialog::loadSettings()
     conf.endArray();
     if (mArchiveList->count() == 0)
         mArchiveList->addItem("(no archives loaded)");
+    mToolIniEdit->setText(conf.value("ToolIniPath", "").toString());
+    mAutoCollectCheck->setChecked(conf.value("AutoCollectOnOpen", false).toBool());
     conf.endGroup();
 
     conf.beginGroup("Papyrus");
@@ -469,6 +485,23 @@ void PreferencesDialog::saveSettings()
 
     conf.beginGroup("Network");
     conf.setValue("bEnableVersionControl", mVersionControlCheck->isChecked());
+    conf.endGroup();
+
+    // The archive list used to be read but never written, so it stayed stuck at
+    // "(no archives loaded)". Round-tripping it keeps the read side honest.
+    conf.beginGroup("Archive");
+    conf.setValue("ToolIniPath", mToolIniEdit->text());
+    conf.setValue("AutoCollectOnOpen", mAutoCollectCheck->isChecked());
+    conf.beginWriteArray("Archives");
+    int archiveIndex = 0;
+    for (int i = 0; i < mArchiveList->count(); ++i) {
+        const QString name = mArchiveList->item(i)->text();
+        if (name == QStringLiteral("(no archives loaded)"))
+            continue;
+        conf.setArrayIndex(archiveIndex++);
+        conf.setValue("path", name);
+    }
+    conf.endArray();
     conf.endGroup();
 
     conf.sync();

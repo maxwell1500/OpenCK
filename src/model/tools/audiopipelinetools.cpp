@@ -1,5 +1,7 @@
 #include "audiopipelinetools.hpp"
 
+#include "ba2/resourcearchiveconfig.hpp"
+
 #include <QDir>
 #include <QFileInfo>
 
@@ -102,7 +104,11 @@ QStringList AudioPipelineTools::roboVoicerArguments(const QString& roboVoicerPat
     return args;
 }
 
-int AudioPipelineTools::wwiseExternalCodecId()
+int AudioPipelineTools::wwiseExternalCodecId(const QString& toolIniPath)
 {
-    return 4;  // the Creation Kit's [Wwise] iDefaultExternalCodecID value
+    // The Creation Kit's own default, used only when no tool INI names one.
+    const int fallback = 4;
+    const ResourceArchiveConfig config = ResourceArchiveConfig::fromIni(toolIniPath);
+    const int configured = config.defaultExternalCodecId();
+    return configured >= 0 ? configured : fallback;
 }

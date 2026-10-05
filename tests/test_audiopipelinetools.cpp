@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QTemporaryDir>
+#include <QFile>
 
 #include "../../src/model/tools/audiopipelinetools.hpp"
 
@@ -107,7 +108,26 @@ void TestAudioPipelineTools::testRoboVoicerArguments()
 
 void TestAudioPipelineTools::testWwiseCodecId()
 {
-    QCOMPARE(AudioPipelineTools::wwiseExternalCodecId(), 4);
+    // No INI at all: the Creation Kit's fallback is still the answer.
+    QCOMPARE(AudioPipelineTools::wwiseExternalCodecId(QString()), 4);
+
+    // A readable INI that states [Wwise] iDefaultExternalCodecID defers to it.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString iniPath = dir.path() + QStringLiteral("/CreationKit.ini");
+    QFile ini(iniPath);
+    QVERIFY(ini.open(QIODevice::WriteOnly));
+    ini.write("[Wwise]\niDefaultExternalCodecID = 9\n");
+    ini.close();
+    QCOMPARE(AudioPipelineTools::wwiseExternalCodecId(iniPath), 9);
+
+    // An INI that exists but does not state the codec falls back rather than
+    // reporting "unknown".
+    QFile bare(dir.path() + QStringLiteral("/bare.ini"));
+    QVERIFY(bare.open(QIODevice::WriteOnly));
+    bare.write("[Archive]\nSResourceArchiveList = A.ba2\n");
+    bare.close();
+    QCOMPARE(AudioPipelineTools::wwiseExternalCodecId(dir.path() + QStringLiteral("/bare.ini")), 4);
 }
 
 QTEST_MAIN(TestAudioPipelineTools)

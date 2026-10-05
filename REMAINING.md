@@ -2368,7 +2368,7 @@ reproduced here; this is observed behaviour, and the code keeps its own strings.
 
 Two things the CK's archive browser has that we do not, in order of size:
 
-1. **External-data collection.** **Model layer done 2026-10-05; UI still open.**
+1. **External-data collection.** **Done 2026-10-05.**
    The resolution problem was always the easy half, and it is solved: a plugin can
    reference a mesh that resolves fine because the *game* ships it inside a
    resource archive, and that file is simply absent from the mod. Validation
@@ -2420,9 +2420,21 @@ Two things the CK's archive browser has that we do not, in order of size:
    only when a plugin is open — collection works from a plugin's references, so
    there is nothing to collect without one.
 
-   **Still open:** the auto-run-when-the-browser-opens setting, and
-   `AudioPipelineTools::wwiseExternalCodecId()` still returning a literal 4 rather
-   than deferring to the configuration.
+   **Done 2026-10-05 - the auto-run setting and the codec id.** The
+   auto-collect-on-open behaviour is a real preference (`[Archive] AutoCollectOnOpen`
+   in the editor config, `Preferences > Archive`). `MainWindow` reads it when it
+   opens the browser and calls the browser's public `launchCollectionDialog()`,
+   which is a no-op when no plugin is open - so opening the browser without a
+   document still does not pop a collection window with nothing in it. The
+   collector reads the codec id from the tool INI now, not a literal.
+
+   `AudioPipelineTools::wwiseExternalCodecId()` takes the tool INI path and
+   defers to `ResourceArchiveConfig::defaultExternalCodecId()`, falling back to
+   the Creation Kit's `4` only when the INI does not name one. This is what
+   removing the hardcoded constant actually required: there were no production
+   callers, so the function's *signature* was the only thing forcing the value
+   to be baked in. The fallback is still a literal, but it is now the documented
+   last resort rather than the answer to every question.
 
 2. **INI-driven archive configuration.** **Reader done 2026-10-05.**
    `IniFile` (`libs/files/ini/inifile.{hpp,cpp}`) is a tolerant sectioned INI
@@ -2439,19 +2451,21 @@ Two things the CK's archive browser has that we do not, in order of size:
      LOD archives). They do not overlap, and merging them would claim 15 archives
      are resource archives that are not, so they stay separate and
      `allNamedArchives()` unions them only for a membership test.
-   - The codec id is now *read*, not hardcoded. `AudioPipelineTools::
-     wwiseExternalCodecId()` still returns a literal 4 with a comment saying it is
-     "the Creation Kit's [Wwise] iDefaultExternalCodecID value"; it should defer
-     to this config when one is available.
+- The codec id is now *read*, not hardcoded. `AudioPipelineTools::
+      wwiseExternalCodecId()` takes the tool INI path and defers to this config,
+      falling back to `4` only when the INI does not state one.
 
    Lookups are case-insensitive because the file is not self-consistent: one
    section carries both `sResourceIndexFileList` and `SResourceArchiveList`.
 
-   **Still missing:** anywhere to point at the INI. Nothing calls
-   `ResourceArchiveConfig::fromIni()` in production, there is no setting for its
-   path, and `PreferencesDialog::loadSettings()` reads an `[Archive] Archives`
-   array from OpenCK's *own* `editor.ini` that `saveSettings()` never writes — a
-   dead read-only list that shows "(no archives loaded)".
+**Done 2026-10-05 - there is now somewhere to point at it.** `Preferences >
+   Archive` has a "Tool INI" field and an "Auto-collect" checkbox. The INI path
+   is stored as `[Archive] ToolIniPath`, passed by `MainWindow` into the browser's
+   `setToolIniPath()`, and it overrides the previous "look for CreationKit.ini
+   beside the data directory" guess. When the field is blank the derived guess
+   still runs, so the behaviour for anyone who sets nothing is unchanged. The
+   `[Archive] Archives` array that `loadSettings()` read and `saveSettings()`
+   never wrote is now written back on save, so the read side is no longer dead.
 
 **Two items from the list above are withdrawn as unsupported speculation.**
 Nothing in the binary indicates the archive browser can add or replace an entry
@@ -2473,12 +2487,10 @@ with no cancel reads as a hang. Treat them as usability defects to fix on their
 merits, not as measured parity gaps. Items 1, 2, 5 and 8 are now done on exactly
 that reasoning.
 
-**Still open:** the auto-run-on-open setting noted above, and the
-INI path setting — `ResourceArchiveConfig::fromIni()` now has a production caller
-(`ArchiveBrowserDialog::toolIniPath()` finds the file beside the data directory),
-but it is derived rather than configurable. The scoped Archive Browser list is
-closed: items 1-5 and 8 done, 6 and 7 withdrawn, none verified against the CK
-beyond the reasoning recorded above.
+**The Archive Browser list is closed.** Items 1-5 and 8 done, 6 and 7 withdrawn,
+none verified against the CK beyond the reasoning recorded above. The INI path
+setting and the auto-run-on-open preference that remained after the collection
+UI landed are both done (2026-10-05), which closes the remaining gap from item 2.
 
 **The archive browser is now a modeless window, and it holds a plugin handle.**
 Two notes, because both are easy to get wrong later:

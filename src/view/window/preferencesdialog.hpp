@@ -68,6 +68,8 @@ private:
 
     // Archive
     QListWidget* mArchiveList;
+    QLineEdit* mToolIniEdit;
+    QCheckBox* mAutoCollectCheck;
 
     // Papyrus
     QLineEdit* mCompilerDirEdit;

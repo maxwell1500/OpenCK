@@ -126,6 +126,10 @@ void ArchiveBrowserDialog::refreshCollectButton()
 
 QString ArchiveBrowserDialog::toolIniPath() const
 {
+    // A path the user configured wins over the derived guess, so a relocated or
+    // non-standard install is respected rather than second-guessed.
+    if (!mToolIniPathOverride.isEmpty())
+        return mToolIniPathOverride;
     if (mDataDirectory.isEmpty())
         return QString();
     // The tool's file sits beside the Data directory rather than inside it, so the
@@ -137,7 +141,12 @@ QString ArchiveBrowserDialog::toolIniPath() const
     return QFileInfo::exists(candidate) ? candidate : QString();
 }
 
-void ArchiveBrowserDialog::collectExternalData()
+void ArchiveBrowserDialog::setToolIniPath(const QString& path)
+{
+    mToolIniPathOverride = path;
+}
+
+void ArchiveBrowserDialog::launchCollectionDialog()
 {
     if (!mPluginProvider || !mPluginProvider() || mDataDirectory.isEmpty())
         return;
@@ -278,7 +287,7 @@ void ArchiveBrowserDialog::setupUi()
     connect(mPlayBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::playSelected);
     connect(mExtractBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::extractSelected);
     connect(mExtractAllBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::extractAll);
-    connect(mCollectBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::collectExternalData);
+    connect(mCollectBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::launchCollectionDialog);
     refreshCollectButton();
 }
 

@@ -37,10 +37,18 @@ public:
     // Name of the plugin being edited, for the collection UI's benefit. Empty
     // when no plugin is open.
     QString pluginName() const;
-    // Path of the game tool's configuration file, if it can be found next to the
-    // data directory. Empty when there is none, which callers must treat as
-    // "unknown" rather than "no game archives".
+    // Overrides the derived "CreationKit.ini beside the data directory" guess
+    // with a path the user has configured. An empty path leaves the guess in
+    // place, so the behaviour is unchanged for anyone who sets nothing.
+    void setToolIniPath(const QString& path);
+    // Path of the game tool's configuration file, if one is configured or can be
+    // found next to the data directory. Empty when there is none, which callers
+    // must treat as "unknown" rather than "no game archives".
     QString toolIniPath() const;
+    // Opens the collection window. Public so MainWindow can honour the
+    // auto-collect-on-open preference; it no-ops when no plugin is open, since
+    // collection works from a plugin's references.
+    void launchCollectionDialog();
 
     // Writes one entry to an absolute path. quiet suppresses the per-file modal so
     // a batch can report its failures in one summary instead.
@@ -60,7 +68,6 @@ public:
 
 private slots:
     void browseArchive();
-    void collectExternalData();
     void onQuickOpenChanged(int index);
     void onFilterChanged(int index);
     void onSearchTextChanged(const QString& text);
@@ -107,6 +114,8 @@ private:
     int mSelectedIndex = -1;
 
     QString mDataDirectory;
+    // User-configured game tool INI, which wins over the derived path.
+    QString mToolIniPathOverride;
     PluginProvider mPluginProvider;
     QComboBox* mQuickOpen = nullptr;
     QPushButton* mBrowseBtn = nullptr;

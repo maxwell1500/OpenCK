@@ -48,8 +48,11 @@ public:
                                            const QString& text,
                                            const QString& outputWavPath);
 
-    // The default Wwise external codec id used by the Creation Kit.
-    static int wwiseExternalCodecId();
+    // The default Wwise external codec id. Defers to the game tool's INI
+    // ([Wwise] iDefaultExternalCodecID) when one is readable, and falls back to
+    // the Creation Kit's value otherwise, so a caller that has pointed at the
+    // INI no longer reads a hardcoded constant.
+    static int wwiseExternalCodecId(const QString& toolIniPath);
 };
 
 #endif // AUDIOPIPELINETOOLS_H

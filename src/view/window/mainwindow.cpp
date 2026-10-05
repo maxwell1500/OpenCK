@@ -1855,11 +1855,32 @@ void MainWindow::on_actionArchiveBrowser_triggered()
     // The provider is a closure over `this`, not a captured Data*, so a plugin
     // closed while the browser is open cannot leave it holding a freed pointer.
     mArchiveBrowser->setPluginProvider([this]() -> Data* { return mData; });
+
+    // The tool INI path and the auto-collect preference come from Preferences,
+    // not from a hardcoded location, so a relocated install can be pointed at.
+    QString toolIniPath;
+    bool autoCollect = false;
+    {
+        QSettings conf(FilePaths::configFilePath(), QSettings::IniFormat);
+        conf.beginGroup("Archive");
+        toolIniPath = conf.value("ToolIniPath").toString();
+        autoCollect = conf.value("AutoCollectOnOpen", false).toBool();
+        conf.endGroup();
+    }
+    if (!toolIniPath.isEmpty())
+        mArchiveBrowser->setToolIniPath(toolIniPath);
+
     mArchiveBrowser->setAttribute(Qt::WA_DeleteOnClose, false);
     connect(mArchiveBrowser, &QObject::destroyed, this, [this]() { mArchiveBrowser = nullptr; });
     mArchiveBrowser->show();
     mArchiveBrowser->raise();
     mArchiveBrowser->activateWindow();
+
+    // Observed Creation Kit behaviour: with the preference on, opening the
+    // archive browser also opens the collection window. This no-ops when no
+    // plugin is open, because collection reads a plugin's references.
+    if (autoCollect)
+        mArchiveBrowser->launchCollectionDialog();
 }
 
 void MainWindow::on_actionAnimationEditor_triggered()
