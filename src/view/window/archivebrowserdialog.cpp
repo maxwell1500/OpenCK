@@ -1,5 +1,10 @@
 #include "archivebrowserdialog.hpp"
 
+#include "collectexternaldatadialog.hpp"
+#include "voicepreview.hpp"
+#include "nifviewportwidget.hpp"
+#include "../../model/world/data.hpp"
+
 #include "../libs/files/ba2/bsaarchive.hpp"
 #include "../libs/files/ba2/ba2archive.hpp"
 #include "../libs/files/audio/fuzparser.hpp"
@@ -85,6 +90,70 @@ ArchiveBrowserDialog::ArchiveBrowserDialog(const QString& dataDirectory, QWidget
     scanDataDirectory();
 }
 
+void ArchiveBrowserDialog::setPluginProvider(PluginProvider provider)
+{
+    mPluginProvider = std::move(provider);
+    refreshCollectButton();
+}
+
+QString ArchiveBrowserDialog::pluginName() const
+{
+    Data* plugin = mPluginProvider ? mPluginProvider() : nullptr;
+    if (!plugin)
+        return QString();
+    // The edited plugin is the last of the content files; everything before it is
+    // a master, which is the convention the loader and the status bar both use.
+    const QStringList files = plugin->getContentFiles();
+    return files.isEmpty() ? QString() : files.last();
+}
+
+void ArchiveBrowserDialog::refreshCollectButton()
+{
+    const bool havePlugin = mPluginProvider && mPluginProvider() != nullptr;
+    const bool enabled = havePlugin && !mDataDirectory.isEmpty();
+    mCollectBtn->setEnabled(enabled);
+    if (!enabled) {
+        mCollectBtn->setToolTip(
+            mDataDirectory.isEmpty()
+                ? tr("No data directory is set, so there is nowhere to collect from.")
+                : tr("Open a plugin first: collection works from the assets a plugin "
+                     "references."));
+    } else {
+        mCollectBtn->setToolTip(tr("Gather the assets %1 references but does not carry, "
+                                   "so they can ship with it.").arg(pluginName()));
+    }
+}
+
+QString ArchiveBrowserDialog::toolIniPath() const
+{
+    if (mDataDirectory.isEmpty())
+        return QString();
+    // The tool's file sits beside the Data directory rather than inside it, so the
+    // data directory's own name is what has to be stepped out of -- not assumed
+    // to be "Data".
+    const QDir dataDir(mDataDirectory);
+    const QDir parent(dataDir.absoluteFilePath(QStringLiteral("..")));
+    const QString candidate = parent.absoluteFilePath(QStringLiteral("CreationKit.ini"));
+    return QFileInfo::exists(candidate) ? candidate : QString();
+}
+
+void ArchiveBrowserDialog::collectExternalData()
+{
+    if (!mPluginProvider || !mPluginProvider() || mDataDirectory.isEmpty())
+        return;
+
+    // A window in its own right, and deliberately not modal: with two monitors the
+    // user generally wants the plan and the browser side by side, and a modal
+    // dialog would block the browser they are reading from. Parented so it cannot
+    // outlive the browser, but moveable to another screen like any other window.
+    auto* dialog = new CollectExternalDataDialog(mDataDirectory, mPluginProvider,
+                                                 toolIniPath(), this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+    dialog->show();
+    dialog->raise();
+    dialog->activateWindow();
+}
+
 ArchiveBrowserDialog::~ArchiveBrowserDialog()
 {
     closeArchive();
@@ -154,6 +223,12 @@ void ArchiveBrowserDialog::setupUi()
     btnRow->addWidget(mPlayBtn);
     btnRow->addWidget(mExtractBtn);
     btnRow->addWidget(mExtractAllBtn);
+    // Collection needs a plugin to read references from, so it starts disabled and
+    // is enabled by refreshCollectButton() once one is available.
+    mCollectBtn = new QPushButton(tr("Collect External Data..."), this);
+    mCollectBtn->setObjectName(QStringLiteral("collectExternalBtn"));
+    mCollectBtn->setEnabled(false);
+    btnRow->addWidget(mCollectBtn);
     btnRow->addStretch();
     topLayout->addLayout(btnRow);
 
@@ -203,6 +278,8 @@ void ArchiveBrowserDialog::setupUi()
     connect(mPlayBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::playSelected);
     connect(mExtractBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::extractSelected);
     connect(mExtractAllBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::extractAll);
+    connect(mCollectBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::collectExternalData);
+    refreshCollectButton();
 }
 
 // Archives are looked for recursively. Fallout 4 and Skyrim keep their DLC in

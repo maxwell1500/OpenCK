@@ -498,6 +498,15 @@ void MainWindow::setData(Data* data)
     {
         updateStatus("");
     }
+
+    // The archive browser can outlive the plugin, and its collection action is only
+    // meaningful while one is open. Re-evaluated here rather than at construction
+    // so closing a plugin disables the button instead of leaving a live control
+    // that would do nothing.
+    if (mArchiveBrowser)
+    {
+        mArchiveBrowser->setPluginProvider([this]() -> Data* { return mData; });
+    }
 }
 
 void MainWindow::setupEditMenu()
@@ -1831,8 +1840,26 @@ void MainWindow::on_actionArchiveBrowser_triggered()
     LOG_DEBUG("Archive Browser triggered");
     const QString dataDir = mData
         ? mData->getPaths().dataDir.absolutePath() : QString();
-    ArchiveBrowserDialog dialog(dataDir, this);
-    dialog.exec();
+
+    // A modeless top-level window rather than exec(), so it can sit on a second
+    // monitor beside the collection window while the user works. Triggering the
+    // action again raises the existing one instead of opening a second, matching
+    // how QtFormDialogManager behaves.
+    if (mArchiveBrowser) {
+        mArchiveBrowser->raise();
+        mArchiveBrowser->activateWindow();
+        return;
+    }
+
+    mArchiveBrowser = new ArchiveBrowserDialog(dataDir, this);
+    // The provider is a closure over `this`, not a captured Data*, so a plugin
+    // closed while the browser is open cannot leave it holding a freed pointer.
+    mArchiveBrowser->setPluginProvider([this]() -> Data* { return mData; });
+    mArchiveBrowser->setAttribute(Qt::WA_DeleteOnClose, false);
+    connect(mArchiveBrowser, &QObject::destroyed, this, [this]() { mArchiveBrowser = nullptr; });
+    mArchiveBrowser->show();
+    mArchiveBrowser->raise();
+    mArchiveBrowser->activateWindow();
 }
 
 void MainWindow::on_actionAnimationEditor_triggered()

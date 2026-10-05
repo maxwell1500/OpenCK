@@ -2400,13 +2400,29 @@ Two things the CK's archive browser has that we do not, in order of size:
    which visits only directories and so missed every archive in the Data root.
    `resolverFindsArchivesAtTopLevelAndNested` pins both directions.
 
-   **What is still missing is the whole user-facing half:** a dialog that shows
-   the plan and collects it, the setting to ignore files already inside archives,
-   the "include archives" toggle, the automatic run when the archive browser
-   opens, and a way to point at the tool INI. Note the wiring problem: the CK
-   puts this action in the archive browser, but our browser holds no loaded
-   plugin and collection is meaningless without one — so this has to be a separate
-   dialog fed from the main window, not a button bolted onto the browser.
+   **Done 2026-10-05 — the UI exists.** `CollectExternalDataDialog`
+   (`src/view/window/collectexternaldatadialog.{hpp,cpp}`) lists the plan
+   (asset, state, source archive, referencing records), offers the two options, and
+   collects on a worker thread with a real Cancel button and a progress bar that
+   names the file being written. The plan is rebuilt at collect time rather than
+   reused, because the user may have changed a filter or added files since it was
+   built and writing a stale plan would quietly do the wrong thing.
+
+   It is a **modeless top-level window**, not a modal panel, and that is
+   deliberate: on a two-monitor setup the useful arrangement is the browser on one
+   screen and the plan on the other, and a modal dialog would block the browser
+   you are reading from. It is also usable with the browser closed. Both windows
+   persist their geometry, and the collection window clamps its initial size to
+   the screen it opens on, so a size chosen for a large display is not imposed on
+   a laptop.
+
+   Launched from the browser's "Collect External Data..." button, which is enabled
+   only when a plugin is open — collection works from a plugin's references, so
+   there is nothing to collect without one.
+
+   **Still open:** the auto-run-when-the-browser-opens setting, and
+   `AudioPipelineTools::wwiseExternalCodecId()` still returning a literal 4 rather
+   than deferring to the configuration.
 
 2. **INI-driven archive configuration.** **Reader done 2026-10-05.**
    `IniFile` (`libs/files/ini/inifile.{hpp,cpp}`) is a tolerant sectioned INI
@@ -2457,11 +2473,27 @@ with no cancel reads as a hang. Treat them as usability defects to fix on their
 merits, not as measured parity gaps. Items 1, 2, 5 and 8 are now done on exactly
 that reasoning.
 
-**Still open:** the external-data collection **UI** and the INI path setting —
-both have their logic built and tested (`test_externaldata`, 15/15), and neither
-is reachable from the UI yet. The scoped Archive Browser list itself is closed:
-items 1-5 and 8 are done, 6 and 7 are withdrawn, and none of it is verified
-against the CK beyond the reasoning recorded above.
+**Still open:** the auto-run-on-open setting noted above, and the
+INI path setting — `ResourceArchiveConfig::fromIni()` now has a production caller
+(`ArchiveBrowserDialog::toolIniPath()` finds the file beside the data directory),
+but it is derived rather than configurable. The scoped Archive Browser list is
+closed: items 1-5 and 8 done, 6 and 7 withdrawn, none verified against the CK
+beyond the reasoning recorded above.
+
+**The archive browser is now a modeless window, and it holds a plugin handle.**
+Two notes, because both are easy to get wrong later:
+
+- It holds the plugin as a `std::function<Data*()>`, not a `Data*`. It outlives the
+  document — that is the whole point of a window — so a pointer captured at
+  construction would dangle the moment the user closed the plugin behind it.
+  `MainWindow::setData()` re-installs the provider so the button disables itself
+  rather than remaining live and doing nothing.
+- `AssetReference` must be spelled `struct`, not `class`, in every forward
+  declaration. MSVC encodes struct-vs-class into the mangled name, so
+  `QVector<class AssetReference>` produces `?$QList@UAssetReference@` against a
+  definition emitting `?$QList@VAssetReference@`, and the two do not link. This
+  cost real time and would look like a missing source file rather than a
+  spelling difference.
 
 
 ### Series 7 â€” Save-time and interactive validation

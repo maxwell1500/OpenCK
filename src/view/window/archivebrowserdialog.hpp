@@ -3,6 +3,7 @@
 #include <QDialog>
 #include <QVector>
 #include <QByteArray>
+#include <functional>
 
 class QTreeWidget;
 class QTreeWidgetItem;
@@ -10,10 +11,9 @@ class QComboBox;
 class QLineEdit;
 class QPushButton;
 class QLabel;
-class QListWidgetItem;
-class QTreeWidgetItem;
 class BsaArchive;
 class Ba2Archive;
+class Data;
 
 // Browses Bethesda archive files (BSA and BA2) found in a game data
 // directory: filter/search entries, preview textures and sounds (including
@@ -23,9 +23,24 @@ class ArchiveBrowserDialog : public QDialog
     Q_OBJECT
 
 public:
+    // Returns the plugin currently being edited, or null when none is. A provider
+    // rather than a stored pointer because this dialog can outlive a plugin: it is
+    // a modeless window, the user can close the document behind it, and a Data*
+    // captured at construction would then dangle. Asking every time cannot go
+    // stale.
+    using PluginProvider = std::function<Data*()>;
     explicit ArchiveBrowserDialog(const QString& dataDirectory = QString(),
                                   QWidget* parent = nullptr);
     ~ArchiveBrowserDialog() override;
+
+    void setPluginProvider(PluginProvider provider);
+    // Name of the plugin being edited, for the collection UI's benefit. Empty
+    // when no plugin is open.
+    QString pluginName() const;
+    // Path of the game tool's configuration file, if it can be found next to the
+    // data directory. Empty when there is none, which callers must treat as
+    // "unknown" rather than "no game archives".
+    QString toolIniPath() const;
 
     // Writes one entry to an absolute path. quiet suppresses the per-file modal so
     // a batch can report its failures in one summary instead.
@@ -45,6 +60,7 @@ public:
 
 private slots:
     void browseArchive();
+    void collectExternalData();
     void onQuickOpenChanged(int index);
     void onFilterChanged(int index);
     void onSearchTextChanged(const QString& text);
@@ -76,6 +92,7 @@ private:
     void updatePreview(int index);
     void clearPreview();
     void setStatus(const QString& text);
+    void refreshCollectButton();
     // Describes what the current filter/search leaves visible, for the extract
     // button's label and its confirmation.
     QString visibleScopeDescription() const;
@@ -90,6 +107,7 @@ private:
     int mSelectedIndex = -1;
 
     QString mDataDirectory;
+    PluginProvider mPluginProvider;
     QComboBox* mQuickOpen = nullptr;
     QPushButton* mBrowseBtn = nullptr;
     QLabel* mArchiveLabel = nullptr;
@@ -104,4 +122,5 @@ private:
     QPushButton* mPlayBtn = nullptr;
     QPushButton* mExtractBtn = nullptr;
     QPushButton* mExtractAllBtn = nullptr;
+    QPushButton* mCollectBtn = nullptr;
 };

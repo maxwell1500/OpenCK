@@ -181,6 +181,9 @@ void setupPrimitivePreviewMenu();
     Ui::mainwindow *ui;
     Data* mData;
     Document* mDocument = nullptr;
+    // Kept alive (not stack-allocated) so the browser can stay open as a window.
+    // Null when it has been closed; the destroyed connection clears it.
+    ArchiveBrowserDialog* mArchiveBrowser = nullptr;
     /// When set, saving asks for confirmation if validation reports an error.
     bool mValidateBeforeSave = false;
     QAction* mValidateBeforeSaveAction = nullptr;

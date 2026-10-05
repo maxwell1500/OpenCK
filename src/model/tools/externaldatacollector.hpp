@@ -3,6 +3,7 @@
 #include <QString>
 #include <QStringList>
 #include <QVector>
+#include <functional>
 
 class AssetResolver;
 
@@ -74,21 +75,31 @@ public:
     // `config` is only consulted when Options::resourceArchivesOnly is set. Pass
     // null and every item found inside any archive is treated as collectable,
     // which is the right default for a data directory with no tool INI to consult.
-    static Plan buildPlan(const QVector<class AssetReference>& referenced,
+    // struct, not class: AssetReference is declared as a struct, and MSVC encodes
+    // struct-vs-class into the mangled name, so a "class AssetReference"
+    // forward-declaration here produces a symbol that will not link.
+    static Plan buildPlan(const QVector<struct AssetReference>& referenced,
                           const AssetResolver& resolver, const Options& options,
                           const class ResourceArchiveConfig* config = nullptr);
 
     // Writes the plan's collectable items under destination, preserving each
-    // asset's relative path. Returns the number written and appends the failures
+    // asset's relative path. `isCancelled` is polled between files; pass a
+    // std::function rather than a bare flag so the caller can own the flag's
+    // lifetime and type. Returns the number written and appends the failures
     // with their reason, so a partial run is reportable rather than silent.
     struct Outcome
     {
         int written = 0;
         QStringList failures;
         QStringList writtenPaths;
+        bool cancelled = false;
     };
+    // Called with the item about to be written, so a caller can drive a progress
+    // bar; return true from `isCancelled` to stop.
     static Outcome collect(const Plan& plan, const QString& destination,
-                           bool (*isCancelled)() = nullptr);
+                           const std::function<bool()>& isCancelled = nullptr,
+                           const std::function<void(int done, int total,
+                                                     const QString& current)>& onProgress = nullptr);
 
     // Every asset path referenced by a loaded plugin comes from
     // AssetDependencyScanner::collectReferences(), which owns the record walk.

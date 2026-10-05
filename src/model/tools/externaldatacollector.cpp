@@ -123,7 +123,8 @@ ExternalDataCollector::Plan ExternalDataCollector::buildPlan(
 }
 
 ExternalDataCollector::Outcome ExternalDataCollector::collect(
-    const Plan& plan, const QString& destination, bool (*isCancelled)())
+    const Plan& plan, const QString& destination, const std::function<bool()>& isCancelled,
+    const std::function<void(int, int, const QString&)>& onProgress)
 {
     Outcome outcome;
     if (destination.isEmpty())
@@ -169,8 +170,13 @@ ExternalDataCollector::Outcome ExternalDataCollector::collect(
 
     for (const Item& item : plan.toCollect)
     {
-        if (isCancelled && isCancelled())
+        if (isCancelled && isCancelled()) {
+            outcome.cancelled = true;
             break;
+        }
+        if (onProgress)
+            onProgress(outcome.written + outcome.failures.size(), plan.toCollect.size(),
+                      item.assetPath);
 
         QString outPath;
         if (!containedDestination(destination, item.assetPath, &outPath)) {

@@ -31,6 +31,7 @@ private slots:
     void testQuickOpenList();
     void testArchiveDiscoveryIsRecursive();
     void testExtractButtonReflectsFilterScope();
+    void testPluginHandleAndToolIniLookup();
     void testOpenBsaAndList();
     void testVoiceFilter();
     void testSearch();
@@ -234,6 +235,45 @@ void TestArchiveBrowser::testExtractButtonReflectsFilterScope()
     QCOMPARE(treeFilePaths(tree).count(), 0);
     QVERIFY2(!button->isEnabled(),
              "the extract button stayed enabled with nothing selected to extract");
+}
+
+void TestArchiveBrowser::testPluginHandleAndToolIniLookup()
+{
+    QTemporaryDir install;
+    QVERIFY(install.isValid());
+    const QString dataDir = install.path() + QStringLiteral("/Data");
+    QVERIFY(QDir().mkpath(dataDir));
+
+    ArchiveBrowserDialog dlg(dataDir);
+    auto* collect = dlg.findChild<QPushButton*>("collectExternalBtn");
+    QVERIFY(collect);
+
+    // No provider at all: the action must be disabled rather than left live,
+    // because there is no plugin to read references from.
+    QVERIFY(!collect->isEnabled());
+    QVERIFY(dlg.pluginName().isEmpty());
+
+    // A provider that reports no plugin is the same situation, which is the case
+    // that matters once the browser outlives the document.
+    dlg.setPluginProvider([]() -> Data* { return nullptr; });
+    QVERIFY(dlg.pluginName().isEmpty());
+    QVERIFY(!collect->isEnabled());
+
+    // The tool's file sits beside Data, not inside it. Looked up by stepping out
+    // of the data directory rather than assuming it is called "Data".
+    QVERIFY(dlg.toolIniPath().isEmpty());
+    const QString iniPath = install.path() + QStringLiteral("/CreationKit.ini");
+    QFile ini(iniPath);
+    QVERIFY(ini.open(QIODevice::WriteOnly));
+    ini.write("[Archive]\nSResourceArchiveList = Starfield - Meshes01.ba2\n");
+    ini.close();
+    QCOMPARE(QDir::fromNativeSeparators(dlg.toolIniPath()),
+             QDir::fromNativeSeparators(iniPath));
+
+    // No data directory at all means nowhere to collect from.
+    ArchiveBrowserDialog noDir;
+    noDir.setPluginProvider([]() -> Data* { return nullptr; });
+    QVERIFY(noDir.toolIniPath().isEmpty());
 }
 
 void TestArchiveBrowser::testOpenBsaAndList()
