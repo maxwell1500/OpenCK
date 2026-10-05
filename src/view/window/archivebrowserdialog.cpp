@@ -8,6 +8,7 @@
 #include "logger.hpp"
 
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -18,6 +19,7 @@
 #include <QLabel>
 #include <QLocale>
 #include <QMessageBox>
+#include <QProgressDialog>
 #include <QPixmap>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -135,8 +137,8 @@ void ArchiveBrowserDialog::setupUi()
     // file can be judged before extracting it, and sorting is per-column.
     mTree = new QTreeWidget(this);
     mTree->setObjectName(QStringLiteral("entryTree"));
-    mTree->setColumnCount(2);
-    mTree->setHeaderLabels({ tr("Name"), tr("Size") });
+    mTree->setColumnCount(3);
+    mTree->setHeaderLabels({ tr("Name"), tr("Size"), tr("Compressed") });
     mTree->setSelectionMode(QAbstractItemView::ExtendedSelection);
     mTree->setUniformRowHeights(true);
     mTree->setSortingEnabled(true);
@@ -164,11 +166,23 @@ void ArchiveBrowserDialog::setupUi()
     mPreviewImage = new QLabel(this);
     mPreviewImage->setAlignment(Qt::AlignCenter);
     mPreviewImage->setMinimumHeight(120);
-    mPreviewInfo = new QLabel(tr("Select an entry to preview."), this);
-    mPreviewInfo->setWordWrap(true);
-    mPreviewInfo->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    // A metadata table rather than a preformatted label: sizes and offsets need to
+    // line up and be selectable, and a "\n"-joined string cannot be aligned or
+    // read at a glance.
+    mMetaTree = new QTreeWidget(this);
+    mMetaTree->setObjectName(QStringLiteral("entryMeta"));
+    mMetaTree->setColumnCount(2);
+    mMetaTree->setHeaderLabels({ tr("Property"), tr("Value") });
+    mMetaTree->setRootIsDecorated(false);
+    mMetaTree->setUniformRowHeights(true);
+    mMetaTree->setMaximumHeight(160);
     bottomLayout->addWidget(mPreviewImage);
-    bottomLayout->addWidget(mPreviewInfo);
+    bottomLayout->addWidget(mMetaTree);
+
+    mStatusLabel = new QLabel(this);
+    mStatusLabel->setObjectName(QStringLiteral("statusLabel"));
+    mStatusLabel->setWordWrap(true);
+    bottomLayout->addWidget(mStatusLabel);
 
     splitter->addWidget(bottomWidget);
     splitter->setStretchFactor(0, 3);
@@ -354,7 +368,9 @@ qint64 ArchiveBrowserDialog::entrySize(int index) const
     {
     case Kind::Bsa:
         if (mBsa && index >= 0 && index < mBsa->entries().size())
-            return static_cast<qint64>(mBsa->entries().at(index).size);
+            // rawSize(), not size: the top bits of the on-disk size field carry
+            // flags, so using `size` directly over-reports any flagged entry.
+            return static_cast<qint64>(mBsa->entries().at(index).rawSize());
         break;
     case Kind::Ba2:
         if (mBa2 && index >= 0 && index < static_cast<int>(mBa2->entries().size()))
@@ -363,6 +379,59 @@ qint64 ArchiveBrowserDialog::entrySize(int index) const
     default: break;
     }
     return 0;
+}
+
+qint64 ArchiveBrowserDialog::entryPackedSize(int index) const
+{
+    switch (mKind)
+    {
+    case Kind::Bsa:
+        if (mBsa && index >= 0 && index < mBsa->entries().size())
+            return mBsa->recordsPackedSize()
+                ? static_cast<qint64>(mBsa->entries().at(index).packedSize)
+                : -1;
+        break;
+    case Kind::Ba2:
+        if (mBa2 && index >= 0 && index < static_cast<int>(mBa2->entries().size()))
+            return static_cast<qint64>(mBa2->entries().at(index).compressedSize);
+        break;
+    default: break;
+    }
+    return -1;
+}
+
+qint64 ArchiveBrowserDialog::entryOffset(int index) const
+{
+    switch (mKind)
+    {
+    case Kind::Bsa:
+        if (mBsa && index >= 0 && index < mBsa->entries().size())
+            return static_cast<qint64>(mBsa->entries().at(index).offset);
+        break;
+    case Kind::Ba2:
+        if (mBa2 && index >= 0 && index < static_cast<int>(mBa2->entries().size()))
+            return static_cast<qint64>(mBa2->entries().at(index).fileOffset);
+        break;
+    default: break;
+    }
+    return -1;
+}
+
+bool ArchiveBrowserDialog::entryCompressed(int index) const
+{
+    switch (mKind)
+    {
+    case Kind::Bsa:
+        if (mBsa && index >= 0 && index < mBsa->entries().size())
+            return mBsa->entries().at(index).compressed;
+        break;
+    case Kind::Ba2:
+        if (mBa2 && index >= 0 && index < static_cast<int>(mBa2->entries().size()))
+            return mBa2->entries().at(index).compressed;
+        break;
+    default: break;
+    }
+    return false;
 }
 
 bool ArchiveBrowserDialog::readEntry(int index, QByteArray& out) const
@@ -487,6 +556,11 @@ void ArchiveBrowserDialog::rebuildList()
         auto* item = addRow(parent);
         item->setText(0, segments.last());
         item->setText(1, QLocale().formattedDataSize(entrySize(i)));
+        const qint64 packed = entryPackedSize(i);
+        // A recorded zero is not the same as an unrecorded one, so "not recorded"
+        // is shown as such rather than as "0 B".
+        item->setText(2, packed < 0 ? tr("not recorded")
+                                    : QLocale().formattedDataSize(packed));
         item->setData(0, Qt::UserRole, i);
         // A stable secondary sort key, so numeric ordering does not depend on the
         // formatted string ("1 KB" sorting before "900 KB").
@@ -577,12 +651,33 @@ void ArchiveBrowserDialog::updatePreview(int index)
     clearPreview();
 
     const QFileInfo info(path);
-    QString infoText = tr("Name: %1\nFolder: %2\nSize: %3 KB")
-        .arg(info.fileName())
-        .arg(info.path())
-        .arg((mKind == Kind::Bsa && mBsa && index < mBsa->entries().size())
-                 ? mBsa->entries().at(index).size / 1024 : 0);
+    const qint64 size = entrySize(index);
+    const qint64 packed = entryPackedSize(index);
+    const qint64 offset = entryOffset(index);
+    QLocale locale;
+    const auto row = [this](const QString& key, const QString& value) {
+        auto* item = new QTreeWidgetItem(mMetaTree);
+        item->setText(0, key);
+        item->setText(1, value);
+    };
+    row(tr("Name"), info.fileName());
+    row(tr("Folder"), info.path());
+    row(tr("Size"), locale.formattedDataSize(size));
+    if (packed >= 0) {
+        row(tr("Compressed"), locale.formattedDataSize(packed));
+        row(tr("Compression"), entryCompressed(index) ? tr("yes") : tr("no"));
+    } else {
+        row(tr("Compressed"), tr("not recorded by this format"));
+    }
+    row(tr("Offset"), offset >= 0 ? tr("%1 (0x%2)")
+                                         .arg(offset)
+                                         .arg(offset, 0, 16)
+                                   : tr("unknown"));
+    row(tr("Path"), path);
+    if (size > 0 && packed > 0)
+        row(tr("Ratio"), QString::number(static_cast<double>(size) / packed, 'f', 2) + QStringLiteral("x"));
 
+    QString hint;
     if (isTextureExt(lower))
     {
         QString tmp;
@@ -597,7 +692,7 @@ void ArchiveBrowserDialog::updatePreview(int index)
             }
             else
             {
-                infoText += QStringLiteral("\n(no preview available)");
+                hint = tr("No preview available for this texture.");
             }
         }
         mPlayBtn->setEnabled(false);
@@ -607,10 +702,9 @@ void ArchiveBrowserDialog::updatePreview(int index)
              || lower.endsWith(QStringLiteral(".xwm"))
              || lower.endsWith(QStringLiteral(".ogg")))
     {
-        if (lower.endsWith(QStringLiteral(".wav")))
-            infoText += QStringLiteral("\nDouble-click to play.");
-        else
-            infoText += QStringLiteral("\nDouble-click to play audio.");
+        hint = lower.endsWith(QStringLiteral(".wav"))
+            ? tr("Double-click to play.")
+            : tr("Double-click to play audio.");
         mPlayBtn->setEnabled(true);
     }
     else
@@ -618,18 +712,21 @@ void ArchiveBrowserDialog::updatePreview(int index)
         mPlayBtn->setEnabled(false);
     }
 
-    mPreviewInfo->setText(infoText);
+    mMetaTree->resizeColumnToContents(0);
+    // The hint goes to the status label, not the metadata table: it describes the
+    // action available, not a property of the file.
+    setStatus(hint);
 }
 
 void ArchiveBrowserDialog::clearPreview()
 {
     mPreviewImage->clear();
-    if (mPreviewInfo) mPreviewInfo->clear();
+    if (mMetaTree) mMetaTree->clear();
 }
 
 void ArchiveBrowserDialog::setStatus(const QString& text)
 {
-    mPreviewInfo->setText(text);
+    if (mStatusLabel) mStatusLabel->setText(text);
 }
 
 void ArchiveBrowserDialog::playSelected()
@@ -688,32 +785,7 @@ void ArchiveBrowserDialog::extractSelected()
         const QString dir = QFileDialog::getExistingDirectory(
             this, tr("Extract %1 Files Into").arg(selected.size()));
         if (dir.isEmpty()) return;
-
-        int failed = 0;
-        QString firstError;
-        for (int index : selected) {
-            const QString rel = entryPath(index);
-            QString outPath;
-            // Same containment check and directory creation as extractAll(); an
-            // archive entry name is not trusted to be a safe relative path.
-            if (!isSafeExtractionPath(dir, rel, &outPath)
-                || !QDir().mkpath(QFileInfo(outPath).absolutePath())
-                || !extractTo(index, outPath, /*quiet=*/true)) {
-                ++failed;
-                if (firstError.isEmpty()) firstError = rel;
-            }
-        }
-        LOG_INFO(QString("Archive Browser: extracted %1 selected file(s) to %2 (%3 failed)")
-                     .arg(selected.size()).arg(dir).arg(failed));
-        if (failed > 0) {
-            QMessageBox::warning(this, tr("Extraction Incomplete"),
-                tr("%n file(s) could not be written, starting with:\n%1\n\n"
-                   "Nothing outside the chosen folder was written.", nullptr, failed)
-                    .arg(firstError));
-        } else {
-            QMessageBox::information(this, tr("Extracted"),
-                tr("%n file(s) extracted to:\n%1", nullptr, selected.size()).arg(dir));
-        }
+        runBatchExtraction(selected, dir);
         return;
     }
 
@@ -782,33 +854,88 @@ void ArchiveBrowserDialog::extractAll()
     const QString dir = QFileDialog::getExistingDirectory(this, tr("Extract Entries To"));
     if (dir.isEmpty()) return;
 
+    if (!runBatchExtraction(mVisible, dir))
+        return;
+}
+
+// Extracting a whole mesh archive is tens of thousands of synchronous writes.
+// Without this the dialog is unresponsive for minutes with no way out, which
+// reads as a hang rather than as work in progress.
+//
+// The loop stays on this thread and pumps the event queue instead of moving to a
+    // worker: a worker would need the archive's file handle marshalled across threads
+    // and a cancellation handshake for a job that is already a sequence of small,
+//    independent, per-file writes. processEvents is re-entrant and the Cancel button
+//    needs real user input to be delivered, so the widgets that could change the
+//    extraction set are disabled for the duration and restored afterwards.
+bool ArchiveBrowserDialog::runBatchExtraction(QVector<int> indices,
+                                              const QString& destination)
+{
+    if (indices.isEmpty()) return true;
+
+    // Taken by value on purpose: indices very often aliases mVisible, which a
+    // re-entrant rebuildList() could clear while this loop is still reading it.
+    QProgressDialog progress(tr("Extracting %n file(s)...", nullptr, indices.size()),
+                             tr("Cancel"), 0, indices.size(), this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(0);
+    progress.setAutoClose(false);
+    progress.setAutoReset(false);
+    progress.setMinimumWidth(340);
+
+    const QList<QWidget*> locked = { mTree, mFilterCombo, mSearchEdit,
+                                     mExtractBtn, mExtractAllBtn, mPlayBtn };
+    QList<bool> wasEnabled;
+    wasEnabled.reserve(locked.size());
+    for (QWidget* w : locked) {
+        wasEnabled.append(w && w->isEnabled());
+        if (w) w->setEnabled(false);
+    }
+    const auto unlock = [&] {
+        for (int i = 0; i < locked.size(); ++i)
+            if (locked.at(i)) locked.at(i)->setEnabled(wasEnabled.at(i));
+    };
+
     int ok = 0;
     int failed = 0;
-    for (const int index : mVisible)
+    bool cancelled = false;
+    for (int n = 0; n < indices.size(); ++n)
     {
-        QString outPath;
-        if (!isSafeExtractionPath(dir, entryPath(index), &outPath))
-        {
-            ++failed;
-            LOG_WARNING(QString("Archive Browser: rejected unsafe extraction path: %1")
-                .arg(entryPath(index)));
-            continue;
-        }
-        if (!QDir().mkpath(QFileInfo(outPath).absolutePath()))
-        {
-            ++failed;
-            continue;
-        }
-        bool success = false;
-        if (mKind == Kind::Bsa)
-            success = mBsa->extract(static_cast<quint32>(index), outPath);
-        else if (mKind == Kind::Ba2)
-            success = mBa2->extract(static_cast<quint32>(index), outPath);
-        if (success) ++ok;
-        else ++failed;
-    }
+        if (progress.wasCanceled()) { cancelled = true; break; }
+        progress.setValue(n);
 
-    QMessageBox::information(this, tr("Extraction Complete"),
-        tr("Extracted: %1\nFailed: %2").arg(ok).arg(failed));
-    LOG_INFO(QString("Archive Browser: extract all - %1 ok, %2 failed").arg(ok).arg(failed));
+        const int index = indices.at(n);
+        QString outPath;
+        // An archive entry name is not trusted to be a safe relative path: the
+        // containment check rejects "..", absolute, drive-qualified and UNC forms.
+        if (isSafeExtractionPath(destination, entryPath(index), &outPath)
+            && QDir().mkpath(QFileInfo(outPath).absolutePath())
+            && extractTo(index, outPath, /*quiet=*/true)) {
+            ++ok;
+        } else {
+            ++failed;
+            LOG_WARNING(QString("Archive Browser: could not extract entry %1 (%2)")
+                .arg(index).arg(entryPath(index)));
+        }
+        // Keeps the dialog painting and the Cancel button live. Called once per
+        // file, so it is cheap next to the write it follows.
+        QCoreApplication::processEvents();
+    }
+    progress.setValue(indices.size());
+    unlock();
+
+    const int written = ok;
+    if (cancelled) {
+        QMessageBox::information(this, tr("Extraction Cancelled"),
+            tr("Stopped after %1 of %n file(s).\n\n%2 file(s) were written before "
+               "cancelling; partial output has been left in place.", nullptr,
+               indices.size()).arg(ok).arg(written));
+    } else if (failed > 0) {
+        QMessageBox::warning(this, tr("Extraction Incomplete"),
+            tr("Extracted: %1\nFailed: %2\n\nSee the log for the entries that failed.")
+                .arg(ok).arg(failed));
+    }
+    LOG_INFO(QString("Archive Browser: batch extraction - %1 ok, %2 failed%3")
+                 .arg(ok).arg(failed).arg(cancelled ? ", cancelled" : ""));
+    return !cancelled && failed == 0;
 }

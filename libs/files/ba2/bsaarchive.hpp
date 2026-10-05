@@ -65,6 +65,10 @@ public:
     int fileCount() const { return mEntries.size(); }
     quint32 archiveFlags() const { return mFlags; }
     int version() const { return mVersion; }
+    // True when the container records a per-entry packed size. The classic
+    // 'BSA\0' family does not, so a 0 in packedSize there means "unknown", not
+    // "stored" -- a caller displaying it as a size would be lying.
+    bool recordsPackedSize() const { return mBtdx; }
 
     // Extract a file by index to the given output path.
     bool extract(quint32 index, const QString& outputPath) const;

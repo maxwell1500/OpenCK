@@ -30,6 +30,10 @@ public:
     // Writes one entry to an absolute path. quiet suppresses the per-file modal so
     // a batch can report its failures in one summary instead.
     bool extractTo(int index, const QString& outPath, bool quiet = false);
+    // Shared by "Extract All Visible" and multi-select extraction: writes each
+    // index under `destination`, showing cancellable progress. Returns false if
+    // the user cancelled or anything failed.
+    bool runBatchExtraction(QVector<int> indices, const QString& destination);
     static bool isSafeExtractionPath(const QString& root, const QString& entryPath,
                                      QString* outputPath = nullptr);
 
@@ -59,6 +63,11 @@ private:
     int entryCount() const;
     QString entryPath(int index) const;
     qint64 entrySize(int index) const;
+    // -1 where the container does not record the value, which is different from a
+    // recorded zero. Callers must not render -1 as a size.
+    qint64 entryPackedSize(int index) const;
+    qint64 entryOffset(int index) const;
+    bool entryCompressed(int index) const;
     // Archive indices behind the current selection, in selection order. Folder
     // rows carry no index and are skipped.
     QVector<int> selectedIndices() const;
@@ -88,7 +97,10 @@ private:
     QLineEdit* mSearchEdit = nullptr;
     QTreeWidget* mTree = nullptr;
     QLabel* mPreviewImage = nullptr;
-    QLabel* mPreviewInfo = nullptr;
+    // Status text and entry metadata used to share one label, so a status message
+    // wiped the metadata and vice versa. They are separate widgets now.
+    QLabel* mStatusLabel = nullptr;
+    QTreeWidget* mMetaTree = nullptr;
     QPushButton* mPlayBtn = nullptr;
     QPushButton* mExtractBtn = nullptr;
     QPushButton* mExtractAllBtn = nullptr;

@@ -6,6 +6,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QTreeWidget>
+#include <QLabel>
+#include <QLocale>
 #include <functional>
 #include <QComboBox>
 #include <QLineEdit>
@@ -33,6 +35,7 @@ private slots:
     void testVoiceFilter();
     void testSearch();
     void testEntryTreeGroupsAndSorts();
+    void testEntryMetadataIsHonest();
     void testSafeExtractionPaths();
     void testWritePcmWav();
 };
@@ -295,7 +298,7 @@ void TestArchiveBrowser::testEntryTreeGroupsAndSorts()
 
     auto* tree = dlg.findChild<QTreeWidget*>("entryTree");
     QVERIFY(tree);
-    QCOMPARE(tree->columnCount(), 2);
+    QCOMPARE(tree->columnCount(), 3);
     QVERIFY2(tree->isSortingEnabled(), "columns must be sortable to be useful");
     // Multi-select is what makes batch extraction possible, so it is part of the
     // navigation contract rather than a preference.
@@ -340,6 +343,71 @@ void TestArchiveBrowser::testEntryTreeGroupsAndSorts()
         checkSizes(tree->topLevelItem(i));
     QCOMPARE(files, shown.size());
     QCOMPARE(blankSizes, 0);
+}
+
+void TestArchiveBrowser::testEntryMetadataIsHonest()
+{
+    if (!QFileInfo::exists(s_voiceArchive)) QSKIP("Skyrim SE Voices archive not found");
+    ArchiveBrowserDialog dlg(s_dataDir);
+    QVERIFY(openVoicesArchive(dlg));
+
+    auto* tree = dlg.findChild<QTreeWidget*>("entryTree");
+    auto* meta = dlg.findChild<QTreeWidget*>("entryMeta");
+    auto* status = dlg.findChild<QLabel*>("statusLabel");
+    QVERIFY(tree);
+    QVERIFY(meta);
+    QVERIFY(status);
+    QCOMPARE(tree->columnCount(), 3);
+
+    // The classic 'BSA\0' family records no packed size, so the column must say
+    // that rather than showing a confident "0 B", which would read as a claim
+    // about the entry rather than about the format.
+    QVERIFY(!tree->topLevelItemCount() ? false : true);
+    // The tree must have rows at all, or the checks below pass vacuously.
+    std::function<void(QTreeWidgetItem*)> checkColumn;
+    checkColumn = [&checkColumn](QTreeWidgetItem* item) {
+            if (!item->data(0, Qt::UserRole).isValid()) {
+                for (int i = 0; i < item->childCount(); ++i)
+                    checkColumn(item->child(i));
+                return;
+            }
+            QCOMPARE(item->text(2), QObject::tr("not recorded"));
+            QVERIFY(!item->text(1).isEmpty());
+        };
+    for (int i = 0; i < tree->topLevelItemCount(); ++i)
+        checkColumn(tree->topLevelItem(i));
+
+    // Size must come from rawSize(), which masks the flags stored in the top bits
+    // of the on-disk size field; reading `size` directly over-reports flagged
+    // entries. Compared against the archive, not against the widget.
+    BsaArchive archive;
+    QVERIFY(archive.open(s_voiceArchive));
+    QTreeWidgetItem* firstFile = nullptr;
+    std::function<QTreeWidgetItem*(QTreeWidgetItem*)> findFile =
+        [&findFile](QTreeWidgetItem* item) -> QTreeWidgetItem* {
+            if (item->data(0, Qt::UserRole).isValid()) return item;
+            for (int i = 0; i < item->childCount(); ++i)
+                if (QTreeWidgetItem* hit = findFile(item->child(i))) return hit;
+            return nullptr;
+        };
+    for (int i = 0; i < tree->topLevelItemCount() && !firstFile; ++i)
+        firstFile = findFile(tree->topLevelItem(i));
+    QVERIFY(firstFile);
+    const int idx = firstFile->data(0, Qt::UserRole).toInt();
+    QCOMPARE(firstFile->text(1),
+             QLocale().formattedDataSize(archive.entries().at(idx).rawSize()));
+
+    // Selecting a row fills the metadata table and leaves status to itself.
+    const int rowsBefore = meta->topLevelItemCount();
+    QCOMPARE(rowsBefore, 0);
+    tree->setCurrentItem(firstFile);
+    QVERIFY(meta->topLevelItemCount() > 0);
+    bool sawSize = false;
+    for (int i = 0; i < meta->topLevelItemCount(); ++i) {
+        if (meta->topLevelItem(i)->text(0) == QObject::tr("Size"))
+            sawSize = true;
+    }
+    QVERIFY2(sawSize, "the metadata table has no Size row for the selected entry");
 }
 
 void TestArchiveBrowser::testSafeExtractionPaths()

@@ -2288,16 +2288,52 @@ block someone using the dialog:
    when nothing matches, and the confirmation names the scope and the count before
    asking for a destination. `testExtractButtonReflectsFilterScope` pins all three
    states.
-3. **No progress, no cancel, and it blocks the UI thread.** `extractAll()` is a
-   synchronous loop over up to 34,995 files with a message box only at the end. On
-   a large archive the dialog looks hung for minutes with no way to abort. Needs a
-   progress dialog with cancellation. Multi-select extraction shares this problem,
-   so fixing it for one fixes both.
-4. ~~**No file metadata.**~~ **Partly done 2026-10-04.** The entry tree now carries
-   a Size column showing the *uncompressed* size, and sorting on it uses a hidden
-   numeric key so "900 KB" does not sort before "1 KB". Still missing: compressed
-   size, offset, and per-entry compression flags, and the preview panel is still a
-   free-text blob.
+3. ~~**No progress, no cancel, and it blocks the UI thread.**~~ **Done
+   2026-10-05.** Batch extraction is now `runBatchExtraction()`, shared by
+   "Extract All Visible" and multi-select extraction, so the two paths cannot
+   drift apart again. It shows a `QProgressDialog` with a working Cancel, and
+   pumps the event queue once per file so the dialog stays live.
+
+   Two decisions worth recording, because the obvious versions of both are wrong:
+
+   - `processEvents(ExcludeUserInputEvents)` would have made the dialog repaint
+     but also left the Cancel button dead, since it needs user input delivered.
+     It processes all events instead, and the widgets that could change the
+     extraction set — tree, filter, search, and the three action buttons — are
+     disabled for the duration and restored afterwards.
+   - `indices` is taken **by value**. It usually aliases `mVisible`, which a
+     re-entrant `rebuildList()` could clear out from under a loop still reading
+     its `size()`.
+
+   The loop stays on the UI thread rather than moving to a worker: the archive's
+   file handle would have to be marshalled across threads, for a job that is
+   already a sequence of small, independent, per-file writes. The cost is that
+   the dialog is modal during a batch.
+
+   **Not unit-tested, deliberately.** The batch path ends in modal dialogs, so
+   driving it headlessly would need the message boxes factored out behind an
+   injection seam; `wasCanceled()` stopping the loop mid-way is therefore only
+   manually verified. The containment check it depends on *is* covered
+   (`testSafeExtractionPaths`).
+4. ~~**No file metadata.**~~ **Done 2026-10-05.** The tree carries **Size** and
+   **Compressed** columns, and the free-text preview blob is now a two-column
+   metadata table (Name, Folder, Size, Compressed, Compression, Offset, Path, and
+   a compression ratio when both sizes are known). Sorting on Size uses a hidden
+   numeric key so "900 KB" does not sort before "1 KB".
+
+   Two honesty fixes here:
+
+   - Size now comes from `BsaFileEntry::rawSize()`, not `size`. The top bits of
+     the on-disk size field carry flags, so reading `size` directly over-reported
+     every flagged entry — a bug introduced with the tree two commits ago.
+   - A recorded zero and an unrecorded field are not the same thing. The classic
+     `'BSA\0'` family records no packed size at all, so the column reads "not
+     recorded" instead of a confident "0 B", via `BsaArchive::recordsPackedSize()`.
+     Displaying that unknown as a size would be a claim about the entry when it
+     is really a fact about the format.
+
+   Offset and Ratio are in the metadata table rather than as columns: they are
+   diagnostic, not something you scan a list by.
 5. ~~**No multi-select extraction.**~~ **Done 2026-10-04.** A multi-selection is
    extracted into a chosen directory, preserving the archive's folder layout
    under it, through the same containment check and `mkpath` that `extractAll()`
@@ -2367,8 +2403,10 @@ with no cancel reads as a hang. Treat them as usability defects to fix on their
 merits, not as measured parity gaps. Items 1, 2, 5 and 8 are now done on exactly
 that reasoning.
 
-**Still open:** items 3 and the remainder of 4 above, plus external-data
-collection and the INI-driven archive configuration.
+**Still open:** external-data collection and the INI-driven archive
+configuration. The scoped Archive Browser list is now closed — items 1-5 and 8
+are done, 6 and 7 are withdrawn, and none of it is verified against the CK
+beyond the reasoning recorded above.
 
 
 ### Series 7 â€” Save-time and interactive validation
