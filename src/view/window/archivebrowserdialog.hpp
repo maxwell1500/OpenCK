@@ -28,6 +28,12 @@ public:
     static bool isSafeExtractionPath(const QString& root, const QString& entryPath,
                                      QString* outputPath = nullptr);
 
+    // Archives under a data root, found recursively and returned sorted.
+    // Public so the discovery rule can be tested without a game install: the bug
+    // it guards against is a nested layout being silently missed, which the
+    // shipped games cannot demonstrate because they keep DLC in the Data root.
+    static QStringList findArchives(const QString& root);
+
 private slots:
     void browseArchive();
     void onQuickOpenChanged(int index);
@@ -52,6 +58,9 @@ private:
     void updatePreview(int index);
     void clearPreview();
     void setStatus(const QString& text);
+    // Describes what the current filter/search leaves visible, for the extract
+    // button's label and its confirmation.
+    QString visibleScopeDescription() const;
     static bool isVisibleByFilter(const QString& lowerPath, int filterIndex);
     static bool isTextureExt(const QString& lowerPath);
 

@@ -2,11 +2,13 @@
 #include <QTemporaryFile>
 #include <QTemporaryDir>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QListWidget>
 #include <QComboBox>
 #include <QLineEdit>
+#include <QPushButton>
 
 #include "view/window/archivebrowserdialog.hpp"
 #include "view/window/voicepreview.hpp"
@@ -23,6 +25,8 @@ class TestArchiveBrowser : public QObject
 private slots:
     void initTestCase();
     void testQuickOpenList();
+    void testArchiveDiscoveryIsRecursive();
+    void testExtractButtonReflectsFilterScope();
     void testOpenBsaAndList();
     void testVoiceFilter();
     void testSearch();
@@ -71,6 +75,130 @@ void TestArchiveBrowser::testQuickOpenList()
     auto* combo = dlg.findChild<QComboBox*>("quickOpen");
     QVERIFY(combo);
     QVERIFY(combo->count() > 0);
+}
+
+void TestArchiveBrowser::testArchiveDiscoveryIsRecursive()
+{
+    // Self-contained: the discovery rule is worth covering without needing a game
+    // install, because the bug it fixes is precisely that a nested layout was
+    // silently missed. Fallout 4 and Skyrim keep DLC in the Data root, so the
+    // shipped games would not have caught it.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+// Built without QVERIFY inside a lambda on purpose: QVERIFY expands to a
+    // bare `return`, which inside a lambda only leaves the lambda, so a failed
+    // mkdir used to stop creating the remaining files without failing the test.
+    // That produced a fixture missing its nested entries, which then looked like
+    // a discovery bug.
+    const QStringList relatives = {
+        QStringLiteral("Top.bsa"),
+        QStringLiteral("nested/Inner.ba2"),
+        QStringLiteral("nested/deeper/Deepest.ba2"),
+        QStringLiteral("nested/notanarchive.txt"),
+    };
+    for (const QString& relative : relatives) {
+        const QString path = dir.filePath(relative);
+        if (!QDir().mkpath(QFileInfo(path).absolutePath()))
+            QFAIL(qPrintable(QStringLiteral("could not create the folder for %1").arg(relative)));
+        QFile f(path);
+        if (!f.open(QIODevice::WriteOnly))
+            QFAIL(qPrintable(QStringLiteral("could not create %1").arg(relative)));
+        f.write("x");
+        f.close();
+    }
+    // The fixture is asserted by exact path, so a fixture that failed to build
+    // fails here rather than masquerading as a discovery failure.
+    for (const QString& relative : relatives) {
+        const QString path = dir.filePath(relative);
+        if (!QFileInfo::exists(path))
+            QFAIL(qPrintable(QStringLiteral("fixture file was not created: %1").arg(path)));
+    }
+
+    const QStringList found = ArchiveBrowserDialog::findArchives(dir.path());
+    // entryInfoList reports forward slashes on Windows while absoluteFilePath
+    // produces the native separator, so both sides are normalised before
+    // comparing — otherwise this asserts on separator style, not on discovery.
+    const auto normalise = [](QStringList paths) {
+        for (QString& p : paths)
+            p = QDir::fromNativeSeparators(p);
+        return paths;
+    };
+    const QStringList expected = normalise({
+        QDir(dir.path()).absoluteFilePath(QStringLiteral("Top.bsa")),
+        QDir(dir.path()).absoluteFilePath(QStringLiteral("nested/Inner.ba2")),
+        QDir(dir.path()).absoluteFilePath(QStringLiteral("nested/deeper/Deepest.ba2")),
+    });
+    QCOMPARE(normalise(found), expected);
+    // A non-archive in the same tree must not be picked up.
+    for (const QString& path : normalise(found))
+        QVERIFY(!path.endsWith(QStringLiteral("notanarchive.txt")));
+
+    // Sorted, so the quick-open list order does not depend on the filesystem.
+    QStringList sorted = found;
+    sorted.sort();
+    QCOMPARE(found, sorted);
+
+    // An empty or missing root yields nothing rather than throwing.
+    QVERIFY(ArchiveBrowserDialog::findArchives(QString()).isEmpty());
+    QVERIFY(ArchiveBrowserDialog::findArchives(
+        dir.filePath(QStringLiteral("does-not-exist"))).isEmpty());
+}
+
+void TestArchiveBrowser::testExtractButtonReflectsFilterScope()
+{
+    if (!QFileInfo::exists(s_dataDir)) QSKIP("Skyrim SE data dir not found");
+    ArchiveBrowserDialog dlg(s_dataDir);
+    QVERIFY(openVoicesArchive(dlg));
+
+    auto* button = dlg.findChild<QPushButton*>("extractAllBtn");
+    auto* list = dlg.findChild<QListWidget*>("entryList");
+    QVERIFY(button);
+    QVERIFY(list);
+    QVERIFY(list->count() > 0);
+
+    // Unfiltered: the button offers the whole archive and says so with a count.
+    const int total = list->count();
+    const QString unfiltered = button->text();
+    QVERIFY2(unfiltered.contains(QStringLiteral("Extract All")),
+             qPrintable(QStringLiteral("unfiltered label was '%1'").arg(unfiltered)));
+    QVERIFY2(unfiltered.contains(QString::number(total)),
+             qPrintable(QStringLiteral("unfiltered label '%1' omits the entry count %2")
+                            .arg(unfiltered).arg(total)));
+
+    // Narrow with the search box rather than the type filter. A voices archive
+    // contains only .fuz entries, so the Voice filter provably narrows nothing
+    // there and would assert against a premise that does not hold.
+    auto* search = dlg.findChild<QLineEdit*>("searchEdit");
+    QVERIFY(search);
+
+    const QString term = QFileInfo(list->item(0)->text()).completeBaseName();
+    QVERIFY(!term.isEmpty());
+    search->setText(term);
+
+    const int filtered = list->count();
+    if (filtered == 0 || filtered == total) {
+        // A degenerate name would make the label assertions below meaningless.
+        QSKIP(qPrintable(QStringLiteral("search term '%1' did not narrow %2 entries")
+                             .arg(term).arg(total)));
+    }
+
+    const QString filteredLabel = button->text();
+    QVERIFY2(filteredLabel != unfiltered,
+             "label did not change when the search narrowed the list");
+    QVERIFY2(filteredLabel.contains(QString::number(filtered)),
+             qPrintable(QStringLiteral("filtered label '%1' omits the filtered count %2")
+                            .arg(filteredLabel).arg(filtered)));
+    QVERIFY2(!filteredLabel.contains(QStringLiteral("Extract All")),
+             qPrintable(QStringLiteral("filtered label '%1' still claims to extract all")
+                            .arg(filteredLabel)));
+
+    // A search that matches nothing must disable the button rather than leave a
+    // live control that would extract an empty set.
+    search->setText(QStringLiteral("no-such-entry-anywhere-zzz"));
+    QCOMPARE(list->count(), 0);
+    QVERIFY2(!button->isEnabled(),
+             "the extract button stayed enabled with nothing selected to extract");
 }
 
 void TestArchiveBrowser::testOpenBsaAndList()

@@ -1,8 +1,8 @@
-# REMAINING.md — Everything left to make OpenCK truly functional
+# REMAINING.md â€” Everything left to make OpenCK truly functional
 
 > **Single source of truth.** All previous planning/status/debt/roadmap/phase
 > documents were reconciled against the codebase and deleted (2026-08-16).
-> Anything not listed here is **done** or **intentionally closed** (see §6).
+> Anything not listed here is **done** or **intentionally closed** (see Â§6).
 > Don't re-add work that's already shipped.
 >
 > Baseline on this machine: Release build clean, 134/134 test executables
@@ -10,7 +10,7 @@
 > real-data gates that load Starfield.esm + Magnus.esm + Vvardenfell.esp;
 > GUI + CLI smoke tests pass.
 
-### 2026-09-24 — Skyrim SE BSA writer conformance
+### 2026-09-24 â€” Skyrim SE BSA writer conformance
 
 `BsaArchive::create` now emits the v0x69 folder-record layout with 32-bit
 folder offsets and padding, NUL-inclusive folder-name lengths, sorted hashes,
@@ -26,18 +26,18 @@ The product archive action exposes both BA2 and BSA creation, with
 format-specific file filters, compression selection, and recursive collection
 of supported files from the selected directory tree.
 
-### 2026-09-08 — UndoStack::push() now calls execute()
+### 2026-09-08 â€” UndoStack::push() now calls execute()
 
 `UndoStack::push()` previously only stored the command without calling
 `execute()`, meaning `EditRecordCommand` changes were never applied to the
 collection. All 40+ editors that create an `EditRecordCommand` and push it
 were silently discarding user edits. Fixed by adding `command->execute()`
 to `push()`. Added `test_editor_writeback` smoke test (7 cases covering
-STAT/GLOB/CELL/WRLD/ACHR/PACK types) verifying the push→undo→redo cycle.
+STAT/GLOB/CELL/WRLD/ACHR/PACK types) verifying the pushâ†’undoâ†’redo cycle.
 Updated `test_undostack` assertions to match the new push-executes behavior.
 All 109 tests pass.
 
-### 2026-09-06 — ESMWriter group-size stack (Phase 1.2 hardening)
+### 2026-09-06 â€” ESMWriter group-size stack (Phase 1.2 hardening)
 
 `ESMWriter::startGrup`/`endGrup` used a single `grupSizePos` field, so
 nested groups (a top-level CELL group containing a cell-children group)
@@ -48,9 +48,9 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 
 ---
 
-## 1. Data-integrity gaps (highest priority — these are correctness bugs)
+## 1. Data-integrity gaps (highest priority â€” these are correctness bugs)
 
-   1. **Residual reader warnings → zero.** Loading Starfield.esm still produces
+   1. **Residual reader warnings â†’ zero.** Loading Starfield.esm still produces
    ~8 "unconsumed bytes" / compression-misalignment warnings (INFO `01047741`
    over-read of 4 bytes; compressed NPC/AI-package records such as
    `Traits_OctopedeA_BlisterCrab_Large`, `EncShip_TradeAuthority_A_Atlas02_AutopilotAI`,
@@ -73,7 +73,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     with `OPENCK_TEST_PER_TYPE_LIMIT` caps, Release for the full gate.
 
     **Status 2026-08-25 (full-matrix materialization, all deferred types):**
-    the desync class of warnings is eliminated — zero negative-recLeft
+    the desync class of warnings is eliminated â€” zero negative-recLeft
     over-reads remain. Fixed this round (each was silently desyncing every
    following record in its GRUP):
    - `MsttRecord` (disk `MSTT`): Starfield writes 1-byte `FNAM`/`DATA`;
@@ -91,7 +91,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      (four NUL bytes where a name would sit) are captured verbatim
      (`name=0` raw) instead of abandoning hundreds of tail bytes.
      Warning floor is now 0: `testMaterializationMatrixZeroWarnings` passes
-    with 3,829,768 records / 180 types / zero warnings. The 40×
+    with 3,829,768 records / 180 types / zero warnings. The 40Ã—
     compressed-record misalignments and ~30 unknown/garbage-name artifacts
     that previously remained were eliminated by the drain/guard fixes
     above. Fixed 2026-09-07: `Variant::load(Format_GMST)` now drains
@@ -101,7 +101,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
  2. **Untouched-plugin round-trip must be payload-identical.** Build a
     subrecord-diff tool (per-record list of subrecord name+payload) and run it
     for every record type over the full corpus (Starfield.esm, Magnus.esm,
-    SeydaNeen.esp). Load → save untouched → diff; drive every differing
+    SeydaNeen.esp). Load â†’ save untouched â†’ diff; drive every differing
     subrecord to zero. Today only SeydaNeen is covered.
 
     **Status 2026-09-03:** `testSaveRoundTripSubrecordIdentical` passes and
@@ -114,7 +114,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
       appends values absent at load. Added `smallIconPath` mirror (ICO2 was
       silently kept only via `saveAll`).
     - `CellRecord`: spurious `DATA`/`XCLC`/`XOWN`/`XLOC` (members were
-      uninitialized — Debug filled 0xCC — and save wrote them
+      uninitialized â€” Debug filled 0xCC â€” and save wrote them
       unconditionally); `DATA` width preserved (Starfield: 4 bytes) with
       `dataExtra` tail, 12-byte exterior `XCLC` tail kept in `xclcExtra`,
       empty-`XCLW` shape preserved; same load-order replay.
@@ -124,14 +124,14 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     - **Save order:** `Data` now records the plugin's flat load order
       (`m_pluginOrder`) and `Document::save` replays it (switching top-level
       type GRUPs as needed, CELLs with their children groups inline) instead
-      of regrouping by type — Vvardenfell.esp is interleaved (e.g. WRLD
+      of regrouping by type â€” Vvardenfell.esp is interleaved (e.g. WRLD
       between CELLs), which regrouping scrambled. New/overridden records
       absent from the order fall through to the type-grouped pass, which
       skips replayed records via `saveModifiedRecordsExcept`. New
       `IRecordCollection` hooks: `isRecordSaveable`,
       `saveRecordAt` (returns whether anything was written),
       `saveModifiedRecordsExcept`.
-    **Status 2026-09-08:** `testSyntheticMultiTypeRoundTrip` added — writes a
+    **Status 2026-09-08:** `testSyntheticMultiTypeRoundTrip` added â€” writes a
     plugin with NPC_/GLOB/STAT/WRLD records, loads, saves untouched, and
     asserts subrecord-identical output. Always runs (no real-data dependency).
     Fixed: `GlobalVariable` and `LocationRefType` lacked a `formId` field,
@@ -153,13 +153,13 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 
      **Status 2026-09-15 (nightly gate built + save-side fixes):** the
      deferred CI/nightly job now exists: `tests/test_fullscale_roundtrip.cpp`
-     (standalone CLI — load → save untouched → snapshot-diff, plus
+     (standalone CLI â€” load â†’ save untouched â†’ snapshot-diff, plus
      `--compact` mode that compacts a copy and verifies reload; deliberately
      NOT in ctest) driven by `tools/nightly-roundtrip.ps1` (round-trips
      Starfield.esm, compacts up to 5 real `.esp` copies). Validated:
      Vvardenfell.esp 1374/1374 identical, Magnus.esm 522/522 identical,
      `--compact` on a real plugin (73/73 remapped, reload clean). The gate
-     paid for itself immediately — SFBGS00D.esm exposed a save crash and
+     paid for itself immediately â€” SFBGS00D.esm exposed a save crash and
      seven round-trip bugs, all fixed:
      - Save fast-fail (`0xC0000409`) on localised GMSTs: `Variant::write`
        threw on `Var_LString` (and `Var_None` with empty `rawData`); the
@@ -187,7 +187,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      - Rule of thumb established: never emit a subrecord the source lacked
        unless it carries a user edit.
      **Status 2026-09-16 (SFBGS00D order + payload):** the flat record
-     stream is now exactly reproduced — 434,990/434,990 records, and
+     stream is now exactly reproduced â€” 434,990/434,990 records, and
      `test_subrecord_diff` reports `positional-shift 0`. Two structural
      gaps closed:
      - Records with no typed loader (GPOF/GPOG/GWED and any future type)
@@ -202,12 +202,12 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
        sequence (REFR/ACHR/PGRE/PHZD/... + opaque) instead of regrouping.
      `testSyntheticCellChildrenAndOpaque` covers both (typed + unmodelled
      child interleaving, no cross-cell attribution).
-     Payload diffs fell 38,838 → ~1,850 of 434,990 (95%). Fixed classes so
+     Payload diffs fell 38,838 â†’ ~1,850 of 434,990 (95%). Fixed classes so
      far: invented EDID on records whose source lacked it (RFGP, DIAL,
      NAVM, PGRE, ACHR, PHZD); invented CNAM/TLOI on INFO with an ordered
      CTDA replay; Starfield wide XOWN/XESP payloads (12/8-byte) now keep
      their trailing words (component fields must also be copied in
-     `clone()`/`copyFrom()` or they silently vanish on the baseRecord →
+     `clone()`/`copyFrom()` or they silently vanish on the baseRecord â†’
      modifiedRecord copy); CELL no longer invents DATA.
      **Status 2026-09-16 (later):** the fixed-preamble class is largely
      converted. Records now replay the source subrecord order via a shared
@@ -219,7 +219,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      subrecords keep their width via `ESMReader::readSubU32(&width)` /
      stored raw trailing bytes (`TESFlags_Component`, XESP, SPEL SPIT,
      ENCH ENIT, LVLI LVLD/LVLF/LVLO, PACK PKDT/PLDT/PTDT). Non-NPC payload
-     **Status 2026-09-16 (final — §1 complete):** SFBGS00D.esm round-trips
+     **Status 2026-09-16 (final â€” Â§1 complete):** SFBGS00D.esm round-trips
      434,990/434,990 records with zero payload differences,
      BlueprintShips-Starfield.esm round-trips 1,503,332/1,503,332 with
      zero differences, and the full Starfield.esm master round-trips
@@ -255,7 +255,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
       `test_subrecord_diff` prints a per-type mismatch histogram (its name
       filter must include underscores, e.g. `NPC_`).
       The nightly gate should be re-run after each per-type conversion.
-      **Status 2026-09-20 (structured fidelity zero — §1 polish):** a new
+      **Status 2026-09-20 (structured fidelity zero â€” Â§1 polish):** a new
       `test_structuredfidelity` gate loads every MISC/QUST/ARMO/EFSH/WRLD/
       INFO from Starfield.esm, re-saves through the STRUCTURED path
       (`record.save()`, bypassing the verbatim fast path that masks all of
@@ -273,7 +273,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
       - ARMO full conversion (loadOrder replay, FLAG/DNAM/DATA presence +
         width preservation, EDID gating, missing drain-break): TESBipedModel
         gained width-aware INDX/BMDT reads (the fixed u32 read consumed the
-        next subrecord — silent, `recLeft` never went negative so no
+        next subrecord â€” silent, `recLeft` never went negative so no
         warning), raw snapshots for male/female paths, `hasFemale`, and
         `writeSubrecord`; TESEnchantableForm gained `hasEnchant` +
         `writeSubrecord`; pickup sounds emit at position spelling; ARMO
@@ -298,7 +298,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
       Full Starfield.esm round-trip still 3,829,246/3,829,246 zero-diff;
       suite 132/132, zero-warning build, lint clean.
 
-      **Status 2026-09-20 (structured fidelity — every type zero):** the
+      **Status 2026-09-20 (structured fidelity â€” every type zero):** the
       fidelity gate now covers ACTI/BOOK/MSTT/FURN/ENCH/KEYM/LIGH/SPEL/
       SCEN/FLST/OTFT/LVLI/CONT/LCTN/MGEF/PERK/FACT/HAZD/DOOR/WEAP/RACE/
       NAVI/ALCH/DEBR/PACK/CELL/REFR alongside MISC/QUST/ARMO/EFSH/WRLD/
@@ -343,7 +343,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 
     **Status 2026-09-04:** `LocationRecord::locationName` is persisted now.
     `FULL` was consumed as an opaque raw (the shared
-    `TESFullName_Component` never handles it — `tesfullname.cpp` holding
+    `TESFullName_Component` never handles it â€” `tesfullname.cpp` holding
     real `canHandle`/`save` implementations is dead code, not compiled; the
     header-only version is a no-op), so the name mirror was always empty and
     editor edits were silently dropped while the raw preserved the
@@ -359,7 +359,7 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
 
     **Status 2026-09-08:** Resolved. The compactor now uses a generic
     fallback pass (`genericRawFormIdFix`) that rewrites any u32 in an
-    opaque raw subrecord matching the old→new FormID map, in addition to
+    opaque raw subrecord matching the oldâ†’new FormID map, in addition to
     the type-specific rewrites. The -2 refusal path is removed; the
     false-positive risk is negligible (only values matching the plugin's
     own records' FormIDs are affected). ~20 additional record types were
@@ -394,14 +394,14 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      exact first-group size (157113). Invisible to all previous gates
      (payload diffs ignore group headers; `testGrupSizeConsistent`
      enshrined our own convention). A sequential walker using the old
-     ends desynced into garbage sizes and AV'd — that crash is what
+     ends desynced into garbage sizes and AV'd â€” that crash is what
      exposed it. Fixed both sides; `testGrupSizeConsistent` asserts the
      include-24 sizes (52/104) plus a fixture-gated tiling check over
      the first 3 shipped top-level groups. TES3 untouched (no shipped
      groups to ground a change).
 
 4. **DIAL/INFO relationship walking.** INFO records nested under DIAL are
-    parsed but not walked into a DIAL→INFO tree for the dialogue editor.
+    parsed but not walked into a DIALâ†’INFO tree for the dialogue editor.
 
     **Status 2026-09-08:** `DialRecord::load()` now parses INAM into
     `responseIds` (was falling through to `rawSubRecords`). `save()`
@@ -412,19 +412,19 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      `responseIds` and `m_infoParentDial`. **Resolved.**
 
      Perf follow-up (2026-09-15): `Data::infosUnderDial` scans the whole
-     INFO collection per topic — O(dials × infos), which timed out
+     INFO collection per topic â€” O(dials Ã— infos), which timed out
      `testDialInfoParentWalking` at QTest's 5-minute limit on full masters
-     (68k × 126k; responses are sparse early, so even a stop-after-25 cap
+     (68k Ã— 126k; responses are sparse early, so even a stop-after-25 cap
      still timed out). The test now gates on a linear
      `Data::infosWithParentDialCount()` single pass plus a 5-topic
      `infosUnderDial` spot-check. The product callers
      (`DialogueEditorWidget::populateTree`, `DialogueTreeEditor`) have the
      same complexity and will hang on full-master dialogue trees; they need
-     a reverse parent→children index maintained alongside
+     a reverse parentâ†’children index maintained alongside
      `m_infoParentDial`.
 
      **Status 2026-09-19:** Resolved. `Data` now maintains a
-     `m_dialInfoChildren` reverse index (parent DIAL → INFO form id +
+     `m_dialInfoChildren` reverse index (parent DIAL â†’ INFO form id +
      collection index pairs) alongside `m_infoParentDial`: populated at
      load with the known collection index, updated in `setInfoParentDial`
      (reparent-safe, duplicate-free, dial 0 not indexed), cleared in
@@ -435,13 +435,13 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      walked total equals the linear count, plus a synthetic
      `testSyntheticDialInfoReverseIndex` covering attribution, reparenting,
      and duplicates. `populateTree()` and `DialogueTreeEditor::
-     loadDialogueTree()` build a per-call formId→index hash instead of
+     loadDialogueTree()` build a per-call formIdâ†’index hash instead of
      rescanning the INFO collection per response (first occurrence wins,
      same as the old scan).
 
  5. **Master-record state machine on save.** Verify that a materialized
     (deferred) master record saved without edits is not emitted as an override,
-    and that an edit promotes base → modified correctly (State_Base /
+    and that an edit promotes base â†’ modified correctly (State_Base /
     State_Modified / State_ModifiedOnly) across the corpus save path.
 
     **Status 2026-09-08:** Verified. `testMasterRecordSaveStateMachine` passes:
@@ -456,13 +456,13 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     **Status 2026-09-09:** Resolved. `ObjectPalette::onSavePlacementClicked`
     now writes a binary little-endian `QDataStream` file (count, then per
     placement: name, x, y, z, rotX, rotY, rotZ, scale, active) under a
-    `.placement` extension — exactly the layout `onLoadPlacementClicked`
+    `.placement` extension â€” exactly the layout `onLoadPlacementClicked`
     reads back (which re-resolves the base formId from the name via
     `resolveFormIdFromName`).
 
 7. **Field range validation on editors.** Editors still accept out-of-range
    values that can corrupt ESM files (the long-running X-02 item). `ColumnValidator`
-   exists — deploy it to the remaining editors and enforce ranges on every
+   exists â€” deploy it to the remaining editors and enforce ranges on every
    numeric field.
 
    **Status 2026-09-07:** `ColumnValidator` deployed to all 10 editors with
@@ -506,17 +506,17 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
      record, perform a canonical edit, assert the UndoStack gained a command and
      the record changed.
 
-     **Status 2026-09-08:** `test_editor_writeback` added — 7 test cases covering
+     **Status 2026-09-08:** `test_editor_writeback` added â€” 7 test cases covering
      StatRecord, GlobalVariable, CellRecord, WorldspaceRecord, NpcRecord,
-     PackageRecord, and the no-change case. Each case: add fixture → push
-     `EditRecordCommand` → verify record changed → undo → verify reverted →
-     redo → verify re-applied. All pass.
+     PackageRecord, and the no-change case. Each case: add fixture â†’ push
+     `EditRecordCommand` â†’ verify record changed â†’ undo â†’ verify reverted â†’
+     redo â†’ verify re-applied. All pass.
 
      **Status 2026-09-15 (re-audit):** a fresh grep for raw `setModified`
      across `src/view/window/` found two stragglers the 09-07 audit missed:
      the Object Window script-text edit and `DialogueEditorWidget::onAddInfo`
      (DIAL response-id append) both mutated records without an undo command.
-     Both now snapshot original → edit a copy → push `EditRecordCommand`
+     Both now snapshot original â†’ edit a copy â†’ push `EditRecordCommand`
      (with a `setModified` fallback only when no UndoStack exists). The two
      `landscapeeditor.cpp` hits are the canonical pattern (snapshot + push).
      `test_editor_writeback` extended with `testScriptEditorUndoable` and
@@ -535,9 +535,9 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     `QVector<CtdaCondition>` (was opaque raw) and re-emit on save; VMAP
     voice files parse/save. The condition function dropdown is now
     data-driven: `CtdaCondition::functionName(id)` /
-    `functionIdForName(name)` give a stable ID↔name mapping — known
+    `functionIdForName(name)` give a stable IDâ†”name mapping â€” known
     indices render by name, unknown indices render as `Function <hex>`
-    and round-trip exactly — so a condition's function index no longer
+    and round-trip exactly â€” so a condition's function index no longer
     collapses to 0 on save. `InfoDataWidget` stores/parses the function
     id via that mapping (raw hex is also accepted). Quest stages now edit
     the standard per-stage `QSDT` flags (`QuestRecord::stageFlags`, one
@@ -558,10 +558,10 @@ inert HKLM IFEO `test_loader.exe` key via elevated cleanup.
     mesh and visual confirmation of the GPU shader.
 
      **Status 2026-09-13:** Automated tests added.
-     `test_nifanimation` (6/6) covers JSON and XML export→import round-trips
+     `test_nifanimation` (6/6) covers JSON and XML exportâ†’import round-trips
      for clips/channels/keyframes (translation, rotation, scale) and markers,
      plus the null-export and missing-file import error paths. The
-     in-viewport 3D playback is scoped in §8 (it is further along than the
+     in-viewport 3D playback is scoped in Â§8 (it is further along than the
      old note below suggested).
 
    **Status 2026-09-30:** the end-to-end write-back test now exists
@@ -995,7 +995,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
 4. **NavMesh reachability.** NavMesh generation works but uses centroid-based
     cell assignment; a reachability flood-fill pass is a documented residual.
 
-    **Status 2026-09-09:** Added `NavMeshTools::largestReachableComponent` — a
+    **Status 2026-09-09:** Added `NavMeshTools::largestReachableComponent` â€” a
     4-connected flood-fill over the row-major walkable cell grid that returns
     the largest connected component and (optionally) the total component
     count. `NavMeshGenerator::voxelFilter` now builds the walkable grid, runs
@@ -1020,7 +1020,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     (`testRefrTransformUndoable`) alongside the other record editors.
     **Remaining verification:** in-render-window 3D playback is wired for
     rigid animation, skinned animation, and particles; the remaining checks
-    need a display and are scoped in §8.
+    need a display and are scoped in Â§8.
 6. **Mod-manager integration** (Mod Organizer 2 / Vortex).
     `ModManagerDetection` (detect/detectMO2/detectVortex/profiles/
     `getInstalledMods`) and `ModManagerDialog` are built and wired into
@@ -1028,7 +1028,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     factored into testable `parseMo2Ini` / `parseVortexField` helpers;
     `test_modmanager` covers profile, gamePath, modsDirectory, selectedProfile
     and Vortex field extraction (6/6 pass).
-7. **OBScript editor** — lexer + parser core done: `ObScript::Lexer`
+7. **OBScript editor** â€” lexer + parser core done: `ObScript::Lexer`
    (`libs/files/esm/obscriptlexer.hpp/.cpp`) tokenizes reserved words,
    identifiers, int/float literals, strings, operators, newlines and `;`
    comments; `ObScript::Parser` (`libs/files/esm/obscriptparser.hpp/.cpp`)
@@ -1036,8 +1036,8 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
    precedence (`|| && == != < > <= >= + - * / %`, unary `- ! ~`, calls,
    field access, indexing, parenthesised grouping, literals) and the common
    statements (`function`/`endfunction`, `if`/`elseif`/`else`/`endif`,
-   `while`/`endwhile`, `for … to …`/`endfor`, `return`, `let`/`set` and bare
-   assignment, expression statements, and the optional `begin … end`/
+   `while`/`endwhile`, `for â€¦ to â€¦`/`endfor`, `return`, `let`/`set` and bare
+   assignment, expression statements, and the optional `begin â€¦ end`/
    `endscript` wrapper). The parser reports the first syntax error with its
    line. `test_obscript` (8/8) covers the lexer; `test_obscriptparser` (15/15)
    covers functions, if/elseif/else, loops, precedence, calls/postfix,
@@ -1133,15 +1133,15 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     - Binary encoders:
       - **PNDT (Planets):** `PlanetCodec::toRecord/fromRecord`
         (`src/model/tools/planetcodec.*`) maps PlanetDefinition onto the real
-        PNDT layout — EDID/ANAM exactly, TEMP via the numeric temperature
+        PNDT layout â€” EDID/ANAM exactly, TEMP via the numeric temperature
         string, DENS/PHLA/RSCS seeded from the record under edit or shipped
         defaults. `test_planetcodec` 6/6, incl. 10 real PNDT losslessly.
       - **MRPH (Morphable Objects):** `MrhpRecord` now parses TCMP (morph
         path), MOBC (flags), TMPP (template path) as typed fields alongside
         EDID, with raw subrecords preserved. Surveyed 998 records (998 MOBC,
-        976 TCMP, 191 TMPP). `test_morphrecord` 3/3 — 20 real records round-
+        976 TCMP, 191 TMPP). `test_morphrecord` 3/3 â€” 20 real records round-
         tripped byte-exact (17 with TCMP, 7 with TMPP, 0 failures).
-      - **Ships:** composite COBJ→FLST→GBFM chain (no single SHIP record).
+      - **Ships:** composite COBJâ†’FLSTâ†’GBFM chain (no single SHIP record).
         Done this round:
         - `GbfmRecord` now parses the BFCB component architecture into a
           derived view (`GbfmComponent`: type name + its subrecords) while
@@ -1152,50 +1152,50 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
           `BGSFormLinkData_Component` ITMC/FLFM/FLKW.
         - `ShipPartCodec` (`src/model/tools/shippartcodec.*`) maps a GBFM to a
           `ShipPartDefinition` and writes it back; every opaque component
-          (Blueprint_Component's BUO4, the NVNM navmesh blob, …) rides along
+          (Blueprint_Component's BUO4, the NVNM navmesh blob, â€¦) rides along
           untouched, so an untouched apply is byte-exact.
-        - `ShipCompositeResolver` walks COBJ → CNAM → FLST → LNAM → GBFM and
+        - `ShipCompositeResolver` walks COBJ â†’ CNAM â†’ FLST â†’ LNAM â†’ GBFM and
           produces `ShipComposite` (recipe, form list, variant form ids +
           resolved editor ids), with a case-insensitive id lookup helper (the
           collections' own `searchId` is case-sensitive while the game is not).
         - `test_shipcomposite` 8/8 against real Starfield.esm: component
           parsing, 15 GBFM byte-exact round-trips, 15 no-op applies, a real
-          chain (`co_SMS_FuelTank_Dogstar_M50_Ulysses` →
-          `SMSSet_FuelTank_Dogstar_M50` → 2 variant GBFMs), the ship
+          chain (`co_SMS_FuelTank_Dogstar_M50_Ulysses` â†’
+          `SMSSet_FuelTank_Dogstar_M50` â†’ 2 variant GBFMs), the ship
           blueprint decode (25 records / 1,267 items / 0 stride failures) and
           the crowd component decode.
         - **Component layouts** are now taken from xEdit's published
           `wbDefinitionsSF1.pas` (MPL) rather than guessed, which unblocked
           two components the earlier note called opaque:
-          - `Blueprint_Component::BUO4` — the module placements (Base Item
+          - `Blueprint_Component::BUO4` â€” the module placements (Base Item
             GBFM, Construction Object COBJ, Vec3PosRot 3+3 floats, Part ID),
             a fixed 36-byte stride. This is the actual ship composition.
-          - `BGSCrowdComponent_Component` — CDND density, CDNS population
+          - `BGSCrowdComponent_Component` â€” CDND density, CDNS population
             count, and per-population STRV name + FLTV scale.
         Genuinely opaque: `ParticleSystem_Component` (PTCL) and
-        `HoudiniData_Component` (PCCC) are `wbReflection` data streams —
+        `HoudiniData_Component` (PCCC) are `wbReflection` data streams â€”
         preserved byte-exactly but not semantically decoded (xEdit blocks
         override-copying them too). (`ReflectionProbes_Component` was in this
         list until 2026-09-14; it has zero shipped instances and the real
-        probe data is `Volumes_Component::VLMS`, now decoded — see below.)
+        probe data is `Volumes_Component::VLMS`, now decoded â€” see below.)
         NVNM (navmesh) is defined but large; it rides along as a raw
         subrecord.
       - **OPAL placement lists:** the real binary `.opl` format is now
         decoded and implemented (the earlier CSV/header version was a guess).
-        Found via the ten shipped lists under `Content/OPAL/` — all 3,311
+        Found via the ten shipped lists under `Content/OPAL/` â€” all 3,311
         entries parse with zero trailing bytes. Layout: `uint32 version` (=3),
         `uint32 count`, then per entry `uint32 nameLen`, name + NUL, `uint32
         payloadLen` (0 or 24), payload (24 = 6 floats: pos xyz + rot xyz),
         `uint64 trailer` (high 32 always 0; low 32 = FormID). `OpalList` was
         rewritten to this layout (payload kept as raw bytes for exact
         round-trip), the dialog now shows name/transform/FormID, and
-        `test_opallist` 7/7 — including a byte-exact round-trip of all ten
+        `test_opallist` 7/7 â€” including a byte-exact round-trip of all ten
         shipped files.
-      - **Galaxy — DONE 2026-09-14.** The galaxy map *is* an ESM record after
+      - **Galaxy â€” DONE 2026-09-14.** The galaxy map *is* an ESM record after
         all: `STDT` (Star), 123 in Starfield.esm. The earlier note missed it.
         `StdtRecord` (`libs/files/esm/stdtrecord.*`) stores subrecords raw and
         round-trips byte-exactly, with typed accessors for the galaxy fields:
-        `ANAM` name, `BNAM` system parsec location (3 floats — the map
+        `ANAM` name, `BNAM` system parsec location (3 floats â€” the map
         position), `DNAM` system id, `ENAM` colour, `SNAM`/`PNAM` links. The
         star catalogue data (catalogue id, spectral class, magnitude, mass,
         habitable zones, HIP, radius, temperature) lives in the
@@ -1203,25 +1203,25 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
         `DATA` layout per xEdit. `test_starrecord` 5/5: 30 stars with all
         fields, 123 scanned / 122 distinct system ids, byte-exact round-trip,
         and REFL schema decode.
-      - **Crowd — DONE (component):** `BGSCrowdComponent_Component` (density,
+      - **Crowd â€” DONE (component):** `BGSCrowdComponent_Component` (density,
         population count, per-population name/scale) is decoded on GBFM.
-      - **ReflectionProbes — RESOLVED 2026-09-14 (was looking in the wrong
+      - **ReflectionProbes â€” RESOLVED 2026-09-14 (was looking in the wrong
         place).** Searched *every* installed master (Starfield.esm,
         BlueprintShips 290 MB, SFBGS00D 97 MB, all DLC/mod masters) and the
         Creation Kit itself:
-        - `ReflectionProbes_Component` has **zero shipped instances** — xEdit
+        - `ReflectionProbes_Component` has **zero shipped instances** â€” xEdit
           defines it, nothing emits it. It was never the right target.
         - The CK's real reflection-probe system is cell/volume based: its
           binary references `ProbeGridVolume`, `ReflectionProbeCellComponent`
           and `ReflectionProbeInstanceData`, and a "Reflection Probes" toolbar
           action, and `E:\BuildAgent\...\Genesis\BSMain\BSReflectionProbe.cpp`.
         - The shipped representation is **`Volumes_Component::VLMS`** (present
-          on STAT/REFR/GBFM in every master) plus `XVOI` — "Volume Reflection
-          Probe Offset Intensity" — on references.
+          on STAT/REFR/GBFM in every master) plus `XVOI` â€” "Volume Reflection
+          Probe Offset Intensity" â€” on references.
         - `parseVolumePayload` (`libs/files/esm/baseformcomponents.*`) decodes
           VLMS: `uint32 count`, then per entry `uint32 type` (1/3/5),
           row-major `float[16]` matrix, 3 floats, and a type-specific tail
-          (1→1, 3→2, 5→3 floats) per xEdit's `wbVLMSTypeDecider`. Validated
+          (1â†’1, 3â†’2, 5â†’3 floats) per xEdit's `wbVLMSTypeDecider`. Validated
           against the whole master: **11,765 VLMS subrecords, every one
           consuming exactly its own size, 0 failures** (types 1:114, 3:549,
           5:18223). `test_shipcomposite::testVolumeComponent` pins a sample.
@@ -1235,7 +1235,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     - Voice/Houdini: done (see above).
     - Voice playback: `SapiVoiceSynthesizer` renders lines to WAV through
       the in-box Windows speech engine (System.Speech over SAPI in a helper
-      process — no ATL/SDK linkage; ~1 s per call), `runVoicePlan` uses it
+      process â€” no ATL/SDK linkage; ~1 s per call), `runVoicePlan` uses it
       whenever voices are installed (David/Zira/Haruka verified here), and
       the dialog offers playback of the first completed line through the
       existing `VoicePreview::playVoiceAudio` path. `test_starfieldtools`
@@ -1243,10 +1243,10 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     - Houdini scripts: `tools/houdini/export_ship.py` (ship geometry to FBX
       via a filmboxfbx ROP, `--node`/`--hip`) and `import_opal.py` (OPAL CSV
       rows to null locators with spare parameters, x/y/z honored when
-      present) — the batch counterparts to the bridge's command builder.
+      present) â€” the batch counterparts to the bridge's command builder.
       `py_compile` clean; both exit 2 with a clear message outside Houdini
       (no Houdini installed here to run them under).
- 9. **Multi-game record dispatch** — foundation verified against real
+ 9. **Multi-game record dispatch** â€” foundation verified against real
     non-Starfield masters:
     `GameFormat` (`libs/files/esm/gameformat.hpp/.cpp`) detects the game
     family from master basenames + the LightMaster flag (`detectGame`), now
@@ -1259,15 +1259,15 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     existing `ESMReader`/`Header`: **FO4 `Fallout4.esm` (1.74M records) and
     Starfield `Starfield-Core.esm` (3.83M records) each read 400 records with
     0 errors and correct `detectGame`, and the base `.esm` masters correctly
-    report no MAST entries** — proving the unified TES4 reader generalizes
+    report no MAST entries** â€” proving the unified TES4 reader generalizes
     beyond Skyrim.
      **Morrowind (TES3) is a genuine separate format:** its first record is
      `'TES3'` and stores `HEDR` *inline* (version/numRecords/nextObjectID as
      raw fields, not a subrecord) followed by per-month `GMST`/`NAME`/`STRV`
-     calendar subrecords — the TES4 reader's `header.load()` desynced on the
+     calendar subrecords â€” the TES4 reader's `header.load()` desynced on the
      inline bytes and yielded 0 records.
 
-     **Status 2026-09-12 (TES3 reader core — Phase 1):** the reader now
+     **Status 2026-09-12 (TES3 reader core â€” Phase 1):** the reader now
      accepts `'TES3'` masters end-to-end at the structural level:
      - `ESMReader::open` recognizes the `'TES3'` magic (`m_tes3` flag);
        TES3 record header is 16 bytes (name+size+unknown+flags, no formId),
@@ -1279,9 +1279,9 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
        record count) plus `MAST`/`DATA`/`GMDT`/`SCRD`/`SCRS`. New
        `ESMReader::readFixedString(int)` reads a fixed-width string field
        inside a subrecord (TES3's HEDR author/description are flat fields,
-       *not* subrecords — `readZString` over-consumed them).
+       *not* subrecords â€” `readZString` over-consumed them).
      - `Data::continueLoading` takes a TES3 branch: read header, dispatch
-       through the existing switch, drain remaining subrecords losslessly —
+       through the existing switch, drain remaining subrecords losslessly â€”
        no desync, no per-type loader required for a clean walk yet.
      - Verified against the real `Morrowind.esm` (79,837,557 bytes):
        **48,295 records walked end-to-end with zero desync** (`test_tes3`
@@ -1289,10 +1289,10 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
        GMST@324; GMST NAME+STRV fully drained). `test_multigame::testMorrowind`
        is upgraded from detection-only to a full 400-record smoke walk.
      - TES3 GMST `STRV` holds a *variable-length string* for string globals
-       (e.g. `sMonthMorningstar` → "Morning Star"), a 4-byte float for
-       numeric ones — the size field disambiguates.
+       (e.g. `sMonthMorningstar` â†’ "Morning Star"), a 4-byte float for
+       numeric ones â€” the size field disambiguates.
      - Morrowind record registry added to `gameformat` (BODY/BSGN/CLOT/
-       CREA/LEVC/LEVI/LOCK/PGRD/PROB/REPA/REGN/SNDG/SSCR — the types
+       CREA/LEVC/LEVI/LOCK/PGRD/PROB/REPA/REGN/SNDG/SSCR â€” the types
        actually present in Morrowind.esm, per the walk histogram);
        `test_gameformat` 12/12.
     `detectGame` is now wired into the loader: `Data::preload` detects the
@@ -1305,11 +1305,11 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     asserts the detection (11/11 overall).
     TES3 Phase 2 scope (superseded by the statuses below): per-type record
     loaders for the Morrowind record types in the walk histogram (INFO/DIAL/
-    CELL/STAT/NPC_ bodies etc. — ~40 types, mirroring the OpenMW
+    CELL/STAT/NPC_ bodies etc. â€” ~40 types, mirroring the OpenMW
     `esm3/load*.cpp` layouts), a TES3 save/round-trip path with subrecord-
-    diff gating, and the game-specific editors (§3.8).
+    diff gating, and the game-specific editors (Â§3.8).
 
-     **Status 2026-09-12 (TES3 generic record + save — Phase 2a):** the
+     **Status 2026-09-12 (TES3 generic record + save â€” Phase 2a):** the
      entire Morrowind format now loads and saves through one generic record,
      no per-type loader required:
      - `Tes3Record` (`libs/files/esm/Tes3record.hpp/.cpp`) preserves the
@@ -1334,14 +1334,14 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
      - 9 new `CkId::Type`s: BODY/LEVC/LEVI/LOCK/PGRD/PROB/REPA/SNDG/SKIL.
      - `test_tes3roundtrip` (new, gated on the real Morrowind.esm): full
        48,295-record load with **exact per-type counts** (GMST 1449, NPC_ 2675,
-       STAT 2788, DIAL 2358, CELL 2538, LAND 1390, PGRD 1194, BODY 1125, …)
+       STAT 2788, DIAL 2358, CELL 2538, LAND 1390, PGRD 1194, BODY 1125, â€¦)
        and a **byte-identical** save of the whole 79,837,557-byte master.
     TES3 Phase 2b scope (superseded by the statuses below): component-backed
     editors for the Morrowind record types (the generic record edits
     losslessly but exposes raw bytes only), and the game-specific editors
-    (§3.8).
+    (Â§3.8).
 
-     **Status 2026-09-13 (TES3 component-backed editing — Phase 2b):**
+     **Status 2026-09-13 (TES3 component-backed editing â€” Phase 2b):**
      - `Tes3Record` gains `parseComponents()`, called after `load()`, which
        extracts display/edit components from the raw subrecords: `TESFullName`
        (FULL), `TESModel` (MODL/MNAM), `TESTexture` (ICON/ICO2), and the new
@@ -1357,15 +1357,15 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     wired into the UndoStack, and specialised editors for Morrowind
     record families.
 
-     **Status 2026-09-20 (component write-back — Phase 2c core):** done.
+     **Status 2026-09-20 (component write-back â€” Phase 2c core):** done.
      - `Tes3Record::operator==` now includes `components` (was raw-only), so
        `EditRecordCommand::hasChanged()` detects form-dialog edits; the
        component `clone()`/`copyFrom()`/`isEqualTo()` set was already
-       complete, so push→undo→redo works through the standard UndoStack.
+       complete, so pushâ†’undoâ†’redo works through the standard UndoStack.
      - `Tes3Record::save()` emits component values for FULL/MODL/MNAM/ICON/
        ICO2/DATA at their load-ordered positions when they differ from the
        parse of the last raw occurrence, and appends component values for
-       subrecords the source lacked (fixed FULL…DATA order). Untouched
+       subrecords the source lacked (fixed FULLâ€¦DATA order). Untouched
        records replay raws verbatim and stay byte-identical. The
        last-occurrence rule matters: parse is last-wins for duplicates and
        lossy for non-UTF8 bytes, so byte comparison flagged untouched
@@ -1373,13 +1373,13 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
        byte-identical test). NAME edits now go through `writeSubZString`
        (NUL-less in TES3 mode) instead of appending a stray NUL.
      - `testSyntheticComponentWriteBack` (always runs, no fixture): synthetic
-       Morrowind.esp with two CLOTs — untouched save byte-identical;
+       Morrowind.esp with two CLOTs â€” untouched save byte-identical;
        FULL+DATA edit survives save/reload at original positions with MODL
-       intact; undo→save→reload restores the original bytes exactly;
+       intact; undoâ†’saveâ†’reload restores the original bytes exactly;
        redo re-applies; MODL added to a MODL-less record is appended.
      Full Morrowind.esm round-trip still byte-identical (48,295 records);
      suite 130/130, zero-warning build (also fixed a pre-existing C4477
-     `%d`→`%lld` in `subrecordsnapshot.hpp` that kept the gate red),
+     `%d`â†’`%lld` in `subrecordsnapshot.hpp` that kept the gate red),
      lint clean.
     TES3 Phase 2c type-specific DATA scope (completed below): the generic
     hex editor stays only for unvalidated layouts.
@@ -1387,18 +1387,18 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
      **Status 2026-09-20 (type-specific DATA parsing):** done for every
      DATA group with a survey-proven layout.
      - `libs/files/esm/tes3datalayout.*` (openck_esm): data-driven
-       (code, size) → field table + LE decode/encode (floats via memcpy):
+       (code, size) â†’ field table + LE decode/encode (floats via memcpy):
        DIAL/1 dialogType; INFO/12 dialogType + disposition + flags + rank
        + gender + pcRank; CELL/12 flags + gridX/Y; CELL/24 placed-ref
        pos/rot floats; LAND/LEVC/LEVI u32 flags; SNDG type; SOUN
        volume/minRange/maxRange; LTEX NUL-terminated texture path.
      - Layouts grounded in `test_tes3data` diagnostics against the real
        master: size histogram, per-lane ranges, INFO byte-0 == parent DIAL
-       type 23,693/23,693, CELL FRMR↔24-byte-DATA pairing 2,538/2,538,
-       INFO value sets (disposition ≤100 + journal indices, gender
+       type 23,693/23,693, CELL FRMRâ†”24-byte-DATA pairing 2,538/2,538,
+       INFO value sets (disposition â‰¤100 + journal indices, gender
        {0,1,255}, ranks 0-9/255). PGRD/12 deliberately undecoded (lane 3
        is not a point count; counts shadowing siblings are unsafe to
-       expose) — pinned by test to stay on hex.
+       expose) â€” pinned by test to stay on hex.
      - `Tes3Data_Component` decodes the mirrored occurrence into typed
        fields with per-field editor properties (plus a committing hex
        view); field edits re-encode into the raw bytes, so save/undo/hex
@@ -1417,7 +1417,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     record-family editors (the generic QtFormDialog path already opens every
     TES3 record with the typed DATA fields).
 
-     **Status 2026-09-22 (specialised Morrowind editors — Phase 2c done):**
+     **Status 2026-09-22 (specialised Morrowind editors â€” Phase 2c done):**
      done.
      - Object Window gains a Morrowind category tree in
        `ObjectWindowModel::initCategories` / `rebuildAllRecords`
@@ -1473,7 +1473,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     `test_starfieldesm` x2, `test_groundtruth`, `test_subrecord_roundtrip`,
     `test_worldspacerecord`, `test_pndrecord`, `test_btdterrain`,
     `test_hknpphysicssystem`) were converted from hard `QVERIFY` to `QSKIP`,
-    so a data-less machine skips instead of failing — verified by running
+    so a data-less machine skips instead of failing â€” verified by running
     all 9 with a bogus `OPENCK_DATA_DIR` (exit 0, skips recorded) and again
     with real data (exit 0, passes). The `if (EXISTS hardcoded-path)` CMake
     guards for pndrecord/worldspacerecord/bsaarchive were replaced with
@@ -1481,7 +1481,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     the env var. Self-created-output checks (pluginio, loader save paths,
     nifanimation temps, ba2/bsa write round-trips) intentionally stay
     `QVERIFY`.
-2. **Materialization matrix test** — index count vs. loaded count vs. warning
+2. **Materialization matrix test** â€” index count vs. loaded count vs. warning
    count for every type from a full master load; assert warnings == 0 or an
    explicitly shrinking allowlist.
 
@@ -1491,7 +1491,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     master index (per-type counts via `ensureTypeLoaded`, heap-validated per
     type with `HeapValidate` + `_CrtCheckMemory`), and asserts the reader
     warning list is empty afterwards. Passes in the suite (3.8M records).
-3. **Per-type round-trip subrecord-diff tests** (the tool from §1.2) as part of
+3. **Per-type round-trip subrecord-diff tests** (the tool from Â§1.2) as part of
    the suite.
 
     **Status 2026-09-13:** Covered.
@@ -1499,7 +1499,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     0 mismatches), `testSyntheticMultiTypeRoundTrip` (synthetic NPC_/GLOB/
     STAT/WRLD), and `test_tes3roundtrip` (full 48,295-record Morrowind.esm,
     byte-identical) are all registered QTest cases and green.
-4. **Fake-data lint** — CI grep that fails on hardcoded game-content strings in
+4. **Fake-data lint** â€” CI grep that fails on hardcoded game-content strings in
    `src/` so sample data comes from fixtures.
 
     **Status 2026-09-13:** Implemented.
@@ -1518,29 +1518,29 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     `Data` (~995 doc lines), `BlenderLauncher`, `ShortcutManager` and
     `NifPyFileWrapper` (class + every public method/struct with
     `///`/`/** */` comments, params and returns) are all documented.
-6. **Final build gate** — zero-warning clean build, all tests, memory-leak
+6. **Final build gate** â€” zero-warning clean build, all tests, memory-leak
    check, coverage target.
 
-    **Status 2026-09-13:** Implemented as `tools/gate.ps1` (lint → build
-    `all_tests` failing on any MSVC warning outside `external/` → full
+    **Status 2026-09-13:** Implemented as `tools/gate.ps1` (lint â†’ build
+    `all_tests` failing on any MSVC warning outside `external/` â†’ full
     `ctest --output-on-failure`). Verified with a from-scratch Release
     rebuild into a separate build dir: the first clean build exposed 25,782
-    warning lines, all fixed or justified —
+    warning lines, all fixed or justified â€”
     C4373 (~4.3k template-amplified diagnostics) fixed properly by dropping
     top-level `const` from three `Collection<T>` override declarations
     (`getId`/`replace`/`getRecord`) to match `BaseCollection` and the
     out-of-line definitions; C4714 (Qt-internal `__forceinline` noise)
     disabled project-wide with a comment, following the existing `/wd4100`
     precedent; 8 real diagnostics fixed (merged `#include` lines, unused
-    locals, `int`→`quint32` casts, a shadowed `found`, `%d`→`%lld` for
-    `qsizetype` printf args, `getenv`→`qEnvironmentVariable`). Rebuild is
+    locals, `int`â†’`quint32` casts, a shadowed `found`, `%d`â†’`%lld` for
+    `qsizetype` printf args, `getenv`â†’`qEnvironmentVariable`). Rebuild is
     zero-warning; full `ctest` is 124/124. The same run caught a stale
     `all_tests` DEPENDS list (8 newer tests missing, 2 removed tests still
-    listed) — now verified identical to the built set, which is also what
+    listed) â€” now verified identical to the built set, which is also what
     CI's build step compiles.     Leak coverage comes from the in-suite
     `HeapValidate`/`_CrtCheckMemory` instrumentation in the matrix test.
     Coverage is verified working via `tools/coverage.ps1`: it builds the
-    requested tests in a `RelWithDebInfo` directory (PDBs are required —
+    requested tests in a `RelWithDebInfo` directory (PDBs are required â€”
     the default Release build emits none), runs each under OpenCppCoverage,
     and prints per-test line rates from the Cobertura XML (verified:
     `test_opallist` 94.6%, `test_particlesimulation` 93.3%, including the
@@ -1548,7 +1548,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     install; `dotnet-coverage` cannot substitute (it attaches via the CLR
     profiling API, which never initializes in pure-native processes).
     Full-suite coverage is slow (instrumentation overhead on the real-data
-    tests) — treat it as a nightly job, use `-Tests` for slices.
+    tests) â€” treat it as a nightly job, use `-Tests` for slices.
 7. **CTest registration** for the 3 remaining non-QTest binaries
    (`dumpesm`, `scanbtd`, `meshprobe`).
 
@@ -1568,15 +1568,15 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
    calls, so subsequent allocations skip already-scanned IDs. Counter resets
    on `removeRecord`. Build + 108 tests pass.
 2. Editor `saveRecord()` paths that validate **after** mutating the record
-   (partial mutation on validation failure) — validate first, commit via a
+   (partial mutation on validation failure) â€” validate first, commit via a
    temp copy.
 
    **Status 2026-09-07:** Audit of all 29 editors with ColumnValidator
    confirmed none exhibit this bug. All follow the correct pattern:
-   validate → then mutate. Stat/tree editors use a probe copy inside
-   `validate()` — safe.
+   validate â†’ then mutate. Stat/tree editors use a probe copy inside
+   `validate()` â€” safe.
  3. `LandscapeEditCommand` rewrites the full heightmap per brush stroke and
-    stores unused params — implement partial updates or drop the params.
+    stores unused params â€” implement partial updates or drop the params.
 
     **Status 2026-09-08:** Implemented partial updates. `LandscapeEditCommand`
     now stores only the dirty bounding-box region (x, y, width, height +
@@ -1584,9 +1584,9 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     `strokeDirtyRect` during brush strokes and extracts only that region on
     mouse release. Full-heightmap operations (paste, import R32) still use
     the full region (0, 0, terrainSize, terrainSize). Memory per undo entry
-    dropped from 2×N² floats to 2×(region) floats.
+    dropped from 2Ã—NÂ² floats to 2Ã—(region) floats.
 4. `Logger` singleton is not thread-safe before init and never restores the
-   Qt message handler — guard + restore.
+   Qt message handler â€” guard + restore.
 
    **Status 2026-09-07:** Logger already uses `QRecursiveMutex` on all public
    methods and has a `m_preInitBuffer` that queues messages before `init()`.
@@ -1599,25 +1599,25 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     `file(GLOB "C:/Qt/6.*")` + `msvc*` ABI glob, sorted descending so the
     newest version wins. Verified it finds `C:/Qt/6.5.3/msvc2019_64` on
     this machine. Qt5 deps not relevant (project is Qt6-only).
-6. 7 remaining `const_cast` call sites in `src/` — add proper mutable getters.
+6. 7 remaining `const_cast` call sites in `src/` â€” add proper mutable getters.
 
     **Status 2026-09-07:** Fixed 4 of 7 sites:
-    - `landscapeeditor.cpp`: 2 sites — removed unnecessary casts (mutable
+    - `landscapeeditor.cpp`: 2 sites â€” removed unnecessary casts (mutable
       getters already exist for `getLandCollection()`/`getCellCollection()`).
-    - `objectwindowdialog.cpp`: 2 sites — changed `const auto&` to `auto&`
+    - `objectwindowdialog.cpp`: 2 sites â€” changed `const auto&` to `auto&`
       for `getRefrCollection()`, removed casts.
-    - Remaining 3: `nodegraphwidget.cpp` (intentional — graph API only
+    - Remaining 3: `nodegraphwidget.cpp` (intentional â€” graph API only
       exposes const nodes), `data.cpp` x2 (standard
       const-delegates-to-non-const pattern). All safe, no fix needed.
 
     **Status 2026-09-13 (re-audit):** a 4th site had appeared since the
-    audit — `mainwindow.cpp` (`const_cast<FilePaths&>(mData->getPaths())`
+    audit â€” `mainwindow.cpp` (`const_cast<FilePaths&>(mData->getPaths())`
     in the Convert-to-ESL flow). Fixed properly per the item: added a
     non-const `Data::getPaths()` overload and dropped the cast. Verified
-    the other §5 claims still hold (`mNextLocalId` persists/resets;
+    the other Â§5 claims still hold (`mNextLocalId` persists/resets;
     `strokeDirtyRect` partial updates; logger mutex + pre-init buffer with
     no message-handler install; install targets + Qt GLOB; stat/glob
-    editors validate-before-mutate; no real TODO/FIXME — the hits are
+    editors validate-before-mutate; no real TODO/FIXME â€” the hits are
     `toDouble` and the `XXXX` subrecord name; no `.bak` files, only
     vendored Blender binaries under `external/`). Full build + 124/124
     green.
@@ -1626,29 +1626,29 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
 
      **Status 2026-09-08:** Audited. No commented-out blocks, no TODO/FIXME
      markers, no truly dead functions. All 55 `Q_UNUSED` sites are in Qt
-     virtual overrides (parameter required by signature — correct pattern).
+     virtual overrides (parameter required by signature â€” correct pattern).
      Both `catch(...)` blocks are top-level safety nets in `main.cpp` and
      `crashhandler.cpp` (legitimate). Nothing to remove.
 
      **Status 2026-09-13 (file-level re-audit):** the 09-08 audit covered
-     functions, not files — 12 source files were uncompiled AND unreferenced
+     functions, not files â€” 12 source files were uncompiled AND unreferenced
      (verified: absent from every CMakeLists, no `#include`, no symbol use,
      no `.ui`/docs references) and are now deleted: `genericrecordeditor.*`
      (save path never validated, nothing opens it), `globeditor.*`
      (superseded by `globvar_editor` + the water-editor GLOB flow),
      `npcvalidator.cpp`/`questvalidator.cpp`/`weaponvalidator.cpp` (hazardous
-     out-of-line duplicates of the header-inline implementations — compiling
+     out-of-line duplicates of the header-inline implementations â€” compiling
      them would break the link; headers stay), `nifviewport.*` (first-gen
      viewport superseded by `NifViewportWidget`), `worldviewwidget.*`
      (~42 KB, unreferenced), `mainwindow_construction.cpp` (10-line orphaned
      constructor fragment). The `catch(...)` claim needed one correction:
      `crashhandler.cpp` was never compiled and `installCrashHandlers()` never
-     called, so the documented crash reporter was dormant — it is now wired
+     called, so the documented crash reporter was dormant â€” it is now wired
      up (`openck_files` target, called from `main()` after logger init) with
      two latent bugs fixed (missing `<csignal>`, duplicate
      `EXCEPTION_ACCESS_VIOLATION` case) and covered by `test_crashhandler`
      (5/5: install, stack trace, crash bundle). Full build + 125/125 green.
- 8. Stale `.bak` files and `external/vorbis` build outputs clutter the tree —
+ 8. Stale `.bak` files and `external/vorbis` build outputs clutter the tree â€”
     add a cleanup rule + gitignore.
 
     **Status 2026-09-08:** No `.bak` files or build outputs found in the
@@ -1656,32 +1656,32 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
 
 ---
 
-## 6. Intentionally closed — do NOT re-add
+## 6. Intentionally closed â€” do NOT re-add
 
-- **Cell-transitions editing** — the TES4 format stores no cell-connection
+- **Cell-transitions editing** â€” the TES4 format stores no cell-connection
   data; the editor is honestly read-only.
-- **SCEN PHDA binary encoding** — no shipped game has a PHDA subrecord.
-- **Top-level `CCT_` record** — does not exist in the real format; creature
+- **SCEN PHDA binary encoding** â€” no shipped game has a PHDA subrecord.
+- **Top-level `CCT_` record** â€” does not exist in the real format; creature
   attach points are `ap_CCT_*` EDID markers.
-- **Flat mirror fields** (`containerItems`, `keywords`, `spells`) — kept
+- **Flat mirror fields** (`containerItems`, `keywords`, `spells`) â€” kept
   intentionally for back-compat; audited.
-- **VC server preferences field** — removed intentionally.
-- **Subrecord spelling conversions** (BYDT→ATTR etc.) — fixed; components now
+- **VC server preferences field** â€” removed intentionally.
+- **Subrecord spelling conversions** (BYDTâ†’ATTR etc.) â€” fixed; components now
   re-emit the exact spelling they loaded.
-- **Deferred-master synchronous expansion** — replaced by time-sliced
+- **Deferred-master synchronous expansion** â€” replaced by time-sliced
   materialization; the fetchMore model-reset crash cannot recur.
-- **"REFR materialization heap corruption (0xC0000374)"** — the 2026-08-25
+- **"REFR materialization heap corruption (0xC0000374)"** â€” the 2026-08-25
   entry below attributed it to a registry page-heap configuration, but on
   2026-09-03 the crash reproduced deterministically at the REFR transition
   (exit 0xC0000374 in both Debug and Release on the restored tree) and was
   fixed by guarding the `BGSRefData_Component` fixed-width subrecord reads
-  to consume only declared bytes (see §1.1 status 2026-09-03): it was a real
+  to consume only declared bytes (see Â§1.1 status 2026-09-03): it was a real
   parser over-read after all. The 08-25 "non-reproducible" verdict is
   superseded; the page-heap/VEH/`_CrtCheckMemory` instrumentation in
   `test_loader.cpp` stays as the detector kit. Debug full-matrix runs that
   die near 300s are the QTest function timeout + teardown race, not this
   bug. Machine-local note: HKLM IFEO `test_loader.exe` held inert values
-  (`GlobalFlag=0x10000000` enables nothing) — removed 2026-09-04 via
+  (`GlobalFlag=0x10000000` enables nothing) â€” removed 2026-09-04 via
   elevated cleanup; the `phcanary.exe` key was already absent.
 
 ---
@@ -1692,65 +1692,65 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
 - All `test_*.exe` in `build/bin/Release/` exit 0 (currently 134, excluding
   the standalone `test_subrecord_diff` CLI). `test_subrecord_diff.exe` is a
   CLI diff tool, not a test: exit 2 means "usage error" when run without its
-  two file arguments, by design — exclude it from the glob.
+  two file arguments, by design â€” exclude it from the glob.
 - `openck --cli info <SeydaNeen.esp>` exits 0.
 - `docs/record_formats.md` warning rows trend to zero.
 - `tools/gen_record_audit.ps1` regenerates `docs/record_formats.md`.
 
 ---
 
-## 8. Phase 5 — in-viewport 3D playback (scoped from the code, 2026-09-13)
+## 8. Phase 5 â€” in-viewport 3D playback (scoped from the code, 2026-09-13)
 
-The §3.2/§3.5 "Phase 5 scope" notes understated what is already wired.
-Verified by reading `NifViewportWidget` + `NifAnimationState` (no new code —
-this section is documentation of findings, per the §3 review).
+The Â§3.2/Â§3.5 "Phase 5 scope" notes understated what is already wired.
+Verified by reading `NifViewportWidget` + `NifAnimationState` (no new code â€”
+this section is documentation of findings, per the Â§3 review).
 
 **Already working end-to-end:**
-- Animation: `NifAnimationState`'s QTimer ticks → `timeChanged` → timeline
-  slider/label update + `glWidget->update()` → `renderMesh()` calls
-  `applyAnimationFrame()` whenever playing → node cumulative transforms are
-  recomputed with animation overrides → rest-pose vertices (`restVertices` /
-  `restNormals`) are deformed on CPU with normal-matrix correction →
+- Animation: `NifAnimationState`'s QTimer ticks â†’ `timeChanged` â†’ timeline
+  slider/label update + `glWidget->update()` â†’ `renderMesh()` calls
+  `applyAnimationFrame()` whenever playing â†’ node cumulative transforms are
+  recomputed with animation overrides â†’ rest-pose vertices (`restVertices` /
+  `restNormals`) are deformed on CPU with normal-matrix correction â†’
   `m_meshDirty` triggers VBO re-upload. Rigid/prop animation plays.
 - Particles: `initParticleSystems()` parses the NIF's effects and shows the
   toolbar, play/pause/stop drive `ParticleSystem`'s timer,
   `ParticleRenderer::render` runs inside `renderMesh()`, and
-  `ParticleSystem::updated` → `glWidget->update()` closes the repaint loop.
+  `ParticleSystem::updated` â†’ `glWidget->update()` closes the repaint loop.
   The simulation math is unit-tested (`test_particlesimulation`) after the
   `ParticleSimulation` extraction, which kept the viewport path intact.
 
 **The actual remaining gaps (this is the Phase 5 work):**
-1. **Per-vertex skinning — DONE 2026-09-14 (CPU).** `NifSkinInstance` /
+1. **Per-vertex skinning â€” DONE 2026-09-14 (CPU).** `NifSkinInstance` /
    `NifSkinData` dialect blocks (`libs/files/esm/nifrecord.*`) parse and
    round-trip; `extractGeometry` links instances to shapes (bone refs
    resolved to scene nodes, out-of-range data warned and skipped);
    `applyAnimationFrame` blends skinned shapes through a shared GUI-free
-   core (`libs/files/nif/nifskinning.*`: `v' = OwnerWorld * Σ w·(BoneWorld·
-   BindInverse)·v`, per-vertex weight normalization, unweighted fallback to
-   rigid) — single-bone weight-1.0 reproduces the rigid path exactly.
-   `test_nifskinning` 15/15 (blend math, block codec, synthetic file load→
+   core (`libs/files/nif/nifskinning.*`: `v' = OwnerWorld * Î£ wÂ·(BoneWorldÂ·
+   BindInverse)Â·v`, per-vertex weight normalization, unweighted fallback to
+   rigid) â€” single-bone weight-1.0 reproduces the rigid path exactly.
+   `test_nifskinning` 15/15 (blend math, block codec, synthetic file loadâ†’
    link, playback composition, real-file canary). The work also fixed two
    latent loader bugs the tests exposed: `NiTriShapeData` misdispatched as
    `NiTriShape` (prefix match order), and a zero-progress infinite loop in
    `parseAllBlocks` on non-dialect input (now breaks cleanly). GPU skinning
-   landed 2026-09-21 (see §8.3).
-2. **Quaternion-correct interpolation — DONE 2026-09-14.** `AnimKeyframe`
+   landed 2026-09-21 (see Â§8.3).
+2. **Quaternion-correct interpolation â€” DONE 2026-09-14.** `AnimKeyframe`
    / `TransformKeyframe` carry `qw..qz` + `hasQuat` alongside the Euler
    angles; `interpolateChannel` slerps when both endpoints have quats
    (Euler derived from the result for legacy consumers) and keeps Euler
    lerp otherwise; the viewport imports quats from keyframe controllers
    and renders rotation straight from quat matrices; the blend path uses
    stored quats; JSON/XML persist quats when present (old files keep the
-   Euler path). `test_nifanimation` 11/11, incl. the 350°→−5° short-path
-   proof (Euler lerp would sit at 175°).
- 3. **Verification gate on real assets — HEADLESS COMPLETE; DISPLAY
+   Euler path). `test_nifanimation` 11/11, incl. the 350Â°â†’âˆ’5Â° short-path
+   proof (Euler lerp would sit at 175Â°).
+ 3. **Verification gate on real assets â€” HEADLESS COMPLETE; DISPLAY
     CONFIRMATION OUTSTANDING (2026-09-22).** The Gamebryo 20.2.0.7 block
     reader is now in the tree
     (`libs/files/nif/nifparser.cpp`, `Gamebryo::` section; `NifParser::load`
     routes by magic, dialect path untouched). It strictly parses the real
     header (magic line, version dword, BS172 `BSStreamHeader` with
     byte-length `ExportString` tail, type table, per-block size table,
-    string table, footer — validated byte-exact in Python against all 255
+    string table, footer â€” validated byte-exact in Python against all 255
     loose shipped NIFs), dispatches blocks by type index with exact
     seek-by-size (unknown blocks skipped, never guessed), builds `NiNode`
     hierarchies with string-table names and child refs, and decodes the
@@ -1761,41 +1761,41 @@ this section is documentation of findings, per the §3 review).
     (meshes live in BA2s), recorded on the parser via
     `NifParser::externalMeshRefs()`. `testRealNifSurvey` flipped: 8/8
     shipped files load with 66 named nodes + 205 external mesh refs and 0
-    local verts. **Vertices 2026-09-15:** the external paths resolve —
+    local verts. **Vertices 2026-09-15:** the external paths resolve â€”
     NIF mesh path + `geometries/` prefix + `.mesh` suffix addresses
     Meshes01.ba2 directly (320,483 files; verified by extraction), and
     `Nif::parseBsMeshData` decodes the `.mesh` stream (scaled ShortVector3
     verts, half UVs, BGRA colors, packed normals/tangents, weights, LODs,
-    meshlets, cull — exact full-buffer consumption). `testExternalMeshData`
+    meshlets, cull â€” exact full-buffer consumption). `testExternalMeshData`
     proves it on a shipped mesh (16 verts, 8 tris, valid indices). New
     diagnostic `test_meshresolve` finds/extracts BA2 entries by path.
     Debugging footnote: `QDataStream::operator>>(float&)` was observed
-    consuming 8 bytes (not 4) in this build — the mesh parser reads float
+    consuming 8 bytes (not 4) in this build â€” the mesh parser reads float
     bits as u32 + memcpy (see AGENTS.md gotchas).
     **Auto-resolution 2026-09-16:** `Nif::MeshArchiveResolver`
     (`nifparser.*`, process-wide BA2 cache) maps NIF mesh paths to mesh
-    BA2 entries — hash form `h1\h2` and full `Geometries\h1\h2[.mesh]`
+    BA2 entries â€” hash form `h1\h2` and full `Geometries\h1\h2[.mesh]`
     address `geometries/h1/h2.mesh` directly; name-style paths
     (`SomeFolder\SomeMesh`) match no shipped archive entry anywhere and
     stay unresolved by design (no substring guessing). Resolved meshes
     decode into synthetic data blocks so `extractGeometry` yields real
     shapes: the survey now reports 53,715 verts over the 8 files
     (`totalVerts > 0` replaces the old `== 0` tripwire). Vertex units
-    settled empirically: meters = int16 × vertexScale / 65536 (bound
+    settled empirically: meters = int16 Ã— vertexScale / 65536 (bound
     sphere/box ratios exact on 6 axes across 2 scales). `Ba2Archive`
     gained `extractToBytes` (backing `extract()`); `totalVertexCount` /
     `shapeCount` now recurse the whole tree (they previously counted the
-    root only — the tree was always fully populated).
-    **Skinned meshes 2026-09-16:** Starfield does not use NiSkin — faces
+    root only â€” the tree was always fully populated).
+    **Skinned meshes 2026-09-16:** Starfield does not use NiSkin â€” faces
     use `BSSkin::Instance` + `BSSkin::BoneData` + `SkinAttach` triplets
     (positional: geometry, extras, attach, instance, bonedata; a
     `BSClothExtraData` may sit between attach and instance; the geometry's
     skin ref points at its instance directly). Layouts validated across
     15 triplets in 2 shipped face NIFs: attach = u32 unk(4) + names;
     instance = target/bonedata/n + i32(-1) + 16 raw bytes per bone;
-    bonedata = count + per-bone 4×4 matrix + scale float (~1.0).
+    bonedata = count + per-bone 4Ã—4 matrix + scale float (~1.0).
     `BSFaceGenNiNode` roots parse as `NiNode` + 2 tail bytes. Bone names
-    link onto `TriShape.skinBones` (nodes null, weights empty — rigid
+    link onto `TriShape.skinBones` (nodes null, weights empty â€” rigid
     fallback preserved); `testFaceSkinBlocks` proves it on a shipped face
     (10 shapes, 10 skinned, 129 named bones, 53,444 verts).
     **Per-vertex weights 2026-09-21:** the `.mesh` weight stream is no
@@ -1805,19 +1805,19 @@ this section is documentation of findings, per the §3 review).
     BSSkin triplet link converts them into `TriShape::skinWeights`
     (`weight = weightRaw / 65535`, zero-weight slots skipped). The bone
     index is **attach-local**: across all 10 shipped face shapes
-    `maxBone == attachBones - 1` exactly (2→1, 14→13, 50→49, 54→53, …),
+    `maxBone == attachBones - 1` exactly (2â†’1, 14â†’13, 50â†’49, 54â†’53, â€¦),
     and `BSSkin::Instance` bone count == attach name count, so the mesh
     index addresses `skinBones[i]` directly. `testFaceSkinBlocks` now
     asserts 10/10 shapes weighted, 223,584 weights, every bone/vertex
     index in range, per-vertex weights partitioning to 1.0, and a
-    bind-pose blend (identity palettes — the exact viewport state when no
+    bind-pose blend (identity palettes â€” the exact viewport state when no
     animated skeleton is present) reproducing the rest pose vertex- and
     normal-exact through `Nif::blendSkinnedLocal`. The viewport already
     degrades to rigid when `boneNode` is null, so this changes no
     rendering until a skeleton resolves. The `BSSkin::Instance` 16-byte
     per-bone payload is **not** topology: only 5 distinct values across
     the 50-bone head (bit patterns = 1.0f, 0, -1, and a small int),
-    matching the earlier 76-bone observation — kept raw, not interpreted.
+    matching the earlier 76-bone observation â€” kept raw, not interpreted.
     **Current residual (2026-09-22):** the 16-byte per-bone payload remains
     intentionally raw. Skeleton resolution, bind-pose and deformation tests,
     CPU/GPU animated blend, and headless particle playback wiring are complete.
@@ -1837,15 +1837,15 @@ this section is documentation of findings, per the §3 review).
     now loads the face + skeleton, asserts every head bone resolves, that
     the bind-pose blend reproduces rest, and that translating the
     most-weighted bone deforms exactly the vertices weighted to it or its
-    subtree (and no others) — real Starfield skinning, headlessly. Note the
+    subtree (and no others) â€” real Starfield skinning, headlessly. Note the
     *animation* stream is a separate undocumented format (`.ffxanim` in
     `Starfield - FaceAnimation0*.ba2`), so animated playback still needs
     that decoder.
 
     **GPU skinning 2026-09-21:** the viewport vertex shader now supports
     `uSkinned` + `uBones[128]` with per-vertex 8-slot bone index/weight
-    attributes (locations 4–7, 28 floats/vertex); skinned shapes upload
-    rest vertices and let the shader blend `Σ w·(owner·boneWorld·
+    attributes (locations 4â€“7, 28 floats/vertex); skinned shapes upload
+    rest vertices and let the shader blend `Î£ wÂ·(ownerÂ·boneWorldÂ·
     bindInverse)`, while rigid shapes keep the CPU path and `uSkinned`
     false. `Nif::packGpuSkinInfluences` (GUI-free, in `nifskinning.*`)
     packs and normalizes influences; `testGpuSkinPacking` /
@@ -1855,7 +1855,7 @@ this section is documentation of findings, per the §3 review).
     `setGpuSkinningEnabled()` toggles it (forces a VBO rebuild). The shader
     itself needs a display to confirm visually.
 
-    **Face animation (`__ffx`) 2026-09-21 — investigated, out of scope.**
+    **Face animation (`__ffx`) 2026-09-21 â€” investigated, out of scope.**
     Shipped face motion is not in the NIF: it is FaceFX middleware data.
      `Starfield - FaceAnimation0*.ba2` holds `*.ffxanim` (76,659 entries in
      vol. 01) carrying `__ffx\0` + version + u32 size + 20-byte id (last 8
@@ -1884,7 +1884,7 @@ this section is documentation of findings, per the §3 review).
      `OPENCK_TEST_FACEFX_DIR`). Deeper `FxCompiledFaceGraph` evaluation
      remains out of scope with the runtime reimplementation above.
 
-     **`.ffxanim` container parse 2026-10-02 — DONE:** `libs/files/facefx/facefxanim.*`
+     **`.ffxanim` container parse 2026-10-02 â€” DONE:** `libs/files/facefx/facefxanim.*`
      decodes the `.ffxanim` blob structurally: magic `__ffx\0`, a u16
      format word, u32 size (checked against the file), a 20-byte entry id
      (last 8 bytes observed constant per entry type), u32 record count,
@@ -1900,7 +1900,7 @@ this section is documentation of findings, per the §3 review).
      scope; what now exists is a strict container reader that stops
      drift at the parse boundary instead of letting telemetry through.
 
-## 9. Series items — Creation Kit parity audit
+## 9. Series items â€” Creation Kit parity audit
 
 **Audit date:** 2026-09-25. This section records nine concrete series of
 remaining work, followed by additional gaps found by inspecting the local
@@ -1917,7 +1917,7 @@ plugins. OpenCK uses Qt6 and its own vendored ADS build; it must not copy or
 redistribute the CK's Qt deployment. Any compatibility work must use public Qt
 APIs or remain inside OpenCK's existing Qt6/ADS implementation.
 
-### Series 1 — Transactional generic Object Window editing
+### Series 1 â€” Transactional generic Object Window editing
 
 **Priority: P0 correctness.** `ObjectWindowDialog::editSelected()` passes live
 record components into dialogs, while `QtFormDialogManager::openOrFocus()` has
@@ -1929,14 +1929,14 @@ undo stack.
 Replace this with a working-copy edit session: clone the record/components,
 bind the dialog to the copy, validate and compare on OK, push
 `EditRecordCommand` only after a successful commit, and discard on Cancel or
-close. **Status 2026-09-26 — done.** `RecordEditSession`
+close. **Status 2026-09-26 â€” done.** `RecordEditSession`
 (`src/view/window/recordeditsession.hpp`) owns a working copy
 of the whole record. The dialog's property grid and any custom data widget edit
 *that* copy, so only `commit()` writes the live record and it always goes through
 the document's undo stack; `discard()` drops the copy, and `QtFormDialog::reject()`
 calls it so both Cancel and closing the window discard. Because the copy is a
 whole record rather than just its components, a widget writing plain fields is
-covered for free — no per-widget snapshot logic. `HasFormComponents<T>` gates
+covered for free â€” no per-widget snapshot logic. `HasFormComponents<T>` gates
 which types expose working components. Custom data widgets implement
 `FormDataWidget` (`src/view/widgets/formdatawidget.hpp`) for `loadSession()`,
 `validateSession()` and `applySession()`; a failing `validateSession()` blocks
@@ -1962,7 +1962,7 @@ than left as dead code.
 piece was the custom data widgets themselves: of the 16 `*DataWidget`
 implementations, only `InfoDataWidget`, `QuestDataWidget` and `WorldspaceDataWidget`
 ever wrote to the record, so the other 13 read the record into controls and threw
-the user's edits away. All 12 of those now implement `FormDataWidget` —
+the user's edits away. All 12 of those now implement `FormDataWidget` â€”
 `loadSession()` repopulates the controls from the session's working record,
 `validateSession()` rejects malformed FormIDs with a message naming the offending
 row, and `applySession()` writes the controls back into the working record.
@@ -1979,8 +1979,8 @@ with, where a spin box range did not match the field it fed:
   -99999..99999, so a negative coordinate became a huge unsigned value. Interior
   cell coordinates are non-negative, so the range is now 0..99999.
 
-`test_recorddatawidgets` drives all 12 the way the dialog does — construct with the
-working record, edit a control, validate, apply — and checks the value reached the
+`test_recorddatawidgets` drives all 12 the way the dialog does â€” construct with the
+working record, edit a control, validate, apply â€” and checks the value reached the
 record through `commit()` and came back through `undo()`, that untouched fields
 survive, that a refused FormID writes nothing, and that every widget is actually
 discovered as a `FormDataWidget` (a silent failure to derive from the interface
@@ -1993,7 +1993,7 @@ this series existed to close. It is kept for dialogs with no record to edit, is
 commented as a footgun in the header, and nothing in production calls it. It
 should be deleted once no caller needs it.
 
-### Series 2 — Width-correct component property bindings
+### Series 2 â€” Width-correct component property bindings
 
 **Priority: P0 memory safety.** `IntEditorProperty` and `EnumEditorProperty`
 write 32-bit values through pointers, while several tier-3 components expose
@@ -2005,13 +2005,13 @@ editor properties.
 Add typed 8/16/32-bit properties or callback-based accessors, retain range
 metadata, and add canary-neighbor tests for every generated binding. No
 property may reinterpret a narrow record field as a wider integer. **Status
-2026-09-25 — done.** `IntegerEditorProperty` now provides a common clamped UI
+2026-09-25 â€” done.** `IntegerEditorProperty` now provides a common clamped UI
 contract for signed/unsigned 8/16/32-bit values, `UInt8EnumEditorProperty`
 preserves the AI enum editor, and all Tier 3 ACBS/AIDT bindings use typed
 fields. Regression checks verify neighboring fields remain unchanged; the full
 134-test CTest suite and `tools/fakedata-lint.ps1` pass.
 
-### Series 3 — Real CELL child references
+### Series 3 â€” Real CELL child references
 
 **Priority: P0 save integrity.** `CellReferenceEditor` treats embedded raw
 `REFR` subrecords as children and `CellEditor::openReferences()` writes them
@@ -2023,13 +2023,13 @@ Remove the embedded-record path. Populate the editor from real `RefrRecord`
 children, create/remove actual child records, allocate FormIDs, and batch the
 collection, parent index, and child-group changes through one undo command.
 Acceptance requires a synthetic CELL/REFR save-reload and undo/redo test. **Status
-2026-09-25 — done.** `CellReferenceEditor` now edits a working list sourced from
+2026-09-25 â€” done.** `CellReferenceEditor` now edits a working list sourced from
 real `RefrRecord` children. `CellEditor` allocates FormIDs, inserts/removes typed
 REFR records, updates parent/order indexes through one `MacroCommand`, and
 removes legacy embedded REFR subrecords before the outer cell commit. Synthetic
 coverage verifies add/remove, save/reload, and undo/redo.
 
-### Series 4 — New-plugin and new-record workflow
+### Series 4 â€” New-plugin and new-record workflow
 
 **Priority: P1 authoring viability.** The user guide describes game/master
 selection for new plugins, but the actual new-plugin dialog only supplies a
@@ -2042,7 +2042,7 @@ author, and next local FormID. Add a table-driven blank-record factory for
 Object Window categories with defaults and required components, and route all
 creation through `AddRecordCommand` with valid ID allocation. Synthetic tests
 must cover header masters, game detection, local IDs, save/reload, and undo.
-**Status 2026-09-26 — done.** The new-plugin flow collects game, active master
+**Status 2026-09-26 â€” done.** The new-plugin flow collects game, active master
 order, plugin/light type, author, and next local FormID; configured headers save
 and reload correctly. `BlankRecordFactory` plus `AddRecordCommand` now covers
 every record type in the shared list rather than a hand-written switch naming
@@ -2069,8 +2069,8 @@ usable component set rather than an empty form grid, and that it survives
 
 Paste is now a single generic path. `ObjectWindowDialog::pasteRecord()` used to
 run about thirty hand-written per-type branches that rebuilt a record field by
-field from a `QJsonObject` clipboard — copying only the fields each branch
-happened to list — and then added it through a type-specific `mData->addXxx()`
+field from a `QJsonObject` clipboard â€” copying only the fields each branch
+happened to list â€” and then added it through a type-specific `mData->addXxx()`
 that never entered the undo stack. The branch list could not keep up with the
 record types, and a paste could not be undone. `recordpaste.cpp` now deep-copies
 the source record, stamps the new editor ID and FormID, marks it
@@ -2096,7 +2096,7 @@ clipboard holds a snapshot. Making the clipboard carry a deep copy would need a
 type-erased snapshot in the static clipboard, which is straightforward but was
 not needed for the undo fix.
 
-### Series 5 — Record-specific tabs and real form pickers
+### Series 5 â€” Record-specific tabs and real form pickers
 
 **Priority: P1 workflow parity.** Several custom data widgets create controls
 without signal/commit paths, including NPC, CREA, FACT, CLAS, and PACK;
@@ -2108,7 +2108,7 @@ Build a `FormPickerWidget` backed by a form index with type filtering, search,
 duplicate detection, and navigation. Give every custom widget load/validate/
 apply behavior and table models with undoable commits. Remove the overwritten
 SCEN registration or implement a persisted editor. Add offscreen Qt tests for
-each widget and picker workflow. **Status 2026-09-26 — widgets done; the
+each widget and picker workflow. **Status 2026-09-26 â€” widgets done; the
 overwritten SCEN registration removed.**
 
 `FormPickerWidget` provides indexed search, type filtering, duplicate FormID
@@ -2119,7 +2119,7 @@ have full load/validate/apply sessions (see Series 1).
 SCEN had two registrations, and because `registerFactory()` assigned into a hash
 the second silently discarded the first. The survivor was a `RawSubrecordWidget`
 showing the raw PHDA subrecords, so the source contained a `SceneTimelineWidget`
-that could never be reached — and that widget only ever edited a
+that could never be reached â€” and that widget only ever edited a
 `QVector<ScenePhase>` it allocated itself, never reading the record or writing
 back, so wiring it up as-is would have looked editable and discarded every
 change. The dead registration is removed and SCEN now has one deliberate
@@ -2128,11 +2128,11 @@ existing factory, so this cannot fail quietly again, and a test pins that the
 second registration wins while the discarded factory is never called.
 
 `SceneTimelineWidget` and `ScenePhaseModel` are left in place with their own
-tests (`test_scenetimeline`, `test_scenephasemodel`) — they are working,
+tests (`test_scenetimeline`, `test_scenephasemodel`) â€” they are working,
 tested components awaiting a persisted scene editor, not dead code.
 
 **The heavyweight real-data tests were failing on QTest's watchdog, not a
-memory bug — fixed 2026-09-26.** `test_structuredfidelity` and `test_loader`
+memory bug â€” fixed 2026-09-26.** `test_structuredfidelity` and `test_loader`
 were intermittently reported as failing with `0xc0000409`, which reads exactly
 like a stack buffer overrun and sent me looking for an out-of-bounds access in
 the hand-rolled subrecord walkers. That diagnosis was **wrong**. The real cause,
@@ -2164,12 +2164,12 @@ inferring a cause from its exit code. `0xC0000409` is a timeout here, and the
 `strncpy`/`_chkstk` frames in the stack were the watchdog's own stack, not the
 fault.
 
-**Still open:** a persisted SCEN editor — and it is blocked on evidence, not
+**Still open:** a persisted SCEN editor â€” and it is blocked on evidence, not
 effort. The phase timeline is held in `ScenePhaseModel` and rendered by
 `SceneTimelineWidget` (both with passing tests), but the phases have to live in
 the PHDA subrecord, whose layout is unverified. A byte scan of `Skyrim.esm`,
-`Dawnguard.esm`, `Dragonborn.esm` and `HearthFires.esm` — 329 MB containing
-**9,143 SCEN records — found zero PHDA subrecords.** The base game ships no phase
+`Dawnguard.esm`, `Dragonborn.esm` and `HearthFires.esm` â€” 329 MB containing
+**9,143 SCEN records â€” found zero PHDA subrecords.** The base game ships no phase
 data, Oblivion is not installed, and no fixture in this repository contains a
 real PHDA. So there is nothing here to validate an encoding against, and writing
 guessed bytes into a user's scene data is worse than offering no editor.
@@ -2191,7 +2191,7 @@ and prove byte-exact round-trip for untouched phases.
 **The container, keyword and spell tables now commit their vectors.** All three
 rendered their vector and mutated it only on Add and Remove: typing a new Form ID
 into a cell changed nothing at all, and Add inserted a null FormID with count 1
-— which every reference check skips, because 0 means "unset". They are now two
+â€” which every reference check skips, because 0 means "unset". They are now two
 small table classes (`FormIdVectorTable` and `ContainerItemsTable`) that write
 cell edits straight back, validate the cell through `parseFormId`, normalise
 what is displayed, and mark a rejected cell with a tooltip and a red background
@@ -2200,7 +2200,7 @@ opens it for editing rather than leaving a silent null reference.
 
 Writing the container version surfaced a second, worse bug: it captured its
 refresh flag and its refresh lambda **by reference from constructor locals**, so
-every later cell edit read freed stack memory — the flag was observed holding
+every later cell edit read freed stack memory â€” the flag was observed holding
 values like 56 and 144, and no edit ever reached the record. That is why both are
 now QObject-derived classes whose state outlives the constructor. The same class
 of bug was latent in the old Add/Remove handlers, which also captured by
@@ -2210,15 +2210,15 @@ reference; it simply had never been exercised because nothing connected
 still being delivered, so Qt touched freed memory as the emission unwound; the
 cell is now normalised in place.
 
-`test_formidvectortables` drives all of this the way a user does — set a cell,
-click Add, click Remove — and checks the component vector actually changes, that
+`test_formidvectortables` drives all of this the way a user does â€” set a cell,
+click Add, click Remove â€” and checks the component vector actually changes, that
 an unparseable Form ID and a bad count are both rejected with the previous value
 intact, that untouched rows are unaffected, and that the container's count column
 commits at all. It reports through `fprintf` rather than `qWarning` because
 linking the view library installs the application's log handler, which swallows
 Qt messages.
 
-### Series 6 — Archive orchestration, older BSA targets, and extraction safety
+### Series 6 â€” Archive orchestration, older BSA targets, and extraction safety
 
 **Priority: P1 file workflow.** The current v0x69 writer now has correct folder
 records, LZ4 frame compression, stored fallbacks, independent table tests, and
@@ -2233,7 +2233,7 @@ Introduce explicit `sourcePath`/`archivePath` entries or a source root,
 versioned archive targets, and canonical extraction checks that reject absolute,
 drive-qualified, UNC, and `..` paths. Use `QSaveFile` for output replacement.
 Synthetic malicious-path, Unicode-name, duplicate-name, differing-root, and
-v0x67/68/69 fixtures are required. **Status 2026-09-26 — game target presets
+v0x67/68/69 fixtures are required. **Status 2026-09-26 â€” game target presets
 done.** BSA creation now accepts an explicit source root, supports v0x67/v0x68
 zlib targets alongside v0x69 LZ4, and writes extracted files through `QSaveFile`.
 Archive browser bulk extraction rejects absolute, drive-qualified, UNC, and `..`
@@ -2252,11 +2252,11 @@ from SE and the choice has to stay visible rather than being guessed. Morrowind
 refuses them rather than writing a wrong-format archive.
 
 `test_bsatargets` pins the mapping, checks that exactly one target per game claims
-to be the default and that every target is labelled, and — the part that matters —
+to be the default and that every target is labelled, and â€” the part that matters â€”
 writes and reads back a real archive at 0x67, 0x68 and 0x69, confirming each
 carries the version asked for with the payload intact.
 
-**Status 2026-10-04 — scoped.** "Broader archive UX" was a one-line placeholder
+**Status 2026-10-04 â€” scoped.** "Broader archive UX" was a one-line placeholder
 with no definition of done, so it sat at the bottom of the queue behind every
 measurable defect. It is now an enumerated list, read off `src/view/window/
 archivebrowserdialog.cpp` rather than imagined. Ordered by how much they actually
@@ -2269,13 +2269,22 @@ block someone using the dialog:
    typing a search string. This is the reason the dialog feels unfinished, and it
    is a navigation defect rather than a cosmetic one. Add a folder tree, sortable
    columns, and multi-selection.
-2. **"Extract All..." extracts only the *visible* entries, but does not say so.**
-   `extractAll()` iterates `mVisible`, which the filter combo has already
-   narrowed. A user who filtered to ~40 textures and clicks a button reading
-   "Extract All..." can be led to believe they are extracting everything, when
-   the real risk is the reverse one — being unclear about how much is about to be
-   written. Make the label reflect the filter, and report the filtered count
-   before starting.
+2. ~~**"Extract All..." extracts only the *visible* entries, but does not say
+   so.**~~ **Done 2026-10-04.** `extractAll()` always acted on the filtered set,
+   so the label misdescribed it. The button now reads "Extract All N..." when
+   nothing is filtered and "Extract N Visible..." when it is, it disables itself
+   when nothing matches, and the confirmation names the scope and the count before
+   asking for a destination. `testExtractButtonReflectsFilterScope` pins all three
+   states.
+7. ~~**`scanDataDirectory()` is not recursive.**~~ **Done 2026-10-04.** Archives
+   are now collected by an explicit descent (`findArchives()`), so a nested `Data`
+   tree is no longer silently missing from quick-open. It matches by suffix
+   rather than by QDir name patterns, because a name is matched against *every*
+   pattern unless disjunction is requested â€” `"*.bsa"` and `"*.ba2"` together
+   match neither, which is exactly what the first attempt did.
+   `testArchiveDiscoveryIsRecursive` covers the nested case with a self-contained
+   fixture, since Fallout 4 and Skyrim both keep DLC in the Data root and so
+   cannot demonstrate the bug.
 3. **No progress, no cancel, and it blocks the UI thread.** `extractAll()` is a
    synchronous loop over up to 34,995 files with a message box only at the end. On
    a large archive the dialog looks hung for minutes with no way to abort. Needs a
@@ -2286,26 +2295,20 @@ block someone using the dialog:
 5. **No multi-select extraction.** "Extract Selected..." handles exactly one
    entry, which is what makes items 1-4 matter: the only way to get a hundred
    files out today is "Extract All", i.e. item 2's ambiguity.
-6. **Read-only.** `BsaArchive::create()` exists and the Create Archive dialog uses
-   it, but the browser cannot add or replace an entry in an existing archive.
-   Whether that belongs here or in the create dialog is a judgement call; it is
-   listed so the decision is made rather than deferred again.
-7. **`scanDataDirectory()` is not recursive.** `entryList()` is called without
-   `QDir::Subdirectories`, so archives in a nested `Data` tree never appear in the
-   quick-open list. Fallout 4 and Skyrim keep DLC in the Data root so it mostly
-   works; it is a latent bug for any layout that does not.
-8. **No verify action and no archive-level header display** — version, `GNRL`
-   versus `DX10`, compression method and file count are not surfaced, so a broken
-   archive cannot be diagnosed from the UI.
+6. ~~**Read-only.**~~ **Withdrawn.** No evidence the CK's browser can add or
+   replace entries in an existing archive; archive creation is a separate dialog we
+   already have.
+7. ~~**No verify action / header display.**~~ **Withdrawn.** Likewise unsupported
+   by the observed behaviour.
 
 Deliberately unchanged: extraction containment checks (`..`, absolute,
 drive-qualified, UNC), the `QSaveFile` write, and the per-game BSA target presets
 are all done and stay as they are.
 
-**Status 2026-10-04 — researched against the local Creation Kit, and the list
+**Status 2026-10-04 â€” researched against the local Creation Kit, and the list
 changed.** Evidence is from the installed `CreationKit.exe` (a Qt5 application,
 so its labels are in the binary) and its `CreationKit.ini`. No source tree is
-reachable on this machine — the `Genesis\...` paths this file quotes come from a
+reachable on this machine â€” the `Genesis\...` paths this file quotes come from a
 different host. Per the legal note at the top, none of the CK's wording is
 reproduced here; this is observed behaviour, and the code keeps its own strings.
 
@@ -2321,8 +2324,8 @@ Two things the CK's archive browser has that we do not, in order of size:
    `validateAssetPaths()`, the NIF external `.mesh` references) without the
    collection UI or the gathering step.
 2. **INI-driven archive configuration.** `CreationKit.ini` carries an `[Archive]`
-   section with a resource-archive list — on this machine all 34 shipped Starfield
-   archives by name — and a default external codec id. Nothing equivalent is
+   section with a resource-archive list â€” on this machine all 34 shipped Starfield
+   archives by name â€” and a default external codec id. Nothing equivalent is
    modelled: our reader opens whatever path it is handed and has no notion of an
    archive being a *resource* archive.
 
@@ -2338,18 +2341,18 @@ Item 2 is reinforced rather than overturned: the CK's model makes scope explicit
 our button says "Extract All" and quietly acts on the filtered set.
 
 **What the research could not settle.** The binary does not expose the dialog's
-per-widget labels, so items 1, 3, 4 and 5 — the flat list, the missing progress
-and cancel, the absent metadata and the single-selection limit — are *not*
+per-widget labels, so items 1, 3, 4 and 5 â€” the flat list, the missing progress
+and cancel, the absent metadata and the single-selection limit â€” are *not*
 verified against the CK. They stand on their own reasoning: 34,995 entries in a
 flat unsorted list is unnavigable whatever the real CK does, and a synchronous
 35,000-file extraction with no cancel reads as a hang. Treat them as usability
 defects to fix on their merits, not as measured parity gaps.
 
-**Still open:** items 1-5 and 7 above, plus external-data collection and the
-INI-driven archive configuration.
+**Still open:** items 1, 3, 4 and 5 above, plus external-data collection and
+the INI-driven archive configuration.
 
 
-### Series 7 — Save-time and interactive validation
+### Series 7 â€” Save-time and interactive validation
 
 **Priority: P1 safety net.** The current validation command covers only
 NPC, weapon, quest, and coverage validators. A separate plugin validator uses
@@ -2363,21 +2366,21 @@ FormIDs, missing masters, invalid relationships, duplicate IDs, missing scripts,
 quest/dialogue links, required components, and escaping asset paths. Add an
 optional pre-save severity policy and remove the obsolete raw-byte validator
 from the active path. Synthetic plugin graphs must prove every diagnostic and
-its source location. **Status 2026-09-26 — relationships, asset paths and the
+its source location. **Status 2026-09-26 â€” relationships, asset paths and the
 save policy are in.**
 
 `AssetValidator::validateReferences()` checks per-field references one record
 type at a time and cannot see structural problems, so two rule families were
 added and wired into `validateAll()`:
 
-- `validateRelationships()` — a placed reference whose parent cell came from the
+- `validateRelationships()` â€” a placed reference whose parent cell came from the
   load-time index and does not exist (or is missing entirely, as a warning), a
   placed reference whose base object does not exist, a cell whose owner does not
   exist, quest stage/objective/alias/script links, dialogue topic responses,
   response target topics, and a worldspace claiming a cell that does not exist.
   The last of these is the kind of error that otherwise only shows up as a
   worldspace that will not render.
-- `validateAssetPaths()` — asset paths that are absolute, drive-qualified, or
+- `validateAssetPaths()` â€” asset paths that are absolute, drive-qualified, or
   contain a `..` hop, checked textually without touching the filesystem since
   the asset may legitimately live inside an archive. Covers STAT, NPC_, WEAP,
   SOUN, WTHR and LIGH. An actor's model and icon live in components rather than
@@ -2409,7 +2412,7 @@ REFR with no parent cell (warning) versus a missing one (error) versus a clean
 one, a cell with a missing owner, four kinds of dangling quest/dialogue link, a
 fully wired graph that must produce nothing, and both save-policy overloads.
 
-### Series 8 — Replace pseudo-save editors with active-document transactions
+### Series 8 â€” Replace pseudo-save editors with active-document transactions
 
 **Priority: P1 correctness.** Weather/light and water editors discover GMST
 records by EditorID substring and write standalone flat streams instead of
@@ -2422,14 +2425,14 @@ Route these dialogs through `Data`, `AddRecordCommand`,
 `EditRecordCommand`, and the document save path. Replace heuristic setting
 discovery with game/version-aware catalogs and implement actual WTHR/LIGH/
 SOUN/WATR editing where advertised. Synthetic record tests must prove active
-document save, reload, and undo for each workflow. **Status 2026-09-25 — core
+document save, reload, and undo for each workflow. **Status 2026-09-25 â€” core
 expanded.** Weather/light, water, and AI Package editors now save the active
 Document instead of writing standalone ESM streams; AI Package creation uses
 allocated FormIDs and `AddRecordCommand`. Dialogue save/add/remove paths use
 typed `EditRecordCommand`/`AddRecordCommand` plus parent-index commands. Full
 WTHR/LIGH/SOUN/WATR editing and synthetic active-document round trips remain.
 
-### Series 9 — NIF animation write-back
+### Series 9 â€” NIF animation write-back
 
 **Priority: P1 asset authoring.** `AnimationEditor` loads an in-memory NIF
 animation model but discards the source parser/path and exposes only JSON/XML
@@ -2441,7 +2444,7 @@ Retain the parser and source path, convert edits back to controller/data blocks,
 support add/remove/replace operations, preserve unknown blocks, and use
 `QSaveFile` for replacement. A synthetic NIF must load, edit, save, reload, and
 prove both changed keyframes and preservation of unrelated blocks. **Status
-2026-09-25 — internal dialect done, real Bethesda blocks done, Skyrim 1.5
+2026-09-25 â€” internal dialect done, real Bethesda blocks done, Skyrim 1.5
 keyframe encoding done.** `AnimationEditor` keeps the parsed source NIF
 and its path, and a `Save NIF` action writes edited channels back (Euler edits
 are converted to quaternions). `NifBlockFile` reads and writes the real
@@ -2460,7 +2463,7 @@ controller field layout changed between game generations) and follows the
 The writer refuses to touch any keyframe block it cannot reproduce byte for
 byte, so an unconfirmed layout is declined instead of corrupting the file.
 
-**Status 2026-10-04 — keyed/idle event round-trips done at the model level.**
+**Status 2026-10-04 â€” keyed/idle event round-trips done at the model level.**
 The clip marker list is no longer an editor-only decoration: a load merges the
 `NiTextKeyExtraData` keys from each controller sequence's `text_keys` ref, and
 a save writes `AnimMarker`s back through
@@ -2468,7 +2471,7 @@ a save writes `AnimMarker`s back through
 There is no UI tree for authoring a schedule beyond adding/removing markers;
 when the marker set must survive, the save path serializes it as NIF text keys.
 
-**Status 2026-10-04 — channel-preserving editor payload done.** The flat
+**Status 2026-10-04 â€” channel-preserving editor payload done.** The flat
 `TransformKeyframe` write path is no longer the only edit representation. The
 loader attaches `NiTransformDataRaw` to each animation channel, the timeline
 undo commands update that raw payload through `NifAnimationWriter`, and Save
@@ -2497,7 +2500,7 @@ testing" line:
   supplied 4,533 blocks, Oblivion thousands more). A channel-preserving
   semantic representation now exists at the writer/editor level.
 
-**Status 2026-10-04 — Fallout 4 archives and meshes now read, and the
+**Status 2026-10-04 â€” Fallout 4 archives and meshes now read, and the
 `NiKeyframeData` gap is now measured rather than assumed.** Two independent
 blockers were in the way, both found by measuring real archives rather than by
 reading a format description:
@@ -2506,27 +2509,27 @@ reading a format description:
    apart.** Starfield writes a 32-byte header (36 for v3); Fallout 4 writes 24.
    `readBtdx()` unconditionally consumed a trailing `u64`, which reads the first
    file declaration as header tail, so **every** Fallout 4 archive failed to
-   open. Both shapes are now tried and the one that validates wins — validated by
+   open. Both shapes are now tried and the one that validates wins â€” validated by
    every declaration carrying `0xBAADF00D` *and* the name table yielding exactly
    `fileCount` names. Measured across all 34 Fallout 4 `GNRL` archives present
    (versions 1 and 8, all stored uncompressed). Nothing is recorded on the object
    until a shape has fully proved itself.
 2. **The `bs_header` export strings are four, not three, at `bs_version` 130.**
    Their membership is `unknown_int` above 130, `process_script` below 131,
-   `export_script` always, `max_filepath` from 103 — and the two conditional
+   `export_script` always, `max_filepath` from 103 â€” and the two conditional
    words are mutually exclusive, so the run is fully determined by `bs_version`.
    The old fixed three-string read was right for Skyrim and Oblivion *by
    accident*: at `bs_version` 100 and below the three present strings are
    author/process_script/export_script with no `max_filepath`, so omitting
    `process_script` and reading `max_filepath` instead consumes the same number
    of bytes and only the labels differ. Fallout 4 ships `bs_version` 130, where
-   all four are present, and the fixed read landed six bytes early — rejecting
+   all four are present, and the fixed read landed six bytes early â€” rejecting
    all 34,995 meshes. `process_script` is now read and re-emitted.
 
 With both fixed, Fallout 4 reads: 34,995 meshes parse, and the sampled archives
 round-trip byte for byte with every block walked. Fallout 4's meshes turn out to
 carry `NiTransformData` with the 1.5 `controller -> interpolator -> data` chain,
-**not** `NiKeyframeData` — so they do not supply the missing sample either. That
+**not** `NiKeyframeData` â€” so they do not supply the missing sample either. That
 closes the question rather than the gap: `NiKeyframeData` (1.6+) is still
 confirmed only against its own encoder, and no installed archive carries one.
 
@@ -2537,7 +2540,7 @@ Two smaller things this turned up, both left alone deliberately:
 **The channel-preserving codec is now validated on Fallout 4 as well.** The
 fitter used to hard-filter `headerVersion() == "20.0.0.4"` and check blocks with
 `tryNiTransformData20()`, a version-blind framer for that one layout, so every
-other generation was silently untested — Fallout 4's 20,397 `NiTransformData`
+other generation was silently untested â€” Fallout 4's 20,397 `NiTransformData`
 blocks included. It now runs the version-aware
 `NifBlockFile::decodeNiTransformData()` / `encodeNiTransformData()` pair on
 **every** block, passing the file's own version, and requires the re-encode to be
@@ -2555,7 +2558,7 @@ Effect, both measured:
   `NiTransformData` blocks; 9,392 is what is reachable through a
   `NiTransformController` chain, the rest being driven by some other controller
   type. The sample cap is a named constant that `OPENCK_TEST_NIF_BLOCK_SAMPLE`
-  can raise, and 400 — the value this originally used — was far too small to
+  can raise, and 400 â€” the value this originally used â€” was far too small to
   trust, since it saw 25 of those 429 sizes. Nothing failed at the larger sweep,
   but the point of running it is that a layout assumption can hold for the first
   few hundred blocks and break on a shape that only appears later.
@@ -2563,18 +2566,18 @@ Effect, both measured:
 The skip message was also wrong in a way worth recording: it claimed the archive
 was "pre-20.2.0.5 containers with no block size table", which described the
 archive the test had silently fallen back to rather than the one requested. It
-now names the actual condition — no `NiTransformController` block resolved to an
+now names the actual condition â€” no `NiTransformController` block resolved to an
 addressable data block.
 
 Measured after the fix: the whole `Fallout4 - Meshes.ba2` archive opens and
 **34,995 of 34,995 NIFs round-trip byte for byte, every one walked**, in about
 six minutes. That run needs `QTEST_FUNCTION_TIMEOUT` set, because the test is
-already registered with `openck_add_heavy_test()` — which supplies that variable
+already registered with `openck_add_heavy_test()` â€” which supplies that variable
 through the CTest environment but not to a directly-launched executable. An
 earlier revision of this note called the bare-exe watchdog a limitation; it is
 only an artefact of running the exe without the variable ctest sets.
 
-**Starfield BA2 — done, and it changed the animation target.** `BsaArchive`
+**Starfield BA2 â€” done, and it changed the animation target.** `BsaArchive`
 now reads the Starfield `BTDX` container. Layout (verified against the shipped
 archives): a 32-byte header (magic, version, `GNRL` tag, file count u32, name
 table offset u64, trailing u64; 36 bytes with an extra u32 on the v3 variant),
@@ -2587,7 +2590,7 @@ extracting NIFs back.
 
 **The BA2 version field is not a monotonic series.** The Starfield container
 is "version 2" while Skyrim SE is `0x69` (105) and Skyrim LE is `0x68`, so
-`version >= 2` is *not* a valid way to detect the new layout — it rejects
+`version >= 2` is *not* a valid way to detect the new layout â€” it rejects
 every Skyrim archive. `BTDX` is the only reliable discriminator. This was
 mistaken during this work and broke `test_bsawrite`, `test_xwmadecoder`,
 `test_assetresolver`, `test_archivebrowser` and `test_nifblockfile` until the
@@ -2598,7 +2601,7 @@ reading in place, every one of the 76 readable Starfield archives was tallied
 by file extension: 1,472,873 entries in total, comprising `.mesh` (685,586),
 `.wem` audio (328,603), `.ffxanim` (279,323) and `.nif` (110,124). There is
 not a single `.hkx`. An earlier note in this section named HKX as the Starfield
-animation target; that was wrong — it was an assumption, not an observation,
+animation target; that was wrong â€” it was an assumption, not an observation,
 and the archive census disproves it.
 
 A block-type census of 4,000 shipped Starfield mesh and face NIFs backs this
@@ -2611,7 +2614,7 @@ so this is not a parsing failure.
 Where Starfield animation actually lives is therefore still open, and the
 candidates are Starfield's own `.mesh` binary format (whose `BsMeshData`
 fragment OpenCK already decodes for geometry) and `.ffxanim` FaceFX animation,
-which `REMAINING.md` §8 already places outside the current scope. Both are
+which `REMAINING.md` Â§8 already places outside the current scope. Both are
 substantially larger than the NIF work. Until one of them is parsed, the NIF
 keyframe write-back in `NifAnimationWriter` cannot serve Starfield.
 
@@ -2625,14 +2628,14 @@ differs. Measured against `Starfield - Textures11.ba2` (1,327 files, LZ4):
 
 - The declaration area is a flat run of **sentinel-terminated records of exactly
   two sizes**, 48 and 24, every one ending in `0xBAADF00D`. Walking them yields
-  exactly 1,327 records of 48 bytes — precisely the file count — plus 2,786
+  exactly 1,327 records of 48 bytes â€” precisely the file count â€” plus 2,786
   records of 24 bytes, totalling 130,560 bytes with no slack. A 48-byte record
   starts a file; the 24-byte records after it belong to that file.
 - The 48-byte file record: `hash u32`, extension `char[4]` (`"dds\0"`, so it is
   NUL-terminated unlike `GNRL`), `dirHash u32`, then `u8 0`, `u8 3`, and
-  `u16 24` — that 24 being the size of the DDS header that is *not* stored. Then
+  `u16 24` â€” that 24 being the size of the DDS header that is *not* stored. Then
   `+24` is the **absolute file offset** of the file's first chunk, `+28` is 0,
-  `+38` is **bits per texel** (16 on `_normal.dds`, 8 on the rest — BC7-family
+  `+38` is **bits per texel** (16 on `_normal.dds`, 8 on the rest â€” BC7-family
   and BC5-family), and `+36` is the **base mip size in bytes** (1,048,576 for a
   1024x1024 16bpp texture, 524,288 for 8bpp, i.e. the 1-byte-per-texel BCn
   rule). Cross-checked: each file's `+24` equals the previous file's last chunk
@@ -2654,14 +2657,14 @@ mip level in the entry's numMips is covered by exactly one chunk range,
 starting with mip 0. Confirmed by
 `test_bsaarchive::testOpenStarfieldDx10ArchiveExtractsValidDds`: opens
 `Starfield - Textures01.ba2`, extracts the first entries, asserts the magic
-is `DDS ` and that `size == 148 + Σ chunk.unpackedSize`. The +20/format and
+is `DDS ` and that `size == 148 + Î£ chunk.unpackedSize`. The +20/format and
 bpp-at-+38 semantics are therefore resolved by use, not by continued
 conjecture; only `+32` remains uncharted, and it is not needed to build the
 DDS.
 
 **Starfield mesh archives open with many weak-reference stub NIFs** (a single
 `BSWeakReferenceNode` pointing at real geometry), so anything sampling these
-archives must skip stubs or it will conclude the wrong thing — as an earlier
+archives must skip stubs or it will conclude the wrong thing â€” as an earlier
 sample of this work did.
 
 **Oblivion NIF support: DONE for reading and lossless saving. 7,962 of 7,962
@@ -2669,7 +2672,7 @@ sample of this work did.
 round-tripping and being *block-addressable* are different claims: the first means
 a file loads and saves back unchanged, which holds for all 7,962 whether the
 block region was split or kept as one opaque run. The second means the blocks
-were individually located and typed, which is all 7,962 — see the walk
+were individually located and typed, which is all 7,962 â€” see the walk
 frontier below.
 `test_nifroundtriparchive` walks the whole archive (~110 s, on a local drive so it
 is fully reproducible) and asserts that every `Gamebryo` file survives a load and
@@ -2690,7 +2693,7 @@ each field on a version:
 
 | field | present from | absent in `20.0.0.4`? |
 |---|---|---|
-| `endian_type` (u8) | `0x14000003` (20.0.0.3) | **yes** — reading it anyway picks up the low byte of `user_version` |
+| `endian_type` (u8) | `0x14000003` (20.0.0.3) | **yes** â€” reading it anyway picks up the low byte of `user_version` |
 | `num_strings` / `max_string_length` / `strings` | `0x14010001` (20.1.0.1) | **yes** |
 | `block_size[num_blocks]` | `0x14020005` (20.2.0.5) | **yes** |
 
@@ -2713,7 +2716,7 @@ Measured result over the archive (7,962 `Gamebryo` files, **0** failures):
 The `10.x` files are what the `unsupported byte order 10` failures were: 580 of
 them, and the whole group is now explained by the missing `endian_type` byte.
 
-**Status 2026-10-04 — the 70 `NetImmerse File Format` files now load and
+**Status 2026-10-04 â€” the 70 `NetImmerse File Format` files now load and
 re-save byte for byte.** They are the Morrowind-era container, not a
 `Gamebryo` variant, so `NifBlockFile::parseNetImmerse()` reads them instead of
 `parse()`, and `isBethesdaNif()` matches both header lines. All 70 are covered
@@ -2733,7 +2736,7 @@ to reject a file that is perfectly valid:
   `SizedString` (u32).** Reading a u8 length as a u32 picks up the first three
   characters of the text as the length; that one mistake is what made an earlier
   reader reject all 23 `10.0.1.2` files while accepting the 41 `10.0.1.0` ones.
-- **Below `5.0.0.1` there is no type table at all** — each block carries its own
+- **Below `5.0.0.1` there is no type table at all** â€” each block carries its own
   sized type name inline, so the header ends right after `num_blocks`.
 
 What this deliberately does *not* claim is block addressability. The container
@@ -2743,13 +2746,13 @@ read-and-save only, exactly like the pre-20.2.0.5 `Gamebryo` opaque region.
 `NifAnimationWriter` says so in the log and declines rather than falling through
 to a generic "no controller blocks" complaint that would read as a parse failure.
 
-**Oblivion is installed and reachable, which changes what is knowable — and
+**Oblivion is installed and reachable, which changes what is knowable â€” and
 immediately exposed a second gap.** `test_ntdlayout` prefers
 `F:/XboxGames/.../Oblivion GOTY English/Data/Oblivion - Meshes.bsa` over the
 on-demand Skyrim archives, because Oblivion sits on a normal local drive and is
 always fully resident. The archive opens fine (it is **BSA version 0x67**, an
 independent confirmation of the Oblivion target preset). It now parses those
-headers cleanly — but still samples **zero** `NiTransformData` blocks, for the
+headers cleanly â€” but still samples **zero** `NiTransformData` blocks, for the
 reason above: Oblivion meshes are all pre-20.2.0.5 containers, so no individual
 block is addressable to hand to the fitter. The test skips with that explanation
 rather than reporting a meaningless "no layout fits" verdict, and the skip is now
@@ -2784,7 +2787,7 @@ attributed the failure to a block further along than the one that was wrong:
   particle-system case.
 - A block's bytes start *before* the per-block zero tag, not after. Versions up
   to 10.1.0.106 put a four-byte zero in front of every non-`bhk` block, and the
-  walker consumed and discarded it — four bytes lost per re-serialized block.
+  walker consumed and discarded it â€” four bytes lost per re-serialized block.
 - The header re-emitted the group table from a parsed member, dropping four bytes
   on any file whose reference and group tables are empty, because the
   block-reference table is not modelled. Those bytes are now kept verbatim.
@@ -2793,7 +2796,7 @@ attributed the failure to a block further along than the one that was wrong:
 
 | field | declared | on disk |
 |---|---|---|
-| `HavokFilter` | layer + flags + group (6 bytes) | one packed u32 (**4**) — worth 4,234 files |
+| `HavokFilter` | layer + flags + group (6 bytes) | one packed u32 (**4**) â€” worth 4,234 files |
 | `TexDesc.uv_set` | ushort | u32 |
 | `NiAlphaProperty.threshold` | float | a byte holding 127 |
 
@@ -2811,7 +2814,7 @@ divergence findable rather than guessable.
 
 **Two ways this project loses a layout silently, both worth checking first on any
 new block type.** A duplicate `add()` registration is overwritten by the second
-call with no diagnostic — a `bhkBlendCollisionObject` was registered correctly and
+call with no diagnostic â€” a `bhkBlendCollisionObject` was registered correctly and
 then again to the plain collision-object walker, so the type looked handled and
 was not. The same happened with a three-argument overload of `walkNiPSysModifier`
 that nothing called and whose comment described the wrong layout. And
@@ -2835,34 +2838,34 @@ most frequent types is:
 | all 113 | 7,962 | 321 |
 
 Only **321 of 7,962 files carry `NiTransformData` at all**, and between them they
-contain **102 distinct block types**. So the tempting milestone — "implement the
-twenty commonest types, which covers half the archive" — would have been a large
+contain **102 distinct block types**. So the tempting milestone â€” "implement the
+twenty commonest types, which covers half the archive" â€” would have been a large
 body of work that unblocked **2** of the 321 files the `NiTransformData` fitter
 actually needs. The animated meshes that carry it are precisely the files that
 also pull in the particle, physics, skinning and morph families, so "common" and
 "needed" are almost disjoint sets here.
 
 Recorded so the next attempt does not spend itself on the top-20 plan. The real
-choice is: implement ~102–113 payload walkers (a large but bounded project that
+choice is: implement ~102â€“113 payload walkers (a large but bounded project that
 finally makes these files block-addressable and unblocks the fitter), or accept
 that the pre-20.2.0.5 container is read-and-save-only for now.
-`test_nifroundtriparchive` recomputes the curve and the frontier on every run —
+`test_nifroundtriparchive` recomputes the curve and the frontier on every run â€”
 write it to `OPENCK_TEST_NIF_CENSUS` to read the table, since the log level pins
 `qInfo` to Error and discards it otherwise.
 
-**The last eight files: generated, not malformed.** The 102–113 walker project is
+**The last eight files: generated, not malformed.** The 102â€“113 walker project is
 finished and the frontier is closed, but the final eight were worth recording
 because the diagnosis was the opposite of what it looked like. The eight
 `meshes/landscape/lod/*.nif` meshes reported "walk ended leaving N bytes". The
 walk was correct: it stopped exactly where the root table sits, reading one root,
-block zero — where a conforming writer puts it, and where the reference reader
+block zero â€” where a conforming writer puts it, and where the reference reader
 lands too. The bytes after it belong to no block.
 
 The cause is provenance, not format. These are the distant-terrain LOD quads, and
 they are *generated* rather than exported: tes4ll, which lists a NIF exporter
 among its features, writes them, so a valid NIF is followed by the tool's own
 payload. The block payloads decode exactly per the field list, which is why this
-never looked like a walker problem — and why the reference reader also fails on
+never looked like a walker problem â€” and why the reference reader also fails on
 them, with "End of file not reached", for the same reason rather than a different
 one. (Their residual data is not a uniform array either: values in the thousands
 where one file has 88 vertices, no consistent element width across files, so it
@@ -2875,7 +2878,7 @@ as trailing bytes, the way the header tail and per-block footers already are.
 argument is the part worth keeping.** Nothing is scanned: the root count is read
 at the position the walk ended, so a walk that is a few bytes out still has to
 find a root count in range there. And a trailing remainder is accepted only when
-at least one root was read — a zero read as a root count satisfies every other
+at least one root was read â€” a zero read as a root count satisfies every other
 test, so without that condition a mis-walk would quietly become a pass. The
 archive test asserts byte-identical re-saves for all 7,962 either way, so this
 cannot hide a wrong layout in the output.
@@ -2915,7 +2918,7 @@ immediately before its first block's name:
 
 Consuming the tag lines that file up completely; without it the name is read two
 words early, which is what looked like a surplus field. With the tag handled, the
-whole archive walks past `NiNode` — **block 0 no longer fails for a single file**,
+whole archive walks past `NiNode` â€” **block 0 no longer fails for a single file**,
 across all 7,962. The reference reader's own field list documents the same rule
 (`version <= 0x0A01006A and not block_type.startswith("bhk")`).
 
@@ -2997,7 +3000,7 @@ the Skyrim masters did. The GOTY install does not help the SCEN editor; the
 Shivering Isles content is dialogue rather than phase data. Persisting scene
 phases still needs a real PHDA sample from a mod.
 
-**Update 2026-10-04 — the channel-preserving payload is done.** The
+**Update 2026-10-04 â€” the channel-preserving payload is done.** The
 `NiTransformData` codec round-trips shipped files byte-for-byte, the editor now
 keeps `NiTransformDataRaw` on each `AnimChannel`, and keyframe edits go through
 `channelAddKeyframe`/`channelRemoveKeyframe`/`channelMoveKeyframe`/
@@ -3008,7 +3011,7 @@ model.
 
 **The game folders are on-demand installs, and that makes the archive tests
 flaky.** Individual `.ba2` files flip between resident and evicted between runs
-and even between processes launched back to back — `QFile::exists` and a direct
+and even between processes launched back to back â€” `QFile::exists` and a direct
 `QFile::open` return "cannot find the file" for a path that PowerShell opens
 fine a second later. `test_bsaarchive` now warms each archive (a small read
 forces the rehydration) and retries before failing, which is what keeps the
@@ -3016,7 +3019,7 @@ suite green while heavy scanning is in progress. Tests that need these files
 should use the same helper rather than assuming the file is present, and must
 skip rather than fail when the game is absent.
 
-### Beyond §9 — local CK/tool compatibility gaps
+### Beyond Â§9 â€” local CK/tool compatibility gaps
 
 These are additional evidence-backed series discovered from the local install,
 separate from the nine required parity series:
@@ -3045,15 +3048,16 @@ separate from the nine required parity series:
   deployment manifests, ownership, or hardlink state.
 - **Wwise/FaceFX authoring:** OpenCK has wrappers and partial FaceFX framing,
   but not Wwise project authoring or FaceFX graph evaluation/playback. The
-  latter remains the separate §8 runtime boundary.
+  latter remains the separate Â§8 runtime boundary.
 
 ### Delivery order and verification boundary
 
-1. Series 1–3 first: they can silently corrupt or lose user edits.
-2. Series 4–6 next: they are prerequisites for normal plugin and asset
+1. Series 1â€“3 first: they can silently corrupt or lose user edits.
+2. Series 4â€“6 next: they are prerequisites for normal plugin and asset
    authoring workflows.
-3. Series 7–9 after the core transactions are reliable.
+3. Series 7â€“9 after the core transactions are reliable.
 4. The local executable/tool observations above are evidence for fixtures and
    integration design, not permission to copy CK binaries, assets, or source.
 5. Runtime acceptance still requires manual/game-tool validation; the headless
    gates cover format, model, editor-session, and save/undo behavior only.
+

@@ -9,6 +9,7 @@
 
 #include <QComboBox>
 #include <QDir>
+#include <QDirIterator>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -113,8 +114,11 @@ void ArchiveBrowserDialog::setupUi()
     auto* filterRow = new QHBoxLayout();
     mFilterCombo = new QComboBox(this);
     mFilterCombo->setObjectName(QStringLiteral("filterCombo"));
+    // "All" is worded as "Everything" rather than "All Files" because the filter
+    // is about entry types, not about which files exist. The distinction matters
+    // to the extract button below, which acts on whatever this leaves visible.
     mFilterCombo->addItems({
-        tr("All Files"), tr("Models"), tr("Textures"), tr("Sounds"), tr("Voice (.fuz)")
+        tr("Everything"), tr("Models"), tr("Textures"), tr("Sounds"), tr("Voice (.fuz)")
     });
     mSearchEdit = new QLineEdit(this);
     mSearchEdit->setObjectName(QStringLiteral("searchEdit"));
@@ -132,7 +136,8 @@ void ArchiveBrowserDialog::setupUi()
     auto* btnRow = new QHBoxLayout();
     mPlayBtn = new QPushButton(tr("Play"), this);
     mExtractBtn = new QPushButton(tr("Extract Selected..."), this);
-    mExtractAllBtn = new QPushButton(tr("Extract All..."), this);
+    mExtractAllBtn = new QPushButton(tr("Extract Visible..."), this);
+    mExtractAllBtn->setObjectName(QStringLiteral("extractAllBtn"));
     mPlayBtn->setEnabled(false);
     btnRow->addWidget(mPlayBtn);
     btnRow->addWidget(mExtractBtn);
@@ -176,16 +181,55 @@ void ArchiveBrowserDialog::setupUi()
     connect(mExtractAllBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::extractAll);
 }
 
+// Archives are looked for recursively. Fallout 4 and Skyrim keep their DLC in
+// the Data root, so a flat listing happened to work for them, but any install
+// that nests its content — and the CK's own resource-archive list is not
+// root-only either — would silently be missing from the quick-open list.
+// Written as an explicit descent rather than handed to QDirIterator or to
+// entryList's recursion flag: both hide the traversal rule behind a default, and
+// this is the one place where "did we recurse" is the entire behaviour under
+// test. Matching is by suffix rather than by QDir name patterns, because a name
+// is matched against *every* pattern unless disjunction is requested — so
+// "*.bsa" and "*.ba2" together silently match neither.
+namespace {
+
+bool isArchiveSuffix(const QString& suffix)
+{
+    return suffix.compare(QLatin1String("bsa"), Qt::CaseInsensitive) == 0
+        || suffix.compare(QLatin1String("ba2"), Qt::CaseInsensitive) == 0;
+}
+
+void collectArchives(const QDir& dir, QStringList& out)
+{
+    const auto entries = dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot,
+                                           QDir::Name);
+    for (const QFileInfo& info : entries) {
+        if (info.isDir()) {
+            collectArchives(QDir(info.absoluteFilePath()), out);
+        } else if (isArchiveSuffix(info.suffix())) {
+            out << info.absoluteFilePath();
+        }
+    }
+}
+
+} // namespace
+
+QStringList ArchiveBrowserDialog::findArchives(const QString& root)
+{
+    QStringList found;
+    if (root.isEmpty()) return found;
+    const QDir dataRoot(root);
+    if (!dataRoot.exists()) return found;
+    collectArchives(dataRoot, found);
+    found.sort();
+    return found;
+}
+
 void ArchiveBrowserDialog::scanDataDirectory()
 {
     if (mDataDirectory.isEmpty()) return;
 
-    QStringList archivePaths;
-    const QDir dir(mDataDirectory);
-    const QStringList filters = { "*.bsa", "*.ba2" };
-    const auto files = dir.entryList(filters, QDir::Files, QDir::Name);
-    for (const auto& f : files)
-        archivePaths << dir.absoluteFilePath(f);
+    const QStringList archivePaths = findArchives(mDataDirectory);
 
     mQuickOpen->blockSignals(true);
     mQuickOpen->clear();
@@ -383,6 +427,20 @@ void ArchiveBrowserDialog::rebuildList()
     mList->setUpdatesEnabled(true);
 
     setStatus(tr("%1 of %2 entries shown").arg(mVisible.size()).arg(entryCount()));
+
+    // Keep the button honest about its scope as the filter and search change.
+    // When nothing is filtered it can offer the whole archive; once a filter or
+    // search narrows the list, the label has to say so.
+    if (mKind == Kind::None || mVisible.isEmpty()) {
+        mExtractAllBtn->setEnabled(false);
+        mExtractAllBtn->setText(tr("Extract Visible..."));
+    } else if (mVisible.size() == entryCount()) {
+        mExtractAllBtn->setEnabled(true);
+        mExtractAllBtn->setText(tr("Extract All %1...").arg(entryCount()));
+    } else {
+        mExtractAllBtn->setEnabled(true);
+        mExtractAllBtn->setText(tr("Extract %1 Visible...").arg(mVisible.size()));
+    }
 }
 
 void ArchiveBrowserDialog::onFilterChanged(int)
@@ -552,9 +610,40 @@ void ArchiveBrowserDialog::extractSelected()
         tr("File extracted to:\n%1").arg(savePath));
 }
 
+// A user-facing description of what the filter and search box currently leave
+// visible, used by the extract button's label and its confirmation. An archive is
+// far too large to extract wholesale by accident, so this always names the scope
+// rather than leaning on the button text alone.
+QString ArchiveBrowserDialog::visibleScopeDescription() const
+{
+    const int total = entryCount();
+    const int visible = mVisible.size();
+    const QString filter = mFilterCombo ? mFilterCombo->currentText() : QString();
+    if (visible == total)
+        return tr("every entry (%1)").arg(total);
+    return tr("the %1 entries matching \"%2\" (%3 of %4)")
+        .arg(visible)
+        .arg(filter.isEmpty() ? tr("All") : filter)
+        .arg(visible)
+        .arg(total);
+}
+
 void ArchiveBrowserDialog::extractAll()
 {
     if (mKind == Kind::None || mVisible.isEmpty()) return;
+
+    // The button used to read "Extract All..." while iterating the *filtered*
+    // set, so a user who narrowed the list to a few dozen textures and clicked it
+    // had no way to tell that the archive's other 30,000-odd entries were not
+    // also going to be written. State the scope and the count before asking for
+    // a destination, so the decision is informed.
+    const QString scope = visibleScopeDescription();
+    const QString prompt = tr("Extract %1 to a folder?\n\n%2 will be written.")
+                               .arg(scope, tr("%1 entries match the current filter.")
+                                       .arg(mVisible.size()));
+    if (QMessageBox::question(this, tr("Extract Entries"), prompt,
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+        return;
 
     const QString dir = QFileDialog::getExistingDirectory(this, tr("Extract Entries To"));
     if (dir.isEmpty()) return;
