@@ -2262,13 +2262,25 @@ measurable defect. It is now an enumerated list, read off `src/view/window/
 archivebrowserdialog.cpp` rather than imagined. Ordered by how much they actually
 block someone using the dialog:
 
-1. **A flat, unsorted, single-selection list cannot hold a real archive.** The
-   list is `QAbstractItemView::SingleSelection` over every entry, with no sorting
-   and no folder tree. `Fallout4 - Meshes.ba2` has 34,995 entries and Skyrim's
-   archives are ~22,000, so there is no way to navigate to anything except by
-   typing a search string. This is the reason the dialog feels unfinished, and it
-   is a navigation defect rather than a cosmetic one. Add a folder tree, sortable
-   columns, and multi-selection.
+1. ~~**A flat, unsorted, single-selection list cannot hold a real archive.**~~
+   **Done 2026-10-04.** The entry list is now a `QTreeWidget`: entries are grouped
+   into real folder rows, the columns are sortable, and selection is
+   `ExtendedSelection`. All three had to land together, because multi-selection is
+   what makes item 5 possible and grouping is what makes the rows addressable.
+
+   Two things this got wrong on the way, both worth remembering:
+
+   - `new QTreeWidgetItem(nullptr)` does **not** add the item to the tree. Unlike
+     `QListWidget::addItem()`, `QTreeWidget` leaves it detached and invisible, so
+     the first build silently produced an empty view over a fully-loaded archive.
+     The archive reported 75,408 entries and the widget had zero rows, which reads
+     like a filter bug and was not one.
+   - BSA stores entry names with `\`, BA2 with `/`, so the split has to accept
+     both or every BSA folder collapses into one row.
+
+   `testEntryTreeGroupsAndSorts` checks the tree against the archive's own entry
+   list rather than against itself: grouping may not add, drop, rename or
+   duplicate a path. That is the assertion that would have caught both bugs.
 2. ~~**"Extract All..." extracts only the *visible* entries, but does not say
    so.**~~ **Done 2026-10-04.** `extractAll()` always acted on the filtered set,
    so the label misdescribed it. The button now reads "Extract All N..." when
@@ -2276,30 +2288,36 @@ block someone using the dialog:
    when nothing matches, and the confirmation names the scope and the count before
    asking for a destination. `testExtractButtonReflectsFilterScope` pins all three
    states.
-7. ~~**`scanDataDirectory()` is not recursive.**~~ **Done 2026-10-04.** Archives
-   are now collected by an explicit descent (`findArchives()`), so a nested `Data`
-   tree is no longer silently missing from quick-open. It matches by suffix
-   rather than by QDir name patterns, because a name is matched against *every*
-   pattern unless disjunction is requested â€” `"*.bsa"` and `"*.ba2"` together
-   match neither, which is exactly what the first attempt did.
-   `testArchiveDiscoveryIsRecursive` covers the nested case with a self-contained
-   fixture, since Fallout 4 and Skyrim both keep DLC in the Data root and so
-   cannot demonstrate the bug.
 3. **No progress, no cancel, and it blocks the UI thread.** `extractAll()` is a
    synchronous loop over up to 34,995 files with a message box only at the end. On
    a large archive the dialog looks hung for minutes with no way to abort. Needs a
-   progress dialog with cancellation.
-4. **No file metadata.** No size, compression or offset anywhere in the list; the
-   preview is a free-text blob. Nothing tells you how big a file is before
-   extracting it, or why an extraction failed. Add columns.
-5. **No multi-select extraction.** "Extract Selected..." handles exactly one
-   entry, which is what makes items 1-4 matter: the only way to get a hundred
-   files out today is "Extract All", i.e. item 2's ambiguity.
+   progress dialog with cancellation. Multi-select extraction shares this problem,
+   so fixing it for one fixes both.
+4. ~~**No file metadata.**~~ **Partly done 2026-10-04.** The entry tree now carries
+   a Size column showing the *uncompressed* size, and sorting on it uses a hidden
+   numeric key so "900 KB" does not sort before "1 KB". Still missing: compressed
+   size, offset, and per-entry compression flags, and the preview panel is still a
+   free-text blob.
+5. ~~**No multi-select extraction.**~~ **Done 2026-10-04.** A multi-selection is
+   extracted into a chosen directory, preserving the archive's folder layout
+   under it, through the same containment check and `mkpath` that `extractAll()`
+   already used — an archive entry name is not trusted to be a safe relative
+   path. One selection still asks for a single file. Failures are summarised in
+   one dialog rather than one modal per file, which would make a hundred-file
+   extraction unusable.
 6. ~~**Read-only.**~~ **Withdrawn.** No evidence the CK's browser can add or
    replace entries in an existing archive; archive creation is a separate dialog we
    already have.
 7. ~~**No verify action / header display.**~~ **Withdrawn.** Likewise unsupported
    by the observed behaviour.
+8. ~~**`scanDataDirectory()` is not recursive.**~~ **Done 2026-10-04.** Archives are
+   now collected by an explicit descent (`findArchives()`), so a nested `Data` tree
+   is no longer silently missing from quick-open. It matches by suffix rather than
+   by QDir name patterns, because a name is matched against *every* pattern unless
+   disjunction is requested — `"*.bsa"` and `"*.ba2"` together match neither, which
+   is exactly what the first attempt did. `testArchiveDiscoveryIsRecursive` covers
+   the nested case with a self-contained fixture, since Fallout 4 and Skyrim both
+   keep DLC in the Data root and so cannot demonstrate the bug.
 
 Deliberately unchanged: extraction containment checks (`..`, absolute,
 drive-qualified, UNC), the `QSaveFile` write, and the per-game BSA target presets
@@ -2341,15 +2359,16 @@ Item 2 is reinforced rather than overturned: the CK's model makes scope explicit
 our button says "Extract All" and quietly acts on the filtered set.
 
 **What the research could not settle.** The binary does not expose the dialog's
-per-widget labels, so items 1, 3, 4 and 5 â€” the flat list, the missing progress
-and cancel, the absent metadata and the single-selection limit â€” are *not*
-verified against the CK. They stand on their own reasoning: 34,995 entries in a
-flat unsorted list is unnavigable whatever the real CK does, and a synchronous
-35,000-file extraction with no cancel reads as a hang. Treat them as usability
-defects to fix on their merits, not as measured parity gaps.
+per-widget labels, so the usability items above — the flat list, the missing
+progress and cancel, the partial metadata — are *not* verified against the CK.
+They stand on their own reasoning: 34,995 entries in a flat unsorted list is
+unnavigable whatever the real CK does, and a synchronous 35,000-file extraction
+with no cancel reads as a hang. Treat them as usability defects to fix on their
+merits, not as measured parity gaps. Items 1, 2, 5 and 8 are now done on exactly
+that reasoning.
 
-**Still open:** items 1, 3, 4 and 5 above, plus external-data collection and
-the INI-driven archive configuration.
+**Still open:** items 3 and the remainder of 4 above, plus external-data
+collection and the INI-driven archive configuration.
 
 
 ### Series 7 â€” Save-time and interactive validation

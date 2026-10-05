@@ -4,12 +4,14 @@
 #include <QVector>
 #include <QByteArray>
 
-class QListWidget;
+class QTreeWidget;
+class QTreeWidgetItem;
 class QComboBox;
 class QLineEdit;
 class QPushButton;
 class QLabel;
 class QListWidgetItem;
+class QTreeWidgetItem;
 class BsaArchive;
 class Ba2Archive;
 
@@ -25,6 +27,9 @@ public:
                                   QWidget* parent = nullptr);
     ~ArchiveBrowserDialog() override;
 
+    // Writes one entry to an absolute path. quiet suppresses the per-file modal so
+    // a batch can report its failures in one summary instead.
+    bool extractTo(int index, const QString& outPath, bool quiet = false);
     static bool isSafeExtractionPath(const QString& root, const QString& entryPath,
                                      QString* outputPath = nullptr);
 
@@ -39,8 +44,8 @@ private slots:
     void onQuickOpenChanged(int index);
     void onFilterChanged(int index);
     void onSearchTextChanged(const QString& text);
-    void onEntrySelected(int index);
-    void onEntryDoubleClicked(QListWidgetItem* item);
+    void onEntrySelected();
+    void onEntryDoubleClicked(QTreeWidgetItem* item, int column);
     void playSelected();
     void extractSelected();
     void extractAll();
@@ -53,6 +58,10 @@ private:
     void rebuildList();
     int entryCount() const;
     QString entryPath(int index) const;
+    qint64 entrySize(int index) const;
+    // Archive indices behind the current selection, in selection order. Folder
+    // rows carry no index and are skipped.
+    QVector<int> selectedIndices() const;
     bool readEntry(int index, QByteArray& out) const;
     bool extractToTemp(int index, QString& tmpPath) const;
     void updatePreview(int index);
@@ -77,7 +86,7 @@ private:
     QLabel* mArchiveLabel = nullptr;
     QComboBox* mFilterCombo = nullptr;
     QLineEdit* mSearchEdit = nullptr;
-    QListWidget* mList = nullptr;
+    QTreeWidget* mTree = nullptr;
     QLabel* mPreviewImage = nullptr;
     QLabel* mPreviewInfo = nullptr;
     QPushButton* mPlayBtn = nullptr;

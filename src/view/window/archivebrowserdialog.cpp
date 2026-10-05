@@ -9,18 +9,20 @@
 
 #include <QComboBox>
 #include <QDir>
-#include <QDirIterator>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHash>
 #include <QHBoxLayout>
 #include <QImage>
 #include <QLineEdit>
 #include <QLabel>
-#include <QListWidget>
+#include <QLocale>
 #include <QMessageBox>
 #include <QPixmap>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QSplitter>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 
 #ifdef _WIN32
@@ -127,11 +129,19 @@ void ArchiveBrowserDialog::setupUi()
     filterRow->addWidget(mSearchEdit, 1);
     topLayout->addLayout(filterRow);
 
-    mList = new QListWidget(this);
-    mList->setObjectName(QStringLiteral("entryList"));
-    mList->setSelectionMode(QAbstractItemView::SingleSelection);
-    mList->setUniformItemSizes(true);
-    topLayout->addWidget(mList, 1);
+    // A tree rather than a flat list: a mesh archive holds tens of thousands of
+    // entries laid out in folders, and a flat list of full paths cannot be
+    // scanned or navigated at that size. Columns carry the uncompressed size so a
+    // file can be judged before extracting it, and sorting is per-column.
+    mTree = new QTreeWidget(this);
+    mTree->setObjectName(QStringLiteral("entryTree"));
+    mTree->setColumnCount(2);
+    mTree->setHeaderLabels({ tr("Name"), tr("Size") });
+    mTree->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    mTree->setUniformRowHeights(true);
+    mTree->setSortingEnabled(true);
+    mTree->setExpandsOnDoubleClick(false);
+    topLayout->addWidget(mTree, 1);
 
     auto* btnRow = new QHBoxLayout();
     mPlayBtn = new QPushButton(tr("Play"), this);
@@ -172,9 +182,9 @@ void ArchiveBrowserDialog::setupUi()
             this, &ArchiveBrowserDialog::onFilterChanged);
     connect(mSearchEdit, &QLineEdit::textChanged,
             this, &ArchiveBrowserDialog::onSearchTextChanged);
-    connect(mList, &QListWidget::currentRowChanged,
+    connect(mTree, &QTreeWidget::itemSelectionChanged,
             this, &ArchiveBrowserDialog::onEntrySelected);
-    connect(mList, &QListWidget::itemDoubleClicked,
+    connect(mTree, &QTreeWidget::itemDoubleClicked,
             this, &ArchiveBrowserDialog::onEntryDoubleClicked);
     connect(mPlayBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::playSelected);
     connect(mExtractBtn, &QPushButton::clicked, this, &ArchiveBrowserDialog::extractSelected);
@@ -336,6 +346,25 @@ QString ArchiveBrowserDialog::entryPath(int index) const
     return QString();
 }
 
+qint64 ArchiveBrowserDialog::entrySize(int index) const
+{
+    // Uncompressed size on both sides: compressed size would misreport the
+    // archive and mislead anyone deciding whether to extract.
+    switch (mKind)
+    {
+    case Kind::Bsa:
+        if (mBsa && index >= 0 && index < mBsa->entries().size())
+            return static_cast<qint64>(mBsa->entries().at(index).size);
+        break;
+    case Kind::Ba2:
+        if (mBa2 && index >= 0 && index < static_cast<int>(mBa2->entries().size()))
+            return static_cast<qint64>(mBa2->entries().at(index).uncompressedSize);
+        break;
+    default: break;
+    }
+    return 0;
+}
+
 bool ArchiveBrowserDialog::readEntry(int index, QByteArray& out) const
 {
     if (mKind == Kind::Bsa)
@@ -395,7 +424,7 @@ bool ArchiveBrowserDialog::isVisibleByFilter(const QString& lowerPath, int filte
 void ArchiveBrowserDialog::rebuildList()
 {
     mVisible.clear();
-    mList->clear();
+    mTree->clear();
     mSelectedIndex = -1;
     clearPreview();
 
@@ -411,7 +440,36 @@ void ArchiveBrowserDialog::rebuildList()
     const QString search = mSearchEdit ? mSearchEdit->text().trimmed().toLower() : QString();
 
     mVisible.reserve(entryCount());
-    mList->setUpdatesEnabled(false);
+    // QTreeWidget, unlike QListWidget, does not adopt an item constructed with a
+    // null parent: it stays detached and invisible until addTopLevelItem() claims
+    // it. Every row therefore goes through one of these two helpers.
+    const auto addRow = [this](QTreeWidgetItem* parent) {
+        if (parent) return new QTreeWidgetItem(parent);
+        auto* item = new QTreeWidgetItem();
+        mTree->addTopLevelItem(item);
+        return item;
+    };
+    // Folder nodes are created on demand and reused, so an archive with many
+    // files per folder builds one row per folder rather than one per file.
+    QHash<QString, QTreeWidgetItem*> folders;
+    const auto folderFor = [&folders, &addRow](const QStringList& segments, int upto) {
+        QTreeWidgetItem* parent = nullptr;
+        QString key;
+        for (int s = 0; s < upto; ++s) {
+            key += QLatin1Char('/') + segments.at(s).toLower();
+            QTreeWidgetItem*& slot = folders[key];
+            if (!slot)
+                slot = addRow(parent);
+            // No reparenting is needed: a folder key is a full path from the
+            // archive root, so its parent is the same every time it is reached,
+            // and the walk above has already created it.
+            slot->setText(0, segments.at(s));
+            parent = slot;
+        }
+        return parent;
+    };
+
+    mTree->setUpdatesEnabled(false);
     for (int i = 0; i < entryCount(); ++i)
     {
         const QString path = entryPath(i);
@@ -419,14 +477,28 @@ void ArchiveBrowserDialog::rebuildList()
         if (!isVisibleByFilter(lower, filterIndex)) continue;
         if (!search.isEmpty() && !lower.contains(search)) continue;
 
-        auto* item = new QListWidgetItem(path);
-        item->setData(Qt::UserRole, i);
-        mList->addItem(item);
+        // BSA stores entry names as "folder\file" while BA2 uses forward
+        // slashes, so both separators have to be honoured or a BSA's folders
+        // never split and the whole archive appears as one flat folder row.
+        QStringList segments = path.split(QRegularExpression(QStringLiteral("[/\\\\]")),
+                                          Qt::SkipEmptyParts);
+        if (segments.isEmpty()) continue;
+        QTreeWidgetItem* parent = folderFor(segments, segments.size() - 1);
+        auto* item = addRow(parent);
+        item->setText(0, segments.last());
+        item->setText(1, QLocale().formattedDataSize(entrySize(i)));
+        item->setData(0, Qt::UserRole, i);
+        // A stable secondary sort key, so numeric ordering does not depend on the
+        // formatted string ("1 KB" sorting before "900 KB").
+        item->setData(1, Qt::UserRole, static_cast<qlonglong>(entrySize(i)));
         mVisible.append(i);
     }
-    mList->setUpdatesEnabled(true);
+    mTree->setUpdatesEnabled(true);
+    mTree->expandToDepth(0);
+    mTree->resizeColumnToContents(0);
 
-    setStatus(tr("%1 of %2 entries shown").arg(mVisible.size()).arg(entryCount()));
+    setStatus(tr("%1 of %2 entries shown in %3 folder(s)")
+                  .arg(mVisible.size()).arg(entryCount()).arg(mTree->topLevelItemCount()));
 
     // Keep the button honest about its scope as the filter and search change.
     // When nothing is filtered it can offer the whole archive; once a filter or
@@ -453,21 +525,48 @@ void ArchiveBrowserDialog::onSearchTextChanged(const QString&)
     rebuildList();
 }
 
-void ArchiveBrowserDialog::onEntrySelected(int row)
+void ArchiveBrowserDialog::onEntrySelected()
 {
-    if (row < 0 || row >= mVisible.size()) return;
-    updatePreview(mVisible.at(row));
+    const QVector<int> selected = selectedIndices();
+    mSelectedIndex = selected.isEmpty() ? -1 : selected.first();
+    // Preview and the action buttons follow the first selected file; a folder row
+    // has no archive index and so leaves both disabled.
+    mExtractBtn->setEnabled(mSelectedIndex >= 0);
+    mPlayBtn->setEnabled(mSelectedIndex >= 0
+        && isVisibleByFilter(entryPath(mSelectedIndex).toLower(), 3));
+    if (mSelectedIndex < 0) {
+        clearPreview();
+        return;
+    }
+    updatePreview(mSelectedIndex);
 }
 
-void ArchiveBrowserDialog::onEntryDoubleClicked(QListWidgetItem* item)
+void ArchiveBrowserDialog::onEntryDoubleClicked(QTreeWidgetItem* item, int)
 {
     if (!item) return;
-    const int index = item->data(Qt::UserRole).toInt();
+    const QVariant stored = item->data(0, Qt::UserRole);
+    // Folder rows have no archive index; expanding is handled by setExpandsOnDoubleClick.
+    if (!stored.isValid()) return;
+    const int index = stored.toInt();
     if (index < 0) return;
+    mSelectedIndex = index;
     if (isVisibleByFilter(entryPath(index).toLower(), 3))
         playSelected();
     else
         extractSelected();
+}
+
+QVector<int> ArchiveBrowserDialog::selectedIndices() const
+{
+    QVector<int> out;
+    const QList<QTreeWidgetItem*> items = mTree->selectedItems();
+    out.reserve(items.size());
+    for (QTreeWidgetItem* item : items) {
+        const QVariant stored = item->data(0, Qt::UserRole);
+        if (stored.isValid())
+            out.append(stored.toInt());
+    }
+    return out;
 }
 
 void ArchiveBrowserDialog::updatePreview(int index)
@@ -579,35 +678,70 @@ void ArchiveBrowserDialog::playSelected()
 
 void ArchiveBrowserDialog::extractSelected()
 {
-    if (mSelectedIndex < 0) return;
+    const QVector<int> selected = selectedIndices();
+    if (selected.isEmpty()) return;
 
+    // More than one file cannot sensibly be written to one chosen path, so a
+    // multi-selection is extracted into a chosen directory, preserving the
+    // archive's folder layout under it.
+    if (selected.size() > 1) {
+        const QString dir = QFileDialog::getExistingDirectory(
+            this, tr("Extract %1 Files Into").arg(selected.size()));
+        if (dir.isEmpty()) return;
+
+        int failed = 0;
+        QString firstError;
+        for (int index : selected) {
+            const QString rel = entryPath(index);
+            QString outPath;
+            // Same containment check and directory creation as extractAll(); an
+            // archive entry name is not trusted to be a safe relative path.
+            if (!isSafeExtractionPath(dir, rel, &outPath)
+                || !QDir().mkpath(QFileInfo(outPath).absolutePath())
+                || !extractTo(index, outPath, /*quiet=*/true)) {
+                ++failed;
+                if (firstError.isEmpty()) firstError = rel;
+            }
+        }
+        LOG_INFO(QString("Archive Browser: extracted %1 selected file(s) to %2 (%3 failed)")
+                     .arg(selected.size()).arg(dir).arg(failed));
+        if (failed > 0) {
+            QMessageBox::warning(this, tr("Extraction Incomplete"),
+                tr("%n file(s) could not be written, starting with:\n%1\n\n"
+                   "Nothing outside the chosen folder was written.", nullptr, failed)
+                    .arg(firstError));
+        } else {
+            QMessageBox::information(this, tr("Extracted"),
+                tr("%n file(s) extracted to:\n%1", nullptr, selected.size()).arg(dir));
+        }
+        return;
+    }
+
+    const int index = selected.first();
     const QString savePath = QFileDialog::getSaveFileName(this, tr("Extract File"),
-        QFileInfo(entryPath(mSelectedIndex)).fileName(), tr("All Files (*.*)"));
+        QFileInfo(entryPath(index)).fileName(), tr("All Files (*.*)"));
     if (savePath.isEmpty()) return;
 
-    if (mKind == Kind::Bsa)
-    {
-        if (!mBsa->extract(static_cast<quint32>(mSelectedIndex), savePath))
-        {
-            QMessageBox::critical(this, tr("Extract Failed"),
-                tr("Failed to extract: %1").arg(entryPath(mSelectedIndex)));
-            return;
-        }
-    }
-    else if (mKind == Kind::Ba2)
-    {
-        if (!mBa2->extract(static_cast<quint32>(mSelectedIndex), savePath))
-        {
-            QMessageBox::critical(this, tr("Extract Failed"),
-                tr("Failed to extract: %1").arg(entryPath(mSelectedIndex)));
-            return;
-        }
-    }
-    else return;
+    if (!extractTo(index, savePath, /*quiet=*/false)) return;
 
     LOG_INFO(QString("Archive Browser: extracted %1").arg(savePath));
     QMessageBox::information(this, tr("Extracted"),
         tr("File extracted to:\n%1").arg(savePath));
+}
+
+bool ArchiveBrowserDialog::extractTo(int index, const QString& outPath, bool quiet)
+{
+    bool ok = false;
+    if (mKind == Kind::Bsa && mBsa)
+        ok = mBsa->extract(static_cast<quint32>(index), outPath);
+    else if (mKind == Kind::Ba2 && mBa2)
+        ok = mBa2->extract(static_cast<quint32>(index), outPath);
+    // In a batch, one failure is reported in the summary rather than by popping a
+    // modal per file, which would make extracting hundreds unwieldy.
+    if (!ok && !quiet)
+        QMessageBox::critical(this, tr("Extract Failed"),
+            tr("Failed to extract: %1").arg(entryPath(index)));
+    return ok;
 }
 
 // A user-facing description of what the filter and search box currently leave

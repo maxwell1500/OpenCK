@@ -5,13 +5,15 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
-#include <QListWidget>
+#include <QTreeWidget>
+#include <functional>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPushButton>
 
 #include "view/window/archivebrowserdialog.hpp"
 #include "view/window/voicepreview.hpp"
+#include "ba2/bsaarchive.hpp"
 #include "logger.hpp"
 
 // Validates the ArchiveBrowserDialog wiring against the user's Skyrim SE
@@ -30,11 +32,12 @@ private slots:
     void testOpenBsaAndList();
     void testVoiceFilter();
     void testSearch();
+    void testEntryTreeGroupsAndSorts();
     void testSafeExtractionPaths();
     void testWritePcmWav();
 };
 
-// Opening and filtering a 75k-file BSA through a QListWidget takes minutes
+// Opening and filtering a 75k-file BSA through a QTreeWidget takes minutes
 // in a Debug build; the default per-function watchdog (5 min) is too tight
 // for CI. This test requires the game, so its timeout budget is raised
 // before main() runs (i.e. before QTest reads the limit).
@@ -145,6 +148,35 @@ void TestArchiveBrowser::testArchiveDiscoveryIsRecursive()
         dir.filePath(QStringLiteral("does-not-exist"))).isEmpty());
 }
 
+// The entry view is a tree, so a test cannot ask it for "row N" and get an
+// entry. Walking it and rebuilding each row's path from its ancestors gives back
+// exactly what the old flat list held, which is what these tests actually assert
+// on. Sorting matters only to make the chosen rows deterministic.
+static QStringList treeFilePaths(QTreeWidget* tree)
+{
+    QStringList out;
+    std::function<void(QTreeWidgetItem*, const QString&)> walk;
+    walk = [&out, &walk](QTreeWidgetItem* item, const QString& prefix) {
+            // A row with a valid UserRole is a file; anything else is a folder.
+            if (item->data(0, Qt::UserRole).isValid()) {
+                out << (prefix.isEmpty() ? item->text(0)
+                                         : prefix + '/' + item->text(0));
+                return;
+            }
+            // A folder contributes its own name to the prefix before descending,
+            // including at the top level, where the prefix starts empty.
+            const QString here = prefix.isEmpty()
+                ? item->text(0)
+                : prefix + '/' + item->text(0);
+            for (int i = 0; i < item->childCount(); ++i)
+                walk(item->child(i), here);
+        };
+    for (int i = 0; i < tree->topLevelItemCount(); ++i)
+        walk(tree->topLevelItem(i), QString());
+    out.sort();
+    return out;
+}
+
 void TestArchiveBrowser::testExtractButtonReflectsFilterScope()
 {
     if (!QFileInfo::exists(s_dataDir)) QSKIP("Skyrim SE data dir not found");
@@ -152,13 +184,13 @@ void TestArchiveBrowser::testExtractButtonReflectsFilterScope()
     QVERIFY(openVoicesArchive(dlg));
 
     auto* button = dlg.findChild<QPushButton*>("extractAllBtn");
-    auto* list = dlg.findChild<QListWidget*>("entryList");
+    auto* tree = dlg.findChild<QTreeWidget*>("entryTree");
     QVERIFY(button);
-    QVERIFY(list);
-    QVERIFY(list->count() > 0);
+    QVERIFY(tree);
+    const int total = treeFilePaths(tree).count();
+    QVERIFY(total > 0);
 
     // Unfiltered: the button offers the whole archive and says so with a count.
-    const int total = list->count();
     const QString unfiltered = button->text();
     QVERIFY2(unfiltered.contains(QStringLiteral("Extract All")),
              qPrintable(QStringLiteral("unfiltered label was '%1'").arg(unfiltered)));
@@ -172,11 +204,11 @@ void TestArchiveBrowser::testExtractButtonReflectsFilterScope()
     auto* search = dlg.findChild<QLineEdit*>("searchEdit");
     QVERIFY(search);
 
-    const QString term = QFileInfo(list->item(0)->text()).completeBaseName();
+    const QString term = QFileInfo(treeFilePaths(tree).first()).completeBaseName();
     QVERIFY(!term.isEmpty());
     search->setText(term);
 
-    const int filtered = list->count();
+    const int filtered = treeFilePaths(tree).count();
     if (filtered == 0 || filtered == total) {
         // A degenerate name would make the label assertions below meaningless.
         QSKIP(qPrintable(QStringLiteral("search term '%1' did not narrow %2 entries")
@@ -196,7 +228,7 @@ void TestArchiveBrowser::testExtractButtonReflectsFilterScope()
     // A search that matches nothing must disable the button rather than leave a
     // live control that would extract an empty set.
     search->setText(QStringLiteral("no-such-entry-anywhere-zzz"));
-    QCOMPARE(list->count(), 0);
+    QCOMPARE(treeFilePaths(tree).count(), 0);
     QVERIFY2(!button->isEnabled(),
              "the extract button stayed enabled with nothing selected to extract");
 }
@@ -207,9 +239,9 @@ void TestArchiveBrowser::testOpenBsaAndList()
     ArchiveBrowserDialog dlg(s_dataDir);
     QVERIFY(openVoicesArchive(dlg));
 
-    auto* list = dlg.findChild<QListWidget*>("entryList");
-    QVERIFY(list);
-    QVERIFY(list->count() > 1000);
+    auto* tree = dlg.findChild<QTreeWidget*>("entryTree");
+    QVERIFY(tree);
+    QVERIFY(treeFilePaths(tree).count() > 1000);
     QVERIFY(dlg.windowTitle().contains("Voices_en0", Qt::CaseInsensitive));
 }
 
@@ -220,16 +252,15 @@ void TestArchiveBrowser::testVoiceFilter()
     QVERIFY(openVoicesArchive(dlg));
 
     auto* filter = dlg.findChild<QComboBox*>("filterCombo");
-    auto* list = dlg.findChild<QListWidget*>("entryList");
+    auto* tree = dlg.findChild<QTreeWidget*>("entryTree");
     QVERIFY(filter);
-    QVERIFY(list);
+    QVERIFY(tree);
 
     filter->setCurrentIndex(4); // Voice (.fuz)
-    QVERIFY(list->count() > 1000);
-    qDebug() << "voice-filtered entries:" << list->count();
-    for (int i = 0; i < list->count(); ++i)
+    const QStringList paths = treeFilePaths(tree);
+    QVERIFY(paths.count() > 1000);
+    for (const QString& text : paths)
     {
-        const QString text = list->item(i)->text();
         QVERIFY2(text.endsWith(QStringLiteral(".fuz"), Qt::CaseInsensitive),
                  qPrintable(text));
     }
@@ -242,18 +273,73 @@ void TestArchiveBrowser::testSearch()
     QVERIFY(openVoicesArchive(dlg));
 
     auto* search = dlg.findChild<QLineEdit*>("searchEdit");
-    auto* list = dlg.findChild<QListWidget*>("entryList");
+    auto* tree = dlg.findChild<QTreeWidget*>("entryTree");
     QVERIFY(search);
-    QVERIFY(list);
+    QVERIFY(tree);
 
     search->setText("femalekhajiit");
-    QVERIFY(list->count() > 0);
-    for (int i = 0; i < list->count(); ++i)
+    const QStringList paths = treeFilePaths(tree);
+    QVERIFY(paths.count() > 0);
+    for (const QString& text : paths)
     {
-        const QString text = list->item(i)->text();
         QVERIFY2(text.contains(QStringLiteral("femalekhajiit"), Qt::CaseInsensitive),
                  qPrintable(text));
     }
+}
+
+void TestArchiveBrowser::testEntryTreeGroupsAndSorts()
+{
+    if (!QFileInfo::exists(s_voiceArchive)) QSKIP("Skyrim SE Voices archive not found");
+    ArchiveBrowserDialog dlg(s_dataDir);
+    QVERIFY(openVoicesArchive(dlg));
+
+    auto* tree = dlg.findChild<QTreeWidget*>("entryTree");
+    QVERIFY(tree);
+    QCOMPARE(tree->columnCount(), 2);
+    QVERIFY2(tree->isSortingEnabled(), "columns must be sortable to be useful");
+    // Multi-select is what makes batch extraction possible, so it is part of the
+    // navigation contract rather than a preference.
+    QCOMPARE(tree->selectionMode(), QAbstractItemView::ExtendedSelection);
+
+    // Ground truth: the archive's own entry list. The tree must be a faithful
+    // regrouping of it -- grouping may not add, drop, rename or duplicate a path,
+    // and the tree stores separators as '/', so both sides are normalised.
+    BsaArchive archive;
+    QVERIFY(archive.open(s_voiceArchive));
+    QStringList expected;
+    expected.reserve(static_cast<int>(archive.entries().size()));
+    for (const BsaFileEntry& e : archive.entries())
+        expected << QDir::fromNativeSeparators(e.fullPath);
+    expected.sort();
+
+    const QStringList shown = treeFilePaths(tree);
+    QCOMPARE(shown.size(), expected.size());
+    QCOMPARE(shown, expected);
+
+    // The archive is genuinely nested, so folders must exist as real rows rather
+    // than the tree quietly flattening everything back to one level.
+    QVERIFY2(tree->topLevelItemCount() < shown.size(),
+             "no folder rows were created, so grouping did not happen");
+
+// Counted rather than asserted inside the walk: QVERIFY in a lambda only
+    // returns from the lambda, so a failure there would be swallowed.
+    int files = 0;
+    int blankSizes = 0;
+    std::function<void(QTreeWidgetItem*)> checkSizes;
+    checkSizes = [&files, &blankSizes, &checkSizes](QTreeWidgetItem* item) {
+        if (item->data(0, Qt::UserRole).isValid()) {
+            ++files;
+            if (item->text(1).isEmpty())
+                ++blankSizes;
+            return;
+        }
+        for (int i = 0; i < item->childCount(); ++i)
+            checkSizes(item->child(i));
+    };
+    for (int i = 0; i < tree->topLevelItemCount(); ++i)
+        checkSizes(tree->topLevelItem(i));
+    QCOMPARE(files, shown.size());
+    QCOMPARE(blankSizes, 0);
 }
 
 void TestArchiveBrowser::testSafeExtractionPaths()
