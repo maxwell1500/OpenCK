@@ -2256,7 +2256,53 @@ to be the default and that every target is labelled, and — the part that matte
 writes and reads back a real archive at 0x67, 0x68 and 0x69, confirming each
 carries the version asked for with the payload intact.
 
-**Still open:** broader archive UX.
+**Status 2026-10-04 — scoped.** "Broader archive UX" was a one-line placeholder
+with no definition of done, so it sat at the bottom of the queue behind every
+measurable defect. It is now an enumerated list, read off `src/view/window/
+archivebrowserdialog.cpp` rather than imagined. Ordered by how much they actually
+block someone using the dialog:
+
+1. **A flat, unsorted, single-selection list cannot hold a real archive.** The
+   list is `QAbstractItemView::SingleSelection` over every entry, with no sorting
+   and no folder tree. `Fallout4 - Meshes.ba2` has 34,995 entries and Skyrim's
+   archives are ~22,000, so there is no way to navigate to anything except by
+   typing a search string. This is the reason the dialog feels unfinished, and it
+   is a navigation defect rather than a cosmetic one. Add a folder tree, sortable
+   columns, and multi-selection.
+2. **"Extract All..." extracts only the *visible* entries, but does not say so.**
+   `extractAll()` iterates `mVisible`, which the filter combo has already
+   narrowed. A user who filtered to ~40 textures and clicks a button reading
+   "Extract All..." can be led to believe they are extracting everything, when
+   the real risk is the reverse one — being unclear about how much is about to be
+   written. Make the label reflect the filter, and report the filtered count
+   before starting.
+3. **No progress, no cancel, and it blocks the UI thread.** `extractAll()` is a
+   synchronous loop over up to 34,995 files with a message box only at the end. On
+   a large archive the dialog looks hung for minutes with no way to abort. Needs a
+   progress dialog with cancellation.
+4. **No file metadata.** No size, compression or offset anywhere in the list; the
+   preview is a free-text blob. Nothing tells you how big a file is before
+   extracting it, or why an extraction failed. Add columns.
+5. **No multi-select extraction.** "Extract Selected..." handles exactly one
+   entry, which is what makes items 1-4 matter: the only way to get a hundred
+   files out today is "Extract All", i.e. item 2's ambiguity.
+6. **Read-only.** `BsaArchive::create()` exists and the Create Archive dialog uses
+   it, but the browser cannot add or replace an entry in an existing archive.
+   Whether that belongs here or in the create dialog is a judgement call; it is
+   listed so the decision is made rather than deferred again.
+7. **`scanDataDirectory()` is not recursive.** `entryList()` is called without
+   `QDir::Subdirectories`, so archives in a nested `Data` tree never appear in the
+   quick-open list. Fallout 4 and Skyrim keep DLC in the Data root so it mostly
+   works; it is a latent bug for any layout that does not.
+8. **No verify action and no archive-level header display** — version, `GNRL`
+   versus `DX10`, compression method and file count are not surfaced, so a broken
+   archive cannot be diagnosed from the UI.
+
+Deliberately unchanged: extraction containment checks (`..`, absolute,
+drive-qualified, UNC), the `QSaveFile` write, and the per-game BSA target presets
+are all done and stay as they are.
+
+**Still open:** items 1-8 above.
 
 
 ### Series 7 — Save-time and interactive validation
