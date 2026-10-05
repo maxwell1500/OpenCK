@@ -2302,7 +2302,51 @@ Deliberately unchanged: extraction containment checks (`..`, absolute,
 drive-qualified, UNC), the `QSaveFile` write, and the per-game BSA target presets
 are all done and stay as they are.
 
-**Still open:** items 1-8 above.
+**Status 2026-10-04 — researched against the local Creation Kit, and the list
+changed.** Evidence is from the installed `CreationKit.exe` (a Qt5 application,
+so its labels are in the binary) and its `CreationKit.ini`. No source tree is
+reachable on this machine — the `Genesis\...` paths this file quotes come from a
+different host. Per the legal note at the top, none of the CK's wording is
+reproduced here; this is observed behaviour, and the code keeps its own strings.
+
+Two things the CK's archive browser has that we do not, in order of size:
+
+1. **External-data collection.** The binary carries an action to collect external
+   data, a setting to run it automatically when the archive browser opens, and a
+   setting to ignore files already present inside archives, plus an
+   "Include Archives" toggle. This is the mod-authoring half of the dialog: scan
+   the plugin for assets it references but that live loose on disk, and gather
+   them so the mod is shippable. It is a much larger feature than anything else on
+   this list, and we have the *resolution* half already (`AssetResolver`,
+   `validateAssetPaths()`, the NIF external `.mesh` references) without the
+   collection UI or the gathering step.
+2. **INI-driven archive configuration.** `CreationKit.ini` carries an `[Archive]`
+   section with a resource-archive list — on this machine all 34 shipped Starfield
+   archives by name — and a default external codec id. Nothing equivalent is
+   modelled: our reader opens whatever path it is handed and has no notion of an
+   archive being a *resource* archive.
+
+**Two items from the list above are withdrawn as unsupported speculation.**
+Nothing in the binary indicates the archive browser can add or replace an entry
+in an existing archive, or offers a verify action or container-header display.
+Item 6 was therefore a guess dressed as a parity gap, and item 8 was the same.
+Archive *creation* is a separate dialog we already have. Both are struck from
+the list rather than left to be "found later" as phantom work.
+
+Item 2 is reinforced rather than overturned: the CK's model makes scope explicit
+(whole archives are the unit, with an explicit include/exclude toggle), whereas
+our button says "Extract All" and quietly acts on the filtered set.
+
+**What the research could not settle.** The binary does not expose the dialog's
+per-widget labels, so items 1, 3, 4 and 5 — the flat list, the missing progress
+and cancel, the absent metadata and the single-selection limit — are *not*
+verified against the CK. They stand on their own reasoning: 34,995 entries in a
+flat unsorted list is unnavigable whatever the real CK does, and a synchronous
+35,000-file extraction with no cancel reads as a hang. Treat them as usability
+defects to fix on their merits, not as measured parity gaps.
+
+**Still open:** items 1-5 and 7 above, plus external-data collection and the
+INI-driven archive configuration.
 
 
 ### Series 7 — Save-time and interactive validation
