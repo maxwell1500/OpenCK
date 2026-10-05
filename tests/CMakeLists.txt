@@ -360,6 +360,15 @@ target_link_libraries(test_assetresolver PRIVATE openck_model test_stubs Qt6::Te
 target_include_directories(test_assetresolver PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_assetresolver)
 
+# INI reader, resource-archive config, and external-data collection planning.
+# Self-contained: builds its own archives and INI files, so it needs no game
+# install -- which matters because the collection logic is about what is missing
+# from a mod, something no shipped archive can demonstrate.
+add_executable(test_externaldata test_externaldata.cpp)
+target_link_libraries(test_externaldata PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_externaldata PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_externaldata)
+
 # Diagnostic: scan archives for .btd terrain samples (test_scanbtd [dataDir]).
 add_executable(test_scanbtd test_scanbtd.cpp)
 target_link_libraries(test_scanbtd PRIVATE openck_model test_stubs Qt6::Core)

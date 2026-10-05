@@ -25,6 +25,7 @@ void AssetResolver::scan(const QString& dataDir)
     mPaths.clear();
     mPathSet.clear();
     mLooseSet.clear();
+    mArchiveOfPath.clear();
     mArchiveCount = 0;
 
     QDir dir(dataDir);
@@ -32,14 +33,34 @@ void AssetResolver::scan(const QString& dataDir)
 
     addLooseFiles(dataDir);
 
-    const auto archives = dir.entryList({ "*.bsa", "*.ba2" }, QDir::Files, QDir::Name);
-    for (const auto& archive : archives)
+    // Top level first, then every subdirectory: almost every shipped archive sits
+    // directly in the Data root and only DLC archives are nested. A single
+    // recursive walk filtered on QDir::Dirs would visit only directories and miss
+    // every archive in the root, which is what happened the first time this was
+    // written.
+    const auto openArchivesIn = [this](const QString& dir) {
+        const QFileInfoList archives =
+            QDir(dir).entryInfoList({ QStringLiteral("*.bsa"), QStringLiteral("*.ba2") },
+                                    QDir::Files, QDir::Name);
+        for (const QFileInfo& info : archives) {
+            const QString full = info.absoluteFilePath();
+            if (info.fileName().endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive))
+                addBa2(full);
+            else
+                addBsa(full);
+        }
+    };
+
+    openArchivesIn(dataDir);
+
+    // Recursive, matching ArchiveBrowserDialog::findArchives(): an archive under
+    // Data\DLC used to be invisible to asset resolution while the browser listed
+    // the same directory.
+    QDirIterator it(dataDir, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    while (it.hasNext())
     {
-        const QString full = dir.absoluteFilePath(archive);
-        if (archive.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive))
-            addBa2(full);
-        else
-            addBsa(full);
+        it.next();
+        openArchivesIn(it.filePath());
     }
 }
 
@@ -77,6 +98,12 @@ void AssetResolver::addBsa(const QString& path)
             mPathSet.insert(canon);
             mPaths.append(canon);
         }
+        // First archive to claim a path wins, which is load order: a DLC archive
+        // read before the base archive will shadow it. Collection only needs *an*
+        // archive that has the file, and Bethesda's own override order is a
+        // separate problem from knowing where to read a file from.
+        if (!mArchiveOfPath.contains(canon) && !containsLoose(canon))
+            mArchiveOfPath.insert(canon, path);
     }
     ++mArchiveCount;
 }
@@ -98,8 +125,16 @@ void AssetResolver::addBa2(const QString& path)
             mPathSet.insert(canon);
             mPaths.append(canon);
         }
+        if (!mArchiveOfPath.contains(canon) && !containsLoose(canon))
+            mArchiveOfPath.insert(canon, path);
     }
     ++mArchiveCount;
+}
+
+QString AssetResolver::archiveContaining(const QString& relativePath) const
+{
+    if (relativePath.isEmpty()) return QString();
+    return mArchiveOfPath.value(canonical(relativePath), QString());
 }
 
 bool AssetResolver::contains(const QString& relativePath) const

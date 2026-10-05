@@ -2368,20 +2368,74 @@ reproduced here; this is observed behaviour, and the code keeps its own strings.
 
 Two things the CK's archive browser has that we do not, in order of size:
 
-1. **External-data collection.** The binary carries an action to collect external
-   data, a setting to run it automatically when the archive browser opens, and a
-   setting to ignore files already present inside archives, plus an
-   "Include Archives" toggle. This is the mod-authoring half of the dialog: scan
-   the plugin for assets it references but that live loose on disk, and gather
-   them so the mod is shippable. It is a much larger feature than anything else on
-   this list, and we have the *resolution* half already (`AssetResolver`,
-   `validateAssetPaths()`, the NIF external `.mesh` references) without the
-   collection UI or the gathering step.
-2. **INI-driven archive configuration.** `CreationKit.ini` carries an `[Archive]`
-   section with a resource-archive list â€” on this machine all 34 shipped Starfield
-   archives by name â€” and a default external codec id. Nothing equivalent is
-   modelled: our reader opens whatever path it is handed and has no notion of an
-   archive being a *resource* archive.
+1. **External-data collection.** **Model layer done 2026-10-05; UI still open.**
+   The resolution problem was always the easy half, and it is solved: a plugin can
+   reference a mesh that resolves fine because the *game* ships it inside a
+   resource archive, and that file is simply absent from the mod. Validation
+   reports nothing wrong, because the file genuinely exists — just not anywhere
+   the mod can reach. So the distinction this feature needs is loose versus
+   archived, not present versus absent.
+
+   `ExternalDataCollector` (`src/model/tools/externaldatacollector.{hpp,cpp}`)
+   does this in two steps. `buildPlan()` sorts every referenced asset into
+   `toCollect` / `alreadyLoose` / `coveredByArchives` / `inNonResourceArchive` /
+   `unavailable` without touching the disk, so the result can be shown before
+   anything is written. `collect()` writes the collectable ones out preserving
+   each asset's relative layout, through the same containment check the archive
+   browser uses — an archive entry name is not trusted to be a safe relative
+   path. Archives are opened once per run and their path indexes built from those
+   same objects, so a plan drawing on one archive does not re-read its name table
+   per file.
+
+   `coveredByArchives` is deliberately not folded into `alreadyLoose`: nothing is
+   on disk for those, they are merely covered by an archive the caller is
+   shipping. Keeping the buckets apart stops "skipped" from being reported as
+   "already there".
+
+   The scan feeding it had a real bug, found by writing the tests:
+   `AssetResolver::scan()` globbed archives non-recursively while walking loose
+   files recursively, so an archive under `Data\DLC` was invisible to asset
+   resolution yet visible to the browser listing the same directory. Both are
+   recursive now — and the first attempt at that fix filtered on `QDir::Dirs`,
+   which visits only directories and so missed every archive in the Data root.
+   `resolverFindsArchivesAtTopLevelAndNested` pins both directions.
+
+   **What is still missing is the whole user-facing half:** a dialog that shows
+   the plan and collects it, the setting to ignore files already inside archives,
+   the "include archives" toggle, the automatic run when the archive browser
+   opens, and a way to point at the tool INI. Note the wiring problem: the CK
+   puts this action in the archive browser, but our browser holds no loaded
+   plugin and collection is meaningless without one — so this has to be a separate
+   dialog fed from the main window, not a button bolted onto the browser.
+
+2. **INI-driven archive configuration.** **Reader done 2026-10-05.**
+   `IniFile` (`libs/files/ini/inifile.{hpp,cpp}`) is a tolerant sectioned INI
+   reader — the tree had none. The only hand-rolled scanner is scoped to `[MMS]`,
+   has no production caller, and cannot represent a repeated key, which this
+   configuration needs. It is deliberately not `QSettings`, which reinterprets
+   keys and arrays on the way out; these files are read for interoperability.
+
+   `ResourceArchiveConfig` reads the archive lists and the default external codec
+   id. Two corrections to the note this replaces:
+
+   - There are **two** archive lists, not one: `SResourceArchiveList` (34 entries
+     on the Starfield install here) *and* `sResourceIndexFileList` (15 texture and
+     LOD archives). They do not overlap, and merging them would claim 15 archives
+     are resource archives that are not, so they stay separate and
+     `allNamedArchives()` unions them only for a membership test.
+   - The codec id is now *read*, not hardcoded. `AudioPipelineTools::
+     wwiseExternalCodecId()` still returns a literal 4 with a comment saying it is
+     "the Creation Kit's [Wwise] iDefaultExternalCodecID value"; it should defer
+     to this config when one is available.
+
+   Lookups are case-insensitive because the file is not self-consistent: one
+   section carries both `sResourceIndexFileList` and `SResourceArchiveList`.
+
+   **Still missing:** anywhere to point at the INI. Nothing calls
+   `ResourceArchiveConfig::fromIni()` in production, there is no setting for its
+   path, and `PreferencesDialog::loadSettings()` reads an `[Archive] Archives`
+   array from OpenCK's *own* `editor.ini` that `saveSettings()` never writes — a
+   dead read-only list that shows "(no archives loaded)".
 
 **Two items from the list above are withdrawn as unsupported speculation.**
 Nothing in the binary indicates the archive browser can add or replace an entry
@@ -2403,10 +2457,11 @@ with no cancel reads as a hang. Treat them as usability defects to fix on their
 merits, not as measured parity gaps. Items 1, 2, 5 and 8 are now done on exactly
 that reasoning.
 
-**Still open:** external-data collection and the INI-driven archive
-configuration. The scoped Archive Browser list is now closed — items 1-5 and 8
-are done, 6 and 7 are withdrawn, and none of it is verified against the CK
-beyond the reasoning recorded above.
+**Still open:** the external-data collection **UI** and the INI path setting —
+both have their logic built and tested (`test_externaldata`, 15/15), and neither
+is reachable from the UI yet. The scoped Archive Browser list itself is closed:
+items 1-5 and 8 are done, 6 and 7 are withdrawn, and none of it is verified
+against the CK beyond the reasoning recorded above.
 
 
 ### Series 7 â€” Save-time and interactive validation

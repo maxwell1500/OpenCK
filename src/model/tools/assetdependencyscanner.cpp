@@ -67,34 +67,6 @@ QString AssetDependencyScanner::typeName(CkId::Type type)
     }
 }
 
-void AssetDependencyScanner::checkPathsForRecord(const QString& recordId, CkId::Type type,
-                                                 const QString& modelPath, const QString& iconPath,
-                                                 const QString& dataDir, const AssetResolver& resolver,
-                                                 ScanResult& result)
-{
-    auto checkPath = [&](const QString& path, const QString& assetType) {
-        if (path.isEmpty())
-            return;
-
-        result.totalPathsScanned++;
-
-        if (!resolver.contains(path))
-        {
-            MissingAsset missing;
-            missing.recordId = recordId;
-            missing.recordType = type;
-            missing.assetPath = path;
-            missing.assetType = assetType;
-            missing.suggestions = findSimilarPathsFrom(resolver, path, 5);
-            result.missingAssets.append(missing);
-            result.totalMissing++;
-        }
-    };
-
-    checkPath(modelPath, "model");
-    checkPath(iconPath, "texture");
-}
-
 // ============================================================================
 // findSimilarPaths
 // ============================================================================
@@ -174,101 +146,101 @@ QStringList AssetDependencyScanner::findSimilarPathsFrom(const AssetResolver& re
 // scanAll
 // ============================================================================
 
+QVector<AssetReference> AssetDependencyScanner::collectReferences(const Data& data)
+{
+    QVector<AssetReference> refs;
+    const auto add = [&refs](const QString& recordId, CkId::Type type,
+                             const QString& modelPath, const QString& iconPath) {
+        if (!modelPath.isEmpty())
+            refs.append({ recordId, type, modelPath, QStringLiteral("model") });
+        if (!iconPath.isEmpty())
+            refs.append({ recordId, type, iconPath, QStringLiteral("texture") });
+    };
+
+    const auto& statCollection = data.getStatCollection();
+    for (int i = 0; i < statCollection.size(); i++)
+    {
+        const auto& rec = statCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Stat_, rec.modelPath, rec.iconPath);
+    }
+    const auto& weapCollection = data.getWeaponCollection();
+    for (int i = 0; i < weapCollection.size(); i++)
+    {
+        const auto& rec = weapCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Weap_, rec.modelPath, rec.iconPath);
+    }
+    const auto& armorCollection = data.getArmorCollection();
+    for (int i = 0; i < armorCollection.size(); i++)
+    {
+        const auto& rec = armorCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Armor_, rec.modelPath, rec.iconPath);
+    }
+    const auto& bookCollection = data.getBookCollection();
+    for (int i = 0; i < bookCollection.size(); i++)
+    {
+        const auto& rec = bookCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Book_, rec.modelPath, rec.iconPath);
+    }
+    const auto& miscCollection = data.getMiscCollection();
+    for (int i = 0; i < miscCollection.size(); i++)
+    {
+        const auto& rec = miscCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Misc_, rec.modelPath, rec.iconPath);
+    }
+    const auto& ingrCollection = data.getIngrCollection();
+    for (int i = 0; i < ingrCollection.size(); i++)
+    {
+        const auto& rec = ingrCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Ingr_, rec.modelPath, rec.iconPath);
+    }
+    const auto& alchCollection = data.getAlchCollection();
+    for (int i = 0; i < alchCollection.size(); i++)
+    {
+        const auto& rec = alchCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Alch_, rec.modelPath, rec.iconPath);
+    }
+    const auto& contCollection = data.getContCollection();
+    for (int i = 0; i < contCollection.size(); i++)
+    {
+        const auto& rec = contCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Cont_, rec.modelPath, rec.iconPath);
+    }
+    const auto& actiCollection = data.getActiCollection();
+    for (int i = 0; i < actiCollection.size(); i++)
+    {
+        const auto& rec = actiCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Acti_, rec.modelPath, rec.iconPath);
+    }
+    const auto& treeCollection = data.getTreeCollection();
+    for (int i = 0; i < treeCollection.size(); i++)
+    {
+        const auto& rec = treeCollection.getRecord(i).get();
+        add(rec.editorId, CkId::Type_Tree_, rec.modelPath, rec.iconPath);
+    }
+    return refs;
+}
+
 AssetDependencyScanner::ScanResult AssetDependencyScanner::scanAll(const Data& data, const QString& dataDir)
 {
     ScanResult result;
     AssetResolver resolver(dataDir);
 
-    // Scan Stat records
-    const auto& statCollection = data.getStatCollection();
-    for (int i = 0; i < statCollection.size(); i++)
+    // Driven by the same walk the external-data collector uses, so the two cannot
+    // disagree about which assets a plugin depends on.
+    for (const AssetReference& ref : collectReferences(data))
     {
-        const auto& rec = statCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Stat_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
+        result.totalPathsScanned++;
+        if (resolver.contains(ref.assetPath))
+            continue;
+        MissingAsset missing;
+        missing.recordId = ref.recordId;
+        missing.recordType = ref.recordType;
+        missing.assetPath = ref.assetPath;
+        missing.assetType = ref.assetType;
+        missing.suggestions = findSimilarPathsFrom(resolver, ref.assetPath, 5);
+        result.missingAssets.append(missing);
+        result.totalMissing++;
     }
-
-    // Scan Weapon records
-    const auto& weapCollection = data.getWeaponCollection();
-    for (int i = 0; i < weapCollection.size(); i++)
-    {
-        const auto& rec = weapCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Weap_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Armor records
-    const auto& armorCollection = data.getArmorCollection();
-    for (int i = 0; i < armorCollection.size(); i++)
-    {
-        const auto& rec = armorCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Armor_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Book records
-    const auto& bookCollection = data.getBookCollection();
-    for (int i = 0; i < bookCollection.size(); i++)
-    {
-        const auto& rec = bookCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Book_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Misc records
-    const auto& miscCollection = data.getMiscCollection();
-    for (int i = 0; i < miscCollection.size(); i++)
-    {
-        const auto& rec = miscCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Misc_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Ingredient records
-    const auto& ingrCollection = data.getIngrCollection();
-    for (int i = 0; i < ingrCollection.size(); i++)
-    {
-        const auto& rec = ingrCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Ingr_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Alchemy records
-    const auto& alchCollection = data.getAlchCollection();
-    for (int i = 0; i < alchCollection.size(); i++)
-    {
-        const auto& rec = alchCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Alch_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Container records
-    const auto& contCollection = data.getContCollection();
-    for (int i = 0; i < contCollection.size(); i++)
-    {
-        const auto& rec = contCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Cont_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Activator records
-    const auto& actiCollection = data.getActiCollection();
-    for (int i = 0; i < actiCollection.size(); i++)
-    {
-        const auto& rec = actiCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Acti_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
-    // Scan Tree records
-    const auto& treeCollection = data.getTreeCollection();
-    for (int i = 0; i < treeCollection.size(); i++)
-    {
-        const auto& rec = treeCollection.getRecord(i).get();
-        checkPathsForRecord(rec.editorId, CkId::Type_Tree_, rec.modelPath, rec.iconPath,
-                           dataDir, resolver, result);
-    }
-
     return result;
 }
 

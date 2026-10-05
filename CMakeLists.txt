@@ -587,6 +587,8 @@ set(FILES_SOURCES
     libs/files/nif/tgaencoder.cpp
     libs/files/ba2/ba2archive.cpp
     libs/files/ba2/bsaarchive.cpp
+    libs/files/ba2/resourcearchiveconfig.cpp
+    libs/files/ini/inifile.cpp
     libs/files/nifanim/nifanimationexporter.cpp
     libs/files/nifanim/nifanimationimporter.cpp
     libs/files/nifanim/nifanimationwriter.cpp
@@ -620,6 +622,8 @@ set(FILES_HEADERS
     libs/files/nif/tgaencoder.hpp
     libs/files/ba2/ba2archive.hpp
     libs/files/ba2/bsaarchive.hpp
+    libs/files/ba2/resourcearchiveconfig.hpp
+    libs/files/ini/inifile.hpp
     libs/files/nifanim/nifanimation.hpp
     libs/files/nifanim/nifanimationexporter.hpp
     libs/files/nifanim/nifanimationimporter.hpp
@@ -741,6 +745,7 @@ set(MODEL_SOURCES
     src/model/tools/assetconverter.cpp
     src/model/tools/assetvalidator.cpp
     src/model/tools/assetresolver.cpp
+    src/model/tools/externaldatacollector.cpp
     src/model/tools/papyrusprevalidator.cpp
     src/model/tools/papyrustypechecker.cpp
     src/model/tools/papyruslanguageserver.cpp
@@ -826,6 +831,7 @@ set(MODEL_HEADERS
     src/model/tools/assetconverter.hpp
     src/model/tools/assetvalidator.hpp
     src/model/tools/assetresolver.hpp
+    src/model/tools/externaldatacollector.hpp
     src/model/tools/papyrusprevalidator.hpp
     src/model/tools/papyrustypechecker.hpp
     src/model/tools/papyruslanguageserver.hpp

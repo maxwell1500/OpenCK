@@ -2,6 +2,7 @@
 
 #include <QString>
 #include <QStringList>
+#include <QMap>
 #include <QSet>
 
 // Tells callers whether a game asset path exists, looking both at loose files
@@ -24,6 +25,10 @@ public:
     bool containsLoose(const QString& relativePath) const;
     // Absolute path for a loose file; empty when the path is only in archives.
     QString absoluteLoosePath(const QString& relativePath, const QString& dataDir) const;
+    // Absolute path of an archive that holds this path, or empty when the path is
+    // loose or unknown. Lets a caller extract the entry instead of only knowing
+    // that it exists somewhere.
+    QString archiveContaining(const QString& relativePath) const;
 
     // All known relative asset paths (normalized, backslash separators).
     const QStringList& allPaths() const { return mPaths; }
@@ -39,5 +44,7 @@ private:
     QStringList mPaths;
     QSet<QString> mPathSet;
     QSet<QString> mLooseSet;
+    // canonical path -> absolute archive path, for paths only an archive provides.
+    QMap<QString, QString> mArchiveOfPath;
     int mArchiveCount = 0;
 };
