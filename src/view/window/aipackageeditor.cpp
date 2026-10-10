@@ -9,6 +9,7 @@
 #include "../../model/world/idtable.hpp"
 #include "../../model/tools/undostack.hpp"
 #include "../../model/tools/columnvalidator.hpp"
+#include "../../libs/files/esm/packagesemantics.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/packagerecord.hpp"
@@ -119,11 +120,36 @@ void AIPackageEditor::loadPackages()
         PackageRecord& pack = packCollection.getRecord(idx).get();
         QTreeWidgetItem* packItem = new QTreeWidgetItem(mTree);
         packItem->setText(0, pack.editorId.isEmpty() ? QString("Package_%1").arg(pack.formId, 8, 16, QChar('0')).toUpper() : pack.editorId);
-        packItem->setText(1, "PACKAGE");
-        packItem->setText(2, QString("Type: %1 | Targets: %2 | Params: %3")
-            .arg(pack.packageType)
-            .arg(pack.targetIds.size())
-            .arg(pack.parameters.size()));
+
+        // Show the semantics the editor actually exposes: the package family
+        // and whether the schedule gates it.
+        bool decoded = false;
+        const openck::PackageData data = openck::decodePackageData(pack, &decoded);
+        const QString kindName =
+            decoded ? openck::packageKindName(openck::packageKindFromU32(data.type))
+                     : QStringLiteral("?");
+        QString schedule;
+        if (decoded && openck::scheduleConstraintSet(data.schedule))
+        {
+            const QVector<openck::ScheduleCheck> checks =
+                openck::scheduleChecks(data.schedule);
+            for (const auto& check : checks)
+            {
+                if (!schedule.isEmpty()) schedule += QLatin1String(", ");
+                schedule += check.name;
+            }
+        }
+        else
+        {
+            schedule = QObject::tr("always");
+        }
+
+        packItem->setText(1, kindName);
+        packItem->setText(2, pack.targetIds.isEmpty()
+                                ? QObject::tr("%1 | no targets").arg(schedule)
+                                : QObject::tr("%1 | %2 target(s)")
+                                      .arg(schedule)
+                                      .arg(pack.targetIds.size()));
         packItem->setData(0, Qt::UserRole, QVariant::fromValue<PackageRecord*>(&pack));
     }
 
@@ -146,14 +172,19 @@ void AIPackageEditor::onNodeSelected(QTreeWidgetItem* item, int column)
     mEditButton->setEnabled(true);
     mDeleteButton->setEnabled(true);
 
-    QString type = item->text(1);
+    // A package row is identified by its attached record, not by a column
+    // string, so the details column stays free to show semantics.
+    const QVariant packPtr = item->data(0, Qt::UserRole);
+    if (!packPtr.canConvert<PackageRecord*>())
+    {
+        return;
+    }
 
-    if (type == "PACKAGE") {
-        PackageRecord* pack = static_cast<PackageRecord*>(item->data(0, Qt::UserRole).value<PackageRecord*>());
-        if (pack) {
-            mSelectedPack = pack;
-            showPackageDetails(pack);
-        }
+    PackageRecord* pack = packPtr.value<PackageRecord*>();
+    if (pack)
+    {
+        mSelectedPack = pack;
+        showPackageDetails(pack);
     }
 }
 
@@ -162,10 +193,59 @@ void AIPackageEditor::showPackageDetails(const PackageRecord* pack)
     QString text;
     text += QString("<h2>%1</h2>").arg(pack->editorId.isEmpty() ? QString("Package_%1").arg(pack->formId, 8, 16, QChar('0')).toUpper() : pack->editorId);
     text += QString("<p><b>FormID:</b> 0x%1</p>").arg(pack->formId, 8, 16, QChar('0')).toUpper();
-    text += QString("<p><b>Package Type:</b> %1</p>").arg(pack->packageType);
-    text += QString("<p><b>Target Type:</b> %1</p>").arg(pack->targetType);
-    text += QString("<p><b>Flags:</b> 0x%1</p>").arg(pack->flags, 8, 16, QChar('0')).toUpper();
 
+    bool decoded = false;
+    const openck::PackageData data = openck::decodePackageData(*pack, &decoded);
+    if (decoded)
+    {
+        const openck::PackageKind kind = openck::packageKindFromU32(data.type);
+        text += QString("<p><b>Kind:</b> %1 (type %2)</p>")
+                    .arg(openck::packageKindName(kind))
+                    .arg(data.type);
+        text += QString("<p><b>Flags:</b> 0x%1 &nbsp;&nbsp;Perform all: %2</p>")
+                    .arg(data.flags, 8, 16, QChar('0'))
+                    .arg(data.doAll ? QStringLiteral("yes") : QStringLiteral("no"));
+
+        text += "<h3>Schedule</h3>";
+        const QVector<openck::ScheduleCheck> checks =
+            openck::scheduleChecks(data.schedule);
+        if (checks.isEmpty())
+        {
+            text += "<p>Runs at any time.</p>";
+        }
+        else
+        {
+            text += "<ul>";
+            for (const auto& check : checks)
+            {
+                text += QString("<li>%1</li>").arg(check.name);
+            }
+            text += "</ul>";
+        }
+
+        const QVector<openck::PackageIssue> issues =
+            openck::validatePackageData(*pack, data);
+        if (!issues.isEmpty())
+        {
+            text += "<h3>Validation</h3><ul>";
+            for (const auto& issue : issues)
+            {
+                const QString color = issue.severity == openck::PackageIssueSeverity::Error
+                                          ? QStringLiteral("#c62828")
+                                          : QStringLiteral("#f57f17");
+                text += QString("<li style='color:%1'>%2</li>").arg(color, issue.message);
+            }
+            text += "</ul>";
+        }
+    }
+    else
+    {
+        text += QString("<p><b>Package Type:</b> %1</p>").arg(pack->packageType);
+        text += "<p><i>No PKDT payload: the record stores no decodable "
+                "procedure data.</i></p>";
+    }
+
+    text += QString("<p><b>Target Type:</b> %1</p>").arg(pack->targetType);
     text += "<h3>Target IDs</h3>";
     if (pack->targetIds.isEmpty()) {
         text += "<p>(none)</p>";
@@ -265,22 +345,30 @@ void AIPackageEditor::onDeletePackage()
     QTreeWidgetItem* item = mTree->currentItem();
     if (!item) return;
 
-    QString type = item->text(1);
+    const QVariant packPtr = item->data(0, Qt::UserRole);
+    if (!packPtr.canConvert<PackageRecord*>())
+    {
+        return;
+    }
 
-    if (type == "PACKAGE") {
-        const PackageRecord* pack = static_cast<const PackageRecord*>(item->data(0, Qt::UserRole).value<const PackageRecord*>());
-        if (!pack) return;
+    const PackageRecord* pack = packPtr.value<PackageRecord*>();
+    if (!pack) return;
 
-        auto reply = QMessageBox::question(this, "Delete Package",
-            QString("Are you sure you want to delete package '%1'?\n\nThis action cannot be undone.")
-                .arg(pack->editorId),
-            QMessageBox::Yes | QMessageBox::No);
+    auto reply = QMessageBox::question(this, "Delete Package",
+        QString("Are you sure you want to delete package '%1'?\n\nThis action cannot be undone.")
+            .arg(pack->editorId),
+        QMessageBox::Yes | QMessageBox::No);
 
-        if (reply == QMessageBox::Yes) {
-            mData->removeRecord(CkId::Type_Pack_, pack->editorId);
-            LOG_INFO(QString("Deleted package '%1'").arg(pack->editorId));
-            refreshTree();
-        }
+    if (reply == QMessageBox::Yes)
+    {
+        QString packId = pack->editorId;
+        auto& coll = mData->getPackCollection();
+        bool removed = coll.removeRecordWithUndo(packId, mData->getUndoStack());
+        if (!removed)
+            mData->removeRecord(CkId::Type_Pack_, packId);
+        LOG_INFO(QString("Deleted package '%1'").arg(packId));
+        mSelectedPack = nullptr;
+        refreshTree();
     }
 }
 

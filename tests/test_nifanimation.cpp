@@ -14,6 +14,7 @@
 #include "../../libs/files/nif/nifparser.hpp"
 #include "../../libs/files/nif/nifblockfile.hpp"
 #include "model/tools/nifanimationstate.hpp"
+#include "animationeditor.hpp"
 
 class TestNifAnimation : public QObject
 {
@@ -37,6 +38,7 @@ private slots:
     void testRealArchiveKeyframeWriteBack();
     void testRealArchiveKeyframeCodecRoundTrip();
     void testUneditedSaveIsByteIdentical();
+    void testSyntheticNifEditorPersistence();
 
 private:
     static NifAnimation sampleAnimation();
@@ -1545,6 +1547,186 @@ void TestNifAnimation::testUneditedSaveIsByteIdentical()
     QVERIFY2(blockIdentical == patched,
              qPrintable(QStringLiteral("%1 of %2 unedited saves changed the block: %3")
                             .arg(patched - blockIdentical).arg(patched).arg(firstDiff)));
+}
+
+void TestNifAnimation::testSyntheticNifEditorPersistence()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString nifPath = dir.filePath(QStringLiteral("synthetic_persist.nif"));
+
+    // 1. Build synthetic NIF with an animated bone AND unrelated geometry blocks
+    auto root = std::make_unique<Nif::Node>();
+    root->name = QStringLiteral("Scene Root");
+
+    // Unrelated geometry shape on root
+    Nif::TriShape unrelatedShape;
+    unrelatedShape.name = QStringLiteral("UnrelatedGeometry");
+    unrelatedShape.vertices.append({10.0f, 20.0f, 30.0f});
+    unrelatedShape.vertices.append({40.0f, 50.0f, 60.0f});
+    unrelatedShape.vertices.append({70.0f, 80.0f, 90.0f});
+    unrelatedShape.uvs.append({0.1f, 0.2f});
+    unrelatedShape.uvs.append({0.3f, 0.4f});
+    unrelatedShape.uvs.append({0.5f, 0.6f});
+    unrelatedShape.colors.append({1.0f, 0.0f, 0.0f, 1.0f});
+    unrelatedShape.colors.append({0.0f, 1.0f, 0.0f, 1.0f});
+    unrelatedShape.colors.append({0.0f, 0.0f, 1.0f, 1.0f});
+    unrelatedShape.indices = {0, 1, 2};
+    unrelatedShape.texture = QStringLiteral("textures/props/unrelated.dds");
+    unrelatedShape.baseColor = {0.8f, 0.8f, 0.8f, 1.0f};
+    root->shapes.append(unrelatedShape);
+
+    // Unrelated child prop node
+    auto* propChild = new Nif::Node();
+    propChild->name = QStringLiteral("UnrelatedPropNode");
+    Nif::TriShape propShape;
+    propShape.name = QStringLiteral("PropGeom");
+    propShape.vertices.append({1.0f, 1.0f, 1.0f});
+    propShape.uvs.append({0.0f, 0.0f});
+    propShape.colors.append({1.0f, 1.0f, 1.0f, 1.0f});
+    propShape.indices = {0};
+    propChild->shapes.append(propShape);
+    root->children.append(propChild);
+
+    // Animated bone node
+    auto* animatedBone = new Nif::Node();
+    animatedBone->name = QStringLiteral("Bip01 Spine");
+
+    Nif::NiKeyframeController controller;
+    controller.targetNode = 5;
+    controller.clipName = QStringLiteral("Idle");
+
+    Nif::TransformKeyframe kf0;
+    kf0.time = 0.0f;
+    kf0.translation = {0.0f, 0.0f, 0.0f};
+    kf0.rotation = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+    kf0.scale = {1.0f, 1.0f, 1.0f};
+
+    Nif::TransformKeyframe kf1;
+    kf1.time = 1.0f;
+    kf1.translation = {10.0f, 0.0f, 0.0f};
+    kf1.rotation = {1.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+    kf1.scale = {1.0f, 1.0f, 1.0f};
+
+    controller.keyframes = {kf0, kf1};
+    animatedBone->animations.append(controller);
+    animatedBone->hasAnimation = true;
+    root->children.append(animatedBone);
+
+    // Save synthetic NIF to disk
+    Nif::NifParser initialWriter;
+    initialWriter.setRoot(root.release());
+    QVERIFY(initialWriter.save(nifPath));
+    QVERIFY(QFile::exists(nifPath));
+
+    // 2. Open via AnimationEditor and verify retained parser + model
+    {
+        AnimationEditor editor;
+        QVERIFY(editor.loadNif(nifPath));
+        QCOMPARE(editor.sourceNifPath(), nifPath);
+        QVERIFY(editor.sourceParser() != nullptr);
+        QVERIFY(editor.animation() != nullptr);
+
+        NifAnimation* anim = editor.animation();
+        QCOMPARE(anim->clips.size(), 1);
+        QCOMPARE(anim->clips[0].channels.size(), 1);
+
+        AnimChannel& channel = anim->clips[0].channels[0];
+        QCOMPARE(channel.boneName, QStringLiteral("Bip01 Spine"));
+        QCOMPARE(channel.keyframes.size(), 2);
+
+        // 3. Edit animation: Modify, Add, and Remove keyframes
+        // a) Modify t=0.0 keyframe translation
+        channel.keyframes[0].tx = 5.0f;
+        channel.keyframes[0].ty = 10.0f;
+        channel.keyframes[0].tz = 15.0f;
+
+        // b) Add a keyframe at t=0.5
+        AnimKeyframe kfMid;
+        kfMid.time = 0.5f;
+        kfMid.tx = 2.5f;
+        kfMid.ty = 5.0f;
+        kfMid.tz = 7.5f;
+        kfMid.sx = 1.0f;
+        kfMid.sy = 1.0f;
+        kfMid.sz = 1.0f;
+        channel.keyframes.insert(1, kfMid);
+
+        // c) Add a temporary keyframe at t=0.75 then remove it (proves add/remove operations)
+        AnimKeyframe kfTemp;
+        kfTemp.time = 0.75f;
+        kfTemp.tx = 99.0f;
+        channel.keyframes.insert(2, kfTemp);
+        QCOMPARE(channel.keyframes.size(), 4);
+        channel.keyframes.removeAt(2);
+        QCOMPARE(channel.keyframes.size(), 3);
+
+        // 4. Save NIF atomically via AnimationEditor
+        QVERIFY(editor.saveNif());
+    }
+
+    // 5. Reload independently from disk via NifParser and verify persistence
+    Nif::NifParser reloaded;
+    QVERIFY(reloaded.load(nifPath));
+
+    Nif::Node* reloadedRoot = reloaded.getRoot();
+    QVERIFY(reloadedRoot != nullptr);
+    QCOMPARE(reloadedRoot->name, QStringLiteral("Scene Root"));
+
+    // Verify preservation of unrelated blocks (geometry, shapes, materials, children)
+    QCOMPARE(reloadedRoot->shapes.size(), 1);
+    const Nif::TriShape& preservedShape = reloadedRoot->shapes.first();
+    QCOMPARE(preservedShape.name, QStringLiteral("UnrelatedGeometry"));
+    QCOMPARE(preservedShape.vertices.size(), 3);
+    QVERIFY(qAbs(preservedShape.vertices[0].x - 10.0f) < 0.0001f);
+    QVERIFY(qAbs(preservedShape.vertices[1].y - 50.0f) < 0.0001f);
+    QVERIFY(qAbs(preservedShape.vertices[2].z - 90.0f) < 0.0001f);
+    QCOMPARE(preservedShape.uvs.size(), 3);
+    QVERIFY(qAbs(preservedShape.uvs[0].u - 0.1f) < 0.0001f);
+    QCOMPARE(preservedShape.indices.size(), 3);
+    QCOMPARE(preservedShape.texture, QStringLiteral("textures/props/unrelated.dds"));
+
+    // Verify unrelated child node
+    QCOMPARE(reloadedRoot->children.size(), 2);
+    Nif::Node* childProp = reloadedRoot->children[0];
+    QCOMPARE(childProp->name, QStringLiteral("UnrelatedPropNode"));
+    QCOMPARE(childProp->shapes.size(), 1);
+    QCOMPARE(childProp->shapes.first().name, QStringLiteral("PropGeom"));
+
+    // Verify animated bone changed keyframes (count increased from 2 to 3, values updated)
+    Nif::Node* reloadedBone = reloadedRoot->children[1];
+    QCOMPARE(reloadedBone->name, QStringLiteral("Bip01 Spine"));
+    QVERIFY(reloadedBone->hasAnimation);
+    QCOMPARE(reloadedBone->animations.size(), 1);
+
+    const Nif::NiKeyframeController& ctrl = reloadedBone->animations.first();
+    QCOMPARE(ctrl.clipName, QStringLiteral("Idle"));
+    QCOMPARE(ctrl.keyframes.size(), 3);
+
+    // Verify modified keyframe 0
+    QVERIFY(qAbs(ctrl.keyframes[0].time - 0.0f) < 0.0001f);
+    QVERIFY(qAbs(ctrl.keyframes[0].translation.x - 5.0f) < 0.0001f);
+    QVERIFY(qAbs(ctrl.keyframes[0].translation.y - 10.0f) < 0.0001f);
+    QVERIFY(qAbs(ctrl.keyframes[0].translation.z - 15.0f) < 0.0001f);
+
+    // Verify added keyframe 1
+    QVERIFY(qAbs(ctrl.keyframes[1].time - 0.5f) < 0.0001f);
+    QVERIFY(qAbs(ctrl.keyframes[1].translation.x - 2.5f) < 0.0001f);
+    QVERIFY(qAbs(ctrl.keyframes[1].translation.y - 5.0f) < 0.0001f);
+    QVERIFY(qAbs(ctrl.keyframes[1].translation.z - 7.5f) < 0.0001f);
+
+    // Verify preserved keyframe 2
+    QVERIFY(qAbs(ctrl.keyframes[2].time - 1.0f) < 0.0001f);
+    QVERIFY(qAbs(ctrl.keyframes[2].translation.x - 10.0f) < 0.0001f);
+
+    // 6. Reload via fresh AnimationEditor instance to prove roundtrip
+    {
+        AnimationEditor editor2;
+        QVERIFY(editor2.loadNif(nifPath));
+        QVERIFY(editor2.sourceParser() != nullptr);
+        QCOMPARE(editor2.animation()->clips[0].channels[0].keyframes.size(), 3);
+        QVERIFY(qAbs(editor2.animation()->clips[0].channels[0].keyframes[1].tx - 2.5f) < 0.0001f);
+    }
 }
 
 QTEST_MAIN(TestNifAnimation)

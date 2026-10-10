@@ -1,5 +1,6 @@
 #include "assetvalidator.hpp"
 #include "assetresolver.hpp"
+#include <functional>
 #include "logger.hpp"
 
 #include <QFile>
@@ -45,6 +46,9 @@
 #include "../../../libs/files/esm/worldspacerecord.hpp"
 #include "../../../libs/files/esm/locationrecord.hpp"
 #include "../../../libs/files/esm/refrecord.hpp"
+#include "formcomponentsresolver.hpp"
+#include "../../../libs/components/formcomponents.hpp"
+#include "../../../libs/components/editorproperty.hpp"
 
 // ============================================================================
 // ValidationReport
@@ -463,6 +467,33 @@ AssetValidator::ValidationReport AssetValidator::validateMasters(const Data& dat
                 QString("Declared master is missing: %1").arg(master.name), "", master.name});
         }
     }
+    // Check FormID master index range:
+    // If declared masters exist, the high byte of a FormID must not exceed the declared master count.
+    const int masterCount = header.masters.size();
+    if (masterCount > 0)
+    {
+        for (const auto& typed : data.allCollectionsWithTypes())
+        {
+            if (!typed.collection) continue;
+            for (int i = 0; i < typed.collection->count(); ++i)
+            {
+                quint32 formId = typed.collection->getFormId(i);
+                if (formId == 0) continue;
+                quint32 modIndex = (formId >> 24) & 0xFF;
+                if (modIndex == 0xFE || modIndex == 0xFF) continue;
+                if (modIndex > static_cast<quint32>(masterCount))
+                {
+                    report.issues.append({ValidationIssue::Error, "Master",
+                        QString("Record '%1' (0x%2) references master index 0x%3, but only %4 master(s) are declared.")
+                            .arg(typed.collection->getEditorId(i))
+                            .arg(QString::number(formId, 16))
+                            .arg(QString::number(modIndex, 16))
+                            .arg(masterCount),
+                        typed.collection->getEditorId(i), ""});
+                }
+            }
+        }
+    }
 
     if (contentFiles.isEmpty())
         return report;
@@ -684,6 +715,255 @@ AssetValidator::ValidationReport AssetValidator::validateReferences(const Data& 
         for (quint32 id : record.scriptIds)
             check(id, record.editorId, QStringLiteral("Info"), QStringLiteral("Scripts"));
     }
+
+    const auto& facts = data.getFactCollection();
+    for (int i = 0; i < facts.size(); ++i)
+    {
+        const auto& record = facts.getRecord(i).get();
+        for (quint32 id : record.relations)
+            check(id, record.editorId, QStringLiteral("Faction"), QStringLiteral("Relation"));
+    }
+    const auto& locts = data.getLocationCollection();
+    for (int i = 0; i < locts.size(); ++i)
+    {
+        const auto& record = locts.getRecord(i).get();
+        if (record.parentId != 0)
+            check(record.parentId, record.editorId, QStringLiteral("Location"), QStringLiteral("Parent"));
+    }
+    const auto& enchs = data.getEnchCollection();
+    for (int i = 0; i < enchs.size(); ++i)
+    {
+        const auto& record = enchs.getRecord(i).get();
+        check(record.soulGem, record.editorId, QStringLiteral("Enchantment"), QStringLiteral("Soul Gem"));
+    }
+    const auto& packs = data.getPackCollection();
+    for (int i = 0; i < packs.size(); ++i)
+    {
+        const auto& record = packs.getRecord(i).get();
+        for (quint32 id : record.targetIds)
+            check(id, record.editorId, QStringLiteral("Package"), QStringLiteral("Target"));
+    }
+
+    // Generic inspection of FormID references exposed via FormComponents
+    for (const auto& typed : data.allCollectionsWithTypes())
+    {
+        if (!typed.collection) continue;
+        BaseCollection* coll = const_cast<Data&>(data).getCollectionByType(typed.type);
+        if (!coll) continue;
+        const QString typeName = CkId(typed.type).getTypeName();
+        for (int i = 0; i < coll->count(); ++i)
+        {
+            openck::FormComponents* comps = nullptr;
+            void* recPtr = nullptr;
+            if (resolveComponents(coll, i, comps, recPtr) && comps)
+            {
+                const QString editorId = coll->getEditorId(i);
+                for (const auto& comp : comps->all())
+                {
+                    if (!comp) continue;
+                    auto props = comp->createEditorProperties();
+                    for (const auto& prop : props)
+                    {
+                        if (auto* formProp = dynamic_cast<FormEditorProperty*>(prop.get()))
+                        {
+                            quint32 fid = formProp->value().toUInt();
+                            check(fid, editorId, typeName, QString("%1 -> %2").arg(comp->name(), formProp->name()));
+                        }
+                        else if (auto* arrayProp = dynamic_cast<FormArrayEditorProperty*>(prop.get()))
+                        {
+                            QVector<quint32> fids = arrayProp->value().value<QVector<quint32>>();
+                            for (quint32 fid : fids)
+                            {
+                                check(fid, editorId, typeName, QString("%1 -> %2").arg(comp->name(), arrayProp->name()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return report;
+}
+
+// ============================================================================
+// validateEditorIds
+// ============================================================================
+
+AssetValidator::ValidationReport AssetValidator::validateEditorIds(const Data& data)
+{
+    ValidationReport report;
+    struct ExistingId {
+        quint32 formId;
+        QString typeName;
+    };
+    QMap<QString, ExistingId> editorIdMap;
+
+    for (const auto& typed : data.allCollectionsWithTypes())
+    {
+        if (!typed.collection) continue;
+        const QString typeName = CkId(typed.type).getTypeName();
+        for (int i = 0; i < typed.collection->count(); ++i)
+        {
+            const QString editorId = typed.collection->getEditorId(i);
+            const quint32 formId = typed.collection->getFormId(i);
+
+            if (editorId.trimmed().isEmpty())
+                continue;
+
+            const QString lower = editorId.toLower();
+            auto it = editorIdMap.find(lower);
+            if (it != editorIdMap.end())
+            {
+                if (it.value().formId != formId)
+                {
+                    report.issues.append({ValidationIssue::Error, "EditorID",
+                        QString("Duplicate EditorID '%1' used by FormID 0x%2 (%3) and 0x%4 (%5)")
+                            .arg(editorId,
+                                 QString::number(formId, 16),
+                                 typeName,
+                                 QString::number(it.value().formId, 16),
+                                 it.value().typeName),
+                        editorId, ""});
+                }
+            }
+            else
+            {
+                editorIdMap.insert(lower, {formId, typeName});
+            }
+        }
+    }
+    return report;
+}
+
+// ============================================================================
+// validateRequiredComponents
+// ============================================================================
+
+AssetValidator::ValidationReport AssetValidator::validateRequiredComponents(const Data& data)
+{
+    ValidationReport report;
+
+    // Placed references must have a valid base object
+    const auto& refs = data.getRefrCollection();
+    for (int i = 0; i < refs.size(); ++i)
+    {
+        const auto& rec = refs.getRecord(i).get();
+        if (rec.baseId == 0)
+        {
+            report.issues.append({ValidationIssue::Error, "Component",
+                QString("Placed reference '%1' (0x%2) is missing required base object FormID.")
+                    .arg(rec.editorId, QString::number(rec.formId, 16)),
+                rec.editorId, ""});
+        }
+    }
+
+    // Actors (NPC) must have a race
+    const auto& npcs = data.getNpcCollection();
+    for (int i = 0; i < npcs.size(); ++i)
+    {
+        const auto& rec = npcs.getRecord(i).get();
+        if (rec.race == 0)
+        {
+            report.issues.append({ValidationIssue::Error, "Component",
+                QString("Actor '%1' (0x%2) is missing required race FormID.")
+                    .arg(rec.editorId, QString::number(rec.formId, 16)),
+                rec.editorId, ""});
+        }
+    }
+
+    // Statics must have a 3D model
+    const auto& stats = data.getStatCollection();
+    for (int i = 0; i < stats.size(); ++i)
+    {
+        const auto& rec = stats.getRecord(i).get();
+        bool hasModel = !rec.modelPath.isEmpty();
+        if (!hasModel)
+        {
+            if (const auto* comp = static_cast<const tescomponents::TESModel_Component*>(
+                    rec.components.findByName(QStringLiteral("TESModel"))))
+            {
+                hasModel = !comp->modelPath.isEmpty();
+            }
+        }
+        if (!hasModel)
+        {
+            report.issues.append({ValidationIssue::Warning, "Component",
+                QString("Static '%1' (0x%2) has no 3D model path specified.")
+                    .arg(rec.editorId, QString::number(rec.formId, 16)),
+                rec.editorId, ""});
+        }
+    }
+
+    // Quests must have non-empty EditorID
+    const auto& quests = data.getQuestCollection();
+    for (int i = 0; i < quests.size(); ++i)
+    {
+        const auto& rec = quests.getRecord(i).get();
+        if (rec.editorId.trimmed().isEmpty())
+        {
+            report.issues.append({ValidationIssue::Error, "Component",
+                QString("Quest (0x%1) is missing a required EditorID.")
+                    .arg(QString::number(rec.formId, 16)),
+                "", ""});
+        }
+    }
+
+    return report;
+}
+
+// ============================================================================
+// validateScripts
+// ============================================================================
+
+AssetValidator::ValidationReport AssetValidator::validateScripts(const Data& data)
+{
+    ValidationReport report;
+
+    QSet<quint32> knownScripts;
+    const auto& scriptColl = data.getScptCollection();
+    for (int i = 0; i < scriptColl.size(); ++i)
+    {
+        quint32 fid = scriptColl.getRecord(i).get().formId;
+        if (fid != 0) knownScripts.insert(fid);
+    }
+    for (const auto& typed : data.allCollectionsWithTypes())
+    {
+        if (!typed.collection) continue;
+        for (int i = 0; i < typed.collection->count(); ++i)
+        {
+            quint32 fid = typed.collection->getFormId(i);
+            if (fid != 0) knownScripts.insert(fid);
+        }
+    }
+
+    auto checkScript = [&](quint32 scriptId, const QString& editorId, const QString& typeName) {
+        if (scriptId != 0 && !knownScripts.contains(scriptId))
+        {
+            report.issues.append({ValidationIssue::Error, "Script",
+                QString("%1 '%2' references missing script FormID 0x%3")
+                    .arg(typeName, editorId, QString::number(scriptId, 16)),
+                editorId, ""});
+        }
+    };
+
+    const auto& quests = data.getQuestCollection();
+    for (int i = 0; i < quests.size(); ++i)
+    {
+        const auto& rec = quests.getRecord(i).get();
+        for (quint32 id : rec.scriptIds)
+            checkScript(id, rec.editorId, QStringLiteral("Quest"));
+    }
+
+    const auto& infos = data.getInfoCollection();
+    for (int i = 0; i < infos.size(); ++i)
+    {
+        const auto& rec = infos.getRecord(i).get();
+        for (quint32 id : rec.scriptIds)
+            checkScript(id, rec.editorId, QStringLiteral("Dialogue response"));
+    }
+
+
     return report;
 }
 
@@ -928,6 +1208,128 @@ AssetValidator::ValidationReport AssetValidator::validateRelationships(const Dat
             QStringLiteral("target topic"));
     }
 
+    // Cell grid coordinates. Interior cells must not carry a grid position
+    // (they are positioned by their own XCLC-less DATA), and exterior grid
+    // coordinates outside the engine's +-32 cell range make the cell
+    // unreachable by the renderer.
+    const auto& cellColl = data.getCellCollection();
+    for (int i = 0; i < cellColl.size(); ++i)
+    {
+        const auto& cell = cellColl.getRecord(i).get();
+        const bool interior = (cell.flags & 1) != 0;
+        if (interior)
+        {
+            if (cell.hasXclc)
+            {
+                report.issues.append({ValidationIssue::Warning, "Cell",
+                    QStringLiteral("Interior cell carries an exterior grid "
+                                   "position (XCLC); the position is ignored"),
+                    cell.editorId, ""});
+            }
+            continue;
+        }
+        // XCLC stores signed coordinates; check against the engine range.
+        const int gridX = static_cast<int>(static_cast<qint32>(cell.cellX));
+        const int gridY = static_cast<int>(static_cast<qint32>(cell.cellY));
+        if (!cell.hasXclc)
+        {
+            report.issues.append({ValidationIssue::Warning, "Cell",
+                QStringLiteral("Exterior cell has no grid position (XCLC)"),
+                cell.editorId, ""});
+        }
+        else if (gridX < -32 || gridX > 32 || gridY < -32 || gridY > 32)
+        {
+            report.issues.append({ValidationIssue::Error, "Cell",
+                QString("Exterior cell grid position (%1, %2) is outside the "
+                        "valid -32..32 range")
+                    .arg(gridX).arg(gridY),
+                cell.editorId, ""});
+        }
+    }
+
+    // Circular dialogue links: topic -> response -> another topic -> ...
+    // A cycle here deadlocks the conversation (the same exchange repeats
+    // forever) and the Creation Kit happily saves it. Depth-first search
+    // over the DIAL/INFO graph with three-colour marking finds the cycle
+    // rather than looping forever on the plugin's own logic.
+    {
+        QHash<quint32, QVector<quint32>> edges;   // DIAL formId -> INFO ids
+        const auto& dialColl = data.getDialCollection();
+        for (int i = 0; i < dialColl.size(); ++i)
+        {
+            const auto& dial = dialColl.getRecord(i).get();
+            for (quint32 infoId : dial.responseIds)
+                edges[dial.formId].append(infoId);
+        }
+        const auto& infoColl = data.getInfoCollection();
+        QHash<quint32, QVector<quint32>> infoToTopics; // INFO formId -> topic ids
+        for (int i = 0; i < infoColl.size(); ++i)
+        {
+            const auto& info = infoColl.getRecord(i).get();
+            if (info.targetId != 0)
+                infoToTopics[info.formId].append(info.targetId);
+        }
+
+        // topic ids reachable from a topic: through its responses' targets.
+        QHash<quint32, QVector<quint32>> topicEdges;
+        for (auto it = edges.constBegin(); it != edges.constEnd(); ++it)
+        {
+            QVector<quint32> targets;
+            for (quint32 infoId : it.value())
+            {
+                for (quint32 topicId : infoToTopics.value(infoId))
+                    targets.append(topicId);
+            }
+            topicEdges[it.key()] = targets;
+        }
+
+        enum Color { White, Grey, Black };
+        QHash<quint32, Color> color;
+        QVector<quint32> stack;
+        QVector<quint32> cyclePath;
+
+        std::function<bool(quint32)> visit = [&](quint32 topic) -> bool {
+            color[topic] = Grey;
+            stack.append(topic);
+            for (quint32 next : topicEdges.value(topic))
+            {
+                if (color.value(next, White) == Grey)
+                {
+                    // Closed a cycle: stack[next..] is the path.
+                    const int at = stack.indexOf(next);
+                    cyclePath = stack.mid(at);
+                    cyclePath.append(next);
+                    return true;
+                }
+                if (color.value(next, White) == White && visit(next))
+                    return true;
+            }
+            stack.removeLast();
+            color[topic] = Black;
+            return false;
+        };
+
+        for (auto it = topicEdges.constBegin(); it != topicEdges.constEnd(); ++it)
+        {
+            const quint32 topic = it.key();
+            if (color.value(topic, White) != White)
+                continue;
+            stack.clear();
+            if (visit(topic))
+            {
+                QString path;
+                for (quint32 id : cyclePath)
+                    path += QString("0x%1 -> ").arg(id, 0, 16);
+                path.chop(4);   // trailing arrow
+                report.issues.append({ValidationIssue::Error, "Dialogue",
+                    QStringLiteral("Circular dialogue link starting at %1")
+                        .arg(path),
+                    QString(), ""});
+                break;   // one cycle is enough to fail the save gate
+            }
+        }
+    }
+
     // A worldspace that claims a cell which does not exist will not render.
     const auto& worldspaces = data.getWorldspaceCollection();
     for (int i = 0; i < worldspaces.size(); ++i)
@@ -1021,21 +1423,31 @@ AssetValidator::ValidationReport AssetValidator::validateAll(const Data& data, c
 {
     QVector<ValidationReport> reports;
 
-    // 1. Validate masters and load order
+    // 1. Validate masters and load order (includes master index range)
     reports.append(validateMasters(data));
 
     // 2. Validate formID conflicts
     reports.append(validateFormIds(data));
 
+    // 3. Validate duplicate EditorIDs
+    reports.append(validateEditorIds(data));
+
+    // 4. Validate references (all collections + component properties)
     reports.append(validateReferences(data));
 
-    // 4. Validate orphaned records
+    // 5. Validate orphaned records
     reports.append(validateOrphanedRecords(data));
 
-    // 5. Structural relationships the per-field reference check cannot see
+    // 6. Structural relationships the per-field reference check cannot see
     reports.append(validateRelationships(data));
 
-    // 6. Asset paths that escape the data tree
+    // 7. Required engine components
+    reports.append(validateRequiredComponents(data));
+
+    // 8. Script references
+    reports.append(validateScripts(data));
+
+    // 9. Asset paths that escape the data tree
     reports.append(validateAssetPaths(data));
 
     // The remaining rules resolve assets on disk. Without a usable data

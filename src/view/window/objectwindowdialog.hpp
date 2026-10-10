@@ -2,6 +2,7 @@
 #define OBJECTWINDOWDIALOG_H
 
 #include <QDockWidget>
+#include <memory>
 #include <QTreeView>
 #include <QLineEdit>
 #include <QComboBox>
@@ -17,6 +18,8 @@ class Data;
 struct CellRecord;
 
 namespace openck { class FormComponents; }
+
+class BlenderBridge;
 
 class ObjectWindowDialog : public QDockWidget
 {
@@ -55,6 +58,8 @@ public slots:
     void copyRecord();
     void cutRecord();
     void pasteRecord();
+    void useInfoSelected();
+    void findInRenderWindowSelected();
     void onDoubleClick(const QModelIndex& index);
     void saveFilter();
     void loadFilter();
@@ -69,6 +74,7 @@ public:
     QTreeView* getTreeView() const { return mTreeView; }
     QLineEdit* getFilterEdit() const { return mFilterEdit; }
     CellRecord* getSelectedCell() const;
+    bool selectRecord(const QString& idOrFormId);
 
     struct RecordLookupResult {
         openck::FormComponents* components = nullptr;
@@ -86,6 +92,7 @@ public slots:
     void batchDuplicateIds();
     void batchReferenceActions();
     void openInBlender();
+    void openInBlenderLiveSync();
     void previewNif();
     void compareNifs();
 
@@ -117,6 +124,9 @@ private:
 
     static ClipboardRecord sClipboardData;
     static bool sHasClipboardData;
-};
 
+    // Phase 12.2: live-sync bridge shared by the context menu and the
+    // status dialog (one Blender session per editor).
+    std::unique_ptr<class BlenderBridge> mBlenderBridge;
+};
 #endif // OBJECTWINDOWDIALOG_H

@@ -2,15 +2,18 @@
 
 #include "../../model/world/data.hpp"
 #include "../../model/world/collection.hpp"
+#include "../../model/world/collection_impl.hpp"
 #include "../../model/world/idcollection.hpp"
+#include "../../model/world/idtable.hpp"
 #include "../../model/tools/editrecordcommand.hpp"
+#include "../../model/tools/addrecordcommand.hpp"
 #include "../../model/tools/undostack.hpp"
-#include "../../model/tools/columnvalidator.hpp"
+#include "../../model/tools/macrocommand.hpp"
+#include "../../model/tools/setinfoparentdialcommand.hpp"
 #include "logger.hpp"
 
 #include "../../../libs/files/esm/dialrecord.hpp"
 #include "../../../libs/files/esm/inforecord.hpp"
-#include "../../../libs/files/esm/esmwriter.hpp"
 #include "dialeditor.hpp"
 #include "infoeditor.hpp"
 
@@ -20,10 +23,13 @@
 #include <QHeaderView>
 #include <QDateTime>
 #include <QHash>
+#include <utility>
 
-DialogueTreeEditor::DialogueTreeEditor(Data* data, QWidget* parent)
+DialogueTreeEditor::DialogueTreeEditor(Data* data, std::function<bool()> saveCallback,
+                                       QWidget* parent)
     : QDialog(parent),
       mData(data),
+      mSaveCallback(std::move(saveCallback)),
       mTree(nullptr),
       mDetailEdit(nullptr),
       mSearchEdit(nullptr),
@@ -143,7 +149,8 @@ void DialogueTreeEditor::loadDialogueTree()
         dialItem->setText(1, "DIAL");
         dialItem->setText(2, QString("Topic: %1").arg(dial.topicName));
         dialItem->setData(0, Qt::UserRole, QVariant::fromValue<DialRecord*>(&dial));
-
+        dialItem->setData(0, Qt::UserRole + 1, dial.editorId);
+        dialItem->setData(0, Qt::UserRole + 2, dial.formId);
         // Load INFO children
         for (quint32 responseId : dial.responseIds) {
             const int infoIdx = infoByForm.value(responseId, -1);
@@ -155,6 +162,8 @@ void DialogueTreeEditor::loadDialogueTree()
             infoItem->setText(1, "INFO");
             infoItem->setText(2, QString("Response: %1...").arg(info.responseText.left(50)));
             infoItem->setData(0, Qt::UserRole, QVariant::fromValue<InfoRecord*>(&info));
+            infoItem->setData(0, Qt::UserRole + 1, info.editorId);
+            infoItem->setData(0, Qt::UserRole + 2, info.formId);
         }
     }
 
@@ -256,53 +265,147 @@ int DialogueTreeEditor::getTreeWidgetItemType(QTreeWidgetItem* item) const
 void DialogueTreeEditor::onAddDial()
 {
     bool ok = false;
-    QString editorId = QInputDialog::getText(this, "Add Dialogue",
-        "Enter Editor ID for new dialogue:", QLineEdit::Normal, "", &ok);
+    QString editorId = QInputDialog::getText(this, tr("Add Dialogue"),
+        tr("Enter Editor ID for new dialogue:"), QLineEdit::Normal, "", &ok);
 
-    if (!ok || editorId.isEmpty()) return;
+    if (!ok || editorId.trimmed().isEmpty()) return;
+    const QString finalId = editorId.trimmed();
+
+    auto& dialCollection = mData->getDialCollection();
+    if (dialCollection.searchId(finalId) >= 0)
+    {
+        QMessageBox::warning(this, tr("Add Dialogue"),
+            tr("A dialogue named '%1' already exists.").arg(finalId));
+        return;
+    }
 
     DialRecord newDial;
-    newDial.editorId = editorId.toLower();
-    newDial.formId = 0;
-    newDial.topicName = editorId;
-
-    if (mData->addDial(newDial)) {
-        LOG_INFO(QString("Added dialogue '%1'").arg(editorId));
-        mStatusLabel->setText(QString("Added dialogue '%1'").arg(editorId));
-        refreshTree();
-    } else {
-        QMessageBox::warning(this, "Error",
-            QString("Failed to add dialogue '%1'. ID may already exist.").arg(editorId));
+    newDial.blank();
+    newDial.initComponents();
+    newDial.editorId = finalId;
+    newDial.topicName = finalId;
+    try
+    {
+        newDial.formId = mData->createNewRecord(CkId::Type_Dial_, finalId);
     }
+    catch (const std::exception& e)
+    {
+        QMessageBox::warning(this, tr("Add Dialogue"),
+            tr("Could not allocate a FormID: %1").arg(QString::fromUtf8(e.what())));
+        return;
+    }
+
+    auto* table = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Dial_));
+    const int appendIdx = dialCollection.getAppendIndex(finalId, CkId::Type_Dial_);
+    Record<DialRecord> record(State_ModifiedOnly, nullptr, &newDial);
+
+    if (mData->getUndoStack() && table)
+    {
+        mData->getUndoStack()->push(new AddRecordCommand(
+            table, &dialCollection, appendIdx, record,
+            QStringLiteral("Add Dialogue: %1").arg(finalId)));
+    }
+    else
+    {
+        dialCollection.appendRecord(record, CkId::Type_Dial_);
+    }
+
+    LOG_INFO(QString("Added dialogue '%1'").arg(finalId));
+    mStatusLabel->setText(QString("Added dialogue '%1'").arg(finalId));
+    refreshTree();
 }
 
 void DialogueTreeEditor::onAddInfo()
 {
-    if (mSelectedDials.isEmpty()) {
-        QMessageBox::information(this, "No Selection",
-            "Please select a DIAL node first.");
+    QTreeWidgetItem* current = mTree->currentItem();
+    QTreeWidgetItem* dialItem = nullptr;
+    if (current)
+    {
+        if (getTreeWidgetItemType(current) == 0)
+            dialItem = current;
+        else if (getTreeWidgetItemType(current) == 1 && current->parent())
+            dialItem = current->parent();
+    }
+    if (!dialItem)
+    {
+        QMessageBox::information(this, tr("No Selection"),
+            tr("Please select a DIAL node or response first."));
+        return;
+    }
+
+    const QString parentDialId = dialItem->data(0, Qt::UserRole + 1).toString();
+    auto& dialCollection = mData->getDialCollection();
+    int dialIdx = dialCollection.searchId(parentDialId);
+    if (dialIdx < 0)
+    {
+        QMessageBox::warning(this, tr("Add Response"), tr("Selected dialogue could not be found."));
         return;
     }
 
     bool ok = false;
-    QString responseText = QInputDialog::getMultiLineText(this, "Add Response",
-        "Enter response text:", "", &ok);
+    QString responseText = QInputDialog::getMultiLineText(this, tr("Add Response"),
+        tr("Enter response text:"), "", &ok);
 
-    if (!ok || responseText.isEmpty()) return;
+    if (!ok || responseText.trimmed().isEmpty()) return;
+
+    QString infoId;
+    auto& infoCollection = mData->getInfoCollection();
+    for (int attempt = 0; attempt < 100; ++attempt)
+    {
+        infoId = QString("Response_%1_%2")
+            .arg(QDateTime::currentMSecsSinceEpoch() % 100000)
+            .arg(attempt);
+        if (infoCollection.searchId(infoId) < 0)
+            break;
+    }
 
     InfoRecord newInfo;
-    newInfo.editorId = QString("Response_%1").arg(QDateTime::currentMSecsSinceEpoch() % 100000);
-    newInfo.formId = 0;
-    newInfo.responseText = responseText;
-
-    if (mData->addInfo(newInfo)) {
-        LOG_INFO(QString("Added info '%1'").arg(newInfo.editorId));
-        mStatusLabel->setText(QString("Added response '%1'").arg(newInfo.editorId));
-        refreshTree();
-    } else {
-        QMessageBox::warning(this, "Error",
-            QString("Failed to add response."));
+    newInfo.blank();
+    newInfo.initComponents();
+    newInfo.editorId = infoId;
+    newInfo.responseText = responseText.trimmed();
+    try
+    {
+        newInfo.formId = mData->createNewRecord(CkId::Type_Info_, infoId);
     }
+    catch (const std::exception& e)
+    {
+        QMessageBox::warning(this, tr("Add Response"),
+            tr("Could not allocate a FormID: %1").arg(QString::fromUtf8(e.what())));
+        return;
+    }
+
+    DialRecord origDial = dialCollection.getRecord(dialIdx).get();
+    DialRecord updatedDial = origDial;
+    updatedDial.responseIds.append(newInfo.formId);
+
+    auto* infoTable = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Info_));
+    const int appendIdx = infoCollection.getAppendIndex(infoId, CkId::Type_Info_);
+    Record<InfoRecord> infoRec(State_ModifiedOnly, nullptr, &newInfo);
+
+    if (mData->getUndoStack() && infoTable)
+    {
+        auto* macro = new MacroCommand(QStringLiteral("Add Response to %1").arg(parentDialId));
+        macro->addCommand(new AddRecordCommand(
+            infoTable, &infoCollection, appendIdx, infoRec,
+            QStringLiteral("Add response %1").arg(infoId)));
+        macro->addCommand(new EditRecordCommand<DialRecord>(
+            &dialCollection, dialIdx, origDial, updatedDial,
+            QStringLiteral("Link response to %1").arg(parentDialId)));
+        macro->addCommand(new SetInfoParentDialCommand(
+            mData, newInfo.formId, 0, origDial.formId));
+        mData->getUndoStack()->push(macro);
+    }
+    else
+    {
+        infoCollection.appendRecord(infoRec, CkId::Type_Info_);
+        dialCollection.getRecord(dialIdx).get().responseIds.append(newInfo.formId);
+        dialCollection.getRecord(dialIdx).state = State_Modified;
+    }
+
+    LOG_INFO(QString("Added response '%1' to dialogue '%2'").arg(infoId, parentDialId));
+    mStatusLabel->setText(QString("Added response '%1'").arg(infoId));
+    refreshTree();
 }
 
 void DialogueTreeEditor::onEditNode()
@@ -369,27 +472,70 @@ void DialogueTreeEditor::onDeleteNode()
     int type = getTreeWidgetItemType(item);
 
     if (type == 0) { // Delete DIAL
-        QString dialId = getTreeWidgetItemText(item);
-        auto reply = QMessageBox::question(this, "Delete Dialogue",
-            QString("Are you sure you want to delete dialogue '%1'?\n\nThis action cannot be undone.")
-                .arg(dialId),
+        QString dialId = item->data(0, Qt::UserRole + 1).toString();
+        if (dialId.isEmpty()) dialId = getTreeWidgetItemText(item);
+
+        auto reply = QMessageBox::question(this, tr("Delete Dialogue"),
+            tr("Are you sure you want to delete dialogue '%1'?").arg(dialId),
             QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
-            mData->removeRecord(CkId::Type_Dial_, dialId);
+            auto& coll = mData->getDialCollection();
+            bool removed = coll.removeRecordWithUndo(dialId, mData->getUndoStack());
+            if (!removed)
+                mData->removeRecord(CkId::Type_Dial_, dialId);
             LOG_INFO(QString("Deleted dialogue '%1'").arg(dialId));
+            mSelectedDials.clear();
             refreshTree();
         }
     } else if (type == 1) { // Delete INFO
-        QString infoId = getTreeWidgetItemText(item);
-        auto reply = QMessageBox::question(this, "Delete Response",
-            QString("Are you sure you want to delete response '%1'?\n\nThis action cannot be undone.")
-                .arg(infoId),
+        QString infoId = item->data(0, Qt::UserRole + 1).toString();
+        quint32 infoFormId = item->data(0, Qt::UserRole + 2).toUInt();
+        if (infoId.isEmpty()) infoId = getTreeWidgetItemText(item);
+
+        auto reply = QMessageBox::question(this, tr("Delete Response"),
+            tr("Are you sure you want to delete response '%1'?").arg(infoId),
             QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
-            mData->removeRecord(CkId::Type_Info_, infoId);
+            QTreeWidgetItem* parentItem = item->parent();
+            QString parentDialId = parentItem ? parentItem->data(0, Qt::UserRole + 1).toString() : QString();
+
+            auto& dialCollection = mData->getDialCollection();
+            auto& infoCollection = mData->getInfoCollection();
+
+            int dialIdx = parentDialId.isEmpty() ? -1 : dialCollection.searchId(parentDialId);
+
+            if (mData->getUndoStack())
+            {
+                if (dialIdx >= 0)
+                {
+                    DialRecord origDial = dialCollection.getRecord(dialIdx).get();
+                    DialRecord updatedDial = origDial;
+                    updatedDial.responseIds.removeAll(infoFormId);
+                    if (origDial != updatedDial)
+                    {
+                        mData->getUndoStack()->push(new EditRecordCommand<DialRecord>(
+                            &dialCollection, dialIdx, origDial, updatedDial,
+                            QStringLiteral("Unlink response from %1").arg(parentDialId)));
+                    }
+                    mData->getUndoStack()->push(new SetInfoParentDialCommand(
+                        mData, infoFormId, origDial.formId, 0));
+                }
+                infoCollection.removeRecordWithUndo(infoId, mData->getUndoStack());
+            }
+            else
+            {
+                if (dialIdx >= 0)
+                {
+                    dialCollection.getRecord(dialIdx).get().responseIds.removeAll(infoFormId);
+                    dialCollection.getRecord(dialIdx).state = State_Modified;
+                }
+                infoCollection.removeRecordWithUndo(infoId, nullptr);
+            }
+
             LOG_INFO(QString("Deleted response '%1'").arg(infoId));
+            mSelectedInfos.clear();
             refreshTree();
         }
     }
@@ -397,86 +543,10 @@ void DialogueTreeEditor::onDeleteNode()
 
 void DialogueTreeEditor::onSave()
 {
-    QString filePath = QFileDialog::getSaveFileName(this, "Save Dialogue Tree", "",
-        "ESM Files (*.esm);;All Files (*)");
-
-    if (filePath.isEmpty()) return;
-
-    ESMWriter writer;
-    QFile saveFile(filePath);
-    if (!saveFile.open(QIODevice::WriteOnly))
+    if (!mSaveCallback || !mSaveCallback())
     {
-        QMessageBox::critical(this, "Error", QString("Cannot open file: %1").arg(filePath));
+        QMessageBox::warning(this, tr("Save"), tr("The active document could not be saved."));
         return;
     }
-
-    const auto& metaData = mData->getMetaData().getRecords();
-    for (const auto& record : metaData)
-    {
-        writer.addMaster(record.get().editorId);
-    }
-
-    writer.setVersion(1.0f);
-
-    int dialCount = 0;
-    int infoCount = 0;
-
-    const auto& dials = mData->getDialCollection().getRecords();
-    for (const auto& record : dials)
-    {
-        if (record.state == State_Modified || record.state == State_ModifiedOnly)
-        {
-            auto results = ColumnValidator::validateDial(record.get(), mData);
-            for (const auto& r : results) {
-                if (r.severity == ColumnValidator::Severity::Error) {
-                    QMessageBox::warning(this, tr("Validation Error"),
-                        QString("%1: %2").arg(r.field, r.message));
-                    saveFile.close();
-                    return;
-                }
-            }
-            RecHeader recHeader;
-            recHeader.id = record.get().formId;
-            writer.startRecord('DIAL', recHeader);
-            record.get().save(writer);
-            writer.endRecord();
-            dialCount++;
-        }
-    }
-
-    const auto& infos = mData->getInfoCollection().getRecords();
-    for (const auto& record : infos)
-    {
-        if (record.state == State_Modified || record.state == State_ModifiedOnly)
-        {
-            auto results = ColumnValidator::validateInfo(record.get(), mData);
-            for (const auto& r : results) {
-                if (r.severity == ColumnValidator::Severity::Error) {
-                    QMessageBox::warning(this, tr("Validation Error"),
-                        QString("%1: %2").arg(r.field, r.message));
-                    saveFile.close();
-                    return;
-                }
-            }
-            RecHeader recHeader;
-            recHeader.id = record.get().formId;
-            writer.startRecord('INFO', recHeader);
-            record.get().save(writer);
-            writer.endRecord();
-            infoCount++;
-        }
-    }
-
-    writer.close();
-    saveFile.close();
-
-    LOG_INFO(QString("Saved dialogue tree to %1").arg(filePath));
-    LOG_INFO(QString("DIAL records: %1, INFO records: %2").arg(dialCount).arg(infoCount));
-
-    QMessageBox::information(this, "Saved",
-        QString("Dialogue tree data exported.\n\n"
-                "DIAL records: %1\n"
-                "INFO records: %2")
-            .arg(dialCount)
-            .arg(infoCount));
+    mStatusLabel->setText(tr("Active document saved."));
 }

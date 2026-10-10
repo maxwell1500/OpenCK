@@ -1,6 +1,7 @@
 #include "nifparser.hpp"
 
 #include <QFile>
+#include <QSaveFile>
 #include <QDataStream>
 #include <QFileInfo>
 #include <QDir>
@@ -2374,12 +2375,6 @@ bool NifParser::save(const QString& fileName) const
 
     LOG_INFO(QString("Saving NIF file: %1").arg(fileName));
 
-    QFile file(fileName);
-    if (!file.open(QIODevice::WriteOnly)) {
-        LOG_ERROR(QString("Failed to open NIF file for writing: %1").arg(fileName));
-        return false;
-    }
-
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
     stream.setByteOrder(QDataStream::LittleEndian);
@@ -2410,29 +2405,31 @@ bool NifParser::save(const QString& fileName) const
 
         // Write full node tree
         writeNodeTree(stream, root);
+    } else {
+        // Simplified format (shapes only)
+        if (!writeHeader(stream, fileName)) {
+            return false;
+        }
 
-        file.write(data);
-        file.close();
-
-        LOG_INFO(QString("Saved NIF (full format): %1 shapes").arg(totalVertexCount()));
-        return true;
+        stream << static_cast<quint32>(root->shapes.size());
+        for (const auto& shape : root->shapes) {
+            writeShape(stream, shape);
+        }
     }
 
-    // Simplified format (shapes only)
-    if (!writeHeader(stream, fileName)) {
-        file.close();
+    QSaveFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly)) {
+        LOG_ERROR(QString("Failed to open NIF file for writing: %1").arg(fileName));
+        return false;
+    }
+    if (file.write(data) != data.size() || !file.commit()) {
+        LOG_ERROR(QString("Failed to atomically save NIF file: %1").arg(fileName));
         return false;
     }
 
-    stream << static_cast<quint32>(root->shapes.size());
-    for (const auto& shape : root->shapes) {
-        writeShape(stream, shape);
-    }
-
-    file.write(data);
-    file.close();
-
-    LOG_INFO(QString("Saved NIF: %1 shapes").arg(root->shapes.size()));
+    LOG_INFO(QString("Saved NIF (%1): %2 shapes")
+                 .arg(needsFullFormat ? QStringLiteral("full format") : QStringLiteral("simplified"))
+                 .arg(needsFullFormat ? totalVertexCount() : root->shapes.size()));
     return true;
 }
 

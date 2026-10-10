@@ -25,6 +25,8 @@ const QSet<QString>& keywords()
         // modifiers / literals
         "const", "static", "pure", "hidden", "implicit", "auto",
         "let", "set",
+        // script header (Papyrus/OBScript `ScriptName X extends Y`)
+        "scriptname", "extends", "property",
         "true", "false", "nil", "null"
     };
     return k;

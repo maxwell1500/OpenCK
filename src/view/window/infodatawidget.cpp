@@ -1,7 +1,9 @@
 #include "infodatawidget.hpp"
 #include "../libs/files/esm/inforecord.hpp"
 #include "../libs/files/audio/fuzparser.hpp"
+#include "../libs/files/audio/fuzwriter.hpp"
 #include "../libs/components/formcomponents.hpp"
+#include "../../model/tools/audiopipelinetools.hpp"
 #include "papyruscompiler.hpp"
 #include "voicepreview.hpp"
 #include "logger.hpp"
@@ -142,11 +144,20 @@ InfoDataWidget::InfoDataWidget(void* recordPtr, FormComponents* components,
     auto* browseBtn = new QPushButton(QStringLiteral("Browse..."), voiceGroup);
     auto* playBtn = new QPushButton(QStringLiteral("Play"), voiceGroup);
     auto* recordBtn = new QPushButton(QStringLiteral("Record"), voiceGroup);
+    auto* lipBtn = new QPushButton(QStringLiteral("Generate LipSync..."), voiceGroup);
+    auto* fuzBtn = new QPushButton(QStringLiteral("Package .fuz..."), voiceGroup);
+    lipBtn->setToolTip(QStringLiteral(
+        "Run the Creation Kit's LipGenerator on the WAV + response text "
+        "against a FaceFX actor to produce a lip animation"));
+    fuzBtn->setToolTip(QStringLiteral(
+        "Package the WAV plus its lip animation into a .fuz voice archive"));
     recordBtn->setToolTip(QStringLiteral("Voice recording is not yet implemented"));
     recordBtn->setEnabled(false);
     voiceRow->addWidget(browseBtn);
     voiceRow->addWidget(playBtn);
     voiceRow->addWidget(recordBtn);
+    voiceRow->addWidget(lipBtn);
+    voiceRow->addWidget(fuzBtn);
     voiceLayout->addLayout(voiceRow);
 
     mainLayout->addWidget(voiceGroup);
@@ -155,6 +166,8 @@ InfoDataWidget::InfoDataWidget(void* recordPtr, FormComponents* components,
         [rec](const QString& t) { rec->voiceFile = t; });
     connect(browseBtn, &QPushButton::clicked, this, &InfoDataWidget::onBrowseVoiceFile);
     connect(playBtn, &QPushButton::clicked, this, &InfoDataWidget::onPlayVoiceFile);
+    connect(lipBtn, &QPushButton::clicked, this, &InfoDataWidget::onGenerateLipSync);
+    connect(fuzBtn, &QPushButton::clicked, this, &InfoDataWidget::onPackageFuz);
 
     // --- Script fragment support ---
     auto* fragGroup = new QGroupBox(QStringLiteral("Script Fragment"), this);
@@ -380,6 +393,158 @@ void InfoDataWidget::onPlayVoiceFile()
     QMessageBox::information(this, QStringLiteral("Play Voice File"),
         QStringLiteral("Voice playback is not supported on this platform."));
 #endif
+}
+
+void InfoDataWidget::onGenerateLipSync()
+{
+    if (!m_voiceEdit) return;
+    const QString path = m_voiceEdit->text();
+    if (path.isEmpty() || !path.endsWith(QStringLiteral(".wav"),
+                                          Qt::CaseInsensitive)
+        || !QFile::exists(path))
+    {
+        QMessageBox::information(this, QStringLiteral("Generate LipSync"),
+            QStringLiteral("Set a local .wav voice file first (Browse...)."));
+        return;
+    }
+
+    auto* rec = static_cast<InfoRecord*>(m_recordPtr);
+    const QString text = rec ? rec->responseText : QString();
+    if (text.trimmed().isEmpty())
+    {
+        QMessageBox::information(this, QStringLiteral("Generate LipSync"),
+            QStringLiteral("The response text is empty; LipGenerator needs "
+                           "the spoken line to analyze the phonemes."));
+        return;
+    }
+
+    // Same Tools layout the SoundEditor assumes: the game install's Tools
+    // directory next to the editor executable.
+    const QString toolsDir = QDir::cleanPath(QCoreApplication::applicationDirPath())
+        + QStringLiteral("/Tools");
+    const QString lipGen = AudioPipelineTools::findTool(
+        AudioPipelineTools::Tool::LipGenerator, toolsDir);
+    if (lipGen.isEmpty())
+    {
+        QMessageBox::warning(this, QStringLiteral("Generate LipSync"),
+            QStringLiteral("LipGenerator was not found under %1.\nInstall the "
+                           "Creation Kit tools into that folder.").arg(toolsDir));
+        return;
+    }
+
+    const QFileInfo wavInfo(path);
+    const QString textPath = wavInfo.absolutePath()
+        + QStringLiteral("/%1.txt").arg(wavInfo.completeBaseName());
+    QFile textFile(textPath);
+    if (!textFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+        QMessageBox::critical(this, QStringLiteral("Generate LipSync"),
+            QStringLiteral("Could not write the spoken line to:\n%1").arg(textPath));
+        return;
+    }
+    QTextStream ts(&textFile);
+    ts << text;
+    textFile.close();
+
+    // Starfield ships its actors under Tools/FaceFX; the analysis file is
+    // what ffxc derives from the same actor.
+    const QString actor = AudioPipelineTools::facefxActorPath(
+        toolsDir, QStringLiteral("StarfieldHumanMale"));
+    const QString animPath = wavInfo.absolutePath()
+        + QStringLiteral("/%1.ffxanim").arg(wavInfo.completeBaseName());
+
+    const QStringList args = AudioPipelineTools::lipGeneratorArguments(
+        lipGen, path, textPath, actor, actor, animPath);
+
+    auto* process = new QProcess(this);
+    connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, process, animPath](int exitCode, QProcess::ExitStatus) {
+        process->deleteLater();
+        if (exitCode == 0)
+        {
+            QMessageBox::information(this, QStringLiteral("Generate LipSync"),
+                QStringLiteral("Lip animation written to:\n%1").arg(animPath));
+        }
+        else
+        {
+            QMessageBox::warning(this, QStringLiteral("Generate LipSync"),
+                QStringLiteral("LipGenerator failed (exit code %1).").arg(exitCode));
+        }
+    });
+    process->start(args.first(), args.mid(1));
+    LOG_INFO(QString("InfoDataWidget: LipGenerator running for %1").arg(path));
+}
+
+void InfoDataWidget::onPackageFuz()
+{
+    if (!m_voiceEdit) return;
+    const QString path = m_voiceEdit->text();
+    if (path.isEmpty() || !QFile::exists(path))
+    {
+        QMessageBox::information(this, QStringLiteral("Package .fuz"),
+            QStringLiteral("Set a local voice file first (Browse...)."));
+        return;
+    }
+
+    QFile wav(path);
+    if (!wav.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::warning(this, QStringLiteral("Package .fuz"),
+            QStringLiteral("Could not read voice file:\n%1").arg(path));
+        return;
+    }
+    const QByteArray audio = wav.readAll();
+    wav.close();
+
+    // The lip payload defaults to the animation LipGenerator produced next
+    // to the WAV; a hand-picked one is allowed too.
+    const QFileInfo wavInfo(path);
+    QString lipPath = wavInfo.absolutePath()
+        + QStringLiteral("/%1.ffxanim").arg(wavInfo.completeBaseName());
+    if (!QFile::exists(lipPath))
+    {
+        lipPath = QFileDialog::getOpenFileName(
+            this, QStringLiteral("Lip Animation"), wavInfo.absolutePath(),
+            QStringLiteral("Face Animations (*.ffxanim);;All Files (*)"));
+        if (lipPath.isEmpty())
+        {
+            return;
+        }
+    }
+    QFile lip(lipPath);
+    if (!lip.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::warning(this, QStringLiteral("Package .fuz"),
+            QStringLiteral("Could not read lip animation:\n%1").arg(lipPath));
+        return;
+    }
+    const QByteArray lipData = lip.readAll();
+    lip.close();
+
+    const QString fuzPath = wavInfo.absolutePath()
+        + QStringLiteral("/%1.fuz").arg(wavInfo.completeBaseName());
+    if (!FuzWriter::writeFile(fuzPath, lipData, audio))
+    {
+        QMessageBox::critical(this, QStringLiteral("Package .fuz"),
+            QStringLiteral("Could not write:\n%1").arg(fuzPath));
+        return;
+    }
+
+    // Read the archive back through the parser before declaring success, so
+    // the packaged file is known-good rather than merely written.
+    FuzParser verify;
+    if (!FuzParser::loadFile(fuzPath, verify) || verify.audioData != audio
+        || verify.lipData != lipData)
+    {
+        QMessageBox::warning(this, QStringLiteral("Package .fuz"),
+            QStringLiteral("The written archive failed verification:\n%1")
+                .arg(fuzPath));
+        return;
+    }
+
+    QMessageBox::information(this, QStringLiteral("Package .fuz"),
+        QStringLiteral("Voice archive written to:\n%1").arg(fuzPath));
+    LOG_INFO(QString("InfoDataWidget: packaged .fuz %1").arg(fuzPath));
 }
 
 void InfoDataWidget::onCompileFragment()

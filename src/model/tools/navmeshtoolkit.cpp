@@ -569,4 +569,144 @@ QVector<int> largestReachableComponent(int width, int height,
     return best;
 }
 
+QVector<int> largestReachableTriangleComponent(const QVector<MeshTriangle>& triangles,
+                                               const QVector<QVector<int>>& adjacency,
+                                               int* componentCount)
+{
+    if (triangles.isEmpty()) {
+        if (componentCount) *componentCount = 0;
+        return {};
+    }
+
+    QVector<quint8> visited(triangles.size(), 0);
+    QVector<int> best;
+    int count = 0;
+
+    for (int start = 0; start < triangles.size(); ++start) {
+        if (visited[start]) continue;
+        ++count;
+        QVector<int> component;
+        QVector<int> stack;
+        stack.append(start);
+        visited[start] = 1;
+
+        while (!stack.isEmpty()) {
+            int cur = stack.takeLast();
+            component.append(cur);
+            if (cur >= 0 && cur < adjacency.size()) {
+                for (int nb : adjacency[cur]) {
+                    if (nb >= 0 && nb < triangles.size() && !visited[nb]) {
+                        visited[nb] = 1;
+                        stack.append(nb);
+                    }
+                }
+            }
+        }
+
+        if (component.size() > best.size()) {
+            best = component;
+        }
+    }
+
+    if (componentCount) *componentCount = count;
+    return best;
+}
+
+bool extrudeEdge(QVector<QVector3D>& vertices, QVector<MeshTriangle>& triangles,
+                 int v0, int v1, const QVector3D& targetPos, int* outNewTriIdx)
+{
+    if (v0 < 0 || v0 >= vertices.size() || v1 < 0 || v1 >= vertices.size() || v0 == v1) {
+        return false;
+    }
+
+    int newV = vertices.size();
+    vertices.append(targetPos);
+
+    MeshTriangle newTri;
+    newTri.v0 = v0;
+    newTri.v1 = v1;
+    newTri.v2 = newV;
+    newTri.flags = 1; // walkable
+
+    int triIdx = triangles.size();
+    triangles.append(newTri);
+    if (outNewTriIdx) *outNewTriIdx = triIdx;
+    return true;
+}
+
+bool splitEdge(QVector<QVector3D>& vertices, QVector<MeshTriangle>& triangles,
+               int v0, int v1, const QVector3D& targetPos, int* outNewVertIdx)
+{
+    if (v0 < 0 || v0 >= vertices.size() || v1 < 0 || v1 >= vertices.size() || v0 == v1) {
+        return false;
+    }
+
+    int newV = vertices.size();
+    vertices.append(targetPos);
+    if (outNewVertIdx) *outNewVertIdx = newV;
+
+    // Find any triangle sharing edge (v0, v1) or (v1, v0)
+    QVector<MeshTriangle> addedTris;
+    for (int i = 0; i < triangles.size(); ++i) {
+        MeshTriangle& tri = triangles[i];
+        int opp = -1;
+        if ((tri.v0 == v0 && tri.v1 == v1) || (tri.v0 == v1 && tri.v1 == v0)) opp = tri.v2;
+        else if ((tri.v1 == v0 && tri.v2 == v1) || (tri.v1 == v1 && tri.v2 == v0)) opp = tri.v0;
+        else if ((tri.v2 == v0 && tri.v0 == v1) || (tri.v2 == v1 && tri.v0 == v0)) opp = tri.v1;
+
+        if (opp != -1) {
+            // Replace tri with (v0, newV, opp) and add (newV, v1, opp)
+            MeshTriangle t1 = tri;
+            MeshTriangle t2 = tri;
+            t1.v0 = v0; t1.v1 = newV; t1.v2 = opp;
+            t2.v0 = newV; t2.v1 = v1; t2.v2 = opp;
+            triangles[i] = t1;
+            addedTris.append(t2);
+        }
+    }
+    triangles.append(addedTris);
+    return true;
+}
+
+bool flipEdge(const QVector<QVector3D>& vertices, QVector<MeshTriangle>& triangles,
+              int v0, int v1)
+{
+    if (v0 < 0 || v0 >= vertices.size() || v1 < 0 || v1 >= vertices.size() || v0 == v1) {
+        return false;
+    }
+
+    int triAIdx = -1, triBIdx = -1;
+    int oppA = -1, oppB = -1;
+
+    for (int i = 0; i < triangles.size(); ++i) {
+        const MeshTriangle& tri = triangles[i];
+        int opp = -1;
+        if ((tri.v0 == v0 && tri.v1 == v1) || (tri.v0 == v1 && tri.v1 == v0)) opp = tri.v2;
+        else if ((tri.v1 == v0 && tri.v2 == v1) || (tri.v1 == v1 && tri.v2 == v0)) opp = tri.v0;
+        else if ((tri.v2 == v0 && tri.v0 == v1) || (tri.v2 == v1 && tri.v0 == v0)) opp = tri.v1;
+
+        if (opp != -1) {
+            if (triAIdx == -1) {
+                triAIdx = i;
+                oppA = opp;
+            } else if (triBIdx == -1) {
+                triBIdx = i;
+                oppB = opp;
+                break;
+            }
+        }
+    }
+
+    if (triAIdx == -1 || triBIdx == -1 || oppA == -1 || oppB == -1) {
+        return false; // Not a shared edge between two triangles
+    }
+
+    // Flip edge (v0, v1) to (oppA, oppB)
+    MeshTriangle& triA = triangles[triAIdx];
+    MeshTriangle& triB = triangles[triBIdx];
+    triA.v0 = oppA; triA.v1 = oppB; triA.v2 = v0;
+    triB.v0 = oppA; triB.v1 = oppB; triB.v2 = v1;
+    return true;
+}
+
 } // namespace NavMeshTools

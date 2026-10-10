@@ -38,6 +38,14 @@ public:
 
     bool setCompilerPath(const QString& path);
     static QString detectCompilerPath();
+    static QString detectStarfieldToolchain();
+
+    bool isStarfieldToolchain() const;
+    QString toolchainDirectory() const;
+    QString compilerDllPath() const;
+    QString assemblerPath() const;
+    QString projectSchemaPath() const;
+
     bool setScriptPath(const QString& path);
     bool setOutputPath(const QString& path);
     void addIncludePath(const QString& path);

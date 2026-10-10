@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
         QSettings conf(configPath, QSettings::IniFormat);
         conf.beginGroup("OpenCK");
         QString themeName = conf.value("Theme", "Dark").toString();
+        QString uiScale = conf.value("UiScale", "Desktop").toString();
         QString language = conf.value("Language", QString()).toString();
         conf.endGroup();
 
@@ -72,8 +73,10 @@ int main(int argc, char *argv[])
             }
         }
 
-        ThemeManager::Theme theme = ThemeManager::themeFromName(themeName);
+        const ThemeManager::Theme theme = ThemeManager::themeFromName(themeName);
         ThemeManager::applyTheme(a, theme);
+        // Density is applied after the palette so it can augment the sheet.
+        ThemeManager::applyScale(a, ThemeManager::scaleFromName(uiScale));
         
         Editor w(argc, argv);
         return a.exec();

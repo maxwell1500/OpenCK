@@ -48,6 +48,8 @@ private:
 
     QString mSelectedName;
     QString mSelectedValue;
+    QString mSelectedType;
+    quint32 mSelectedFormId = 0;
 };
 
 #endif // WEATHERLIGHTEDITOR_HPP

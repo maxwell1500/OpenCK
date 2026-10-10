@@ -242,17 +242,29 @@ quint32 xxhash32(const QByteArray& data)
     return hash;
 }
 
+// Writes the LZ4 length extension that follows a token nibble of 15. The
+// nibble carries the value only up to 15, so any length >= 15 is encoded as
+// length - 15 in one or more bytes: a byte of 0-254 terminates the run, and
+// 255 continues it. A length of exactly 15 therefore writes a single 0x00,
+// not nothing - skipping that byte desyncs the whole stream.
 void appendLz4Length(QByteArray& output, quint32 length)
 {
-    if (length <= 15)
+    if (length < 15)
+    {
         return;
+    }
     quint32 remaining = length - 15;
-    while (remaining >= 255) {
+    while (remaining >= 255)
+    {
         output.append(static_cast<char>(255));
         remaining -= 255;
     }
     output.append(static_cast<char>(remaining));
 }
+
+// LZ4 spec: the last 5 bytes of an input block are always literals; a match
+// must not end inside that region.
+constexpr int kLastLiterals = 5;
 
 QByteArray lz4CompressBlock(const QByteArray& source)
 {
@@ -277,9 +289,26 @@ QByteArray lz4CompressBlock(const QByteArray& source)
 
         const quint32 literalLength = static_cast<quint32>(position - anchor);
         int matchLength = 4;
+        // LZ4 requires the final 5 bytes of the input to always be literals
+        // (the spec's LASTLITERALS rule); a match must never end inside that
+        // region. The match is then clamped to the boundary rather than
+        // discarded: throwing a long match away would turn highly repetitive
+        // blocks into literals-only and lose all compression.
+        const int matchLimit =
+            size > kLastLiterals ? size - kLastLiterals : 0;
         while (position + matchLength < size
             && data[candidate + matchLength] == data[position + matchLength]) {
             ++matchLength;
+        }
+        if (position + matchLength > matchLimit)
+        {
+            matchLength = matchLimit - position;
+        }
+        // A clamped match below the 4-byte minimum is not a match at all.
+        if (matchLength < 4)
+        {
+            ++position;
+            continue;
         }
 
         const quint32 encodedMatchLength = static_cast<quint32>(matchLength - 4);
@@ -317,16 +346,16 @@ QByteArray lz4CompressFrame(const QByteArray& source)
     appendLe64(frame, static_cast<quint64>(source.size()));
 
     constexpr int blockSize = 1 << 16;
-    for (int offset = 0; offset < source.size(); offset += blockSize) {
+    for (int offset = 0; offset < source.size(); offset += blockSize)
+    {
         const QByteArray block = source.mid(offset, blockSize);
+        // Every block in an LZ4 frame is compressed LZ4 data - the format
+        // has no "stored block" variant, so an incompressible block becomes
+        // a literals-only sequence (slightly larger, still valid). Writing
+        // raw bytes here breaks every reader that decodes each block.
         const QByteArray compressed = lz4CompressBlock(block);
-        if (compressed.size() < block.size()) {
-            appendLe32(frame, static_cast<quint32>(compressed.size()));
-            frame.append(compressed);
-        } else {
-            appendLe32(frame, static_cast<quint32>(block.size()));
-            frame.append(block);
-        }
+        appendLe32(frame, static_cast<quint32>(compressed.size()));
+        frame.append(compressed);
     }
     appendLe32(frame, 0);
     return frame;
@@ -1224,10 +1253,9 @@ bool BsaArchive::create(const QStringList& filePaths, const QString& outputPath,
         }
         if (input.diskData.isEmpty())
             input.diskData = input.data;
-        if (input.data.isEmpty()) {
-            LOG_WARNING(QString("BSA create: skipping empty file: %1").arg(filePath));
-            continue;
-        }
+        // A zero-length payload is legal in a BSA (Oblivion ships one, e.g.
+        // menus\menu_labels.txt in Oblivion - Misc.bsa): keep the entry and
+        // store an empty record instead of dropping the file.
 
         // Split into folder + stem + extension for the hash.
         const int slash = input.fullPath.lastIndexOf('\\');

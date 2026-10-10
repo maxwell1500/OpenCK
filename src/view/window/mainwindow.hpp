@@ -62,6 +62,8 @@ public:
     void updatePluginInfo(const QString& pluginName);
     void showProgress(int value, int maximum);
     void hideProgress();
+    void dropViewportSelectionToGround();
+    void duplicateViewportSelection();
 
 signals:
     void actionData_triggered();
@@ -168,9 +170,13 @@ private slots:
                              const QString& actionName);
 
 private:
-void setupEditMenu();
-void setupTerrainMenu();
-void setupPrimitivePreviewMenu();
+    void setupCanonicalMenus();
+    void ensureViewport();
+    void bindViewportActions();
+    void populateDocksMenu();
+    void setupEditMenu();
+    void setupTerrainMenu();
+    void setupPrimitivePreviewMenu();
     void setupTestsMenu();
     void setupShortcuts();
     void applyShortcuts();
@@ -194,6 +200,7 @@ void setupPrimitivePreviewMenu();
     QList<QAction*> mDynamicActions;
     QList<QShortcut*> mDynamicShortcuts;
     NifViewportWidget* nifViewportWidget;
+    class GamepadNavigator* mGamepadNavigator = nullptr;
     ScriptEditorWidget* scriptEditorWidget;
     DialogueEditorWidget* dialogueEditorWidget;
     FormIdEditorWidget* formIdEditorWidget;
@@ -217,6 +224,8 @@ void setupPrimitivePreviewMenu();
     QString mBnetToken;
     bool mViewportRefsConnected = false;
     bool mCellViewConnected = false;
+    bool mDockTogglesAdded = false;
+    float mCameraSpeed = 1.0f;
 };
 
 #endif //MAINWINDOW_H

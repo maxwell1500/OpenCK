@@ -10,6 +10,7 @@
 
 #include <QCoreApplication>
 #include <QFile>
+#include <QSaveFile>
 #include <QSet>
 
 #include <cstdio>
@@ -92,9 +93,15 @@ void Document::save(const QString& savePath)
     LOG_INFO(QString("Saving document to: %1").arg(savePath));
     ESMWriter writer;
 
-    QFile saveFile{ savePath };
+    // QSaveFile stages the write and only replaces the destination on a
+    // successful commit, so an interrupted or failing save can never leave a
+    // half-written plugin behind.
+    QSaveFile saveFile{ savePath };
     if (!saveFile.open(QIODevice::WriteOnly))
+    {
+        LOG_ERROR(QString("Cannot open for writing: %1").arg(savePath));
         return;
+    }
 
     // Set the full TES4 header BEFORE the TES4 record is written, or the
     // MAST/version/author fields never reach the file.
@@ -128,6 +135,10 @@ void Document::save(const QString& savePath)
     {
         data->saveTes3Records(writer);
         writer.close();
+        if (!saveFile.commit())
+        {
+            LOG_ERROR(QString("Commit failed for %1").arg(savePath));
+        }
         return;
     }
 
@@ -575,6 +586,14 @@ void Document::save(const QString& savePath)
         orphanWriter(achrColl, static_cast<NAME>('ACHR'));
 
     writer.close();
+    // QSaveFile::commit() flushes, fsyncs and swaps the staging file into
+    // place. A failure here leaves the previous plugin untouched, which is
+    // the whole point of staging instead of writing in place.
+    if (!saveFile.commit())
+    {
+        LOG_ERROR(QString("Commit failed for %1: %2")
+                      .arg(savePath, saveFile.errorString()));
+    }
 }
 
 void Document::writeCellChildrenGroups(ESMWriter& writer, quint32 cellId,

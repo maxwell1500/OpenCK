@@ -49,9 +49,9 @@ void ESMWriter::setFileFlags(quint32 flags)
     mFileFlags = flags;
 }
 
-void ESMWriter::save(QFile& file)
+void ESMWriter::save(QIODevice& device)
 {
-    stream.setDevice(&file);
+    stream.setDevice(&device);
     stream.setByteOrder(QDataStream::LittleEndian);
     recordsWritten = 0;
     grupSizePosStack.clear();

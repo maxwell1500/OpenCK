@@ -26,6 +26,8 @@ private slots:
     void onConditionChanged();
     void onBrowseVoiceFile();
     void onPlayVoiceFile();
+    void onGenerateLipSync();
+    void onPackageFuz();
     void onCompileFragment();
 
 private:

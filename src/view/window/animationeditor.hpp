@@ -6,12 +6,15 @@
 #include <QLabel>
 #include <QDoubleSpinBox>
 #include <QUndoStack>
+#include <memory>
 
 #include "../../../model/tools/nodegraph.hpp"
 
 class NifAnimation;
 class TimelineWidget;
 class NodeGraphWidget;
+class NifBlockFile;
+namespace Nif { class NifParser; }
 
 class AnimationEditor : public QDialog
 {
@@ -19,6 +22,15 @@ class AnimationEditor : public QDialog
 
 public:
     explicit AnimationEditor(QWidget* parent = nullptr);
+    ~AnimationEditor() override;
+    bool loadNif(const QString& path);
+    bool saveNif();
+
+    const QString& sourceNifPath() const { return mSourceNifPath; }
+    NifAnimation* animation() const { return mAnimation; }
+    QUndoStack* undoStack() const { return mUndoStack; }
+    const NifBlockFile* sourceBlockFile() const { return mSourceBlockFile.get(); }
+    const Nif::NifParser* sourceParser() const { return mSourceParser.get(); }
 
 private slots:
     void browseNif();
@@ -56,6 +68,8 @@ private:
     QLabel* mDurationLabel;
     NifAnimation* mAnimation;
     QString mSourceNifPath;
+    std::unique_ptr<NifBlockFile> mSourceBlockFile;
+    std::unique_ptr<Nif::NifParser> mSourceParser;
     int mSelectedClip;
     bool mPlaying;
     int mCurrentFrame;

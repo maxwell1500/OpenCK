@@ -7,6 +7,7 @@
 
 #include <QString>
 #include <QVector>
+#include <QMap>
 
 class ESMReader;
 class ESMWriter;
@@ -39,7 +40,10 @@ struct MaterialRecord
     quint32 faction = 0;
     quint32 stage = 0;
     quint32 difficulty = 0;
-    
+    // PBR texture slot map (slot name -> texture path), persisted as an
+    // SLTS sub-record (OpenCK extension of the MATR record).
+    QMap<QString, QString> textureSlots;
+
     QVector<RawSubRecord> rawSubRecords;
     
     void load(ESMReader& esm, bool base);
@@ -56,6 +60,7 @@ inline bool operator==(const MaterialRecord& l, const MaterialRecord& r)
         && l.description == r.description
         && l.iconPath == r.iconPath && l.modelPath == r.modelPath
         && l.bnam == r.bnam && l.cnam == r.cnam && l.texturePath == r.texturePath
+        && l.textureSlots == r.textureSlots
         && l.materialType == r.materialType && l.value == r.value
         && l.weight == r.weight && l.health == r.health
         && l.magicka == r.magicka && l.stamina == r.stamina

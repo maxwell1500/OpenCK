@@ -13,6 +13,7 @@
 #include <QHBoxLayout>
 #include <QSplitter>
 
+#include <functional>
 class Data;
 
 class DialogueTreeEditor : public QDialog
@@ -20,7 +21,8 @@ class DialogueTreeEditor : public QDialog
     Q_OBJECT
 
 public:
-    explicit DialogueTreeEditor(Data* data, QWidget* parent = nullptr);
+    explicit DialogueTreeEditor(Data* data, std::function<bool()> saveCallback = {},
+                               QWidget* parent = nullptr);
     ~DialogueTreeEditor();
 
 private slots:
@@ -50,6 +52,7 @@ private:
     QPushButton* mDeleteButton;
     QPushButton* mSaveButton;
     QLabel* mStatusLabel;
+    std::function<bool()> mSaveCallback;
 
     QList<DialRecord*> mSelectedDials;
     QList<InfoRecord*> mSelectedInfos;

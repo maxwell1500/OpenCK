@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(openck
     VERSION 1.0.0
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 17)
@@ -47,6 +47,24 @@ if(WIN32 AND NOT DEFINED CMAKE_PREFIX_PATH)
 endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets 3DCore 3DRender 3DExtras 3DInput OpenGLWidgets Xml)
+
+# ─── Optional platform bridges ─────────────────────────────────────────────
+# Qt Multimedia gives WavePlayer a real audio device on Linux/macOS
+# (ALSA/PipeWire) instead of the Win32-only waveOut path; Qt Gamepad gives the
+# render window native gamepad input for Steam Deck thumbsticks. Both are
+# optional so a minimal Qt install (or a headless CI box) still builds; the
+# features self-report as unavailable instead of failing the configure.
+find_package(Qt6 QUIET OPTIONAL_COMPONENTS Multimedia Gamepad)
+if(Qt6Multimedia_FOUND)
+    message(STATUS "Qt6 Multimedia: found (native audio preview)")
+else()
+    message(STATUS "Qt6 Multimedia: not found (audio preview disabled)")
+endif()
+if(Qt6Gamepad_FOUND)
+    message(STATUS "Qt6 Gamepad: found (gamepad viewport navigation)")
+else()
+    message(STATUS "Qt6 Gamepad: not found (gamepad navigation disabled)")
+endif()
 
 # ─── Bundle Blender (GPL-2.0+, redistributable with attribution) ────────
 # Downloads the official Blender portable build for the current platform
@@ -98,7 +116,6 @@ libs/files/esm/npcrecord.cpp
     libs/files/esm/locationrecord.cpp
     libs/files/esm/landrecord.cpp
     libs/files/esm/refrecord.cpp
-    libs/files/esm/pluginvalidator.cpp
     libs/files/esm/nifrecord.cpp
     libs/files/esm/sounrecord.cpp
     libs/files/esm/wthrrecord.cpp
@@ -144,6 +161,9 @@ libs/files/esm/npcrecord.cpp
     libs/files/esm/obscriptlexer.cpp
     libs/files/esm/obscriptparser.cpp
     libs/files/esm/obscriptbinder.cpp
+    libs/files/esm/obscriptcatalog.cpp
+    libs/files/esm/obscriptresolver.cpp
+    libs/files/esm/packagesemantics.cpp
     libs/files/esm/obscriptcompiler.cpp
     libs/files/esm/obscripttypechecker.cpp
     libs/files/esm/gameformat.cpp
@@ -326,7 +346,6 @@ set(ESM_HEADERS
     libs/files/esm/cellreferencedata.hpp
     libs/files/esm/nifrecord.hpp
     libs/files/esm/sharedfiledevice.hpp
-    libs/files/esm/pluginvalidator.hpp
     libs/files/esm/sounrecord.hpp
     libs/files/esm/wthrrecord.hpp
     libs/files/esm/ltexrecord.hpp
@@ -589,6 +608,7 @@ set(FILES_SOURCES
     libs/files/ba2/bsaarchive.cpp
     libs/files/ba2/resourcearchiveconfig.cpp
     libs/files/ini/inifile.cpp
+    libs/files/ini/ckconfiginspector.cpp
     libs/files/nifanim/nifanimationexporter.cpp
     libs/files/nifanim/nifanimationimporter.cpp
     libs/files/nifanim/nifanimationwriter.cpp
@@ -602,6 +622,8 @@ set(FILES_SOURCES
     libs/files/audio/wavencoder.cpp
     libs/files/audio/oggencoder.cpp
     libs/files/audio/fuzparser.cpp
+    libs/files/audio/fuzwriter.cpp
+    libs/files/audio/lipfile.cpp
     libs/files/audio/xwmadecoder.cpp
     libs/files/facefx/facefxactor.cpp
     libs/files/facefx/facefxanim.cpp
@@ -633,6 +655,7 @@ set(FILES_HEADERS
     libs/files/audio/wavencoder.hpp
     libs/files/audio/oggencoder.hpp
     libs/files/audio/fuzparser.hpp
+    libs/files/audio/fuzwriter.hpp
     libs/files/audio/xwmadecoder.hpp
     libs/files/facefx/facefxactor.hpp
     libs/files/facefx/facefxanim.hpp
@@ -719,6 +742,8 @@ set(MODEL_SOURCES
     src/model/tools/houdinibridge.cpp
     src/model/tools/scenephasemodel.cpp
     src/model/tools/materialruletemplate.cpp
+    src/model/tools/materialcompiler.cpp
+    src/model/tools/assettoolcli.cpp
     src/model/tools/materialpropertygraph.cpp
     src/model/tools/meshlodconfig.cpp
     src/model/doc/document.cpp
@@ -772,6 +797,14 @@ set(MODEL_SOURCES
     src/model/tools/objectwindowfilter.cpp
     src/model/tools/assetdependencyscanner.cpp
     src/model/tools/modmanagerdetection.cpp
+    src/model/tools/moddeploymentresolver.cpp
+    src/model/tools/archiveconverter.cpp
+    src/model/tools/recordmigrator.cpp
+    src/model/tools/plugindiff.cpp
+    src/model/tools/blenderbridge.cpp
+    src/model/tools/plugintextexport.cpp
+    src/model/tools/recordmerger.cpp
+    src/model/tools/pluginmerger.cpp
     src/model/tools/pluginsignature.cpp
     src/model/tools/cloudsave.cpp
     src/model/tools/batchtools.cpp
@@ -854,6 +887,14 @@ set(MODEL_HEADERS
     src/model/tools/objectwindowfilter.hpp
     src/model/tools/assetdependencyscanner.hpp
     src/model/tools/modmanagerdetection.hpp
+    src/model/tools/moddeploymentresolver.hpp
+    src/model/tools/archiveconverter.hpp
+    src/model/tools/recordmigrator.hpp
+    src/model/tools/plugindiff.hpp
+    src/model/tools/blenderbridge.hpp
+    src/model/tools/plugintextexport.hpp
+    src/model/tools/recordmerger.hpp
+    src/model/tools/pluginmerger.hpp
     src/model/tools/pluginsignature.hpp
     src/model/tools/cloudsave.hpp
     src/model/tools/batchtools.hpp
@@ -878,6 +919,8 @@ set(MODEL_HEADERS
     src/model/tools/particlebundle.hpp
     src/model/tools/scenephasemodel.hpp
     src/model/tools/materialruletemplate.hpp
+    src/model/tools/materialcompiler.hpp
+    src/model/tools/assettoolcli.hpp
     src/model/tools/materialpropertygraph.hpp
     src/model/tools/meshlodconfig.hpp
     src/model/tools/lodgenerator.hpp
@@ -956,13 +999,16 @@ set(VIEW_SOURCES
     src/view/window/watereditor.cpp
     src/view/window/celltransitionseditor.cpp
     src/view/window/materialeditor.cpp
+    src/view/window/materialpreviewwidget.cpp
     src/view/window/materialeditor.hpp
+    src/view/window/materialpreviewwidget.hpp
     src/view/window/papyrusdebugger.cpp
     src/view/window/papyrusdebugger.hpp
     src/view/window/mainwindow.cpp
     src/view/window/inspectorwidget.cpp
     src/view/window/inspectorwidget.hpp
     src/view/window/objectwindowdialog.cpp
+    src/view/window/useinfodialog.cpp
     src/view/window/weaponeditor.cpp
     src/view/window/armor_editor.cpp
     src/view/window/spell_editor.cpp
@@ -1034,6 +1080,7 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/scenetimelinewidget.cpp
     src/view/window/nodegraphwidget.cpp
     src/view/window/waveplayer.cpp
+    src/view/window/gamepadnavigator.cpp
     src/view/window/animationeditor.cpp
     src/view/window/timeline.cpp
     src/view/window/particleeffectseffecteditor.cpp
@@ -1077,6 +1124,10 @@ src/view/window/scriptmanagerdialog.cpp
     src/view/window/infoeditor.cpp
     src/view/window/bashedpatchdialog.cpp
     src/view/window/modmanagerdialog.cpp
+    src/view/window/migrationdialog.cpp
+    src/view/window/recorddiffdialog.cpp
+    src/view/window/livesyncdialog.cpp
+    src/view/window/pluginmergedialog.cpp
     src/view/window/validationreportdialog.cpp
     src/view/window/nifpreviewdialog.cpp
     src/view/window/nifcomparisondialog.cpp
@@ -1209,6 +1260,10 @@ set(VIEW_HEADERS
     src/view/window/bashedpatchdialog.hpp
     src/view/window/cellreferenceeditor.hpp
     src/view/window/modmanagerdialog.hpp
+    src/view/window/migrationdialog.hpp
+    src/view/window/recorddiffdialog.hpp
+    src/view/window/livesyncdialog.hpp
+    src/view/window/pluginmergedialog.hpp
     src/view/window/validationreportdialog.hpp
     src/view/window/nifpreviewdialog.hpp
     src/view/window/nifcomparisondialog.hpp
@@ -1239,6 +1294,18 @@ target_link_libraries(openck_view PUBLIC
     Qt6::OpenGLWidgets
     ads::qtadvanceddocking-qt6
 )
+
+# Optional platform bridges (Qt 6 Multimedia / Gamepad). Defining the macros
+# keeps the guarded implementations in src/view/window/waveplayer.* and
+# src/view/window/gamepadnavigator.* compiling in exactly one place.
+if(Qt6Multimedia_FOUND)
+    target_link_libraries(openck_view PUBLIC Qt6::Multimedia)
+    target_compile_definitions(openck_view PUBLIC OPENCK_WITH_QT_MULTIMEDIA=1)
+endif()
+if(Qt6Gamepad_FOUND)
+    target_link_libraries(openck_view PUBLIC Qt6::Gamepad)
+    target_compile_definitions(openck_view PUBLIC OPENCK_WITH_QT_GAMEPAD=1)
+endif()
 
 if(WIN32)
     target_compile_definitions(openck_view PRIVATE NOMINMAX)
@@ -1338,6 +1405,8 @@ add_custom_command(
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/blender/blender_operations.py $<TARGET_FILE_DIR:openck>/scripts/blender/
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/blender/icon_generator.py $<TARGET_FILE_DIR:openck>/scripts/blender/
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/blender/openck_livesync.py $<TARGET_FILE_DIR:openck>/scripts/blender/
 )
 
 # Deploy Qt6 runtime DLLs to output directory
@@ -1372,6 +1441,14 @@ if(WIN32)
             "$<TARGET_FILE_DIR:openck>/"
         COMMENT "Copying qtadvanceddocking-qt6.dll next to openck.exe"
     )
+    if(EXISTS "${QT6_INSTALL_PREFIX}/bin/opengl32sw.dll")
+        add_custom_command(TARGET openck POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${QT6_INSTALL_PREFIX}/bin/opengl32sw.dll"
+                "$<TARGET_FILE_DIR:openck>/"
+            COMMENT "Copying opengl32sw.dll next to openck.exe"
+        )
+    endif()
 endif()
 
 # Install targets for `cmake --install`
@@ -1385,6 +1462,20 @@ install(FILES data/editor.ini
 install(DIRECTORY scripts/blender
     DESTINATION bin/scripts
 )
+
+# Linux desktop integration: a .desktop entry plus the app icon so a native
+# build (Ubuntu/Arch/Fedora, including a Steam Deck desktop mode) shows up in
+# the launcher with the right name, icon and plugin MIME type. Wayland and X11
+# both honour these; Qt6 needs no per-backend handling here.
+if(UNIX AND NOT APPLE)
+    install(FILES data/linux/openck.desktop
+        DESTINATION share/applications
+    )
+    install(FILES data/icons/open_48.png
+        DESTINATION share/icons/hicolor/48x48/apps
+        RENAME openck.png
+    )
+endif()
 
 # Install Qt6 runtime DLLs alongside the executable (Windows only).
 # windeployqt copies these to the build dir but `cmake --install` doesn't

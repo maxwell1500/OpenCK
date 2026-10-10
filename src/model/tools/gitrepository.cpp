@@ -92,6 +92,51 @@ GitRepository::Result GitRepository::diffStat(const QString& dir)
     return runProcess(dir, { QStringLiteral("diff"), QStringLiteral("--stat") });
 }
 
+QStringList GitRepository::branches(const QString& dir)
+{
+    const Result r = runProcess(dir, { QStringLiteral("for-each-ref"),
+        QStringLiteral("--format=%(refname:short)"),
+        QStringLiteral("refs/heads") });
+    QStringList out;
+    if (r.ok)
+    {
+        const QStringList lines =
+            r.stdoutText.split(QChar('\n'), Qt::SkipEmptyParts);
+        for (const QString& line : lines)
+        {
+            const QString name = line.trimmed();
+            if (!name.isEmpty() && !out.contains(name))
+                out.append(name);
+        }
+    }
+    // The current branch may be unborn (no commits yet), in which case it is
+    // not a ref; currentBranch() reports the name from HEAD instead.
+    const QString current = currentBranch(dir);
+    if (!current.isEmpty() && !out.contains(current))
+        out.prepend(current);
+    return out;
+}
+
+GitRepository::Result GitRepository::checkout(const QString& dir, const QString& branch)
+{
+    return runProcess(dir, { QStringLiteral("checkout"), branch });
+}
+
+GitRepository::Result GitRepository::fetch(const QString& dir)
+{
+    return runProcess(dir, { QStringLiteral("fetch") });
+}
+
+GitRepository::Result GitRepository::pull(const QString& dir)
+{
+    return runProcess(dir, { QStringLiteral("pull") });
+}
+
+GitRepository::Result GitRepository::push(const QString& dir)
+{
+    return runProcess(dir, { QStringLiteral("push") });
+}
+
 QString GitRepository::currentBranch(const QString& dir)
 {
     const Result r = runProcess(dir, { QStringLiteral("rev-parse"),

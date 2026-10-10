@@ -16,8 +16,9 @@ private slots:
     void testParseInvalid();
     void testLoadFile();
     void testParseAttractorsTurbulenceFlipBook();
+    void testStarfieldTypedPofx();
+    void testRealStarfieldPofxIfPresent();
 };
-
 void TestParticleBundle::initTestCase()
 {
     OpenCK::Logging::Logger::instance().setMinLevel(OpenCK::Logging::LogLevel::Debug);
@@ -142,6 +143,84 @@ void TestParticleBundle::testParseAttractorsTurbulenceFlipBook()
     QCOMPARE(plainBundle.nodes[0].flipBook.columns, 1);
     QCOMPARE(plainBundle.nodes[0].flipBook.rows, 1);
     QVERIFY(!plainBundle.nodes[0].flipBook.loop);
+}
+
+void TestParticleBundle::testStarfieldTypedPofx()
+{
+    const QByteArray json = R"({
+        "Data": {
+            "Active": "true",
+            "Bundles": {
+                "Data": [
+                    {
+                        "Data": {
+                            "Active": "true",
+                            "DisplayName": "Synthetic Force"
+                        },
+                        "Type": "Particles::BundleInfo"
+                    }
+                ]
+            },
+            "Definition": {
+                "Data": {
+                    "Gravity": {
+                        "Data": { "x": "0", "y": "0", "z": "-9.8" },
+                        "Type": "XMFLOAT3"
+                    },
+                    "Material": {
+                        "Data": { "Name": "Data/Materials/Effects/Synthetic.mat" }
+                    },
+                    "ParticleType": "Ribbon",
+                    "Stacks": {
+                        "Data": {
+                            "SimulationDefinitionA": {
+                                "Data": [
+                                    {
+                                        "Data": {
+                                            "Data": {
+                                                "DisplayName": "Apply Drag"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    })";
+
+    const ParticleBundle bundle = ParticleBundle::parse(json);
+    QCOMPARE(bundle.name, QStringLiteral("Synthetic Force"));
+    QCOMPARE(bundle.nodes.size(), 1);
+    const auto& node = bundle.nodes[0];
+    QCOMPARE(node.name, QStringLiteral("Synthetic Force"));
+    QVERIFY(qFuzzyCompare(node.gravity, 9.8f));
+    QCOMPARE(node.texture, QStringLiteral("Data/Materials/Effects/Synthetic.mat"));
+    QVERIFY(node.ribbon);
+    QVERIFY(qFuzzyCompare(node.drag, 1.0f));
+}
+
+void TestParticleBundle::testRealStarfieldPofxIfPresent()
+{
+    const QString gravityPath = QStringLiteral("C:/XboxGames/Starfield/Content/Data/EditorFiles/Bundles/Gravity.pofx");
+    if (!QFile::exists(gravityPath)) {
+        QSKIP("Starfield Gravity.pofx not found on machine");
+    }
+
+    ParticleBundle gravityBundle;
+    QVERIFY(ParticleBundle::loadFile(gravityPath, gravityBundle));
+    QCOMPARE(gravityBundle.nodes.size(), 1);
+    QVERIFY(gravityBundle.nodes[0].gravity > 0.0f);
+
+    const QString attractorPath = QStringLiteral("C:/XboxGames/Starfield/Content/Data/EditorFiles/Bundles/Point Attractor.pofx");
+    if (QFile::exists(attractorPath)) {
+        ParticleBundle attrBundle;
+        QVERIFY(ParticleBundle::loadFile(attractorPath, attrBundle));
+        QCOMPARE(attrBundle.nodes.size(), 1);
+        QVERIFY(!attrBundle.nodes[0].attractors.isEmpty());
+    }
 }
 
 QTEST_MAIN(TestParticleBundle)

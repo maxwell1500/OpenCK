@@ -35,7 +35,9 @@ public:
     static ValidationReport validateFormIds(const Data& data);
     static ValidationReport validateOrphanedRecords(const Data& data);
     static ValidationReport validateReferences(const Data& data);
-
+    static ValidationReport validateEditorIds(const Data& data);
+    static ValidationReport validateRequiredComponents(const Data& data);
+    static ValidationReport validateScripts(const Data& data);
     /// Structural relationships the per-field reference check cannot see: a
     /// placed reference whose parent cell or base object is missing, a cell
     /// whose owner does not exist, dialogue and quest links that point at

@@ -154,6 +154,25 @@ QVector<int> largestReachableComponent(int width, int height,
                                        const QVector<bool>& walkable,
                                        int* componentCount = nullptr);
 
+// Reachability over explicit triangle mesh. Returns the indices of the largest
+// connected component of triangles. If componentCount is non-null, receives total components.
+QVector<int> largestReachableTriangleComponent(const QVector<MeshTriangle>& triangles,
+                                               const QVector<QVector<int>>& adjacency,
+                                               int* componentCount = nullptr);
+
+// Topology edit operations:
+// Edge extrusion: Given edge (v0, v1), create new vertex at targetPos and return new triangle (v0, v1, newV)
+bool extrudeEdge(QVector<QVector3D>& vertices, QVector<MeshTriangle>& triangles,
+                 int v0, int v1, const QVector3D& targetPos, int* outNewTriIdx = nullptr);
+
+// Edge split: Insert new vertex at targetPos along edge (v0, v1), splitting any incident triangles
+bool splitEdge(QVector<QVector3D>& vertices, QVector<MeshTriangle>& triangles,
+               int v0, int v1, const QVector3D& targetPos, int* outNewVertIdx = nullptr);
+
+// Edge flip: Given edge (v0, v1) shared by triA and triB, flips shared edge to connect opposite vertices
+bool flipEdge(const QVector<QVector3D>& vertices, QVector<MeshTriangle>& triangles,
+              int v0, int v1);
+
 } // namespace NavMeshTools
 
 #endif // NAVMESHTOOLKIT_HPP

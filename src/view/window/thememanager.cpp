@@ -4,9 +4,12 @@
 
 #include <QSettings>
 #include <QCoreApplication>
+#include <QApplication>
 #include <QPalette>
+#include <QFont>
 
 ThemeManager::Theme ThemeManager::sCurrentTheme = Theme::Dark;
+ThemeManager::Scale ThemeManager::sCurrentScale = Scale::Desktop;
 
 ThemeManager::Theme ThemeManager::currentTheme()
 {
@@ -47,6 +50,7 @@ void ThemeManager::applyTheme(QApplication& app, Theme theme)
 void ThemeManager::setTheme(QApplication& app, Theme theme)
 {
     applyTheme(app, theme);
+    reapply(app);
 
     QString configPath = FilePaths::configFilePath();
     QSettings conf(configPath, QSettings::IniFormat);
@@ -195,4 +199,122 @@ void ThemeManager::applyDefaultTheme(QApplication& app)
     sCurrentTheme = Theme::System;
     LOG_INFO("Applying default theme");
     app.setStyleSheet("");
+}
+
+// ─── Density presets ──────────────────────────────────────────────────────
+//
+// Scale is a stylesheet *addition*, never a replacement: applyTheme() installs
+// the colour sheet and applyScale() appends the hit-target rules that the
+// current scale calls for. reapply() re-runs the palette and then re-appends,
+// so a theme switch never loses the density choice.
+
+ThemeManager::Scale ThemeManager::currentScale()
+{
+    return sCurrentScale;
+}
+
+QString ThemeManager::scaleName(Scale scale)
+{
+    switch (scale) {
+    case Scale::Desktop: return "Desktop";
+    case Scale::Touch:   return "Touch";
+    case Scale::Compact: return "Compact";
+    }
+    return "Desktop";
+}
+
+ThemeManager::Scale ThemeManager::scaleFromName(const QString& name)
+{
+    if (name == "Touch")   return Scale::Touch;
+    if (name == "Compact") return Scale::Compact;
+    return Scale::Desktop;
+}
+
+void ThemeManager::applyScale(QApplication& app, Scale scale)
+{
+    sCurrentScale = scale;
+
+    QFont f = app.font();
+    if (f.pointSize() <= 0)
+        f.setPointSize(9);
+    switch (scale)
+    {
+    case Scale::Touch:
+        // A 1280x800 Steam Deck screen is ~7" across; a mouse-sized hit
+        // target is a miss, so enlarge text and controls together.
+        f.setPointSize(qRound(f.pointSize() * 1.5));
+        break;
+    case Scale::Compact:
+        f.setPointSize(qMax(7, qRound(f.pointSize() * 0.9)));
+        break;
+    case Scale::Desktop:
+    default:
+        break;
+    }
+    app.setFont(f);
+
+    reapply(app);
+    LOG_INFO(QString("UI scale set to: %1").arg(scaleName(scale)));
+}
+
+void ThemeManager::setScale(QApplication& app, Scale scale)
+{
+    applyScale(app, scale);
+
+    QString configPath = FilePaths::configFilePath();
+    QSettings conf(configPath, QSettings::IniFormat);
+    conf.beginGroup("OpenCK");
+    conf.setValue("UiScale", scaleName(scale));
+    conf.endGroup();
+    conf.sync();
+}
+
+void ThemeManager::reapply(QApplication& app)
+{
+    // Rebuild the sheet: palette first, then this scale's additions.
+    switch (sCurrentTheme)
+    {
+    case Theme::Dark:
+        applyDarkTheme(app);
+        break;
+    case Theme::Light:
+    case Theme::System:
+        applyLightTheme(app);
+        break;
+    }
+
+    if (sCurrentScale != Scale::Desktop)
+    {
+        // The sizeable block: every widget class that carries its own padding
+        // gets bigger padding, taller rows and a fatter button. Keep this in
+        // one place so the presets stay comparable.
+        const QByteArray touchSheet = R"(
+            QPushButton, QToolButton {
+                min-height: 34px;
+                padding: 8px 16px;
+                font-size: 15px;
+            }
+            QMenuBar { padding: 4px; }
+            QMenuBar::item { padding: 8px 12px; }
+            QMenu::item { padding: 10px 28px 10px 20px; min-height: 30px; }
+            QTabBar::tab { padding: 10px 18px; min-width: 90px; }
+            QTreeView, QTreeWidget, QTableView, QTableWidget { font-size: 15px; }
+            QTreeView::item, QTreeWidget::item { min-height: 30px; }
+            QTableView, QTableWidget { gridline-color: #666; }
+            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { min-height: 30px; padding: 4px; font-size: 15px; }
+            QScrollBar:vertical { width: 24px; }
+            QScrollBar:horizontal { height: 24px; }
+            QStatusBar { min-height: 28px; }
+        )";
+        const QByteArray compactSheet = R"(
+            QPushButton, QToolButton { min-height: 20px; padding: 2px 6px; }
+            QTreeView::item, QTreeWidget::item { min-height: 0px; }
+            QTabBar::tab { padding: 3px 8px; }
+        )";
+
+        if (sCurrentScale == Scale::Touch)
+            app.setStyleSheet(app.styleSheet() + QString::fromUtf8(touchSheet));
+        else
+            app.setStyleSheet(app.styleSheet() + QString::fromUtf8(compactSheet));
+    }
 }

@@ -99,11 +99,21 @@ signals:
                              const QVector3D& rotation, float scale);
     void refTransformCommitted(int dataIndex, const QVector3D& position,
                                const QVector3D& rotation, float scale);
+    // Requested from the viewport (F key / Ctrl+D); MainWindow owns the
+    // document and performs the atomic write-back.
+    void dropSelectionToGroundRequested();
+    void duplicateSelectionRequested();
+    void displayFlagsChanged();
+    void multiSelectionChanged(const QVector<int>& dataIndices);
 
 public:
     void setSelectedRefIndex(int index);
     void setSelectedRefByDataIndex(int dataIndex);
     int selectedRefIndex() const { return mSelectedRefIndex; }
+    QVector<int> selectedRefIndices() const { return mSelectedRefIndices; }
+    bool isRefSelected(int index) const { return mSelectedRefIndices.contains(index); }
+    void setSelectedRefIndices(const QVector<int>& indices);
+    void selectMarqueeRect(const QRect& rect);
     void focusOnReference(const QVector3D& gameUnitsPos);
 
 protected:
@@ -122,12 +132,31 @@ public:
     void toggleHierarchy();
     void setSelectedShapeByName(const QString& name);
 
+    // Camera nudges. Shared by every continuous input source (gamepad axes,
+    // trackpad drag, keyboard nudge) so they all move the camera the same way
+    // and stay redraw-scaling in one place. Values are in view-space units.
+    void nudgeCamera(float dx, float dy, float dz);
+    void orbitCamera(float pitchDeltaDeg, float yawDeltaDeg);
+    void zoomCamera(float factor);
+    void resetCamera();
+
     const Nif::NifParser* getNifParser() const;
 
     void setNavmeshData(const QVector<QVector3D>& triangles);
+    void setNavmeshTopologyData(const QVector<QVector3D>& vertices,
+                                const QVector<QVector3D>& triangleFaces,
+                                const QVector<QVector3D>& regularEdges,
+                                const QVector<QVector3D>& coverEdges,
+                                const QVector<QVector3D>& portalEdges,
+                                const QVector<QVector3D>& waterEdges,
+                                const QVector<QVector3D>& disconnectedFaces);
     void setPathData(const QVector<QVector3D>& waypoints);
     void highlightNavmeshTriangle(int index);
-
+    void setSelectedNavmeshVertex(int index);
+    void setSelectedNavmeshEdge(int v0, int v1);
+    void setSelectedNavmeshTriangle(int index);
+    int selectedNavmeshVertex() const { return mSelectedNavmeshVertex; }
+    int selectedNavmeshTriangle() const { return mHighlightedTriangle; }
     void setCellReferences(const QVector<ViewportCellRef>& refs);
 
     // Renders a standalone preview primitive (cube/cylinder/plane/sphere)
@@ -144,6 +173,25 @@ public:
     // for shapes that exceed the uniform budget. Toggling forces a rebuild.
     void setGpuSkinningEnabled(bool on);
     bool gpuSkinningEnabled() const { return gpuSkinning; }
+
+    void setWireframeMode(bool enabled);
+    bool isWireframeMode() const { return wireframeMode; }
+    void setGridEnabled(bool enabled);
+    bool isGridEnabled() const { return gridEnabled; }
+    void setBoundsEnabled(bool enabled);
+    bool isBoundsEnabled() const { return boundsEnabled; }
+    void setCollisionEnabled(bool enabled);
+    bool isCollisionEnabled() const { return collisionEnabled; }
+    void setSkyEnabled(bool enabled);
+    bool isSkyEnabled() const { return m_skyEnabled; }
+    void setCameraSpeedMultiplier(float mult) { m_cameraSpeedMultiplier = mult; }
+    float cameraSpeedMultiplier() const { return m_cameraSpeedMultiplier; }
+
+    /// Current free-fly camera position, in game units.
+    QVector3D cameraPosition() const { return cameraPos; }
+
+    /// Live camera / selected-reference position shown in the render toolbar.
+    QString coordinateReadout() const;
 
 private:
     void setupOpenGL();
@@ -211,11 +259,19 @@ private:
     bool boundsEnabled = false;
 
     bool collisionEnabled = false;
-
+    float m_cameraSpeedMultiplier = 1.0f;
+    bool m_skyEnabled = false;
     bool navmeshEnabled = false;
     QVector<QVector3D> navmeshTriangles;
+    QVector<QVector3D> navmeshVertices;
+    QVector<QVector3D> navmeshRegularEdges;
+    QVector<QVector3D> navmeshCoverEdges;
+    QVector<QVector3D> navmeshPortalEdges;
+    QVector<QVector3D> navmeshWaterEdges;
+    QVector<QVector3D> navmeshDisconnectedFaces;
     int mHighlightedTriangle = -1;
-
+    int mSelectedNavmeshVertex = -1;
+    QPair<int, int> mSelectedNavmeshEdge = { -1, -1 };
     bool pathEnabled = false;
     QVector<QVector3D> pathWaypoints;
 
@@ -228,12 +284,19 @@ private:
     OverlayVBO m_bboxVBO;
     OverlayVBO m_pathVBO;
     OverlayVBO m_highlightTriVBO;
+    OverlayVBO m_navmeshEdgesVBO;
+    OverlayVBO m_navmeshCoverEdgesVBO;
+    OverlayVBO m_navmeshPortalEdgesVBO;
+    OverlayVBO m_navmeshWaterEdgesVBO;
+    OverlayVBO m_navmeshVerticesVBO;
+    OverlayVBO m_navmeshDisconnectedVBO;
     OverlayVBO m_collisionVBO;
     OverlayVBO m_axisVBO_R, m_axisVBO_G, m_axisVBO_B;
     OverlayVBO m_cellGridVBO;
     OverlayVBO m_cellRefVBO;
     OverlayVBO m_nodeAxisVBO_R, m_nodeAxisVBO_G, m_nodeAxisVBO_B;
     OverlayVBO m_primitiveVBO;
+    OverlayVBO m_marqueeVBO;
 
     QSplitter* mainSplitter;
     QTreeWidget* hierarchyTree;
@@ -300,6 +363,7 @@ private:
     void populateShapePicker();
     void rebuildPivot();
     void updatePivotInfo();
+    void updateCoordinateReadout();
 
     QVector<QVector3D> restVertices;
     QVector<QVector3D> restNormals;
@@ -315,6 +379,7 @@ private:
     QActionGroup* mEditModeGroup = nullptr;
     QAction* mActionSelect = nullptr;
     QAction* mActionMove = nullptr;
+    QLabel* m_coordLabel = nullptr;
     QAction* mActionRotate = nullptr;
     QAction* mActionScale = nullptr;
     QAction* mActionSnapGrid = nullptr;
@@ -327,7 +392,13 @@ private:
     double mSnapGridSize = 1.0;
 
     int mSelectedRefIndex = -1;
+    // Multi-selection: Shift+Click toggles membership; drag with no hit starts
+    // a screen-space rectangle that selects every reference inside it.
+    QVector<int> mSelectedRefIndices;
     int mHoverRefIndex = -1;
+    bool mMarqueeSelecting = false;
+    QPoint mMarqueeStart;
+    QPoint mMarqueeCurrent;
     bool mGizmoDragging = false;
     int mGizmoAxis = -1;                 // 0=X, 1=Y, 2=Z, -1=none
     int mHoverAxis = -1;
@@ -345,6 +416,12 @@ private:
     void buildRotateGizmo(float len, const QVector3D& origin, int highlightAxis);
     void buildScaleGizmo(float len, const QVector3D& origin, int highlightAxis);
     int pickGizmoAxis(const QPoint& pos, const gizmo::ViewTransform& t);
+    // Rotation matrix mapping a reference's local axes to world axes (same
+    // XYZ Euler order RefrRecord uses on disk), plus the world-space OBB of
+    // the reference: marker radius when no base mesh is known, otherwise the
+    // base mesh bounds transformed by rotation and scale.
+    static QMatrix4x4 refRotationMatrix(const ViewportCellRef& ref);
+    static QPair<QVector3D, QVector3D> refObb(const ViewportCellRef& ref);
     int pickRefMarker(const QPoint& pos, const gizmo::ViewTransform& t);
     void applyGizmoDrag(const QPoint& currentPos);
     void commitGizmoDrag();

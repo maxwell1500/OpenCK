@@ -15,6 +15,7 @@
 #include <QString>
 #include "../../model/tools/navmeshtoolkit.hpp"
 
+class UndoStack;
 struct NavTriangle {
     int v0, v1, v2;
     QVector3D normal;
@@ -22,17 +23,28 @@ struct NavTriangle {
     QVector<int> adjacentTriangles;
 };
 
+enum class NavEdgeType {
+    Regular = 0,
+    Cover = 1,
+    WaterBoundary = 2,
+    Portal = 3
+};
+
 struct NavPortal {
     QString name;
-    int triangleA;
-    int triangleB;
-    float width;
+    int triangleA = -1;
+    int triangleB = -1;
+    float width = 0.0f;
+    quint32 doorRefFormId = 0; // linked interior cell door reference (XNDP)
 };
 
 struct NavEdge {
-    int startVertex;
-    int endVertex;
-    bool blocked;
+    int startVertex = -1;
+    int endVertex = -1;
+    bool blocked = false;
+    NavEdgeType edgeType = NavEdgeType::Regular;
+    float coverHeight = 0.0f; // computed or manual cover height
+    quint32 linkedDoorRef = 0; // door portal link if edgeType == Portal
 };
 
 struct NavMeshData {
@@ -40,6 +52,7 @@ struct NavMeshData {
     QVector<NavTriangle> triangles;
     QVector<NavEdge> edges;
     QVector<NavPortal> portals;
+    QVector<int> disconnectedIslandTriangles; // tri indices in disconnected components
 };
 
 struct PathNode {
@@ -59,11 +72,27 @@ public:
 
     void setNavMesh(const NavMeshData& mesh);
     NavMeshData getNavMesh() const;
+    void setUndoStack(UndoStack* undoStack) { mUndoStack = undoStack; }
+    UndoStack* getUndoStack() const { return mUndoStack; }
+    // Interactive topology operations
+    int addVertex(const QVector3D& pos);
+    bool addTriangle(int v0, int v1, int v2);
+    bool extrudeEdge(int v0, int v1, const QVector3D& targetPos);
+    bool splitEdge(int v0, int v1, const QVector3D& targetPos);
+    bool flipEdge(int v0, int v1);
+
+    // Portals & Cover
+    void linkDoorPortal(int portalIdx, quint32 doorRefFormId);
+    void linkEdgeDoorPortal(int edgeIdx, quint32 doorRefFormId);
+    void generateEdgeCover(float minCoverDepth = 128.0f);
+
+    // Reachability
+    void updateReachability();
 
 signals:
     void triangleSelected(int index);
     void pathChanged(const QVector<QVector3D>& waypoints);
-
+    void navMeshUpdated(const NavMeshData& mesh);
 private slots:
     void onTriangleRowClicked(int row, int column);
     void onAddVertex();
@@ -80,7 +109,11 @@ private slots:
     void onCheckMesh();
     void onCleanMesh();
     void onWeldVertices();
-
+    void onExtrudeEdge();
+    void onSplitEdge();
+    void onFlipEdge();
+    void onGenerateCover();
+    void onCheckReachability();
 private:
     void setupUI();
     void setupInfoPanel(QSplitter* splitter);
@@ -141,6 +174,7 @@ private:
     QPushButton* mWeldButton;
 
     QVector<QVector3D> mLastPath;
+    UndoStack* mUndoStack = nullptr;
 };
 
 #endif // NAVMESHDITORDIALOG_HPP

@@ -137,6 +137,26 @@ void CodeGen::compileStmt(const Statement& stmt)
 
     case StmtKind::Function:
         break;
+
+    case StmtKind::Header:
+        // The script header is metadata, not executable code.
+        break;
+
+    case StmtKind::Property:
+    case StmtKind::Local:
+    {
+        // A declaration with an initializer compiles as an assignment to a
+        // script slot; a bare declaration reserves the slot only.
+        if (stmt.value)
+            compileExpr(*stmt.value);
+        if (!stmt.funcName.isEmpty())
+        {
+            const int index = symbolIndex(stmt.funcName);
+            const int storeIdx = emitInstr(Opcode::StoreVar);
+            m_prog.code[storeIdx].operand = static_cast<quint32>(index);
+        }
+        break;
+    }
     }
 }
 

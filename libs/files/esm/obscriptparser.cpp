@@ -8,6 +8,7 @@ namespace ObScript
 namespace
 {
 
+
 bool isTypeKeyword(const QString& kw)
 {
     static const QSet<QString> k = {
@@ -18,6 +19,65 @@ bool isTypeKeyword(const QString& kw)
     return k.contains(kw);
 }
 
+// Structural clone for assignment-target expressions. Assignment targets are
+// identifiers, field accesses or index expressions; those are the shapes that
+// can be re-evaluated on the right-hand side of a desugared `x += y`.
+ExprPtr cloneExpr(const Expr* e)
+{
+    if (!e)
+    {
+        return nullptr;
+    }
+    Expr* c = new Expr();
+    c->kind = e->kind;
+    c->name = e->name;
+    c->intValue = e->intValue;
+    c->floatValue = e->floatValue;
+    c->stringValue = e->stringValue;
+    c->boolValue = e->boolValue;
+    c->op = e->op;
+    c->line = e->line;
+    c->left = cloneExpr(e->left.get());
+    c->right = cloneExpr(e->right.get());
+    c->operand = cloneExpr(e->operand.get());
+    for (const ExprPtr& a : e->args)
+    {
+        c->args.push_back(cloneExpr(a.get()));
+    }
+    c->base = cloneExpr(e->base.get());
+    c->index = cloneExpr(e->index.get());
+    return ExprPtr(c);
+}
+
+// True when the token at the cursor is a type prefix for a declaration:
+// a built-in type keyword or a capitalised identifier (script type). A
+// declaration `Foo x` and an expression statement are only distinguished by
+// this: a bare identifier followed by another identifier cannot be an
+// expression, so it must be a declaration.
+bool isTypePrefixToken(const Token& t)
+{
+    if (t.kind == TokenKind::Keyword)
+    {
+        return isTypeKeyword(t.text);
+    }
+    if (t.kind == TokenKind::Identifier)
+    {
+        return !t.text.isEmpty() && t.text.at(0).isUpper();
+    }
+    return false;
+}
+
+// Keyword tokens are normalised to lower case by the lexer, which would turn
+// `extends Quest` into `extends quest`. Script-type names are addressable, so
+// restore the conventional leading capital for known script types.
+QString capitalizeTypeKeyword(const Token& t)
+{
+    if (t.kind != TokenKind::Keyword || t.text.isEmpty())
+    {
+        return t.text;
+    }
+    return QString(t.text.at(0).toUpper()) + t.text.mid(1);
+}
 } // namespace
 
 Parser::Parser(const QString& source)
@@ -100,17 +160,19 @@ bool Parser::expectKeyword(const QString& kw)
     return false;
 }
 
-Token Parser::expectIdentifier()
+Token Parser::expectIdentifier(bool allowTypeKeyword)
 {
     const Token& t = peek();
     if (t.kind == TokenKind::Identifier)
     {
         return advance();
     }
-    if (t.kind == TokenKind::Keyword && isTypeKeyword(t.text))
+    if (allowTypeKeyword && t.kind == TokenKind::Keyword && isTypeKeyword(t.text))
     {
-        // A type keyword used where an identifier is expected is a typo; the
-        // caller's context decides whether it is a declaration prefix.
+        // `extends Quest`, `Property ref ...`: script/extend names are
+        // addressable identifiers even when they collude with the type
+        // keyword set.
+        return advance();
     }
     fail(QStringLiteral("expected an identifier but found '%1'")
                .arg(t.kind == TokenKind::End ? QString("end of script") : t.text)
@@ -127,6 +189,47 @@ void Parser::fail(const QString& msg, int line)
         m_errorMsg = msg;
         m_errorLine = line;
     }
+}
+
+// True when the token after the next is the `Property` keyword, i.e. the
+// current position begins a property declaration rather than an expression.
+bool Parser::isPropertyKeywordAhead()
+{
+    const Token& n = peekAt(1);
+    return n.kind == TokenKind::Keyword && n.text == QLatin1String("property");
+}
+
+// True when the cursor sits on `<type> <name>`, i.e. a declaration, rather
+// than `<call>(` or `<name> = <value>`, which are expression statements. A
+// bare capitalised identifier followed by an operator or a left paren is an
+// expression, not a type prefix; only a following identifier makes it one.
+bool Parser::atTypePrefix(const Token& t, QString* typeName) const
+{
+    if (!isTypePrefixToken(t))
+    {
+        return false;
+    }
+    // Built-in type keywords are unambiguous: `int x` can only be a
+    // declaration, and no expression starts with a bare type keyword.
+    if (t.kind == TokenKind::Keyword)
+    {
+        if (typeName)
+        {
+            *typeName = t.text;
+        }
+        return true;
+    }
+    // A script-typed declaration needs an identifier after the type name.
+    const Token& next = peekAt(1);
+    if (next.kind != TokenKind::Identifier)
+    {
+        return false;
+    }
+    if (typeName)
+    {
+        *typeName = t.text;
+    }
+    return true;
 }
 
 ParseResult Parser::parse()
@@ -204,6 +307,10 @@ StmtPtr Parser::parseStatement()
         {
             return parseFunction();
         }
+        if (t.text == "scriptname")
+        {
+            return parseHeader();
+        }
         if (t.text == "if")
         {
             return parseIf();
@@ -228,12 +335,34 @@ StmtPtr Parser::parseStatement()
         {
             return parseLet(false);
         }
+        // `<type> Property name [auto]`, e.g. `MyScript Property ref auto`
+        // and `float Property float_param = 1.0`.
+        if (isTypeKeyword(t.text) && isPropertyKeywordAhead())
+        {
+            const QString typeName = t.text;
+            advance();
+            return parseProperty(typeName, typeName, t.line);
+        }
+        // `<type> name` local/global declaration, e.g. `int i` / `MyScript q`.
+        if (atTypePrefix(t, nullptr))
+        {
+            return parseLocalDeclaration(t.text, t.line);
+        }
         // Unsupported declaration / control keywords in this subset.
         fail(QStringLiteral("unsupported statement '%1'")
-                   .arg(t.text)
-                   ,
+                   .arg(t.text),
              t.line);
         return std::make_unique<Statement>();
+    }
+
+    // `SomeScript Property name auto` — script-typed property whose type is a
+    // plain identifier (another script in the same plugin, or an engine
+    // script type).
+    if (t.kind == TokenKind::Identifier && isPropertyKeywordAhead())
+    {
+        const QString typeName = t.text;
+        advance();
+        return parseProperty(typeName, typeName, t.line);
     }
 
     // Expression-based statement: either `a.b[i] = expr` (assignment) or a
@@ -244,14 +373,48 @@ StmtPtr Parser::parseStatement()
         return std::make_unique<Statement>();
     }
 
-    if (peek().kind == TokenKind::Operator && peek().text == "=")
+    // Plain or compound assignment (`=`, `+=`, `-=`, `*=`, `/=`). Compound
+    // assignment desugars to `lhs = lhs <op> rhs` so downstream passes only
+    // ever see plain Let nodes.
+    static const QStringList kCompound = {QStringLiteral("+="), QStringLiteral("-="),
+                                         QStringLiteral("*="), QStringLiteral("/="),
+                                         QStringLiteral("%=")};
+    if (peek().kind == TokenKind::Operator
+        && (peek().text == "=" || kCompound.contains(peek().text)))
     {
-        advance();
+        const QString op = advance().text;
+        if (m_error)
+        {
+            return std::make_unique<Statement>();
+        }
+
         Statement* s = new Statement();
         s->kind = StmtKind::Let;
-        s->lhs = std::move(expr);
-        s->value = parseExpression();
+        s->declares = false;
         s->line = t.line;
+        s->lhs = std::move(expr);
+
+        if (op == "=")
+        {
+            s->value = parseExpression();
+            return std::unique_ptr<Statement>(s);
+        }
+
+        // `x += rhs` desugars to `x = x + rhs` so downstream passes only ever
+        // see a plain Let with a BinaryOp value. The target expression is
+        // duplicated structurally; only a handful of shapes occur as
+        // assignment targets.
+        Expr* combined = new Expr();
+        combined->kind = ExprKind::BinaryOp;
+        combined->op = op.left(op.size() - 1);
+        combined->line = t.line;
+        combined->left = cloneExpr(s->lhs.get());
+        s->value.reset(combined);
+        s->value->right = parseExpression();
+        if (m_error)
+        {
+            return std::unique_ptr<Statement>(s);
+        }
         return std::unique_ptr<Statement>(s);
     }
 
@@ -532,6 +695,108 @@ StmtPtr Parser::parseFunction()
 ExprPtr Parser::parseExpression()
 {
     return parseOr();
+}
+
+// `ScriptName <name> [extends <base>]` — the first line of every Papyrus
+// source file. Recorded in the AST as a Header statement so semantic passes
+// can validate the script's identity and its parent.
+StmtPtr Parser::parseHeader()
+{
+    advance(); // scriptname
+    Statement* s = new Statement();
+    s->kind = StmtKind::Header;
+    s->line = peek().line;
+
+    Token name = expectIdentifier(true); // `ScriptName MyQuest`
+    if (m_error)
+    {
+        return std::unique_ptr<Statement>(s);
+    }
+    s->funcName = name.text;
+
+    if (peek().kind == TokenKind::Keyword && peek().text == "extends")
+    {
+        advance();
+        Token base = expectIdentifier(true); // `extends Quest` / `extends Actor`
+        if (m_error)
+        {
+            return std::unique_ptr<Statement>(s);
+        }
+        // The lexer normalises keyword tokens to lower case, which would
+        // turn `extends Quest` into `extends quest`. Script types are
+        // addressable names, so restore the display case.
+        s->typeName = capitalizeTypeKeyword(base);
+    }
+    return std::unique_ptr<Statement>(s);
+}
+
+// `<type> Property <name> [auto] [= expr] [hidden|const]`.
+StmtPtr Parser::parseProperty(const QString& typeName, const QString& typeText,
+                              int line)
+{
+    Statement* s = new Statement();
+    s->kind = StmtKind::Property;
+    s->line = line;
+    s->typeName = typeName;
+    (void)typeText;
+
+    if (!(peek().kind == TokenKind::Keyword && peek().text == "property"))
+    {
+        fail(QStringLiteral("expected 'Property' in property declaration"), line);
+        return std::unique_ptr<Statement>(s);
+    }
+    advance(); // property
+
+    Token name = expectIdentifier(true); // `Property ref ...` / `Property count ...`
+    if (m_error)
+    {
+        return std::unique_ptr<Statement>(s);
+    }
+    s->funcName = name.text;
+
+    // Modifiers in any order before the optional initializer.
+    while (peek().kind == TokenKind::Keyword
+           && (peek().text == "auto" || peek().text == "hidden"
+               || peek().text == "const"))
+    {
+        if (peek().text == "auto")
+        {
+            s->isAuto = true;
+        }
+        advance();
+    }
+
+    if (peek().kind == TokenKind::Operator && peek().text == "=")
+    {
+        advance();
+        s->value = parseExpression();
+    }
+    return std::unique_ptr<Statement>(s);
+}
+
+// `<type> <name> [= expr]` local/global variable declaration, e.g.
+// `int i` or `MyScript questRef = someOther as MyScript`.
+StmtPtr Parser::parseLocalDeclaration(const QString& typeText, int line)
+{
+    advance(); // type
+    Statement* s = new Statement();
+    s->kind = StmtKind::Local;
+    s->line = line;
+    s->typeName = typeText;
+
+    Token name = expectIdentifier();
+    if (m_error)
+    {
+        return std::unique_ptr<Statement>(s);
+    }
+    s->funcName = name.text;
+
+    if (peek().kind == TokenKind::Operator && peek().text == "=")
+    {
+        advance();
+        s->value = parseExpression();
+    }
+    return std::unique_ptr<Statement>(s);
 }
 
 ExprPtr Parser::parseOr()
@@ -897,6 +1162,25 @@ ExprPtr Parser::parsePrimary()
 ParseResult parse(const QString& source)
 {
     return Parser(source).parse();
+}
+
+QVector<PropertyDecl> propertyDecls(const ParseResult& program)
+{
+    QVector<PropertyDecl> out;
+    for (const auto& stmt : program.statements)
+    {
+        if (!stmt || stmt->kind != StmtKind::Property)
+        {
+            continue;
+        }
+        PropertyDecl decl;
+        decl.typeName = stmt->typeName;
+        decl.name = stmt->funcName;
+        decl.isAuto = stmt->isAuto;
+        decl.line = stmt->line;
+        out.append(decl);
+    }
+    return out;
 }
 
 } // namespace ObScript

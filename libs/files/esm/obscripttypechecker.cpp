@@ -121,6 +121,15 @@ private:
         case StmtKind::Function:
             checkBlock(stmt.body);
             break;
+
+        case StmtKind::Header:
+        case StmtKind::Property:
+        case StmtKind::Local:
+            // Declarations carry no call/type diagnostics of their own; their
+            // initializers are still checked.
+            if (stmt.value)
+                inferType(*stmt.value);
+            break;
         }
     }
 

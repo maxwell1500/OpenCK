@@ -2,6 +2,9 @@
 #include <QVector3D>
 
 #include "../src/model/tools/navmeshtoolkit.hpp"
+#include "../src/model/tools/undostack.hpp"
+#include "../src/model/tools/navmeshcommand.hpp"
+#include "../src/view/window/navmesheditordialog.hpp"
 #include "../src/model/tools/navmeshgenerator.hpp"
 
 using namespace NavMeshTools;
@@ -30,6 +33,11 @@ private slots:
     void testLargestReachableComponent();
     void testLargestReachableComponentSingle();
     void testVoxelFilterDropsDisconnectedIsland();
+    void testExtrudeEdge();
+    void testSplitEdge();
+    void testFlipEdge();
+    void testLargestReachableTriangleComponent();
+    void testNavmeshEditorDialogTopologyAndUndo();
 };
 
 void TestNavMeshToolkit::testAdjacencySquare()
@@ -580,6 +588,144 @@ void TestNavMeshToolkit::testVoxelFilterDropsDisconnectedIsland()
     QVERIFY(mesh.cells.contains(qMakePair(0, 0)));
     QVERIFY(mesh.cells.contains(qMakePair(1, 0)));
     QVERIFY(!mesh.cells.contains(qMakePair(4, 0)));
+}
+
+void TestNavMeshToolkit::testExtrudeEdge()
+{
+    QVector<QVector3D> verts = {
+        QVector3D(0, 0, 0),
+        QVector3D(100, 0, 0),
+        QVector3D(50, 0, 100)
+    };
+    QVector<MeshTriangle> tris = {
+        { 0, 1, 2, 1 }
+    };
+
+    int newTri = -1;
+    bool ok = extrudeEdge(verts, tris, 0, 1, QVector3D(50, 0, -100), &newTri);
+    QVERIFY(ok);
+    QCOMPARE(verts.size(), 4);
+    QCOMPARE(tris.size(), 2);
+    QCOMPARE(newTri, 1);
+    QCOMPARE(tris[1].v0, 0);
+    QCOMPARE(tris[1].v1, 1);
+    QCOMPARE(tris[1].v2, 3);
+}
+
+void TestNavMeshToolkit::testSplitEdge()
+{
+    QVector<QVector3D> verts = {
+        QVector3D(0, 0, 0),
+        QVector3D(100, 0, 0),
+        QVector3D(50, 0, 100)
+    };
+    QVector<MeshTriangle> tris = {
+        { 0, 1, 2, 1 }
+    };
+
+    int newVert = -1;
+    bool ok = splitEdge(verts, tris, 0, 1, QVector3D(50, 0, 0), &newVert);
+    QVERIFY(ok);
+    QCOMPARE(verts.size(), 4);
+    QCOMPARE(newVert, 3);
+    // Original triangle split into two triangles
+    QCOMPARE(tris.size(), 2);
+    QVERIFY(tris[0].v0 == 0 || tris[1].v0 == 0);
+}
+
+void TestNavMeshToolkit::testFlipEdge()
+{
+    QVector<QVector3D> verts = {
+        QVector3D(0, 0, 0),
+        QVector3D(100, 0, 0),
+        QVector3D(0, 0, 100),
+        QVector3D(100, 0, 100)
+    };
+    // Two triangles sharing diagonal (1, 2)
+    QVector<MeshTriangle> tris = {
+        { 0, 1, 2, 1 },
+        { 1, 3, 2, 1 }
+    };
+
+    bool ok = flipEdge(verts, tris, 1, 2);
+    QVERIFY(ok);
+    QCOMPARE(tris.size(), 2);
+    // After flip, shared edge connects opposite vertices 0 and 3
+    bool has03InTri0 = (tris[0].v0 == 0 && tris[0].v1 == 3) || (tris[0].v0 == 3 && tris[0].v1 == 0);
+    bool has03InTri1 = (tris[1].v0 == 0 && tris[1].v1 == 3) || (tris[1].v0 == 3 && tris[1].v1 == 0);
+    QVERIFY(has03InTri0 && has03InTri1);
+}
+
+void TestNavMeshToolkit::testLargestReachableTriangleComponent()
+{
+    // 3 triangles: tri 0 and 1 adjacent, tri 2 disconnected island
+    QVector<MeshTriangle> tris = {
+        { 0, 1, 2, 1 },
+        { 1, 3, 2, 1 },
+        { 4, 5, 6, 1 }
+    };
+    QVector<QVector<int>> adj = {
+        { 1 },
+        { 0 },
+        {}
+    };
+
+    int components = 0;
+    QVector<int> mainComp = largestReachableTriangleComponent(tris, adj, &components);
+    QCOMPARE(components, 2);
+    QCOMPARE(mainComp.size(), 2);
+    QVERIFY(mainComp.contains(0));
+    QVERIFY(mainComp.contains(1));
+    QVERIFY(!mainComp.contains(2));
+}
+
+void TestNavMeshToolkit::testNavmeshEditorDialogTopologyAndUndo()
+{
+    NavmeshEditorDialog dialog;
+    UndoStack undoStack;
+    dialog.setUndoStack(&undoStack);
+
+    NavMeshData initial;
+    dialog.setNavMesh(initial);
+
+    int v0 = dialog.addVertex(QVector3D(0, 0, 0));
+    int v1 = dialog.addVertex(QVector3D(100, 0, 0));
+    int v2 = dialog.addVertex(QVector3D(50, 0, 100));
+
+    QCOMPARE(dialog.getNavMesh().vertices.size(), 3);
+    QVERIFY(undoStack.canUndo());
+
+    bool triOk = dialog.addTriangle(v0, v1, v2);
+    QVERIFY(triOk);
+    QCOMPARE(dialog.getNavMesh().triangles.size(), 1);
+
+    // Extrude edge (0, 1)
+    bool extOk = dialog.extrudeEdge(0, 1, QVector3D(50, 0, -100));
+    QVERIFY(extOk);
+    QCOMPARE(dialog.getNavMesh().triangles.size(), 2);
+
+    // Undo edge extrusion
+    undoStack.undo();
+    QCOMPARE(dialog.getNavMesh().triangles.size(), 1);
+
+    // Redo edge extrusion
+    undoStack.redo();
+    QCOMPARE(dialog.getNavMesh().triangles.size(), 2);
+
+    // Cover and reachability
+    dialog.generateEdgeCover(128.0f);
+    dialog.updateReachability();
+    QCOMPARE(dialog.getNavMesh().disconnectedIslandTriangles.size(), 0);
+
+    // Add disconnected triangle and check reachability marks it
+    int v3 = dialog.addVertex(QVector3D(500, 0, 0));
+    int v4 = dialog.addVertex(QVector3D(600, 0, 0));
+    int v5 = dialog.addVertex(QVector3D(550, 0, 100));
+    dialog.addTriangle(v3, v4, v5);
+    dialog.updateReachability();
+    // Island of 1 triangle is disconnected from the component of 2 triangles
+    QCOMPARE(dialog.getNavMesh().disconnectedIslandTriangles.size(), 1);
+    QCOMPARE(dialog.getNavMesh().disconnectedIslandTriangles[0], 2);
 }
 
 QTEST_MAIN(TestNavMeshToolkit)

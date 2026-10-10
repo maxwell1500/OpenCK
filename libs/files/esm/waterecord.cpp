@@ -20,6 +20,7 @@ void WateRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); handled = true; break;
+            case 'FULL': fullName = esm.readZString(); handled = true; break;
             case 'FNAM': case 'FLAG': flags = esm.readType<quint32>(); handled = true; break;
             case 'ANAM': color = esm.readType<qint32>(); handled = true; break;
             case 'BNAM': windVel = esm.readType<float>(); handled = true; break;
@@ -55,7 +56,10 @@ void WateRecord::load(ESMReader& esm, bool)
     if (auto* n = static_cast<tescomponents::TESFullName_Component*>(
             components.findByName(QStringLiteral("TESFullName"))))
     {
-        fullName = n->fullName;
+        if (!fullName.isEmpty())
+            n->fullName = fullName;
+        else
+            fullName = n->fullName;
     }
     if (auto* t = static_cast<tescomponents::TESTexture_Component*>(
             components.findByName(QStringLiteral("TESTexture"))))
@@ -66,7 +70,25 @@ void WateRecord::load(ESMReader& esm, bool)
 
 void WateRecord::save(ESMWriter& esm) const
 {
+    if (!fullName.isEmpty())
+    {
+        if (auto* n = static_cast<tescomponents::TESFullName_Component*>(
+                const_cast<WateRecord*>(this)->components.findByName(QStringLiteral("TESFullName"))))
+            n->fullName = fullName;
+        else
+            const_cast<WateRecord*>(this)->components.add<tescomponents::TESFullName_Component>()->fullName = fullName;
+    }
+    if (!iconPath.isEmpty())
+    {
+        if (auto* t = static_cast<tescomponents::TESTexture_Component*>(
+                const_cast<WateRecord*>(this)->components.findByName(QStringLiteral("TESTexture"))))
+            t->iconPath = iconPath;
+        else
+            const_cast<WateRecord*>(this)->components.add<tescomponents::TESTexture_Component>()->iconPath = iconPath;
+    }
     esm.writeSubZString('EDID', editorId);
+    if (!fullName.isEmpty())
+        esm.writeSubZString('FULL', fullName);
     esm.writeSubData<quint32>('FNAM', flags);
     esm.writeSubData<quint32>('DATA', waterFlags);
     esm.writeSubData<qint32>('ANAM', color);

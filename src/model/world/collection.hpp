@@ -451,7 +451,7 @@ void Collection<ESXRecord, IdAccessorT>::insertRecord(const BaseRecord& record, 
         }
     }
 
-    indexes.insert(IdAccessorT().getId(rec.get()), index);
+    indexes.insert(IdAccessorT().getId(rec.get()).toLower(), index);
 }
 
 template<typename ESXRecord, typename IdAccessorT>

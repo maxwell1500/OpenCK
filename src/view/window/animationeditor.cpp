@@ -103,12 +103,8 @@ AnimKeyframe transformKeyframeToAnimKeyframe(const Nif::TransformKeyframe& sourc
     return key;
 }
 
-NifAnimation* loadAnimationFromNif(const QString& path)
+NifAnimation* loadAnimationFromBlockFile(NifBlockFile& file, const QString& path)
 {
-    NifBlockFile file;
-    if (!file.load(path))
-        return nullptr;
-
     const auto sources = file.animationChannels();
     if (sources.isEmpty())
         return nullptr;
@@ -171,6 +167,61 @@ NifAnimation* loadAnimationFromNif(const QString& path)
     clip.duration = maxDuration;
 
     anim->clips.append(clip);
+    return anim;
+}
+
+NifAnimation* loadAnimationFromParser(Nif::NifParser& parser, const QString& path)
+{
+    Nif::Node* root = parser.getRoot();
+    if (!root) return nullptr;
+
+    auto* anim = new NifAnimation();
+    anim->name = QFileInfo(path).baseName();
+
+    const QString defaultClipName = anim->name;
+    QMap<QString, AnimClip> clipsByName;
+
+    auto collectAnim = [&](auto* node, auto&& self) -> void {
+        if (!node) return;
+        for (const auto& ctrl : node->animations) {
+            if (ctrl.keyframes.isEmpty()) continue;
+            AnimChannel channel;
+            channel.boneName = node->name;
+            channel.type = ctrl.clipName.isEmpty() ? QStringLiteral("NiKeyframeData") : ctrl.clipName;
+            for (const auto& kf : ctrl.keyframes) {
+                channel.keyframes.append(transformKeyframeToAnimKeyframe(kf));
+            }
+            channel.duration = channel.keyframes.isEmpty() ? 0.0f : channel.keyframes.last().time;
+
+            const QString clipKey = ctrl.clipName.isEmpty() ? defaultClipName : ctrl.clipName;
+            if (!clipsByName.contains(clipKey)) {
+                AnimClip c;
+                c.name = clipKey;
+                clipsByName[clipKey] = c;
+            }
+            clipsByName[clipKey].channels.append(channel);
+        }
+        for (auto* child : node->children) {
+            self(child, self);
+        }
+    };
+
+    collectAnim(root, collectAnim);
+
+    for (auto& clip : clipsByName) {
+        float maxDuration = 0.0f;
+        for (const auto& ch : clip.channels) {
+            if (ch.duration > maxDuration) maxDuration = ch.duration;
+        }
+        clip.duration = maxDuration;
+        anim->clips.append(clip);
+    }
+
+    if (anim->clips.isEmpty()) {
+        delete anim;
+        return nullptr;
+    }
+
     return anim;
 }
 
@@ -400,6 +451,8 @@ AnimationEditor::AnimationEditor(QWidget* parent)
             this, &AnimationEditor::onTimelineKeyframeRemoved);
 }
 
+AnimationEditor::~AnimationEditor() = default;
+
 void AnimationEditor::browseNif()
 {
     QString path = QFileDialog::getOpenFileName(this, tr("Open NIF"),
@@ -409,10 +462,14 @@ void AnimationEditor::browseNif()
     }
 }
 
-void AnimationEditor::loadAnimation(const QString& path)
+bool AnimationEditor::loadNif(const QString& path)
 {
     delete mAnimation;
     mAnimation = nullptr;
+    mSourceBlockFile.reset();
+    mSourceParser.reset();
+    mSourceNifPath.clear();
+
     mClipList->clear();
     mSelectedClip = -1;
     mPlaying = false;
@@ -433,8 +490,28 @@ void AnimationEditor::loadAnimation(const QString& path)
 
     mTimeline->setClip(nullptr);
 
-    mAnimation = loadAnimationFromNif(path);
-    mSourceNifPath = mAnimation ? path : QString();
+    // Try NifBlockFile first (Bethesda/NetImmerse container)
+    auto blockFile = std::make_unique<NifBlockFile>();
+    if (blockFile->load(path)) {
+        mAnimation = loadAnimationFromBlockFile(*blockFile, path);
+        if (mAnimation) {
+            mSourceBlockFile = std::move(blockFile);
+            mSourceNifPath = path;
+        }
+    }
+
+    // Fall back to NifParser (internal dialect)
+    if (!mAnimation) {
+        auto parser = std::make_unique<Nif::NifParser>();
+        if (parser->load(path)) {
+            mAnimation = loadAnimationFromParser(*parser, path);
+            if (mAnimation) {
+                mSourceParser = std::move(parser);
+                mSourceNifPath = path;
+            }
+        }
+    }
+
     if (mAnimation) {
         if (auto* saveNifBtn = findChild<QPushButton*>("saveNifBtn"))
             saveNifBtn->setEnabled(true);
@@ -455,9 +532,17 @@ void AnimationEditor::loadAnimation(const QString& path)
                      .arg(mAnimation->name)
                      .arg(mAnimation->clipCount())
                      .arg(mAnimation->totalKeyframeCount()));
+        return true;
     } else {
         if (auto* saveNifBtn = findChild<QPushButton*>("saveNifBtn"))
             saveNifBtn->setEnabled(false);
+        return false;
+    }
+}
+
+void AnimationEditor::loadAnimation(const QString& path)
+{
+    if (!loadNif(path)) {
         QMessageBox::information(this, tr("No Animation"),
                                  tr("No animation data found in this NIF file."));
     }
@@ -935,6 +1020,26 @@ void AnimationEditor::onImportAnimation()
     LOG_INFO(QString("Animation imported from %1").arg(path));
 }
 
+bool AnimationEditor::saveNif()
+{
+    if (!mAnimation || mSourceNifPath.isEmpty())
+        return false;
+
+    int saved = 0;
+    int failed = 0;
+    int downgraded = 0;
+    bool ok = NifAnimationWriter::writeAnimationToNif(mSourceNifPath, *mAnimation,
+                                                     &saved, &failed, &downgraded);
+    if (ok) {
+        if (mSourceBlockFile) {
+            mSourceBlockFile->load(mSourceNifPath);
+        } else if (mSourceParser) {
+            mSourceParser->load(mSourceNifPath);
+        }
+    }
+    return ok;
+}
+
 void AnimationEditor::onSaveNif()
 {
     if (!mAnimation || mSourceNifPath.isEmpty()) {
@@ -945,94 +1050,20 @@ void AnimationEditor::onSaveNif()
     int saved = 0;
     int failed = 0;
     int downgraded = 0;
-    for (const auto& clip : mAnimation->clips) {
-        for (const auto& channel : clip.channels) {
-            const QString clipName = channel.type == QStringLiteral("NiKeyframeData")
-                ? QString() : channel.type;
-            bool channelDowngraded = false;
-            if (channel.raw.valid) {
-                if (NifAnimationWriter::writeKeyframesToNif(mSourceNifPath,
-                        channel.boneName, channel, clipName, &channelDowngraded))
-                    ++saved;
-                else
-                    ++failed;
-                if (channelDowngraded) ++downgraded;
-                continue;
-            }
-
-            QVector<Nif::TransformKeyframe> keyframes;
-            keyframes.reserve(channel.keyframes.size());
-            for (const auto& keyframe : channel.keyframes) {
-                Nif::TransformKeyframe output;
-                output.time = keyframe.time;
-                output.translation = {keyframe.tx, keyframe.ty, keyframe.tz};
-                output.scale = {keyframe.sx, keyframe.sy, keyframe.sz};
-                output.hasEuler = false;
-
-                if (keyframe.hasEuler) {
-                    const float degToRad = 3.14159265358979323846f / 180.0f;
-                    output.hasEuler = true;
-                    output.euler = {keyframe.rx * degToRad,
-                                    keyframe.ry * degToRad,
-                                    keyframe.rz * degToRad};
-                } else {
-                    // Prefer the quaternion the NIF stored. It is bit-exact, and
-                    // rebuilding it from Euler angles is not, so re-deriving it
-                    // for a rotation nobody edited would rewrite every key. The
-                    // Euler angles are the user-facing control, so they are only
-                    // trusted once they stop matching what that quaternion
-                    // implies - which is what happens when the timeline moves
-                    // the node.
-                    float fromStored = 0.0f, fy = 0.0f, fz = 0.0f;
-                    quaternionToEuler(keyframe.qw, keyframe.qx,
-                                      keyframe.qy, keyframe.qz,
-                                      fromStored, fy, fz);
-                    const bool rotationEdited =
-                        !qFuzzyCompare(fromStored + 1.0f, keyframe.rx + 1.0f) ||
-                        !qFuzzyCompare(fy + 1.0f, keyframe.ry + 1.0f) ||
-                        !qFuzzyCompare(fz + 1.0f, keyframe.rz + 1.0f);
-                    if (keyframe.hasQuat && !rotationEdited) {
-                        output.rotation = {keyframe.time, keyframe.qw, keyframe.qx,
-                            keyframe.qy, keyframe.qz};
-                    } else {
-                        float qw = 1.0f, qx = 0.0f, qy = 0.0f, qz = 0.0f;
-                        eulerToQuaternion(keyframe.rx, keyframe.ry, keyframe.rz,
-                            qw, qx, qy, qz);
-                        output.rotation = {keyframe.time, qw, qx, qy, qz};
-                    }
-                }
-
-                keyframes.append(output);
-            }
-            if (NifAnimationWriter::writeKeyframesToNif(mSourceNifPath,
-                    channel.boneName, keyframes, clipName, &channelDowngraded))
-                ++saved;
-            else
-                ++failed;
-            if (channelDowngraded) ++downgraded;
+    bool ok = NifAnimationWriter::writeAnimationToNif(mSourceNifPath, *mAnimation,
+                                                     &saved, &failed, &downgraded);
+    if (ok) {
+        if (mSourceBlockFile) {
+            mSourceBlockFile->load(mSourceNifPath);
+        } else if (mSourceParser) {
+            mSourceParser->load(mSourceNifPath);
         }
     }
 
-    if (!mAnimation->markers.isEmpty()) {
-        QSet<QString> markerClips;
-        for (const auto& clip : mAnimation->clips) {
-            for (const auto& channel : clip.channels) {
-                if (channel.type != QStringLiteral("NiKeyframeData"))
-                    markerClips.insert(channel.type);
-            }
-        }
-        for (const QString& markerClipName : markerClips) {
-            if (!NifAnimationWriter::setClipMarkersToNif(mSourceNifPath, markerClipName, mAnimation->markers)) {
-                QMessageBox::warning(this, tr("Save NIF"),
-                    tr("Could not write markers to clip '%1'.").arg(markerClipName));
-            }
-        }
-    }
-
-    if (failed == 0 && downgraded == 0)
+    if (failed == 0 && downgraded == 0 && ok)
         QMessageBox::information(this, tr("Save NIF"),
             tr("Saved %1 animation channel(s) to the source NIF.").arg(saved));
-    else if (failed == 0)
+    else if (failed == 0 && ok)
         QMessageBox::warning(this, tr("Save NIF"),
             tr("Saved %1 channel(s). %2 of them were edited, and an edited "
                "channel cannot keep a non-linear interpolation mode, so those "

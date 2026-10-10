@@ -66,13 +66,13 @@ bool PapyrusCompiler::setCompilerPath(const QString& path)
     }
 
     QString fileName = fileInfo.fileName().toLower();
-    if (!fileName.contains("pp64") && !fileName.contains("papyrus")) {
-        LOG_WARNING(QString("PapyrusCompiler: File name doesn't match expected pp64.exe pattern: %1").arg(path));
+    if (!fileName.contains("pp64") && !fileName.contains("papyrus") && !fileName.contains("pcompiler")) {
+        LOG_WARNING(QString("PapyrusCompiler: File name doesn't match expected compiler pattern: %1").arg(path));
     }
 
     qint64 fileSize = fileInfo.size();
-    if (fileSize < 1024 * 1024) {
-        LOG_WARNING(QString("PapyrusCompiler: File size seems too small for pp64.exe: %1 bytes").arg(fileSize));
+    if (fileSize < 10 * 1024) {
+        LOG_WARNING(QString("PapyrusCompiler: File size seems too small: %1 bytes").arg(fileSize));
     }
 
     compilerPath = path;
@@ -80,10 +80,46 @@ bool PapyrusCompiler::setCompilerPath(const QString& path)
     return true;
 }
 
+QString PapyrusCompiler::detectStarfieldToolchain()
+{
+    const QString dataEnv = qEnvironmentVariable("OPENCK_DATA_DIR");
+    if (!dataEnv.isEmpty())
+    {
+        const QDir dataDir(dataEnv);
+        const QString p1 = dataDir.filePath(QStringLiteral("../Tools/Papyrus Compiler/PapyrusCompiler.exe"));
+        if (QFile::exists(p1))
+            return QFileInfo(p1).absoluteFilePath();
+        const QString p2 = dataDir.filePath(QStringLiteral("../Papyrus Compiler/PapyrusCompiler.exe"));
+        if (QFile::exists(p2))
+            return QFileInfo(p2).absoluteFilePath();
+    }
+
+    const QStringList candidates = {
+        QStringLiteral("C:/XboxGames/Starfield/Content/Tools/Papyrus Compiler/PapyrusCompiler.exe"),
+        QStringLiteral("C:/Program Files (x86)/Steam/steamapps/common/Starfield/Tools/Papyrus Compiler/PapyrusCompiler.exe"),
+        QStringLiteral("C:/Program Files (x86)/Steam/steamapps/common/Skyrim Special Edition/Papyrus Compiler/PapyrusCompiler.exe"),
+        QStringLiteral("C:/Program Files (x86)/Steam/steamapps/common/Fallout 4/Papyrus Compiler/PapyrusCompiler.exe")
+    };
+
+    for (const QString& candidate : candidates)
+    {
+        if (QFile::exists(candidate))
+            return candidate;
+    }
+
+    return QString();
+}
+
 QString PapyrusCompiler::detectCompilerPath()
 {
+    const QString sfCompiler = detectStarfieldToolchain();
+    if (!sfCompiler.isEmpty())
+    {
+        LOG_INFO(QString("PapyrusCompiler: Found Papyrus compiler at %1").arg(sfCompiler));
+        return sfCompiler;
+    }
+
     QStringList candidates;
-    
     QString homeDir = QDir::homePath();
     QString appData = qgetenv("APPDATA");
     QString localAppData = qgetenv("LOCALAPPDATA");
@@ -107,10 +143,51 @@ QString PapyrusCompiler::detectCompilerPath()
             LOG_INFO(QString("PapyrusCompiler: Found pp64.exe at %1").arg(pp64Path));
             return pp64Path;
         }
+        QString papyrusPath = dir + "/PapyrusCompiler.exe";
+        if (QFile::exists(papyrusPath)) {
+            LOG_INFO(QString("PapyrusCompiler: Found PapyrusCompiler.exe at %1").arg(papyrusPath));
+            return papyrusPath;
+        }
     }
     
-    LOG_WARNING("PapyrusCompiler: pp64.exe not found in common locations");
+    LOG_WARNING("PapyrusCompiler: Compiler not found in common locations");
     return QString();
+}
+
+bool PapyrusCompiler::isStarfieldToolchain() const
+{
+    return QFile::exists(compilerDllPath()) || QFile::exists(projectSchemaPath());
+}
+
+QString PapyrusCompiler::toolchainDirectory() const
+{
+    if (compilerPath.isEmpty())
+        return QString();
+    return QFileInfo(compilerPath).absolutePath();
+}
+
+QString PapyrusCompiler::compilerDllPath() const
+{
+    const QString dir = toolchainDirectory();
+    if (dir.isEmpty())
+        return QString();
+    return dir + QStringLiteral("/PCompiler.dll");
+}
+
+QString PapyrusCompiler::assemblerPath() const
+{
+    const QString dir = toolchainDirectory();
+    if (dir.isEmpty())
+        return QString();
+    return dir + QStringLiteral("/PapyrusAssembler.exe");
+}
+
+QString PapyrusCompiler::projectSchemaPath() const
+{
+    const QString dir = toolchainDirectory();
+    if (dir.isEmpty())
+        return QString();
+    return dir + QStringLiteral("/PapyrusProject.xsd");
 }
 
 bool PapyrusCompiler::setScriptPath(const QString& path)

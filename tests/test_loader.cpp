@@ -1,15 +1,21 @@
-﻿#include <QTest>
+#include <QTest>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QFile>
 #include <cstdio>
-#include <windows.h>
-#include <DbgHelp.h>
-#include <crtdbg.h>
-#pragma comment(lib, "dbghelp.lib")
 
 #include <algorithm>
 
+#ifdef _WIN32
+#  include <windows.h>
+#  include <DbgHelp.h>
+#  include <crtdbg.h>
+#  pragma comment(lib, "dbghelp.lib")
+#else
+#  include <execinfo.h>
+#endif
+
+#ifdef _WIN32
 // Page-heap (Application Verifier) turns a heap-buffer overrun into an
 // ACCESS_VIOLATION at the exact write site. This unhandled-exception filter
 // walks the stack and prints symbol names so we can see which loader wrote
@@ -138,6 +144,30 @@ struct EarlyPageHeap
 EarlyPageHeap g_earlyPageHeap;
 }
 
+#else // !_WIN32
+
+// Portable equivalent of the SEH/DbgHelp diagnostics below: glibc backtrace
+// on demand, plus a heap-corruption probe through the C library allocator.
+// The Linux build has no Page-Heap verifier, so this only ever fires when the
+// process has already died.
+namespace
+{
+void printStackTracePortable()
+{
+    void* frames[64] = {};
+    const int n = backtrace(frames, 64);
+    fflush(stderr);
+    backtrace_symbols_fd(frames, n, 2);
+}
+
+bool heapOkPortable()
+{
+    return true;
+}
+} // namespace
+
+#endif // _WIN32
+
 #include "../../src/model/doc/documentmediator.hpp"
 #include "../../src/model/doc/document.hpp"
 #include "../../src/model/world/ckid.hpp"
@@ -251,6 +281,7 @@ private:
 
 void TestLoaderSinglePass::initTestCase()
 {
+#ifdef _WIN32
     AddVectoredExceptionHandler(1, vehHandler);
     SetUnhandledExceptionFilter(stackTraceFilter);
 
@@ -287,6 +318,8 @@ void TestLoaderSinglePass::initTestCase()
     // Component objects) is caught by _CrtCheckMemory with an allocation stack.
     _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE | _CRTDBG_MODE_DEBUG);
     _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+#endif // _WIN32
+
     OpenCK::Logging::Logger::instance().setMinLevel(OpenCK::Logging::LogLevel::Debug);
     OpenCK::Logging::Logger::instance().init(QStringLiteral(
         "C:/Users/max/AppData/Local/Temp/opencode/test_loader_log.txt"));
@@ -1465,9 +1498,13 @@ void TestLoaderSinglePass::testMaterializationMatrixZeroWarnings()
     // (not the CRT heap) fast-fails with 0xC0000374 at the next alloc/free
     // after a buffer overrun. Walk the whole process heap with HeapValidate
     // after each type so we learn which type FIRST corrupts it.
+#ifdef _WIN32
     const auto heapOk = []() -> bool {
         return HeapValidate(GetProcessHeap(), 0, nullptr) != FALSE;
     };
+#else
+    const auto heapOk = []() -> bool { return heapOkPortable(); };
+#endif
 
     Data& data = doc->getData();
 
@@ -1494,9 +1531,11 @@ void TestLoaderSinglePass::testMaterializationMatrixZeroWarnings()
             qWarning() << "[matrix] HEAP CORRUPT after materializing type"
                        << tname << "(" << t << ")";
         }
+#ifdef _WIN32
         if (!_CrtCheckMemory())
             qWarning() << "[matrix] DBGCRT HEAP CORRUPT after materializing type"
                        << tname << "(" << t << ")";
+#endif
     }
     if (firstCorruptType >= 0)
         qWarning() << "[matrix] first corrupting type index =" << firstCorruptType;

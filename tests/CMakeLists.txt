@@ -257,9 +257,21 @@ openck_add_test(test_blenderlauncher)
 
 # ObjectWindow modelPath tests
 add_executable(test_objectwindow test_objectwindow.cpp)
-target_link_libraries(test_objectwindow PRIVATE openck_model test_stubs Qt6::Test)
+target_link_libraries(test_objectwindow PRIVATE openck_view openck_model openck_files test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
 target_include_directories(test_objectwindow PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_objectwindow)
+
+# CellViewPanel, CellTableModel, and RefrTableModel tests (Phase 2 Parity)
+add_executable(test_cellviewpanel test_cellviewpanel.cpp)
+target_link_libraries(test_cellviewpanel PRIVATE openck_view openck_model openck_files test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_cellviewpanel PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_cellviewpanel)
+
+# Phase 3: canonical Creation Kit menu bar and ADS dock layout
+add_executable(test_mainwindow test_mainwindow.cpp)
+target_link_libraries(test_mainwindow PRIVATE openck_view openck_model openck_files test_stubs ads::qtadvanceddocking-qt6 Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_mainwindow PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_mainwindow)
 
 # NIF integration tests
 add_executable(test_nifintegration test_nifintegration.cpp)
@@ -368,6 +380,12 @@ add_executable(test_externaldata test_externaldata.cpp)
 target_link_libraries(test_externaldata PRIVATE openck_model test_stubs Qt6::Test)
 target_include_directories(test_externaldata PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_externaldata)
+
+# Creation Kit configuration and EditorColors.xml inspector test
+add_executable(test_ckconfiginspector test_ckconfiginspector.cpp)
+target_link_libraries(test_ckconfiginspector PRIVATE openck_files test_stubs Qt6::Test)
+target_include_directories(test_ckconfiginspector PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_ckconfiginspector)
 
 # Diagnostic: scan archives for .btd terrain samples (test_scanbtd [dataDir]).
 add_executable(test_scanbtd test_scanbtd.cpp)
@@ -578,7 +596,7 @@ target_include_directories(test_navmrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_navmrecord)
 # NavMesh toolkit algorithms: adjacency, analyze/check, weld, connect, T-junction removal
 add_executable(test_navmeshtoolkit test_navmeshtoolkit.cpp)
-target_link_libraries(test_navmeshtoolkit PRIVATE openck_model test_stubs Qt6::Test)
+target_link_libraries(test_navmeshtoolkit PRIVATE openck_view openck_model openck_files test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
 target_include_directories(test_navmeshtoolkit PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_navmeshtoolkit)
 
@@ -787,6 +805,23 @@ target_link_libraries(test_objectwindowfilter PRIVATE openck_model test_stubs Qt
 target_include_directories(test_objectwindowfilter PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_objectwindowfilter)
 
+# Phase 12.2: Blender live-sync bridge (scene resolution, export verification)
+add_executable(test_blenderbridge test_blenderbridge.cpp)
+target_link_libraries(test_blenderbridge PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_blenderbridge PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_blenderbridge)
+
+# Phase 10: plugin record diff / text export / 3-way merge
+add_executable(test_plugindiff test_plugindiff.cpp)
+target_link_libraries(test_plugindiff PRIVATE openck_model Qt6::Test)
+target_include_directories(test_plugindiff PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_plugindiff)
+
+add_executable(test_gitintegration test_gitintegration.cpp)
+target_link_libraries(test_gitintegration PRIVATE openck_model Qt6::Test)
+target_include_directories(test_gitintegration PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_gitintegration)
+
 # CTDA conditions (PACK/SCEN/DIAL/INFO/QUST)
 add_executable(test_conditionrecord test_conditionrecord.cpp)
 target_link_libraries(test_conditionrecord PRIVATE openck_esm test_stubs Qt6::Test)
@@ -825,9 +860,19 @@ target_link_libraries(test_obscripttypechecker PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_obscripttypechecker PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_obscripttypechecker)
 
+add_executable(test_obscriptcatalog test_obscriptcatalog.cpp)
+target_link_libraries(test_obscriptcatalog PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_obscriptcatalog PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_obscriptcatalog)
+
+add_executable(test_packagesemantics test_packagesemantics.cpp)
+target_link_libraries(test_packagesemantics PRIVATE openck_esm Qt6::Test)
+target_include_directories(test_packagesemantics PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_packagesemantics)
+
 add_executable(test_nifanimation test_nifanimation.cpp)
-target_link_libraries(test_nifanimation PRIVATE openck_files openck_model test_stubs Qt6::Test)
-target_include_directories(test_nifanimation PRIVATE ${TEST_INCLUDE_DIRS})
+target_link_libraries(test_nifanimation PRIVATE openck_view openck_files openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_nifanimation PRIVATE ${TEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/src/view/window)
 openck_add_test(test_nifanimation)
 
 # Game-family detection + per-game record dispatch
@@ -841,6 +886,26 @@ add_executable(test_multigame test_multigame.cpp)
 target_link_libraries(test_multigame PRIVATE openck_esm Qt6::Test)
 target_include_directories(test_multigame PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_multigame)
+
+# Cross-game archive conversion (BSA 0x67/0x69 <-> BA2), real-data gate on
+# the Oblivion GOTY install.
+add_executable(test_archiveconverter test_archiveconverter.cpp)
+target_link_libraries(test_archiveconverter PRIVATE openck_model Qt6::Test)
+target_include_directories(test_archiveconverter PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_archiveconverter)
+
+# Lip-sync (.lip) semantics — real-data gate on the Skyrim voice BSA, which
+# is where the game actually stores .fuz = lip + audio.
+add_executable(test_lipsync test_lipsync.cpp)
+target_link_libraries(test_lipsync PRIVATE openck_files Qt6::Test)
+target_include_directories(test_lipsync PRIVATE ${TEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/libs/files/ba2 ${CMAKE_SOURCE_DIR}/libs/files/audio)
+openck_add_test(test_lipsync)
+
+# Cross-game record migration (shared TES4 codes, EditorID collision policy).
+add_executable(test_recordmigrator test_recordmigrator.cpp)
+target_link_libraries(test_recordmigrator PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_recordmigrator PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_recordmigrator)
 
 # TES3 (Morrowind) reader ground-truth tests against the real Morrowind.esm
 # (16-byte record headers, 4-byte subrecord sizes, fixed-size strings).
@@ -1037,6 +1102,30 @@ target_link_libraries(test_materialruletemplate PRIVATE openck_model test_stubs 
 target_include_directories(test_materialruletemplate PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_materialruletemplate)
 
+# Material compiler: applies a rule template to a slot map and resolves textures
+add_executable(test_materialcompiler test_materialcompiler.cpp)
+target_link_libraries(test_materialcompiler PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_materialcompiler PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_materialcompiler)
+
+# AssetTool/TextureTool/NifSkse CLI detection, invocation, and packaging pipeline
+add_executable(test_assettoolcli test_assettoolcli.cpp)
+target_link_libraries(test_assettoolcli PRIVATE openck_model test_stubs Qt6::Test)
+target_include_directories(test_assettoolcli PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_assettoolcli)
+
+# MaterialRecord SLTS texture-slot subrecord round-trip
+add_executable(test_materialrecord test_materialrecord.cpp)
+target_link_libraries(test_materialrecord PRIVATE openck_esm test_stubs Qt6::Test)
+target_include_directories(test_materialrecord PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_materialrecord)
+
+# Material Editor widget: template combo, slot table, save writes textureSlots
+add_executable(test_materialeditor test_materialeditor.cpp)
+target_link_libraries(test_materialeditor PRIVATE openck_view openck_model openck_files test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_materialeditor PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_materialeditor)
+
 # Helper that writes a minimal test plugin for manual CLI verification
 add_executable(make_testplugin make_testplugin.cpp)
 target_link_libraries(make_testplugin PRIVATE openck_esm test_stubs Qt6::Core)
@@ -1084,6 +1173,13 @@ add_custom_target(all_tests DEPENDS copy_ads_dll
 # start skipping. The stamp is per-config: the exes are per-config too, so one
 # shared stamp would let a Debug build skip its own deployment because Release
 # had just refreshed it.
+#
+# Note --no-opengl-sw is deliberately NOT passed: the view tests (test_mainwindow
+# and friends) construct QOpenGLWidget docks, and when no hardware context is
+# available Qt falls back to opengl32sw.dll. With the flag the DLL was never
+# deployed and those tests died mid-run with 0xc000041d (unhandled user-callback
+# exception) inside QOpenGLContext creation - a "crash" that is purely a missing
+# runtime file. 20 MB next to the test exes is cheap insurance.
 if(WIN32 AND WINDEPLOYQT_EXECUTABLE)
     set(OPENCK_QT_RUNTIME_STAMP "${CMAKE_BINARY_DIR}/qt-test-runtime-$<CONFIG>.stamp")
     set(OPENCK_QT_DEPLOY_EXES "")
@@ -1101,12 +1197,12 @@ if(WIN32 AND WINDEPLOYQT_EXECUTABLE)
         add_custom_command(
             OUTPUT "${OPENCK_QT_RUNTIME_STAMP}"
             COMMAND "${WINDEPLOYQT_EXECUTABLE}"
-                --no-translations --no-opengl-sw --no-system-d3d-compiler
+                --no-translations --no-system-d3d-compiler
                 --dir "$<TARGET_FILE_DIR:${OPENCK_QT_FIRST_TEST_TARGET}>"
                 ${OPENCK_QT_DEPLOY_EXES}
             COMMAND ${CMAKE_COMMAND} -E touch "${OPENCK_QT_RUNTIME_STAMP}"
             DEPENDS ${OPENCK_CTEST_TARGETS}
-            COMMENT "Deploying Qt6 runtime DLLs for test executables (Qt6::Test, ...)"
+            COMMENT "Deploying Qt6 runtime DLLs for test executables (Qt6::Test, opengl-sw, ...)"
             VERBATIM
         )
         add_custom_target(deploy_qt_test_runtime ALL

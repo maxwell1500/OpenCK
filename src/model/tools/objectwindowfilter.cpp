@@ -7,10 +7,14 @@ FilterRule::Type FilterRule::typeFromString(const QString& text)
 {
     const QString lower = text.trimmed().toLower();
     if (lower == QStringLiteral("equalto") || lower == QStringLiteral("==")
-        || lower == QStringLiteral("="))
+        || lower == QStringLiteral("=") || lower == QStringLiteral("equals")
+        || lower == QStringLiteral("exact") || lower == QStringLiteral("exactvalue"))
         return Type::Equals;
-    if (lower == QStringLiteral("notequalto") || lower == QStringLiteral("!="))
+    if (lower == QStringLiteral("notequals") || lower == QStringLiteral("notequalto")
+        || lower == QStringLiteral("!="))
         return Type::NotEquals;
+    if (lower == QStringLiteral("contains"))
+        return Type::Contains;
     if (lower == QStringLiteral("startswith"))
         return Type::StartsWith;
     if (lower == QStringLiteral("endswith"))
@@ -20,6 +24,8 @@ FilterRule::Type FilterRule::typeFromString(const QString& text)
         return Type::Range;
     if (lower == QStringLiteral("regex") || lower == QStringLiteral("regexmatch"))
         return Type::RegexMatch;
+    if (lower == QStringLiteral("wildcard") || lower == QStringLiteral("wildcardmatch"))
+        return Type::Wildcard;
     return Type::Contains;  // "contains" and anything unknown
 }
 
@@ -33,6 +39,7 @@ QString FilterRule::typeToString(Type type)
     case Type::EndsWith:    return QStringLiteral("EndsWith");
     case Type::Range:       return QStringLiteral("Range");
     case Type::RegexMatch:  return QStringLiteral("RegexMatch");
+    case Type::Wildcard:    return QStringLiteral("Wildcard");
     case Type::Contains:    return QStringLiteral("Contains");
     }
     return QStringLiteral("Contains");
@@ -44,8 +51,24 @@ bool FilterRule::matches(const QString& value) const
     switch (type)
     {
     case Type::Equals:
-        matched = value.compare(exactValue, Qt::CaseInsensitive) == 0;
+        if (exactValue.contains(QLatin1Char('*')) || exactValue.contains(QLatin1Char('?')))
+        {
+            const QRegularExpression re(QRegularExpression::wildcardToRegularExpression(exactValue),
+                                         QRegularExpression::CaseInsensitiveOption);
+            matched = re.isValid() && re.match(value).hasMatch();
+        }
+        else
+        {
+            matched = value.compare(exactValue, Qt::CaseInsensitive) == 0;
+        }
         break;
+    case Type::Wildcard:
+    {
+        const QRegularExpression re(QRegularExpression::wildcardToRegularExpression(exactValue),
+                                     QRegularExpression::CaseInsensitiveOption);
+        matched = re.isValid() && re.match(value).hasMatch();
+        break;
+    }
     case Type::NotEquals:
         matched = value.compare(exactValue, Qt::CaseInsensitive) != 0;
         break;
@@ -83,7 +106,17 @@ bool FilterRule::matchesNumber(double value) const
     {
     case Type::Equals:
     case Type::NotEquals:
-        matched = (value == exactValue.toDouble());
+    case Type::Wildcard:
+        if (exactValue.contains(QLatin1Char('*')) || exactValue.contains(QLatin1Char('?')))
+        {
+            const QRegularExpression re(QRegularExpression::wildcardToRegularExpression(exactValue),
+                                         QRegularExpression::CaseInsensitiveOption);
+            matched = re.isValid() && re.match(QString::number(value)).hasMatch();
+        }
+        else
+        {
+            matched = (value == exactValue.toDouble());
+        }
         if (type == Type::NotEquals)
             matched = !matched;
         break;
@@ -112,6 +145,7 @@ FilterRule FilterRule::fromJson(const QJsonObject& obj)
     rule.minValue = obj.value(QStringLiteral("MinValue")).toDouble(0.0);
     rule.maxValue = obj.value(QStringLiteral("MaxValue")).toDouble(0.0);
     rule.isNegative = obj.value(QStringLiteral("IsNegative")).toBool(false);
+    rule.isConcatenatedOr = obj.value(QStringLiteral("IsConcatenatedOr")).toBool(false);
     rule.enabled = !obj.value(QStringLiteral("IsEnabled")).isBool()
         || obj.value(QStringLiteral("IsEnabled")).toBool();
     return rule;
@@ -126,6 +160,7 @@ QJsonObject FilterRule::toJson() const
     obj.insert(QStringLiteral("MinValue"), minValue);
     obj.insert(QStringLiteral("MaxValue"), maxValue);
     obj.insert(QStringLiteral("IsNegative"), isNegative);
+    obj.insert(QStringLiteral("IsConcatenatedOr"), isConcatenatedOr);
     return obj;
 }
 
@@ -191,28 +226,77 @@ void ObjectWindowFilter::clear()
 bool ObjectWindowFilter::matches(const QJsonObject& record) const
 {
     int enabled = 0;
-    bool anyMatch = false;
+    for (const FilterRule& rule : rules)
+    {
+        if (rule.enabled)
+            ++enabled;
+    }
+    if (enabled == 0)
+        return true;
+
+    auto rawMatches = [](const FilterRule& rule, const QJsonValue& item) -> bool {
+        FilterRule pos = rule;
+        pos.isNegative = false;
+        if (item.isDouble())
+            return pos.matchesNumber(item.toDouble());
+        return pos.matches(item.toString());
+    };
+
+    auto evalRule = [&](const FilterRule& rule) -> bool {
+        const QJsonValue val = record.value(rule.parameter);
+        if (val.isArray())
+        {
+            bool anyItemMatched = false;
+            for (const QJsonValue& item : val.toArray())
+            {
+                if (rawMatches(rule, item))
+                {
+                    anyItemMatched = true;
+                    break;
+                }
+            }
+            return rule.isNegative ? !anyItemMatched : anyItemMatched;
+        }
+        if (val.isDouble())
+            return rule.matchesNumber(val.toDouble());
+        return rule.matches(val.toString());
+    };
+
+    if (isConcatenatedOr)
+    {
+        for (const FilterRule& rule : rules)
+        {
+            if (!rule.enabled) continue;
+            if (evalRule(rule))
+                return true;
+        }
+        return false;
+    }
+
+    bool currentAndGroup = true;
+    bool anyGroupMatched = false;
+    bool hasOr = false;
+
     for (const FilterRule& rule : rules)
     {
         if (!rule.enabled)
             continue;
-        ++enabled;
-        const bool hit = matches(rule.parameter, record.value(rule.parameter));
-        if (isConcatenatedOr)
+        const bool hit = evalRule(rule);
+        currentAndGroup = currentAndGroup && hit;
+
+        if (rule.isConcatenatedOr)
         {
-            if (hit)
-                anyMatch = true;
-        }
-        else if (!hit)
-        {
-            return false;
+            hasOr = true;
+            if (currentAndGroup)
+                anyGroupMatched = true;
+            currentAndGroup = true;
         }
     }
-    if (enabled == 0)
-        return true;
-    if (isConcatenatedOr)
-        return anyMatch;
-    return true;
+
+    if (hasOr)
+        return anyGroupMatched || currentAndGroup;
+
+    return currentAndGroup;
 }
 
 bool ObjectWindowFilter::matches(const QString& parameter,
@@ -226,10 +310,31 @@ bool ObjectWindowFilter::matches(const QString& parameter,
             && rule.parameter.compare(parameter, Qt::CaseInsensitive) != 0)
             continue;
         bool hit = false;
-        if (value.isDouble())
+        if (value.isArray())
+        {
+            FilterRule pos = rule;
+            pos.isNegative = false;
+            bool anyItemMatched = false;
+            for (const QJsonValue& item : value.toArray())
+            {
+                bool itemHit = item.isDouble() ? pos.matchesNumber(item.toDouble())
+                                               : pos.matches(item.toString());
+                if (itemHit)
+                {
+                    anyItemMatched = true;
+                    break;
+                }
+            }
+            hit = rule.isNegative ? !anyItemMatched : anyItemMatched;
+        }
+        else if (value.isDouble())
+        {
             hit = rule.matchesNumber(value.toDouble());
+        }
         else
+        {
             hit = rule.matches(value.toString());
+        }
         if (hit)
             return true;
     }

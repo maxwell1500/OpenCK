@@ -1,5 +1,7 @@
 #include "navmesheditordialog.hpp"
 #include "../../model/tools/navmeshtoolkit.hpp"
+#include "../../model/tools/undostack.hpp"
+#include "../../model/tools/navmeshcommand.hpp"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -840,4 +842,227 @@ void NavmeshEditorDialog::onCleanMesh()
     showCheckResults(QVector<QString>()
         << "T-junctions resolved (degenerate vertices welded).");
     LOG_INFO("Navmesh splines cleaned");
+}
+
+int NavmeshEditorDialog::addVertex(const QVector3D& pos)
+{
+    NavMeshData before = mMesh;
+    int idx = mMesh.vertices.size();
+    mMesh.vertices.append(pos);
+    refreshVerticesTable();
+    if (mVertexCountLabel) mVertexCountLabel->setText(QString("Vertices: %1").arg(mMesh.vertices.size()));
+    if (mUndoStack) {
+        mUndoStack->push(new NavmeshEditCommand(&mMesh, before, mMesh, QStringLiteral("Add Navmesh Vertex")));
+    }
+    emit navMeshUpdated(mMesh);
+    return idx;
+}
+
+bool NavmeshEditorDialog::addTriangle(int v0, int v1, int v2)
+{
+    if (v0 < 0 || v0 >= mMesh.vertices.size() ||
+        v1 < 0 || v1 >= mMesh.vertices.size() ||
+        v2 < 0 || v2 >= mMesh.vertices.size() ||
+        v0 == v1 || v1 == v2 || v2 == v0) {
+        return false;
+    }
+
+    NavTriangle tri;
+    tri.v0 = v0;
+    tri.v1 = v1;
+    tri.v2 = v2;
+    QVector3D edge1 = mMesh.vertices[v1] - mMesh.vertices[v0];
+    QVector3D edge2 = mMesh.vertices[v2] - mMesh.vertices[v0];
+    tri.normal = QVector3D::crossProduct(edge1, edge2).normalized();
+    tri.walkable = true;
+    NavMeshData before = mMesh;
+    mMesh.triangles.append(tri);
+    refreshAdjacency();
+    updateReachability();
+    refreshAllTables();
+    if (mUndoStack) {
+        mUndoStack->push(new NavmeshEditCommand(&mMesh, before, mMesh, QStringLiteral("Add Navmesh Triangle")));
+    }
+    emit navMeshUpdated(mMesh);
+    return true;
+}
+
+bool NavmeshEditorDialog::extrudeEdge(int v0, int v1, const QVector3D& targetPos)
+{
+    NavMeshData before = mMesh;
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    int newTriIdx = -1;
+    if (!::NavMeshTools::extrudeEdge(verts, tris, v0, v1, targetPos, &newTriIdx)) {
+        return false;
+    }
+
+    convertFromToolkit(verts, tris);
+    refreshAdjacency();
+    updateReachability();
+    refreshAllTables();
+    if (mUndoStack) {
+        mUndoStack->push(new NavmeshEditCommand(&mMesh, before, mMesh, QStringLiteral("Extrude Navmesh Edge")));
+    }
+    emit navMeshUpdated(mMesh);
+    return true;
+}
+
+bool NavmeshEditorDialog::splitEdge(int v0, int v1, const QVector3D& targetPos)
+{
+    NavMeshData before = mMesh;
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    int newVertIdx = -1;
+    if (!::NavMeshTools::splitEdge(verts, tris, v0, v1, targetPos, &newVertIdx)) {
+        return false;
+    }
+
+    convertFromToolkit(verts, tris);
+    refreshAdjacency();
+    updateReachability();
+    refreshAllTables();
+    if (mUndoStack) {
+        mUndoStack->push(new NavmeshEditCommand(&mMesh, before, mMesh, QStringLiteral("Split Navmesh Edge")));
+    }
+    emit navMeshUpdated(mMesh);
+    return true;
+}
+
+bool NavmeshEditorDialog::flipEdge(int v0, int v1)
+{
+    NavMeshData before = mMesh;
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    if (!::NavMeshTools::flipEdge(verts, tris, v0, v1)) {
+        return false;
+    }
+
+    convertFromToolkit(verts, tris);
+    refreshAdjacency();
+    updateReachability();
+    refreshAllTables();
+    if (mUndoStack) {
+        mUndoStack->push(new NavmeshEditCommand(&mMesh, before, mMesh, QStringLiteral("Flip Navmesh Edge")));
+    }
+    emit navMeshUpdated(mMesh);
+    return true;
+}
+
+void NavmeshEditorDialog::linkDoorPortal(int portalIdx, quint32 doorRefFormId)
+{
+    if (portalIdx >= 0 && portalIdx < mMesh.portals.size()) {
+        mMesh.portals[portalIdx].doorRefFormId = doorRefFormId;
+        refreshPortalsTable();
+        emit navMeshUpdated(mMesh);
+    }
+}
+
+void NavmeshEditorDialog::linkEdgeDoorPortal(int edgeIdx, quint32 doorRefFormId)
+{
+    if (edgeIdx >= 0 && edgeIdx < mMesh.edges.size()) {
+        mMesh.edges[edgeIdx].edgeType = NavEdgeType::Portal;
+        mMesh.edges[edgeIdx].linkedDoorRef = doorRefFormId;
+        refreshEdgesTable();
+        emit navMeshUpdated(mMesh);
+    }
+}
+
+void NavmeshEditorDialog::generateEdgeCover(float minCoverDepth)
+{
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    auto covers = ::NavMeshTools::computeCoverData(verts, tris, 512.0f, minCoverDepth);
+
+    // Convert cover flags to edge cover markers
+    for (auto& edge : mMesh.edges) {
+        if (edge.startVertex >= 0 && edge.startVertex < covers.size() &&
+            edge.endVertex >= 0 && edge.endVertex < covers.size()) {
+            quint8 sFlags = covers[edge.startVertex].flags;
+            quint8 eFlags = covers[edge.endVertex].flags;
+            if ((sFlags & 0x0F) || (eFlags & 0x0F)) { // low cover
+                edge.edgeType = NavEdgeType::Cover;
+                edge.coverHeight = minCoverDepth;
+            } else if ((sFlags & 0xF0) || (eFlags & 0xF0)) { // high cover
+                edge.edgeType = NavEdgeType::Cover;
+                edge.coverHeight = minCoverDepth * 2.0f;
+            }
+        }
+    }
+    refreshEdgesTable();
+    emit navMeshUpdated(mMesh);
+}
+
+void NavmeshEditorDialog::updateReachability()
+{
+    QVector<QVector3D> verts;
+    QVector<::NavMeshTools::MeshTriangle> tris;
+    convertToToolkit(verts, tris);
+
+    QVector<QVector<int>> adj = ::NavMeshTools::rebuildAdjacency(verts, tris);
+    int componentCount = 0;
+    QVector<int> mainComponent = ::NavMeshTools::largestReachableTriangleComponent(tris, adj, &componentCount);
+
+    QSet<int> reachableSet;
+    for (int t : mainComponent) reachableSet.insert(t);
+
+    mMesh.disconnectedIslandTriangles.clear();
+    for (int t = 0; t < mMesh.triangles.size(); ++t) {
+        if (!reachableSet.contains(t)) {
+            mMesh.disconnectedIslandTriangles.append(t);
+        }
+    }
+}
+
+void NavmeshEditorDialog::onExtrudeEdge()
+{
+    int row = mEdgesTable ? mEdgesTable->currentRow() : -1;
+    if (row < 0 || row >= mMesh.edges.size()) return;
+    const auto& edge = mMesh.edges[row];
+    if (edge.startVertex < 0 || edge.endVertex < 0) return;
+
+    QVector3D mid = (mMesh.vertices[edge.startVertex] + mMesh.vertices[edge.endVertex]) * 0.5f;
+    QVector3D dir = (mMesh.vertices[edge.endVertex] - mMesh.vertices[edge.startVertex]).normalized();
+    QVector3D perp(-dir.z(), 0.0f, dir.x());
+    QVector3D targetPos = mid + perp * 64.0f;
+    extrudeEdge(edge.startVertex, edge.endVertex, targetPos);
+}
+
+void NavmeshEditorDialog::onSplitEdge()
+{
+    int row = mEdgesTable ? mEdgesTable->currentRow() : -1;
+    if (row < 0 || row >= mMesh.edges.size()) return;
+    const auto& edge = mMesh.edges[row];
+    if (edge.startVertex < 0 || edge.endVertex < 0) return;
+
+    QVector3D mid = (mMesh.vertices[edge.startVertex] + mMesh.vertices[edge.endVertex]) * 0.5f;
+    splitEdge(edge.startVertex, edge.endVertex, mid);
+}
+
+void NavmeshEditorDialog::onFlipEdge()
+{
+    int row = mEdgesTable ? mEdgesTable->currentRow() : -1;
+    if (row < 0 || row >= mMesh.edges.size()) return;
+    const auto& edge = mMesh.edges[row];
+    flipEdge(edge.startVertex, edge.endVertex);
+}
+
+void NavmeshEditorDialog::onGenerateCover()
+{
+    generateEdgeCover(128.0f);
+}
+
+void NavmeshEditorDialog::onCheckReachability()
+{
+    updateReachability();
+    showCheckResults({ QStringLiteral("Reachability analysis: %1 disconnected island triangles found.")
+                       .arg(mMesh.disconnectedIslandTriangles.size()) });
 }

@@ -12,7 +12,10 @@
 #include "../../libs/files/esm/ingrrecord.hpp"
 #include "../../libs/files/esm/alchrecord.hpp"
 #include "../../libs/files/esm/contrecord.hpp"
-
+#include "../../libs/files/esm/refrecord.hpp"
+#include "../../src/model/world/data.hpp"
+#include "../../src/model/window/objectwindow.hpp"
+#include "../../src/view/window/useinfodialog.hpp"
 class TestObjectWindowModelPath : public QObject
 {
     Q_OBJECT
@@ -29,8 +32,10 @@ private slots:
     void testAlchModelPath();
     void testContModelPath();
     void testEmptyCollection();
+    void testHierarchyGroupNodes();
+    void testFilterWildcardAndReset();
+    void testUseInfoDialog();
 };
-
 void TestObjectWindowModelPath::testWeaponModelPath()
 {
     IdCollection<WeaponRecord> collection;
@@ -175,6 +180,138 @@ void TestObjectWindowModelPath::testEmptyCollection()
 {
     IdCollection<WeaponRecord> collection;
     QCOMPARE(collection.size(), 0);
+}
+
+void TestObjectWindowModelPath::testHierarchyGroupNodes()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+    ObjectWindowModel model;
+    model.setData(&data);
+
+    // Level 0: Groups
+    int groupCount = model.rowCount(QModelIndex());
+    QVERIFY(groupCount >= 8);
+
+    QStringList expectedGroups = {
+        "All Forms", "Actors", "Items", "Magic", "World Objects",
+        "Gameplay", "Audio", "Dialogue", "Special"
+    };
+
+    QStringList actualGroups;
+    for (int r = 0; r < groupCount; ++r) {
+        QModelIndex idx = model.index(r, 0, QModelIndex());
+        actualGroups.append(model.data(idx, Qt::DisplayRole).toString());
+    }
+
+    for (const QString& g : expectedGroups) {
+        QVERIFY2(actualGroups.contains(g), qPrintable(QString("Missing expected group: %1").arg(g)));
+    }
+
+    // Level 1: Categories inside "Actors"
+    int actorsRow = actualGroups.indexOf("Actors");
+    QVERIFY(actorsRow >= 0);
+    QModelIndex actorsIdx = model.index(actorsRow, 0, QModelIndex());
+    int actorsChildCount = model.rowCount(actorsIdx);
+    QVERIFY(actorsChildCount > 0);
+
+    QStringList actorCats;
+    for (int r = 0; r < actorsChildCount; ++r) {
+        QModelIndex catIdx = model.index(r, 0, actorsIdx);
+        actorCats.append(model.data(catIdx, Qt::DisplayRole).toString());
+    }
+    QVERIFY(actorCats.contains("NPC"));
+    QVERIFY(actorCats.contains("Creature"));
+
+    // Level 1: Categories inside "Magic"
+    int magicRow = actualGroups.indexOf("Magic");
+    QVERIFY(magicRow >= 0);
+    QModelIndex magicIdx = model.index(magicRow, 0, QModelIndex());
+    int magicChildCount = model.rowCount(magicIdx);
+    QVERIFY(magicChildCount > 0);
+
+    QStringList magicCats;
+    for (int r = 0; r < magicChildCount; ++r) {
+        QModelIndex catIdx = model.index(r, 0, magicIdx);
+        magicCats.append(model.data(catIdx, Qt::DisplayRole).toString());
+    }
+    QVERIFY(magicCats.contains("Spell"));
+    QVERIFY(magicCats.contains("Magic Effect"));
+}
+
+void TestObjectWindowModelPath::testFilterWildcardAndReset()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+    WeaponRecord w1;
+    w1.editorId = "IronSword";
+    w1.formId = 0x00010001;
+    data.getWeaponCollection().add(w1);
+
+    WeaponRecord w2;
+    w2.editorId = "SteelDagger";
+    w2.formId = 0x00010002;
+    data.getWeaponCollection().add(w2);
+
+    WeaponRecord w3;
+    w3.editorId = "SilverSword";
+    w3.formId = 0x00010003;
+    data.getWeaponCollection().add(w3);
+
+    ObjectWindowModel model;
+    model.setData(&data);
+
+    int catId = -1, recIdx = -1;
+    QModelIndex foundIdx;
+
+
+    // Unfiltered: all 3 can be found
+    QVERIFY(model.findRecord("IronSword", catId, recIdx, foundIdx));
+    QVERIFY(model.findRecord("SilverSword", catId, recIdx, foundIdx));
+
+    // Wildcard filter: *Sword*
+    model.applyFilter("*Sword*");
+    QVERIFY(model.findRecord("IronSword", catId, recIdx, foundIdx));
+    QVERIFY(model.findRecord("SilverSword", catId, recIdx, foundIdx));
+    QVERIFY(!model.findRecord("SteelDagger", catId, recIdx, foundIdx));
+
+    // Clear filter: restores all records without loss
+    model.applyFilter("");
+    QVERIFY(model.findRecord("IronSword", catId, recIdx, foundIdx));
+    QVERIFY(model.findRecord("SteelDagger", catId, recIdx, foundIdx));
+    QVERIFY(model.findRecord("SilverSword", catId, recIdx, foundIdx));
+}
+
+void TestObjectWindowModelPath::testUseInfoDialog()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+    StatRecord stat;
+    stat.editorId = "DungeonDoorArch";
+    stat.formId = 0x00020001;
+    data.getStatCollection().add(stat);
+
+    // Place two references of this static
+    RefrRecord ref1;
+    ref1.formId = 0x00030001;
+    ref1.editorId = "ArchRef01";
+    ref1.baseId = 0x00020001;
+    ref1.posX = 100.0f;
+    ref1.posY = 200.0f;
+    ref1.posZ = 300.0f;
+    data.getRefrCollection().add(ref1);
+
+    RefrRecord ref2;
+    ref2.formId = 0x00030002;
+    ref2.editorId = "ArchRef02";
+    ref2.baseId = 0x00020001;
+    ref2.posX = 500.0f;
+    ref2.posY = 600.0f;
+    ref2.posZ = 700.0f;
+    data.getRefrCollection().add(ref2);
+
+    UseInfoDialog dlg(&data, stat.formId, stat.editorId);
+    QCOMPARE(dlg.totalUsesCount(), 2);
 }
 
 #include "test_objectwindow.moc"

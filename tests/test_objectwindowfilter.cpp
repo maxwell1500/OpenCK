@@ -23,6 +23,9 @@ void testFilterJsonRoundTrip();
     void testFilterDisabledRules();
     void testFilterNegation();
     void testFilterRegex();
+    void testWildcardMatching();
+    void testPerRuleConcatenationOr();
+    void testShippedStarfieldFiltersIfPresent();
 };
 
 void TestObjectWindowFilter::testRuleTypeParsing()
@@ -260,6 +263,88 @@ void TestObjectWindowFilter::testFilterRegex()
         { QStringLiteral("Name"), QStringLiteral("Iron Sword") } }));
     QVERIFY(!filter.matches(QJsonObject{
         { QStringLiteral("Name"), QStringLiteral("Iron Axe") } }));
+}
+
+void TestObjectWindowFilter::testWildcardMatching()
+{
+    ObjectWindowFilter filter;
+    FilterRule rule;
+    rule.parameter = QStringLiteral("Keyword");
+    rule.type = FilterRule::Type::Equals;
+    rule.exactValue = QStringLiteral("*LocTypeDungeon*");
+    filter.addRule(rule);
+
+    QJsonObject rec1;
+    rec1.insert(QStringLiteral("Keyword"), QStringLiteral("PrefixLocTypeDungeonSuffix"));
+    QVERIFY(filter.matches(rec1));
+
+    QJsonObject rec2;
+    rec2.insert(QStringLiteral("Keyword"), QStringLiteral("LocTypeSettlement"));
+    QVERIFY(!filter.matches(rec2));
+
+    // Wildcard rule type explicitly
+    FilterRule wildRule;
+    wildRule.parameter = QStringLiteral("EditorID");
+    wildRule.type = FilterRule::Type::Wildcard;
+    wildRule.exactValue = QStringLiteral("Item_???");
+    ObjectWindowFilter wildFilter;
+    wildFilter.addRule(wildRule);
+
+    QVERIFY(wildFilter.matches(QJsonObject{ { QStringLiteral("EditorID"), QStringLiteral("Item_123") } }));
+    QVERIFY(!wildFilter.matches(QJsonObject{ { QStringLiteral("EditorID"), QStringLiteral("Item_1234") } }));
+}
+
+void TestObjectWindowFilter::testPerRuleConcatenationOr()
+{
+    // Rule 0 OR Rule 1 style (like Planets-Life.filter)
+    const QByteArray orJson = R"([
+        { "ParameterName": "Keyword", "FilterType": "ExactValue", "ExactValue": "*Life*", "IsConcatenatedOr": true },
+        { "ParameterName": "Keyword", "FilterType": "ExactValue", "ExactValue": "*Water*", "IsConcatenatedOr": false }
+    ])";
+
+    const ObjectWindowFilter orFilter = ObjectWindowFilter::fromJson(QJsonDocument::fromJson(orJson).array());
+    QCOMPARE(orFilter.count(), 2);
+    QVERIFY(orFilter.matches(QJsonObject{ { QStringLiteral("Keyword"), QStringLiteral("HasLifeHere") } }));
+    QVERIFY(orFilter.matches(QJsonObject{ { QStringLiteral("Keyword"), QStringLiteral("FreshWaterLake") } }));
+    QVERIFY(!orFilter.matches(QJsonObject{ { QStringLiteral("Keyword"), QStringLiteral("BarrenRock") } }));
+
+    // Rule 0 AND NOT Rule 1 style (like Loc-Dungeons.filter)
+    const QByteArray andNotJson = R"([
+        { "ParameterName": "Keyword", "FilterType": "ExactValue", "ExactValue": "*LocTypeDungeon*", "IsConcatenatedOr": false, "IsNegative": false },
+        { "ParameterName": "Keyword", "FilterType": "ExactValue", "ExactValue": "*LocTypeOE*", "IsConcatenatedOr": false, "IsNegative": true }
+    ])";
+
+    const ObjectWindowFilter andNotFilter = ObjectWindowFilter::fromJson(QJsonDocument::fromJson(andNotJson).array());
+    QCOMPARE(andNotFilter.count(), 2);
+    // Has Dungeon, not OE -> match
+    QVERIFY(andNotFilter.matches(QJsonObject{ { QStringLiteral("Keyword"), QStringLiteral("LocTypeDungeon") } }));
+    // Has Dungeon AND OE -> rejected
+    QVERIFY(!andNotFilter.matches(QJsonObject{ { QStringLiteral("Keyword"), QStringLiteral("LocTypeDungeon_LocTypeOE") } }));
+    // Has neither -> rejected
+    QVERIFY(!andNotFilter.matches(QJsonObject{ { QStringLiteral("Keyword"), QStringLiteral("LocTypeCity") } }));
+}
+
+void TestObjectWindowFilter::testShippedStarfieldFiltersIfPresent()
+{
+    const QString path = QStringLiteral("C:/XboxGames/Starfield/Content/Data/DataViews/ObjectWindow/_common/Loc-Dungeons.filter");
+    if (!QFile::exists(path)) {
+        QSKIP("Starfield Loc-Dungeons.filter not found on machine");
+    }
+
+    QFile f(path);
+    QVERIFY(f.open(QIODevice::ReadOnly));
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    const ObjectWindowFilter filter = ObjectWindowFilter::fromJson(doc.array());
+    QCOMPARE(filter.count(), 2);
+
+    // Array of keywords (as stored on records)
+    QJsonObject dungeonRec;
+    dungeonRec.insert(QStringLiteral("Keyword(s)"), QJsonArray{ QStringLiteral("LocTypeDungeon"), QStringLiteral("LocTypeCave") });
+    QVERIFY(filter.matches(dungeonRec));
+
+    QJsonObject oeRec;
+    oeRec.insert(QStringLiteral("Keyword(s)"), QJsonArray{ QStringLiteral("LocTypeDungeon"), QStringLiteral("LocTypeOE") });
+    QVERIFY(!filter.matches(oeRec));
 }
 
 QTEST_MAIN(TestObjectWindowFilter)

@@ -68,7 +68,7 @@ void DialRecord::save(ESMWriter& esm) const
         esm.writeSubZString('EDID', editorId);
     if (!topicName.isEmpty())
         esm.writeSubZString('FULL', topicName);
-    if (hasInam)
+    if (hasInam || !responseIds.isEmpty())
     {
         RawSubRecord raw;
         raw.name = 'INAM';

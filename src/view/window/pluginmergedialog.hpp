@@ -2,67 +2,39 @@
 #define PLUGINMERGEDIALOG_HPP
 
 #include <QDialog>
-#include <QListWidget>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QProgressBar>
-#include <QCheckBox>
-#include <QTableWidget>
-#include <QMap>
-#include <QVector>
 
-class Data;
+class QLabel;
+class QLineEdit;
+class QPushButton;
+class QTextEdit;
+class QVBoxLayout;
 
-enum class ConflictResolution { AutoRename, KeepSource, KeepDestination };
-
-struct MergeConflict {
-    QString recordType;
-    QString editorId;
-    QString sourceFile;
-    ConflictResolution resolution;
-};
-
+// Phase 10.3: three-way plugin merge UI (base / mine / theirs -> output),
+// reporting every conflict kept for manual resolution.
 class PluginMergeDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit PluginMergeDialog(Data* data, QWidget* parent = nullptr);
-    ~PluginMergeDialog();
+    explicit PluginMergeDialog(QWidget* parent = nullptr);
+    ~PluginMergeDialog() override;
 
 private slots:
+    void onBrowseBase();
+    void onBrowseMine();
+    void onBrowseTheirs();
+    void onBrowseOutput();
     void onMerge();
-    void onSelectAll();
-    void onDeselectAll();
-    void onGeneratePreview();
 
 private:
-    void setupUI();
-    QCheckBox* makeCheckbox(const QString& text, bool checked);
-    bool mergeType(Data* data, const QString& typeName, const QString& sourceFile,
-                   const QMap<QString, ConflictResolution>& resolutions,
-                   QVector<MergeConflict>& newConflicts);
-    bool showManualResolutionDialog();
-    void collectConflicts();
+    void buildUi();
 
-    Data* mData;
-    QListWidget* sourceList;
-    QListWidget* destList;
-    QPushButton* mergeButton;
-    QPushButton* selectAllButton;
-    QPushButton* deselectAllButton;
-    QPushButton* previewButton;
-    QProgressBar* progressBar;
-    QLabel* statusLabel;
-    QWidget* recordTypeCheckboxes;
-    QTableWidget* mPreviewTable;
-    QLabel* mPreviewStats;
-
-    QVector<MergeConflict> mConflicts;
-    QStringList mSourceFiles;
-    QStringList mSelectedTypes;
+    QLineEdit* mBaseEdit = nullptr;
+    QLineEdit* mMineEdit = nullptr;
+    QLineEdit* mTheirsEdit = nullptr;
+    QLineEdit* mOutputEdit = nullptr;
+    QPushButton* mMergeBtn = nullptr;
+    QTextEdit* mReport = nullptr;
 };
 
 #endif // PLUGINMERGEDIALOG_HPP

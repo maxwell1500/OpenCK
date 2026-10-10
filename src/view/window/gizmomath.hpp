@@ -57,7 +57,39 @@ float worldSizeForPixels(const ViewTransform& t, float screenPixels);
 // Snap helpers.
 float snapToStep(float value, double step);
 float snapDegrees(float degrees, int increment);
+// Screen-space ray through a widget point, returned as world-space origin and
+// direction. Direction is the view-plane-normal ray, long enough to reach any
+// visible placed reference.
+struct PickRay
+{
+    QVector3D origin;
+    QVector3D direction;
+};
+PickRay pickRay(const ViewTransform& t, const QPointF& screenPos, float length = 1.0e6f);
 
+// Slab-test ray against an axis-aligned box. Returns the entry distance along
+// the ray, or -1 when there is no intersection.
+float rayAabbDistance(const QVector3D& rayOrigin, const QVector3D& rayDir,
+                      const QVector3D& boxMin, const QVector3D& boxMax);
+
+// Ray against an oriented box given by center, half extents, and a rotation
+// matrix mapping box-local axes to world axes. Returns entry distance or -1.
+float rayObbDistance(const QVector3D& rayOrigin, const QVector3D& rayDir,
+                     const QVector3D& boxCenter, const QVector3D& halfExtents,
+                     const QMatrix4x4& rotation);
+
+// Möller-Trumbore ray/triangle intersection. Returns distance t along rayDir (>= 0),
+// or -1.0f on miss or parallel ray.
+float rayTriangleDistance(const QVector3D& rayOrigin, const QVector3D& rayDir,
+                          const QVector3D& v0, const QVector3D& v1, const QVector3D& v2);
+
+// Raycast against a 33x33 heightmap grid spanning a 4096x4096 exterior cell at (cellOriginX, cellOriginY)
+// with baseHeight + heightData[row][col] * 8.0f elevation.
+// Returns distance along rayDir or -1.0f on miss. If outHit is non-null, populates hit world coordinates.
+float rayTerrainDistance(const QVector3D& rayOrigin, const QVector3D& rayDir,
+                         float cellOriginX, float cellOriginY,
+                         float baseHeight, const qint8 heightData[33][33],
+                         QVector3D* outHit = nullptr);
 } // namespace gizmo
 
 #endif // GIZMOMATH_HPP

@@ -65,7 +65,10 @@ enum class StmtKind
     Return,
     Let,
     ExprStmt,
-    Function
+    Function,
+    Header,
+    Property,
+    Local
 };
 
 struct Statement
@@ -81,8 +84,20 @@ struct Statement
     ExprPtr lhs; // Let / (assignment)
     ExprPtr value; // Let / Return / ExprStmt
     bool declares = false; // Let: true for `let`, false for `set`/bare assignment
-    QString funcName; // Function
+    QString funcName; // Function / Header script name / Property name
+    QString typeName; // Header: extends target; Property / Local: declared type
+    bool isAuto = false; // Property: `auto` modifier
     QVector<QString> params; // Function
+    int line = 1;
+};
+
+/// A declared script property (`MyScript Property ref auto`) with its
+/// declared type, used by cross-script resolution.
+struct PropertyDecl
+{
+    QString typeName;
+    QString name;
+    bool isAuto = false;
     int line = 1;
 };
 
@@ -93,6 +108,9 @@ struct ParseResult
     int errorLine = 0;
     std::vector<StmtPtr> statements;
 };
+
+/// Top-level properties of a parsed program, in source order.
+QVector<PropertyDecl> propertyDecls(const ParseResult& program);
 
 class Parser
 {
@@ -109,7 +127,7 @@ private:
     bool isTerminator(const QStringList& terms) const;
     bool expectOperator(const QString& op);
     bool expectKeyword(const QString& kw);
-    Token expectIdentifier();
+    Token expectIdentifier(bool allowTypeKeyword = false);
     void fail(const QString& msg, int line);
 
     std::vector<StmtPtr> parseBlock(const QStringList& terminators);
@@ -120,6 +138,12 @@ private:
     StmtPtr parseReturn();
     StmtPtr parseLet(bool declares);
     StmtPtr parseFunction();
+    StmtPtr parseHeader();
+    StmtPtr parseProperty(const QString& typeName, const QString& typeText,
+                          int line);
+    StmtPtr parseLocalDeclaration(const QString& typeText, int line);
+    bool atTypePrefix(const Token& t, QString* typeName) const;
+    bool isPropertyKeywordAhead();
 
     ExprPtr parseExpression();
     ExprPtr parseOr();

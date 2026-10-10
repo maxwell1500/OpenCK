@@ -43,7 +43,24 @@ public:
     // Returns the current branch name (or "HEAD" detached).
     static QString currentBranch(const QString& dir);
 
-    // Returns the full path of the .git directory for the work tree
+    // Local branch names, one per line (current branch first). Empty when
+    // the repo has no commits yet.
+    static QStringList branches(const QString& dir);
+
+    // Switches to an existing branch (fails when it does not exist or the
+    // work tree is dirty in a way git refuses to carry over).
+    static Result checkout(const QString& dir, const QString& branch);
+
+    // Fetches and merges the remote tracking branch of the current branch.
+    static Result pull(const QString& dir);
+
+    // Pushes the current branch to its remote.
+    static Result push(const QString& dir);
+
+    // Fetches remotes without touching the work tree.
+    static Result fetch(const QString& dir);
+
+    // Full path of the .git directory for the work tree
     // containing dir, or empty if not a repository.
     static QString gitDir(const QString& dir);
 };

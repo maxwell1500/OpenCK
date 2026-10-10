@@ -1,4 +1,4 @@
-# REMAINING.md â€” Everything left to make OpenCK truly functional
+# REMAINING.md — Everything left to make OpenCK truly functional
 
 > **Single source of truth.** All previous planning/status/debt/roadmap/phase
 > documents were reconciled against the codebase and deleted (2026-08-16).
@@ -9,6 +9,187 @@
 > green (excluding the standalone `test_subrecord_diff` CLI), including the
 > real-data gates that load Starfield.esm + Magnus.esm + Vvardenfell.esp;
 > GUI + CLI smoke tests pass.
+
+### Phase 15: AI Package Editor (Patrol, Sandbox, Travel, Combat) ✅
+*The Creation Kit makes you dial package behaviour in raw record fields with no feedback
+until the game refuses to start.*
+
+- **15.1 Semantic model.** `libs/files/esm/packagesemantics.{hpp,cpp}` decodes the
+  PKDT payload the record layer keeps verbatim into a `PackageData` the editor
+  can act on: the 30-value PackageKind family, the flags word, and the
+  month/weekday/date/hour/minute schedule. Re-encoding writes only the bytes the
+  model owns, so a multi-entry package and every unmodelled byte survive
+  untouched and an unedited package still round-trips bit-for-byte.
+- **15.2 Validation.** `validatePackageData` reports the errors the engine
+  would: an Escort/Find/Activate/Sit package with no PTDT target,
+  Travel/Patrol without road flags, a schedule that sets a date but no minute.
+  Warnings save; errors block.
+- **15.3 Editor.** `PackEditor` is now a real form instead of four spin boxes:
+  a kind combo (every family named), a schedule grid, live target references
+  resolved through the existing `FormPickerWidget`, and a live validation list
+  that disables Save. The AI package browser shows kind + schedule per row.
+- Verified: `test_packagesemantics` 12/12 (kind names, road kinds, decode,
+  schedule decode, foreign-byte preservation across a multi-entry payload,
+  payload creation, no-op round-trip, validation, schedule checks);
+  `test_packagerecord` 4/4 with three new file-level round-trips — schedule
+  edits and target edits survive a real ESM write/read, and an unedited package
+  is byte-identical after save.
+
+### Phase 14: OBScript Script Editor + Validator ✅
+*The Creation Kit shipped a plain text editor with a compile button. This phase makes the script editor part of the correctness chain: it validates what the game would refuse to compile, in the place you are typing it.*
+
+- **14.1 Real-source parsing.** The OBScript parser now accepts the source files the
+  game actually ships instead of failing on the first line: `ScriptName X extends Y`
+  headers, `<Type> Property name [auto] [= expr]` properties, `<type> name`
+  local/global declarations and compound assignment (`+= -=
+  *= /= %=`, desugared to `x = x + y`). The lexer gained `scriptname`,
+  `extends` and `property`; `extends Actor` keeps its capital because the
+  compiler resolves types case-sensitively.
+- **14.2 Per-game native catalogs.** `ObScript::nativeCatalogFor(GameFlavor)`
+  maps the loaded game (`Skyrim SE`, `Fallout 4`, `Morrowind`, …) to a curated
+  native signature table, so `AddItem()` fails in Skyrim SE and an unknown
+  flavor only carries the cross-game builtins. Trailing parameters may be
+  declared optional (Papyrus default arguments), e.g. `wait(1.0)`.
+- **14.3 Cross-script resolution.** `ObScript::resolveProgram` checks every
+  property typed with a script name against the plugin's own SCRO records and
+  reports the ones it cannot see (a warning — they may live in a master file).
+- **14.4 Editor.** `ScriptEditorDialog` takes the game flavor and the plugin's
+  script list, shows the full diagnostics list with click-to-jump, and
+  disables **Save** while a compile-level error is open. Completion is seeded
+  with keywords, script symbols, the flavor's natives and sibling scripts.
+- Tests: `test_obscriptcatalog` (12) covers flavor mapping, surface gating,
+  known-native arity, header/property parsing, compound assignment desugaring
+  and cross-script resolution; `test_scripteditor` grew to 15 with flavor
+  selection, the save gate and the cross-script warning. The six obscript
+  suites total 79 green tests.
+
+### 2026-10-09 — Phase 13 (Native Linux + Steam Deck)
+
+Shipped:
+- 13.1 Linux portability: `tests/test_loader.cpp` no longer includes
+  `<windows.h>`/`<DbgHelp.h>`/`<crtdbg.h>` unconditionally (glibc
+  `backtrace()` on the non-Windows side); `waveplayer.{hpp,cpp}` was rewritten
+  from Win32 `waveOut` to Qt `QAudioSink` so audio preview works on
+  ALSA/PipeWire/macOS; optional Qt modules (Multimedia, Gamepad) are discovered
+  with `find_package(... QUIET OPTIONAL_COMPONENTS ...)` and the features
+  self-report unavailable when missing instead of breaking the configure;
+  `data/linux/openck.desktop` + icon install rules under `UNIX AND NOT APPLE`
+  (Wayland/X11 need no per-backend code).
+- 13.2 `ThemeManager::Scale` density presets (Desktop/Touch/Compact) persisted
+  as `[OpenCK] UiScale` and applied after the palette, plus
+  `NifViewportWidget::{nudgeCamera,orbitCamera,zoomCamera,resetCamera}` and
+  `GamepadNavigator` (left stick=pan, right stick=orbit, triggers=Z,
+  A/B/X=reset/zoom, radial dead zone).
+- Verified: `test_thememanager` 12 passed (5 new), `test_loader` 21 passed,
+  11 view suites passed, app smoke clean; both non-Windows branches compile-checked.
+
+Deliberately **not** done here:
+- The Linux build itself is not compiled in this repo (Windows-only machine);
+  portability was established by guarding every Windows-only dependency and
+  compile-checking the POSIX branches, not by a GCC/Clang run. A Linux CI job
+  remains unbuilt.
+- Qt Multimedia and Qt Gamepad are optional: a Qt install without them builds
+  and runs, but audio preview and gamepad navigation report unavailable.
+- Steam Input / lizard-mode bindings are the Steam client's job; the editor
+  only exposes the axis mapping it can see from the OS.
+- SteamOS packaging (Flatpak/AppImage/Steam Depot) is not produced — only the
+  `.desktop` entry and icon that a native install needs.
+
+### 2026-10-09 — Phase 12 (Blender 4+ DCC live-sync)
+
+Shipped: `blenderbridge.{hpp,cpp}` (skeleton + collision resolution,
+launch plan, watched export, parser-level verification, atomic commit with
+backup + rollback), `scripts/blender/openck_livesync.py` (NifTools import
+with armature/collision attachments, `save_post` export), `LiveSyncDialog`,
+and the "Open in Blender (Live Sync)..." context action. `openck_livesync.py`
+is copied into the build tree's `scripts/blender/` and installed.
+
+Deliberately **not** done here:
+- The export uses NifTools' default export settings per game; a per-game
+  export-tuning UI (FO4 vs Skyrim SE weights/UV flags) is not built —
+  NifTools' importer/exporter is the canonical path and tuning it from the
+  CK would duplicate the addon's own settings.
+- `NifAnimationWriter` does not consume the live export: the bridge
+  updates the mesh asset on disk (the record's model path), and the
+  animation writer keeps its existing explicit pipeline. Auto-importing an
+  export into the active plugin's animation set on every save would fight
+  the artist mid-edit.
+- The first open loads the mesh from disk; a "re-export from the in-editor
+  selection" target (Blender syncing the *in-viewport* selection) is not
+  wired — the record's model asset is the source of truth.
+
+### 2026-10-09 — Phase 10 (Git-native VC + visual diff) and Phase 11 (crash resilience)
+
+Shipped in this pass:
+- `plugindiff.{hpp,cpp}` + `RecordDiffDialog`: record-level diff of two
+  plugins off the on-disk snapshot layer; subrecords aligned by name (LCS,
+  positional inside same-name runs), colour-coded Added/Removed/Modified.
+- `plugintextexport.{hpp,cpp}`: plugin → deterministic JSON (`TYPE:formId`
+  keys, hex payloads). Export is a pure function of the records, so the
+  output is byte-stable across runs. JSON only — no YAML twin was added;
+  one text format keeps the Git surface single.
+- `gitrepository.{hpp,cpp}`: added `branches`, `checkout`, `fetch`, `pull`,
+  `push`; `Preferences > Network / Version Control` is now live (repo
+  path, branch switch, status, commit/pull/push) instead of a disabled
+  checkbox. Requires git on PATH; the panel disables itself otherwise.
+- `recordmerger.{hpp,cpp}` + `pluginmerger.{hpp,cpp}` +
+  `PluginMergeDialog`: three-way merge (base/mine/theirs → output plugin),
+  one-sided changes taken, identical changes collapsed, same-FormID
+  double-allocation flagged as an ID conflict, true divergent edits kept
+  on "mine" with a reason list for the user to resolve. Merged records are
+  written verbatim (`ESMWriter` raw subrecords), so the output re-reads
+  through the normal reader.
+- `Document::save` stages through `QSaveFile` (commit on success only);
+  `ESMWriter::save` now takes `QIODevice&`. An interrupted save can no
+  longer truncate an existing plugin.
+- `AssetValidator::validateRelationships` gained interior-cells-with-XCLC,
+  exterior grid-range (−32..32), missing-XCLC, and circular
+  DIAL→INFO→DIAL-link checks.
+- Tests: `test_plugindiff` 8/8, `test_gitintegration` 7/7 (real git).
+
+Deliberately **not** done here:
+- FormID-conflict *auto-remap* into the destination (`FormIdCompactor`
+  compacts owned records into the ESL range but does not renumber merged
+  records) — conflicts are reported and kept for manual resolution, the
+  merge output is a normal editable plugin.
+- TES3-side record diff/merge: `collectRecordSnapshots` walks the TES4
+  top-level record layout. Morrowind round-trips through its own test
+  suite (`test_tes3data`, `test_tes3*`), not this layer.
+- Git "remote setup" (add remote / set upstream): panel drives commit,
+  branch switch, pull and push on an existing repo.
+- No memory-mapped record index for search: the loader's masters are
+  already index-only; adding mmap would be a new caching layer with its
+  own invalidation risk, and the bounded probe (open + first 400 records
+  of the 3.8M-record masters) stays inside its budget.
+
+### 2026-10-08 — LZ4/BSA writer conformance fixes (found by cross-game archive conversion)
+
+Grounding `ArchiveConverter` on real archives (the Oblivion GOTY
+`Oblivion - Misc.bsa`, 0x67, 115 entries incl. a zero-length file and
+duplicate names, and 262 KB font payloads that split across LZ4 frames)
+surfaced four defects in the shared BSA writer/encoder:
+
+1. **`appendLz4Length` omitted the extension for exactly-15 lengths.** The
+   LZ4 spec writes `length - 15` whenever the token nibble is 15, so a length
+   of exactly 15 is a single `0x00` byte, not nothing. Skipping it desynced
+   every block that hit a 15-literal sequence.
+2. **Matches were allowed to end inside the final 5 bytes.** LASTLITERALS is
+   mandatory: the last 5 bytes of a block are always literals, and Skyrim's
+   strict decoder rejects a block whose closing sequence is a match. Matches
+   are now clamped at that boundary (clamped, not discarded — discarding
+   turned highly repetitive blocks into literals-only and lost all
+   compression).
+3. **"Stored" (uncompressed) blocks were written inside LZ4 frames.** The
+   frame format has no stored-block variant; every block is compressed LZ4
+   data, so an incompressible block is a literals-only sequence. Readers that
+   decode each block (including the one in this file) failed on the raw bytes.
+4. **Zero-length payloads were dropped on write.** A BSA entry with no data is
+   legal — Oblivion ships `menus\menu_labels.txt` at size 0 — so the entry is
+   stored rather than skipped.
+
+`test_archiveconverter` now converts the real archive end-to-end with every
+payload byte-verified, and `test_bsawrite` (8/8) pins the writer's bit
+semantics, hash tables, and older-target versions again.
 
 ### 2026-09-24 â€” Skyrim SE BSA writer conformance
 
@@ -1027,7 +1208,11 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     `MainWindow::on_actionModManager_triggered`. The INI/JSON parsing is
     factored into testable `parseMo2Ini` / `parseVortexField` helpers;
     `test_modmanager` covers profile, gamePath, modsDirectory, selectedProfile
-    and Vortex field extraction (6/6 pass).
+    and Vortex field extraction. **Done 2026-10-08:** deployment consumption —
+    `ModDeploymentResolver` parses the real Vortex deployment manifests and MO2
+    modlist priority, resolves deployed/staged asset paths and hardlink status,
+    and the dialog surfaces it (deployed files, source mods, link status,
+    asset resolver); `test_modmanager` 14/14 including the real-manifest gate.
 7. **OBScript editor** â€” lexer + parser core done: `ObScript::Lexer`
    (`libs/files/esm/obscriptlexer.hpp/.cpp`) tokenizes reserved words,
    identifiers, int/float literals, strings, operators, newlines and `;`
@@ -1246,7 +1431,7 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
       present) â€” the batch counterparts to the bridge's command builder.
       `py_compile` clean; both exit 2 with a clear message outside Houdini
       (no Houdini installed here to run them under).
- 9. **Multi-game record dispatch** â€” foundation verified against real
+ 9. **Multi-game record dispatch** — foundation verified against real
     non-Starfield masters:
     `GameFormat` (`libs/files/esm/gameformat.hpp/.cpp`) detects the game
     family from master basenames + the LightMaster flag (`detectGame`), now
@@ -1259,8 +1444,19 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
     existing `ESMReader`/`Header`: **FO4 `Fallout4.esm` (1.74M records) and
     Starfield `Starfield-Core.esm` (3.83M records) each read 400 records with
     0 errors and correct `detectGame`, and the base `.esm` masters correctly
-    report no MAST entries** â€” proving the unified TES4 reader generalizes
+    report no MAST entries** — proving the unified TES4 reader generalizes
     beyond Skyrim.
+    **Cross-game migration done 2026-10-08 (Phase 9.2):** `ArchiveConverter`
+    (`src/model/tools/archiveconverter.{hpp,cpp}`) rebuilds BSAs (0x67/0x68/
+    0x69) and BA2s for any target game with per-payload verification;
+    `RecordMigrator` (`src/model/tools/recordmigrator.{hpp,cpp}`) copies
+    records across TES4-family plugins over the shared record core with
+    EditorID collision renaming and explicit skip reasons; `MigrationDialog`
+    exposes both (Tools > Cross-Game Migration). Four latent BSA-writer bugs
+    were fixed grounding this on real archives (LZ4 length-15 extension,
+    last-5-bytes match rule, no stored blocks in LZ4 frames, zero-length
+    payloads). `test_archiveconverter` (7, real-data gate on the Oblivion
+    GOTY `Oblivion - Misc.bsa`) and `test_recordmigrator` (6) pass.
      **Morrowind (TES3) is a genuine separate format:** its first record is
      `'TES3'` and stores `HEDR` *inline* (version/numRecords/nextObjectID as
      raw fields, not a subrecord) followed by per-month `GMST`/`NAME`/`STRV`
@@ -1435,6 +1631,15 @@ reads loose `.nif` files from `OPENCK_DATA_DIR`, which is Starfield content
      - `test_tes3recorddatawidget`: mapped-codes round-trip, null +
        synthetic widget fields, `T3:` factory key via `openOrFocus`.
      TES3 Phase 2c complete.
+
+     **Status 2026-10-08 (regression found — OPEN):** `test_tes3roundtrip` fails
+     on the real `Morrowind.esm`: only 41,899 of 48,295 records load (6,396
+     dropped) and the save differs from the original at offset 320. Root cause
+     not yet located (the loader no longer walks every top-level record).
+     `test_tes3roundtrip::testLoadAndSaveByteIdentical` and
+     `testPerTypeCounts` are the reproducers; suite otherwise 149/150 green.
+     Everything else in TES3 Phases 2a–2c still passes (component write-back,
+     editors, synthetic round-trips).
 
 ---
 
@@ -2568,6 +2773,35 @@ REFR with no parent cell (warning) versus a missing one (error) versus a clean
 one, a cell with a missing owner, four kinds of dangling quest/dialogue link, a
 fully wired graph that must produce nothing, and both save-policy overloads.
 
+**Status 2026-10-05 — Series 7 is complete.**
+
+- **Obsolete validator removed:** `PluginValidator` (`libs/files/esm/pluginvalidator.{hpp,cpp}`)
+  read fixed 256-byte master buffers and an obsolete header layout; it had zero production
+  callers and was removed from the tree and `CMakeLists.txt`.
+- **Master index range validation:** `AssetValidator::validateMasters()` now checks the high byte
+  of every FormID across all collections against the declared master count. Indices pointing
+  past declared masters (excluding 0xFE light-master and 0xFF runtime IDs) are reported as Errors.
+- **Cross-collection and component reference index:** `AssetValidator::validateReferences()` was
+  extended across all collections (including Armor, Container, Book, Activator, Enchantment,
+  Faction, Package, Location) and dynamically traverses `FormComponents` properties via
+  `FormEditorProperty` and `FormArrayEditorProperty` to validate all component-based references.
+- **Duplicate EditorID check:** `AssetValidator::validateEditorIds()` checks case-insensitive
+  EditorID uniqueness across all collections and reports duplicate EditorIDs sharing differing FormIDs.
+- **Required component validation:** `AssetValidator::validateRequiredComponents()` verifies
+  mandatory engine data: placed references must have valid base objects (`baseId != 0`), actors
+  must specify a race, statics must provide a 3D model path, and quests must carry an EditorID.
+- **Script reference check:** `AssetValidator::validateScripts()` checks script FormIDs on
+  quests and dialogue responses against known script and record IDs.
+- **Navigable diagnostic model:** `ObjectWindowModel::findRecord()` locates records by either
+  EditorID or FormID (hex and formatted). `ObjectWindowDialog::selectRecord()` expands the
+  hierarchy, selects, centers, and raises the window. `MainWindow` wires
+  `ValidationReportDialog::navigateToRecord` to `selectRecord()`.
+- **Unified validation:** `MainWindow::runValidation()` runs `AssetValidator::validateAll()`
+  alongside the legacy record validators and surfaces all diagnostics in the Warnings dock.
+- **Tests:** `test_assetvalidatorrelationships` expanded with 7 new test slots covering
+  duplicate EditorIDs, unique EditorIDs, required components, valid components, script
+  validation, master index range enforcement, and `findRecord` navigation; all 27 tests pass cleanly.
+
 ### Series 8 â€” Replace pseudo-save editors with active-document transactions
 
 **Priority: P1 correctness.** Weather/light and water editors discover GMST
@@ -2587,6 +2821,45 @@ Document instead of writing standalone ESM streams; AI Package creation uses
 allocated FormIDs and `AddRecordCommand`. Dialogue save/add/remove paths use
 typed `EditRecordCommand`/`AddRecordCommand` plus parent-index commands. Full
 WTHR/LIGH/SOUN/WATR editing and synthetic active-document round trips remain.
+
+**Status 2026-10-06 — Series 8 is complete.**
+
+- **DialogueTreeEditor active-document transactions:** Refactored `DialogueTreeEditor` to save
+  through `MainWindow::saveActiveDocument()` via callback instead of exporting standalone flat
+  ESM streams. Creating DIAL records allocates FormIDs with `Data::createNewRecord(Type_Dial_)`
+  and pushes `AddRecordCommand`. Creating INFO records allocates FormIDs, appends to parent
+  DIAL `responseIds`, and commits atomically as a `MacroCommand` containing `AddRecordCommand`,
+  `EditRecordCommand<DialRecord>`, and `SetInfoParentDialCommand`. Deletion unlinks the response
+  from parent DIAL `responseIds` with `EditRecordCommand` and `SetInfoParentDialCommand`, then
+  removes the record with `removeRecordWithUndo`.
+- **Weather & Light editor catalogs & WTHR/LIGH editing:** Replaced substring matching in
+  `WeatherLightEditor` with `WeatherLightCatalog`, classifying canonical settings per game
+  generation (Morrowind, Skyrim/Oblivion/FO4/Starfield) with categories and descriptions.
+  Added direct editing of WTHR (`WthrRecord`) and LIGH (`LighRecord`) records alongside
+  the GMST settings, routed through `AddRecordCommand`, `EditRecordCommand<WthrRecord>`,
+  `EditRecordCommand<LighRecord>`, `EditRecordCommand<GameSetting>`, and `removeRecordWithUndo`.
+- **Water editor catalogs & WATR editing:** Replaced substring matching in `WaterEditor`
+  with `WaterCatalog`, categorizing canonical water GMSTs and GLOBs. Added direct editing
+  of WATR (`WateRecord`) records alongside game settings and global variables, routed
+  through `AddRecordCommand`, `EditRecordCommand<WateRecord>`, `EditRecordCommand<GlobalVariable>`,
+  `EditRecordCommand<GameSetting>`, and `removeRecordWithUndo`. Re-enabled the Add Item button
+  and hooked Save Changes directly to `MainWindow::saveActiveDocument()`.
+- **AIPackageEditor delete undo:** Fixed `onDeletePackage()` to use
+  `removeRecordWithUndo()` on `mData->getPackCollection()` with `mData->getUndoStack()`.
+- **Object Window transactional wiring:** Extended `ObjectWindowDialog::onDoubleClick` to
+  open transactional edit forms for `CkId::Type_Ligh_` and `CkId::Type_Wate_`.
+- **Engine serialization fixes:**
+  - Fixed `Collection::insertRecord()`: index keys were previously inserted case-sensitively
+    while `searchId()` searched case-insensitively, preventing newly added records from
+    being found.
+  - Fixed `WateRecord::load()` and `save()`: added missing `FULL` subrecord serialization
+    and synchronized with `TESFullName_Component`.
+  - Fixed `DialRecord::save()`: emit `INAM` subrecord when `responseIds` is non-empty.
+- **Synthetic tests:** Added `testDialogueActiveDocWorkflow`,
+  `testWeatherLightActiveDocWorkflow`, `testWaterActiveDocWorkflow`, and
+  `testAIPackageActiveDocWorkflow` to `test_editor_writeback.cpp`. Each workflow verifies
+  FormID allocation, command push, undo revert, redo restore, active document save to disk,
+  and reload verification into `Data`. All 17 tests in `test_editor_writeback` pass cleanly.
 
 ### Series 9 â€” NIF animation write-back
 
@@ -2637,6 +2910,33 @@ upsert/remove/insert against the raw per-channel groups. Edited grouped
 channels still become linear when the GUI moved keys; unchanged channels keep
 their original interpolation and tangents through the bit-exact payload.
 
+
+**Status 2026-10-06 — Series 9 is complete.**
+
+- **Parser and source path retention in AnimationEditor:** `AnimationEditor` now retains the
+  source path (`mSourceNifPath`) alongside the parsed source representation:
+  `std::unique_ptr<NifBlockFile> mSourceBlockFile` for Bethesda/NetImmerse containers and
+  `std::unique_ptr<Nif::NifParser> mSourceParser` for internal dialect NIFs. Public programmatic
+  APIs `loadNif(path)`, `saveNif()`, `sourceNifPath()`, `animation()`, `undoStack()`,
+  `sourceBlockFile()`, and `sourceParser()` are exposed. Loading seamlessly falls back to
+  `NifParser` when opening internal dialect files.
+- **Atomic persistence via `QSaveFile`:** Refactored `NifParser::save()` to serialize into
+  an in-memory byte array and commit atomically using `QSaveFile`, matching `NifBlockFile::save()`.
+  Partial or corrupted files from interrupted writes are eliminated.
+- **Unified single-pass animation writer:** Implemented `NifAnimationWriter::writeAnimationToNif()`,
+  replacing the repeated per-channel file reloading and re-saving loop with an in-memory batch
+  update of all clips, channels, keyframes, and markers, committing the modified container to disk
+  in a single atomic pass with `QSaveFile`.
+- **Keyframe count operations & channel preservation:** Supported keyframe add, remove, and
+  replace operations across channels. Flat resampling preserves per-channel time bases on
+  real multi-channel meshes so unchanged channels retain exact timings without drift.
+- **Synthetic NIF persistence test:** Added `testSyntheticNifEditorPersistence()` in
+  `test_nifanimation.cpp`. The test builds a synthetic NIF with an animated bone and unrelated
+  geometry (shapes, materials, texture paths, child nodes), loads it into `AnimationEditor`,
+  performs modify, add, and remove keyframe edits, saves atomically via `saveNif()`, and
+  reloads independently via `NifParser` and a fresh `AnimationEditor` instance. The test
+  verifies that keyframe counts and values are updated while 100% of unrelated geometry blocks,
+  vertex data, UVs, and prop nodes are preserved. All 18 test slots in `test_nifanimation` pass cleanly.
 **Open evidence gaps (measured, not assumed).** Three things are known to be
 unverified and are worth recording precisely rather than as a single "needs
 testing" line:
@@ -3180,32 +3480,174 @@ skip rather than fail when the game is absent.
 These are additional evidence-backed series discovered from the local install,
 separate from the nine required parity series:
 
-- **CK configuration:** add read-only import/inspection for
-  `CreationKit.ini`, `CreationKitPrefs.ini`, `CreationKitCustom.ini`,
-  `EditorColors.xml`, and CK archive lists instead of relying only on
-  OpenCK-local Qt settings.
-- **POFX compatibility:** shipped POFX files use nested typed particle data,
-  while `ParticleBundle` expects simplified top-level node/emitter fields.
-- **Landscape brushes:** shipped LBR files are single JSON brush objects;
-  `BrushDefinition` expects a `brushes` array with simplified fields.
-- **Object-window filters:** shipped filters use wildcard/exact rules and
-  per-rule concatenation flags; `ObjectWindowFilter` currently maps unknown
-  types to `Contains` and does not implement wildcard matching.
-- **Material rules:** shipped `RuleTemplates` use nested `TemplateRules`, and
-  applied texture options/regex rules differ from OpenCK's simplified schemas.
-- **AssetWatcher integration:** the CK ships BSFBX, BSTextureConverter, xg_xs,
-  xtexconv, and Starwatcher components; OpenCK has no equivalent plugin bridge
-  or settings integration.
-- **Papyrus toolchain:** the CK ships `PapyrusCompiler.exe`, assembler,
-  `PCompiler.dll`, and a project schema; OpenCK's compiler detection should
-  integrate the installed Starfield toolchain rather than only `pp64.exe`.
-- **Mod deployment:** the CK/Xbox install exposes Vortex deployment manifests
-  and deployed asset trees; OpenCK detects Vortex/MO2 but does not consume
-  deployment manifests, ownership, or hardlink state.
-- **Wwise/FaceFX authoring:** OpenCK has wrappers and partial FaceFX framing,
-  but not Wwise project authoring or FaceFX graph evaluation/playback. The
-  latter remains the separate Â§8 runtime boundary.
+- **CK configuration:** **Done 2026-10-06.** `CkConfigInspector`
+  (`libs/files/ini/ckconfiginspector.{hpp,cpp}`) provides read-only inspection
+  and import for `CreationKit.ini`, `CreationKitPrefs.ini`, `CreationKitCustom.ini`,
+  and `EditorColors.xml`. It parses RGBA slot palettes (`Primary`, `Secondary`,
+  `Third`, `Fourth`, `Fifth`), exposes resource archive lists (`SResourceArchiveList`,
+  `sResourceIndexFileList`, `allArchives()`), display FOV/camera speed, and Papyrus
+  paths. Covered by unit tests in `test_ckconfiginspector`.
+- **POFX compatibility:** **Done 2026-10-06.** `ParticleBundle`
+  (`src/model/tools/particlebundle.{hpp,cpp}`) now supports Starfield's nested typed
+  particle bundle schema (`"Data"` -> `"Bundles"` / `"Definition"` -> `"Gravity"` /
+  `"Position"` / `"Rotation"` / `"Stacks"`). Handles string-or-number conversion,
+  material paths, gravity/velocity vectors, ribbon flags, UV animation, and simulation
+  definitions (attractors, turbulence, drag, flipbooks). Tested against synthetic bundles
+  and real shipped Starfield `.pofx` files (`Gravity.pofx`, `Point Attractor.pofx`) in
+  `test_particlebundle`.
+- **Landscape brushes:** **Done 2026-10-06.** `BrushDefinition`
+  (`src/model/tools/brushdefinition.{hpp,cpp}`) supports single-object JSON `.lbr`
+  files as shipped in Starfield alongside the `brushes` array schema. Infers operation
+  modes from boolean flags (`Sculpt`, `Flatten`, `Smooth`, `StampMode`, `BuildUp`,
+  `Subtractive`), parses radius/size, strength, falloff profiles, height targets, and
+  alpha mask texture paths (`BrushAlphas\Circle.dds`). Tested against synthetic and real
+  shipped Starfield brushes (`DefaultBrush.lbr`) in `test_brushdefinition`.
+- **Object-window filters:** **Done 2026-10-06.** `ObjectWindowFilter` and `FilterRule`
+  (`src/model/tools/objectwindowfilter.{hpp,cpp}`) now support per-rule
+  `IsConcatenatedOr` chaining, wildcard pattern matching for `ExactValue` (`*`, `?`),
+  and array attribute evaluation with `IsNegative` (correctly checking that no array item
+  matches negated rules). Tested against synthetic chaining and real shipped Starfield
+  filters (`Loc-Dungeons.filter`, `Planets-Life.filter`) in `test_objectwindowfilter`.
+- **Material rules:** **Done 2026-10-08.** `MaterialRuleTemplate`
+  (`src/model/tools/materialruletemplate.{hpp,cpp}`) parses the real nested
+  `TemplateRules` shape (`Rule{from,to,op}` per material class, regex `From`
+  patterns, `Remove`/`Add`/`Move`/`MakeConst` operations), loads
+  `RuleTemplates/ShaderModels/*.json` + `Bundles/*.json`, resolves texture slots
+  (`Diffuse`, `Normal`, ...), and ships builtin templates
+  (1–4LayerStandard, Terrain, Skin, Hair, Eye, Water, Vegetation).
+  `MaterialCompiler` resolves slot textures against a texture root and reports
+  missing slots; `MaterialEditor` compiles/previews; `MATR` records persist slot
+  textures via the `SLTS` subrecord. Verified in `test_materialruletemplate`,
+  `test_materialcompiler`, `test_materialrecord`, `test_materialeditor`.
+- **AssetWatcher integration:** **Done 2026-10-08.** `AssetToolCliBridge`
+  (`src/model/tools/assettoolcli.{hpp,cpp}`) bridges the shipped
+  Starfield toolchain (BSFBX-equivalent FBX/NIF flows via AssetTool,
+  BSTextureConverter/xtexconv-equivalent TextureTool DDS conversion, xg_xs
+  shader compilation, and Starwatcher-style change tracking): per-tool
+  candidates are auto-detected through `QSettings` overrides and env vars,
+  `runTool` is timeout-safe, `convertTextures` falls back to the internal
+  `AssetConverter`, and the Asset Browser exposes Convert to DDS / Package
+  Material / Toolchain Status. Verified in `test_assettoolcli` (10 tests).
+- **Papyrus toolchain:** **Done 2026-10-06.** `PapyrusCompiler`
+  (`src/view/window/papyruscompiler.{hpp,cpp}`) now detects and integrates the
+  installed Starfield toolchain (`PapyrusCompiler.exe`, `PCompiler.dll`,
+  `PapyrusAssembler.exe`, `PapyrusProject.xsd`) in addition to `pp64.exe`. Adds
+  toolchain directory accessors and schema/assembler queries, lowers the binary size
+  heuristic to avoid false warnings on dynamically linked compilers, and is tested
+  in `test_papyruscompiler`.
+- **Mod deployment:** **Done 2026-10-08.** `ModDeploymentResolver`
+  (`src/model/tools/moddeploymentresolver.{hpp,cpp}`) consumes the real Vortex
+  deployment manifests (game-root `vortex.deployment.json` and Data-folder
+  `vortex.deployment.<name>.json` — schema and native-separator relPaths
+  grounded on the managed Starfield install) and MO2 `modlist.txt` /
+  `profiles/*/modlist.txt` priority lists: deployed vs staged path resolution
+  (last enabled mod wins), and per-file link status (hardlink/symlink/
+  same-file/distinct via NTFS file ids, matching Vortex's
+  `hardlink_activator`). The Mod Manager dialog shows the manifest, method,
+  per-file table and an asset resolver. Verified in `test_modmanager`
+  (14 tests, including a real-manifest gate that resolves every deployed file
+  and confirms the hardlinks on disk).
+- **Wwise/FaceFX authoring:** **LipSync pipeline done 2026-10-08.**
+  `FuzWriter` (`libs/files/audio/fuzwriter.{hpp,cpp}`) packages `.fuz` voice
+  archives (real `FUZE`+version+lipSize+lip+audio form; chunked `LIPF` form
+  for lip-only) and round-trips through `FuzParser`; `AudioPipelineTools` now
+  drives the shipped Starfield `LipGenerator.exe` with its actual CLI
+  (positional wav/text/actor/analysis + `-Language:`/`-OutputFileName:`/
+  `-AnimationGroupName:`; the previous Fonix-era `-wav/-out/-data/-rate` form
+  is not accepted by the shipped tool) and locates the `Tools/FaceFX`
+  actors. The Dialogue (INFO) editor and Sound Editor expose Generate LipSync
+  / Package .fuz against a response WAV. Verified end-to-end against the real
+  tool (produced `voice.ffxanim` from a real SAPI-rendered WAV) plus
+  `test_fuzparser` (9) and `test_audiopipelinetools` (9).
+  Still out of scope: Wwise project authoring and FaceFX graph
+  evaluation/playback (the §8 runtime boundary), and the `.FACEz` desktop
+  blob → packed `__ffx\0` runtime anim transform (no documented mapping; the
 
+  **Done 2026-10-09 (reader, then corrected the same day).** `LipFile`
+  (`libs/files/audio/lipfile.{hpp,cpp}`) parses the lip half of a `.fuz` into
+  the 16 FaceGen viseme curves, so the viseme data is real data rather than
+  opaque bytes. Grounded in real files from the shipped
+  `Skyrim - Voices_en0.bsa` and cross-checked against an independent
+  decoder. Format: a 24-byte LE header (`version`, `gridSize`, `numCurves`,
+  `frames`, `const14`, `first`, `const20`, `u22`) followed by an RLE payload
+  (`0x00` + `u16` count = a run of zero bytes; anything else is a literal)
+  that expands to float32 curve slots, 33 to a frame. Frame N occupies slots
+  [N*33, N*33+33); slots 6..21 of each frame are the 16 visemes in
+  `Aah, BigAah, BMP, ChJSh, DST, Eee, Eh, FV, I, K, N, Oh, OohQ, R, Th, W`
+  order. Frame time is `(frame + first) / 30`, `first` being a negative
+  pre-roll count.
+
+  **What real data showed that the earlier read missed:**
+
+  1. **`gridSize == frames * 132 + 28` holds on all 54 lip-carrying lines,
+     zero exceptions.** `gridSize` is derived from `frames`, not independent,
+     so the pair is a corruption check on the header: a header that disagrees
+     with itself is rejected rather than guessed around.
+  2. **The payload does not always start at 24.** Five lines carry one extra
+     record-header byte and decode correctly at 25 — a search that assumes 24
+     misaligns their grid by one byte. The start offset is therefore searched
+     for over [24, 32], ranked by how close the decoded curve count lands to
+     the declared grid; a misaligned read runs through the stream and cannot
+     come close.
+  3. **The "off-by-one rows" reported earlier was a bug, not a quirk.** The
+     first implementation computed the grid's leading offset from the payload
+     length (`p0 = (6 + 33 - count % 33) % 33`), which is 0 for only 6 of 53
+     lines. For the other 47 the whole grid was shifted by up to 32 slots, so
+     `visemesAt()` read the wrong curves — and the range assertions could not
+     catch it because zeros are always in range. 19 lines also came out one
+     row longer than their header declared. Fixing `p0` to 0 and taking `frames`
+     as the row count removed both symptoms at once.
+  4. **Curves are weights that dip below zero.** All 33 slots per frame carry
+     a normalized weight, but generators let them overshoot slightly; the worst
+     shipped line reaches -0.066. Consumers that draw a weight must clamp.
+  5. **One line in 54 has a truncated payload.**
+     `dlc1rv06_dlc1rv06spousetop_000058c7_1.fuz` carries 4064 of the 4851
+     curve slots its header declares, while its `gridSize`, its frame count
+     and its XWMA duration all agree on 147 frames, and the payload ends in an
+     explicit 112-byte zero-run rather than merely stopping early. It decodes
+     to 123 live frames plus 24 silent ones. `missingSlots()` reports the
+     shortfall so the editor can flag it; the earlier version rejected the line
+     outright and lost 84% of a playable animation for nothing.
+
+  **The viseme names are NOT verified and never were.** Attempts to ground
+  `kVisemeNames` (Aah, BigAah, BMP, ChJSh, DST, Eee, Eh, FV, I, K, N, Oh,
+  OohQ, R, Th, W at slots 6..21):
+  - Scanned **30,661 exe/dll/facefx/bin/dat files** across every installed
+    Steam and XboxGames tree: not one contains the raw names.
+  - No Skyrim Special Edition Creation Kit is installed, so there is no
+    Bethesda lip tooling for Skyrim on this machine at all.
+  - The only lip tooling present is Starfield's FaceFX set
+    (`Tools/LipGenerator/LipGenerator.exe`, `Tools/FaceFX/ffxc.exe`, four
+    `.facefx` actors). It is an OC3/FaceFX tool that reads its phoneme map
+    from an external actor file and uses a **different vocabulary** — targets
+    `tBack`, `tRoof`, `tTeeth`, `JawOnly`, `TongueOnly` with a `SIL`
+    silence phoneme — plus 16 *disguised* phoneme names (`Bump`, `Church`,
+    `Cage`, `Though`, `Wet`, `Earth`, `Ox`, `Oat`, `New`, `Told`, `Size`,
+    `Roar`, `Fave`, `If`, `ShCh`, `PBM`) that lookalike the FaceGen set but
+    do not map cleanly onto it. None of this is a Skyrim `.lip` curve table.
+  - The curves themselves give **no** corroboration: over 7,932 frames of real
+    voice data, no 16-wide slot window is distinguishable from its neighbours
+    (dominance declines monotonically from 0.74 at slot 0 to 0.57 at slot 17,
+    with no peak at slot 6), and slots 6..21 are the *least* active group
+    (mean on-rate 0.088 against 0.122 for slots 0..5). Slot 0 is active on
+    26.6% of frames, 2.5x the busiest slot in the claimed viseme window.
+  So `kVisemeBase`/`kVisemeNames` are recorded as a **display convention**,
+    not a fact, and "Do not invent a viseme table" still stands: nothing in
+    OpenCK gates on them, and `value(row, slot)` exposes all 33 slots. To
+    settle it, play a known Skyrim line next to its curves, or get a Skyrim CK
+    build that ships `LipGenerator.exe` and its FaceFX actor.
+
+  Verified: `test_lipsync` **12 passed** — synthetic header/geometry/timing
+  cases (including the shifted payload, the short payload, untrustworthy
+  timing, truncated zero-runs, header self-inconsistency and grossly wrong
+  frame counts) plus a real-data gate over 60 shipped voice lines: 54
+  lip-carrying, 54 decoded, 5 with the shifted payload, 1 truncated, 0
+  rejected. Regression sweep green: `test_fuzparser` 9,
+  `test_packagesemantics` 12, `test_packagerecord` 7,
+  `test_audiopipelinetools` 9, `test_scripteditor` 15,
+  `test_obscriptcatalog` 12; `openck` builds clean.
+
+  packed runtime blobs are read-only via `FaceFxAnim`).
 ### Delivery order and verification boundary
 
 1. Series 1â€“3 first: they can silently corrupt or lose user edits.

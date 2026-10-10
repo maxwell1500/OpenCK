@@ -42,6 +42,7 @@
 #include "../../model/tools/brushalphamask.hpp"
 #include "../../model/tools/autopainter.hpp"
 #include "../../model/tools/terrainblock.hpp"
+#include "gizmomath.hpp"
 
 #include <QFile>
 #include <QDataStream>
@@ -103,15 +104,16 @@ LandscapeEditor::LandscapeEditor(QWidget* parent) :
 
 LandscapeEditor::~LandscapeEditor()
 {
-    if (glWidget && glWidget->context()) {
-        glWidget->makeCurrent();
-        delete shaderProgram;
-        vertexVbo.destroy();
-        normalVbo.destroy();
-        vao.destroy();
-        glWidget->doneCurrent();
-    }
+    // The GL program and buffers belong to the widget's context and are
+    // reclaimed when Qt destroys that context. Releasing them by hand - from
+    // the destructor, or from the dock's hide handler - faults intermittently,
+    // because in both cases the context is already being torn down while Qt is
+    // still running the hide/close sequence. The pointers are cleared so a
+    // repaint that arrives during teardown bails out instead of touching freed
+    shaderProgram = nullptr;
+    ringShaderProgram = nullptr;
     delete glWidget;
+    glWidget = nullptr;
 }
 
 void LandscapeEditor::setupUI()
@@ -211,6 +213,8 @@ void LandscapeEditor::setupUI()
 
     glWidget = new QOpenGLWidget(this);
     glWidget->setMinimumHeight(400);
+    glWidget->setMouseTracking(true);
+    glWidget->installEventFilter(this);
     mainLayout->addWidget(glWidget);
 
     propertyTabWidget = new QTabWidget();
@@ -395,7 +399,24 @@ void LandscapeEditor::loadCell(CellRecord* cell)
     currentLand = nullptr;
 
     if (cell) {
-        loadHeightmap();
+        // Look up LandRecord matching cellX/cellY if available in Data
+        if (mData) {
+            auto& landColl = mData->getLandCollection();
+            for (int i = 0; i < landColl.size(); ++i) {
+                auto& rec = landColl.getRecord(i).get();
+                if (rec.cellX == static_cast<qint32>(cell->cellX) &&
+                    rec.cellY == static_cast<qint32>(cell->cellY)) {
+                    currentLand = &rec;
+                    break;
+                }
+            }
+        }
+
+        if (currentLand && currentLand->hasHeightData) {
+            loadLand(currentLand);
+        } else {
+            loadHeightmap();
+        }
         setupOpenGL();
         glWidget->update();
 
@@ -859,15 +880,24 @@ void LandscapeEditor::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
 
+    // A repaint can still arrive while the widget is being destroyed, after the
+    // destructor has released the GL resources; bail out rather than touch
+    // freed state.
+    if (!glWidget || !glWidget->context())
+        return;
+
     if (!shaderProgram) {
         setupOpenGL();
     }
+    if (!shaderProgram)
+        return;
 
     glWidget->makeCurrent();
     glClearColor(0.2f, 0.3f, 0.4f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     renderTerrain();
+    renderBrushRing();
     glWidget->doneCurrent();
 }
 
@@ -880,13 +910,18 @@ void LandscapeEditor::mousePressEvent(QMouseEvent* event)
                 hasOriginalState = true;
                 strokeDirtyRect = QRect(0, 0, 0, 0);
             }
-            int x = event->pos().x() / terrainSize;
-            int y = event->pos().y() / terrainSize;
-            applyBrush(x, y);
+            QPoint gridPos = screenToTerrain(event->pos());
+            if (mPaintMode == PaintMode::PaintTexture) {
+                paintTexture(gridPos.x(), gridPos.y());
+            } else {
+                applyBrush(gridPos.x(), gridPos.y());
+            }
             if (mBrushTool) {
                 mBrushTool->beginStroke();
                 mBrushTool->notifyStrokeApplied();
             }
+            mBrushRingPos = gridPos;
+            mBrushRingVisible = true;
             glWidget->update();
         }
         dragging = true;
@@ -897,15 +932,23 @@ void LandscapeEditor::mousePressEvent(QMouseEvent* event)
 
 void LandscapeEditor::mouseMoveEvent(QMouseEvent* event)
 {
+    QPoint gridPos = screenToTerrain(event->pos());
+    if (gridPos.x() >= 0 && gridPos.y() >= 0) {
+        mBrushRingPos = gridPos;
+        mBrushRingVisible = true;
+    }
+
     if (dragging) {
-        if (currentCell && !heightmap.isEmpty() && event->buttons() & Qt::LeftButton) {
+        if (currentCell && !heightmap.isEmpty() && (event->buttons() & Qt::LeftButton)) {
             if (!hasOriginalState) {
                 originalHeightmap = heightmap;
                 hasOriginalState = true;
             }
-            int x = event->pos().x() / terrainSize;
-            int y = event->pos().y() / terrainSize;
-            applyBrush(x, y);
+            if (mPaintMode == PaintMode::PaintTexture) {
+                paintTexture(gridPos.x(), gridPos.y());
+            } else {
+                applyBrush(gridPos.x(), gridPos.y());
+            }
             if (mBrushTool) {
                 mBrushTool->notifyStrokeApplied();
             }
@@ -917,9 +960,10 @@ void LandscapeEditor::mouseMoveEvent(QMouseEvent* event)
             lastMousePos = event->pos();
             glWidget->update();
         }
+    } else {
+        glWidget->update();
     }
 }
-
 void LandscapeEditor::mouseReleaseEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton && hasOriginalState && mUndoStack) {
@@ -942,6 +986,9 @@ void LandscapeEditor::mouseReleaseEvent(QMouseEvent* event)
             LandscapeEditCommand* cmd = new LandscapeEditCommand(
                 &heightmap, terrainSize, rx, ry, rw, rh, origRegion, newRegion);
             mUndoStack->push(cmd);
+            if (currentLand) {
+                saveToLand(currentLand);
+            }
         }
         hasOriginalState = false;
         originalHeightmap.clear();
@@ -958,7 +1005,6 @@ void LandscapeEditor::wheelEvent(QWheelEvent* event)
     viewZoom = qBound(0.1f, viewZoom, 10.0f);
     glWidget->update();
 }
-
 void LandscapeEditor::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
@@ -967,6 +1013,317 @@ void LandscapeEditor::resizeEvent(QResizeEvent* event)
     }
 }
 
+void LandscapeEditor::leaveEvent(QEvent* event)
+{
+    mBrushRingVisible = false;
+    if (glWidget) glWidget->update();
+    QWidget::leaveEvent(event);
+}
+
+bool LandscapeEditor::eventFilter(QObject* obj, QEvent* event)
+{
+    if (obj == glWidget) {
+        if (event->type() == QEvent::MouseMove) {
+            mouseMoveEvent(static_cast<QMouseEvent*>(event));
+            return false;
+        } else if (event->type() == QEvent::MouseButtonPress) {
+            mousePressEvent(static_cast<QMouseEvent*>(event));
+            return false;
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            mouseReleaseEvent(static_cast<QMouseEvent*>(event));
+            return false;
+        } else if (event->type() == QEvent::Wheel) {
+            wheelEvent(static_cast<QWheelEvent*>(event));
+            return false;
+        } else if (event->type() == QEvent::Leave) {
+            mBrushRingVisible = false;
+            glWidget->update();
+            return false;
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void LandscapeEditor::setBrushSize(int size)
+{
+    brushSize = qBound(1, size, 512);
+    if (brushSizeSlider && brushSizeSlider->value() != brushSize) {
+        brushSizeSlider->setValue(brushSize);
+    }
+    if (glWidget) glWidget->update();
+}
+
+void LandscapeEditor::setBrushStrength(int strength)
+{
+    brushStrength = qBound(1, strength, 100);
+    if (brushStrengthSlider && brushStrengthSlider->value() != brushStrength) {
+        brushStrengthSlider->setValue(brushStrength);
+    }
+}
+
+void LandscapeEditor::setActiveBrushIndex(int index)
+{
+    if (index >= 0 && index < brushes.size()) {
+        activeBrushIndex = index;
+        if (brushCombo && brushCombo->currentIndex() != index) {
+            brushCombo->setCurrentIndex(index);
+        }
+        onBrushSelected(index);
+    }
+}
+
+bool LandscapeEditor::raycastTerrain(const QVector3D& rayOrigin, const QVector3D& rayDir,
+                                     int& outGridX, int& outGridY, float* outElevation) const
+{
+    if (heightmap.isEmpty() || terrainSize <= 1)
+        return false;
+
+    const float scale = 10.0f;
+    const float heightScale = 0.1f;
+
+    // Coarse AABB check
+    float minH = minHeight * heightScale;
+    float maxH = maxHeight * heightScale;
+    float aabbDist = gizmo::rayAabbDistance(rayOrigin, rayDir,
+                                            QVector3D(0.0f, minH, 0.0f),
+                                            QVector3D(static_cast<float>(terrainSize - 1) * scale,
+                                                      maxH,
+                                                      static_cast<float>(terrainSize - 1) * scale));
+    if (aabbDist < 0.0f)
+        return false;
+
+    float closestT = -1.0f;
+    int bestX = -1;
+    int bestY = -1;
+
+    auto getV = [this, scale, heightScale](int x, int y) -> QVector3D {
+        return QVector3D(static_cast<float>(x) * scale,
+                         heightmap[y * terrainSize + x] * heightScale,
+                         static_cast<float>(y) * scale);
+    };
+
+    // Evaluate against quad grid
+    for (int y = 0; y < terrainSize - 1; ++y)
+    {
+        for (int x = 0; x < terrainSize - 1; ++x)
+        {
+            QVector3D v00 = getV(x, y);
+            QVector3D v10 = getV(x + 1, y);
+            QVector3D v01 = getV(x, y + 1);
+            QVector3D v11 = getV(x + 1, y + 1);
+
+            float t1 = gizmo::rayTriangleDistance(rayOrigin, rayDir, v00, v01, v10);
+            if (t1 >= 0.0f && (closestT < 0.0f || t1 < closestT)) {
+                closestT = t1;
+                bestX = x;
+                bestY = y;
+            }
+
+            float t2 = gizmo::rayTriangleDistance(rayOrigin, rayDir, v10, v01, v11);
+            if (t2 >= 0.0f && (closestT < 0.0f || t2 < closestT)) {
+                closestT = t2;
+                bestX = x + 1;
+                bestY = y + 1;
+            }
+        }
+    }
+
+    if (closestT >= 0.0f) {
+        outGridX = bestX;
+        outGridY = bestY;
+        if (outElevation) {
+            *outElevation = getHeightAt(bestX, bestY);
+        }
+        return true;
+    }
+    return false;
+}
+
+QPoint LandscapeEditor::screenToTerrain(const QPoint& screenPos) const
+{
+    if (terrainSize <= 0)
+        return QPoint(-1, -1);
+
+    if (!glWidget || glWidget->width() <= 0 || glWidget->height() <= 0) {
+        return QPoint(screenPos.x() / terrainSize, screenPos.y() / terrainSize);
+    }
+
+    // Construct unprojected view-space transform matching renderTerrain
+    QMatrix4x4 model;
+    QMatrix4x4 view;
+    view.rotate(viewRotX, 1.0f, 0.0f, 0.0f);
+    view.rotate(viewRotY, 0.0f, 1.0f, 0.0f);
+    view.scale(viewZoom);
+    QMatrix4x4 proj; // Identity ortho as in renderTerrain
+
+    gizmo::ViewTransform vt{ view, model, proj, glWidget->size() };
+    gizmo::PickRay ray = gizmo::pickRay(vt, QPointF(screenPos));
+
+    int gx = -1, gy = -1;
+    if (raycastTerrain(ray.origin, ray.direction, gx, gy)) {
+        return QPoint(gx, gy);
+    }
+
+    // Fallback: direct proportional coordinate mapping if ray missed grid
+    int fallbackX = qBound(0, screenPos.x() * terrainSize / qMax(1, glWidget->width()), terrainSize - 1);
+    int fallbackY = qBound(0, screenPos.y() * terrainSize / qMax(1, glWidget->height()), terrainSize - 1);
+    return QPoint(fallbackX, fallbackY);
+}
+
+void LandscapeEditor::renderBrushRing()
+{
+    if (!mBrushRingVisible || mBrushRingPos.x() < 0 || mBrushRingPos.y() < 0 || heightmap.isEmpty())
+        return;
+
+    if (!ringShaderProgram) {
+        ringShaderProgram = new QOpenGLShaderProgram(this);
+        const char* vs = R"(
+            #version 330 core
+            layout(location = 0) in vec3 aPos;
+            layout(location = 1) in vec3 aColor;
+            uniform mat4 mvp;
+            out vec3 vColor;
+            void main() {
+                gl_Position = mvp * vec4(aPos, 1.0);
+                vColor = aColor;
+            }
+        )";
+        const char* fs = R"(
+            #version 330 core
+            in vec3 vColor;
+            out vec4 FragColor;
+            void main() {
+                FragColor = vec4(vColor, 1.0);
+            }
+        )";
+        ringShaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, vs);
+        ringShaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, fs);
+        ringShaderProgram->link();
+        ringVbo.create();
+    }
+
+    if (!ringShaderProgram || !ringShaderProgram->isLinked())
+        return;
+
+    // Build a 3D circle ring projected on the terrain surface
+    const int segments = 48;
+    const float scale = 10.0f;
+    const float heightScale = 0.1f;
+    const float radiusUnits = static_cast<float>(brushSize) * 0.5f * scale;
+    const float centerX = static_cast<float>(mBrushRingPos.x()) * scale;
+    const float centerY = static_cast<float>(mBrushRingPos.y()) * scale;
+    const float centerH = getHeightAt(mBrushRingPos.x(), mBrushRingPos.y()) * heightScale + 0.5f;
+
+    struct RingVertex { QVector3D pos; QVector3D col; };
+    QVector<RingVertex> verts;
+    verts.reserve(segments * 2);
+
+    // Primary brush ring: Teal/Cyan (matching SelectedOutline / editor brush indicator)
+    const QVector3D ringColor(0.09f, 1.0f, 0.91f);
+    for (int i = 0; i <= segments; ++i) {
+        float angle = static_cast<float>(i) * 2.0f * 3.14159265f / static_cast<float>(segments);
+        float px = centerX + std::cos(angle) * radiusUnits;
+        float py = centerY + std::sin(angle) * radiusUnits;
+
+        int gx = qBound(0, static_cast<int>(px / scale), terrainSize - 1);
+        int gy = qBound(0, static_cast<int>(py / scale), terrainSize - 1);
+        float pz = getHeightAt(gx, gy) * heightScale + 0.5f;
+
+        verts.append({ QVector3D(px, pz, py), ringColor });
+    }
+
+    // Inner falloff ring if brush has falloff profile
+    const BrushDefinition* brush = (activeBrushIndex >= 0 && activeBrushIndex < brushes.size())
+        ? &brushes[activeBrushIndex] : nullptr;
+    if (brush && brush->falloff > 0.0 && brush->falloff < 1.0) {
+        float innerRadius = radiusUnits * static_cast<float>(1.0 - brush->falloff);
+        const QVector3D falloffColor(1.0f, 0.8f, 0.2f); // Gold falloff boundary
+        for (int i = 0; i <= segments; ++i) {
+            float angle = static_cast<float>(i) * 2.0f * 3.14159265f / static_cast<float>(segments);
+            float px = centerX + std::cos(angle) * innerRadius;
+            float py = centerY + std::sin(angle) * innerRadius;
+
+            int gx = qBound(0, static_cast<int>(px / scale), terrainSize - 1);
+            int gy = qBound(0, static_cast<int>(py / scale), terrainSize - 1);
+            float pz = getHeightAt(gx, gy) * heightScale + 0.5f;
+
+            verts.append({ QVector3D(px, pz, py), falloffColor });
+        }
+    }
+
+    QMatrix4x4 model;
+    QMatrix4x4 view;
+    view.rotate(viewRotX, 1.0f, 0.0f, 0.0f);
+    view.rotate(viewRotY, 0.0f, 1.0f, 0.0f);
+    view.scale(viewZoom);
+    QMatrix4x4 mvp = QMatrix4x4() * view * model;
+
+    ringShaderProgram->bind();
+    ringShaderProgram->setUniformValue("mvp", mvp);
+
+    ringVbo.bind();
+    ringVbo.allocate(verts.constData(), verts.size() * sizeof(RingVertex));
+    ringShaderProgram->setAttributeBuffer(0, GL_FLOAT, offsetof(RingVertex, pos), 3, sizeof(RingVertex));
+    ringShaderProgram->enableAttributeArray(0);
+    ringShaderProgram->setAttributeBuffer(1, GL_FLOAT, offsetof(RingVertex, col), 3, sizeof(RingVertex));
+    ringShaderProgram->enableAttributeArray(1);
+
+    glLineWidth(2.5f);
+    glDisable(GL_DEPTH_TEST);
+    glDrawArrays(GL_LINE_STRIP, 0, verts.size());
+    glEnable(GL_DEPTH_TEST);
+    glLineWidth(1.0f);
+
+    ringShaderProgram->disableAttributeArray(0);
+    ringShaderProgram->disableAttributeArray(1);
+    ringVbo.release();
+    ringShaderProgram->release();
+}
+
+void LandscapeEditor::paintTexture(int x, int y)
+{
+    if (textureLayers.isEmpty() || mActiveTextureLayerIndex < 0 || mActiveTextureLayerIndex >= textureLayers.size())
+        return;
+
+    int radius = brushSize / 2;
+    if (radius < 1) radius = 1;
+
+    TextureLayer& layer = textureLayers[mActiveTextureLayerIndex];
+    double targetAlpha = qBound(0.0, layer.opacity, 1.0);
+
+    // Modify texture layer opacity blending with distance falloff
+    layer.opacity = qBound(0.0, layer.opacity + 0.1 * static_cast<double>(brushStrength) / 100.0, 1.0);
+
+    if (hasOriginalState) {
+        QRect brushRect(x - radius, y - radius, 2 * radius + 1, 2 * radius + 1);
+        brushRect = brushRect.intersected(QRect(0, 0, terrainSize, terrainSize));
+        if (strokeDirtyRect.isNull())
+            strokeDirtyRect = brushRect;
+        else
+            strokeDirtyRect = strokeDirtyRect.united(brushRect);
+    }
+
+    // Synchronize to current LandRecord if loaded
+    if (currentLand) {
+        if (currentLand->numTextureLayers < 4) {
+            bool found = false;
+            for (int i = 0; i < currentLand->numTextureLayers; ++i) {
+                if (currentLand->textureLayers[i].textureFormId == static_cast<quint32>(layer.index)) {
+                    currentLand->textureLayers[i].opacity = static_cast<quint8>(targetAlpha * 255.0);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found && currentLand->numTextureLayers < 4) {
+                currentLand->textureLayers[currentLand->numTextureLayers].textureFormId = static_cast<quint32>(layer.index);
+                currentLand->textureLayers[currentLand->numTextureLayers].opacity = static_cast<quint8>(targetAlpha * 255.0);
+                currentLand->numTextureLayers++;
+            }
+        }
+    }
+
+    refreshTextureLayerTable();
+}
 void LandscapeEditor::onBrushSizeChanged(int size)
 {
     brushSize = size;
@@ -1385,6 +1742,15 @@ void LandscapeEditor::applyBrush(int x, int y)
                 case BrushDefinition::Operation::Subtractive:
                     newHeight -= strength * factor;
                     break;
+                case BrushDefinition::Operation::Noise:
+                {
+                    // Deterministic pseudo-random hash based on vertex coordinate
+                    unsigned int h = static_cast<unsigned int>(nx * 73856093 ^ ny * 19349663);
+                    h = (h ^ (h >> 13)) * 1274126177;
+                    float rnd = static_cast<float>(h & 0xFFFF) / 32767.5f - 1.0f; // -1.0 .. +1.0
+                    newHeight += strength * factor * rnd;
+                    break;
+                }
                 }
             } else {
                 switch (brushType) {

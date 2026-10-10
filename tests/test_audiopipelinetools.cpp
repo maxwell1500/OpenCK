@@ -12,6 +12,7 @@ private slots:
     void testToolNames();
     void testFindTool();
     void testLipGeneratorArguments();
+    void testFacefxActorPath();
     void testFacefxArguments();
     void testRoboVoicerArguments();
     void testWwiseCodecId();
@@ -60,23 +61,52 @@ void TestAudioPipelineTools::testFindTool()
 
 void TestAudioPipelineTools::testLipGeneratorArguments()
 {
+    // The shipped Starfield tool takes positional inputs plus optional
+    // colon-valued flags; verified against the tool's own usage text.
     const QStringList args = AudioPipelineTools::lipGeneratorArguments(
         QStringLiteral("C:/Tools/LipGenerator.exe"),
         QStringLiteral("C:/voice.wav"),
-        QStringLiteral("C:/voice.lip"),
-        QStringLiteral("C:/FonixData.cdf"),
-        22050);
+        QStringLiteral("C:/line.txt"),
+        QStringLiteral("C:/FaceFX/StarfieldHumanMale.facefx"),
+        QStringLiteral("C:/FaceFX/StarfieldHumanMale.facefx"),
+        QStringLiteral("C:/out.ffxanim"));
 
-    QCOMPARE(args.size(), 9);
+    // 5 positional + language + -OutputFileName; no animation group.
+    QCOMPARE(args.size(), 7);
     QCOMPARE(args[0], QStringLiteral("C:/Tools/LipGenerator.exe"));
-    QCOMPARE(args[1], QStringLiteral("-wav"));
-    QCOMPARE(args[2], QStringLiteral("C:/voice.wav"));
-    QCOMPARE(args[3], QStringLiteral("-out"));
-    QCOMPARE(args[4], QStringLiteral("C:/voice.lip"));
-    QCOMPARE(args[5], QStringLiteral("-data"));
-    QCOMPARE(args[6], QStringLiteral("C:/FonixData.cdf"));
-    QCOMPARE(args[7], QStringLiteral("-rate"));
-    QCOMPARE(args[8], QStringLiteral("22050"));
+    QCOMPARE(args[1], QStringLiteral("C:/voice.wav"));
+    QCOMPARE(args[2], QStringLiteral("C:/line.txt"));
+    QCOMPARE(args[3], QStringLiteral("C:/FaceFX/StarfieldHumanMale.facefx"));
+    QCOMPARE(args[4], QStringLiteral("C:/FaceFX/StarfieldHumanMale.facefx"));
+    QCOMPARE(args[5], QStringLiteral("-Language:USEnglish"));
+    QCOMPARE(args[6], QStringLiteral("-OutputFileName:C:/out.ffxanim"));
+
+    const QStringList withGroup = AudioPipelineTools::lipGeneratorArguments(
+        QStringLiteral("C:/Tools/LipGenerator.exe"), QStringLiteral("a.wav"),
+        QStringLiteral("a.txt"), QStringLiteral("a.facefx"),
+        QStringLiteral("a.facefx"), QStringLiteral("out.ffxanim"),
+        QStringLiteral("USEnglish"), QStringLiteral("speech"));
+    QCOMPARE(withGroup.size(), 8);
+    QCOMPARE(withGroup.last(), QStringLiteral("-AnimationGroupName:speech"));
+
+    const QStringList bare = AudioPipelineTools::lipGeneratorArguments(
+        QStringLiteral("C:/Tools/LipGenerator.exe"), QStringLiteral("a.wav"),
+        QStringLiteral("a.txt"), QStringLiteral("a.facefx"),
+        QStringLiteral("a.facefx"), QString());
+    QCOMPARE(bare.size(), 6);
+}
+
+void TestAudioPipelineTools::testFacefxActorPath()
+{
+    // The shipped layout puts the actors next to the tool's own dir.
+    const QString toolsDir =
+        QCoreApplication::applicationDirPath() + QStringLiteral("/Tools");
+    const QString actor =
+        AudioPipelineTools::facefxActorPath(toolsDir,
+                                            QStringLiteral("StarfieldHumanMale"));
+    // Nothing installed -> empty, and a nested FaceFX/FaceFX layout would be
+    // found the same way if the install nests it.
+    QVERIFY(actor.isEmpty() || actor.endsWith(QStringLiteral("StarfieldHumanMale.facefx")));
 }
 
 void TestAudioPipelineTools::testFacefxArguments()

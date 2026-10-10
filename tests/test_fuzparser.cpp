@@ -1,7 +1,9 @@
 #include <QTest>
 #include <QTemporaryFile>
+#include <QtEndian>
 
 #include "../../libs/files/audio/fuzparser.hpp"
+#include "../../libs/files/audio/fuzwriter.hpp"
 #include "../../libs/files/log/logger.hpp"
 
 class TestFuzParser : public QObject
@@ -15,6 +17,8 @@ private slots:
     void testParseRealForm();
     void testWrongMagic();
     void testLoadFile();
+    void testWriteRealFormRoundTrips();
+    void testWriteLipOnlyRoundTrips();
 };
 
 void TestFuzParser::initTestCase()
@@ -138,6 +142,60 @@ void TestFuzParser::testLoadFile()
 
     FuzParser missing;
     QVERIFY(!FuzParser::loadFile(QStringLiteral("Z:/missing.fuz"), missing));
+}
+
+// The writer's contract is the reader's: FUZE + version + lipSize + lip +
+// audio, with nothing in between. A container built by FuzWriter must parse
+// back to the same payloads through FuzParser.
+void TestFuzParser::testWriteRealFormRoundTrips()
+{
+    const QByteArray lip = QByteArray(3072, '\x11');
+    // A minimal RIFF container: "RIFF" + size + "WAVE" at offset 8, which
+    // is where the reader takes the format tag from.
+    QByteArray audio("RIFF");
+    audio.append(static_cast<char>(0x24));
+    audio.append(3, '\0');
+    audio.append("WAVE");
+    audio.append(24, '\x33');
+
+    const QByteArray bytes = FuzWriter::build(lip, audio, 1);
+    // Header exactly: magic + version + lipSize, before any payload.
+    QCOMPARE(bytes.mid(0, 4), QByteArray("FUZE", 4));
+    const quint32 version = qFromLittleEndian<quint32>(
+        reinterpret_cast<const uchar*>(bytes.constData()) + 4);
+    const quint32 lipSize = qFromLittleEndian<quint32>(
+        reinterpret_cast<const uchar*>(bytes.constData()) + 8);
+    QCOMPARE(version, 1u);
+    QCOMPARE(lipSize, static_cast<quint32>(lip.size()));
+    QCOMPARE(bytes.mid(12, lip.size()), lip);
+    QCOMPARE(bytes.mid(12 + lip.size()), audio);
+
+    FuzParser out;
+    QVERIFY(FuzParser::parse(bytes, out));
+    QCOMPARE(out.lipData, lip);
+    QCOMPARE(out.audioData, audio);
+    QCOMPARE(out.audioFourCC, QStringLiteral("WAVE"));
+}
+
+void TestFuzParser::testWriteLipOnlyRoundTrips()
+{
+    const QByteArray lip = QByteArray(16, '\x33');
+    // Lip-only uses the chunked form the reader accepts for that case.
+    const QByteArray bytes = FuzWriter::build(lip, QByteArray(), 1);
+    QCOMPARE(bytes.mid(4, 4), QByteArray("LIPF", 4));
+
+    FuzParser out;
+    QVERIFY(FuzParser::parse(bytes, out));
+    QCOMPARE(out.lipData, lip);
+    QVERIFY(!out.hasAudio());
+
+    QTemporaryFile file;
+    QVERIFY(file.open());
+    file.close();
+    QVERIFY(FuzWriter::writeFile(file.fileName(), lip, QByteArray()));
+    FuzParser fromDisk;
+    QVERIFY(FuzParser::loadFile(file.fileName(), fromDisk));
+    QCOMPARE(fromDisk.lipData, lip);
 }
 
 QTEST_MAIN(TestFuzParser)

@@ -36,6 +36,15 @@ public:
                                     const QString& clipName,
                                     const QVector<AnimMarker>& markers);
 
+    // Writes an entire NifAnimation back to the source NIF in a single pass.
+    // Handles both Bethesda/NetImmerse NIFs (via NifBlockFile) and internal
+    // dialect NIFs (via NifParser), saving atomically via QSaveFile.
+    static bool writeAnimationToNif(const QString& nifPath,
+                                    const NifAnimation& anim,
+                                    int* savedCount = nullptr,
+                                    int* failedCount = nullptr,
+                                    int* downgradedCount = nullptr);
+
     // Channel payload editing helpers. These mutate channel.raw and rebuild the
     // flat keyframes the timeline shows, so keyframe add/remove/move and
     // property edits survive as per-channel data instead of a sampled transform

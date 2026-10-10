@@ -335,10 +335,7 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     wireframeBtn->setCheckable(true);
     wireframeBtn->setObjectName("wireframeBtn");
     toolbar->addWidget(wireframeBtn);
-    connect(wireframeBtn, &QPushButton::toggled, this, [this](bool checked) {
-        wireframeMode = checked;
-        glWidget->update();
-    });
+    connect(wireframeBtn, &QPushButton::toggled, this, &NifViewportWidget::setWireframeMode);
 
     auto* gpuSkinBtn = new QPushButton(tr("GPU Skin"));
     gpuSkinBtn->setCheckable(true);
@@ -354,11 +351,7 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     gridBtn->setCheckable(true);
     gridBtn->setObjectName("gridBtn");
     toolbar->addWidget(gridBtn);
-    connect(gridBtn, &QPushButton::toggled, this, [this](bool checked) {
-        gridEnabled = checked;
-        m_gridVBO.dirty = true;
-        glWidget->update();
-    });
+    connect(gridBtn, &QPushButton::toggled, this, &NifViewportWidget::setGridEnabled);
 
     auto* axisBtn = new QPushButton(tr("Axis"));
     axisBtn->setCheckable(true);
@@ -373,20 +366,13 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     boundsBtn->setCheckable(true);
     boundsBtn->setObjectName("boundsBtn");
     toolbar->addWidget(boundsBtn);
-    connect(boundsBtn, &QPushButton::toggled, this, [this](bool checked) {
-        boundsEnabled = checked;
-        m_bboxVBO.dirty = true;
-        glWidget->update();
-    });
+    connect(boundsBtn, &QPushButton::toggled, this, &NifViewportWidget::setBoundsEnabled);
 
     auto* collisionBtn = new QPushButton(tr("Collision"));
     collisionBtn->setCheckable(true);
     collisionBtn->setObjectName("collisionBtn");
     toolbar->addWidget(collisionBtn);
-    connect(collisionBtn, &QPushButton::toggled, this, [this](bool checked) {
-        collisionEnabled = checked;
-        glWidget->update();
-    });
+    connect(collisionBtn, &QPushButton::toggled, this, &NifViewportWidget::setCollisionEnabled);
 
     auto* cellGridBtn = new QPushButton(tr("Cell Grid"));
     cellGridBtn->setCheckable(true);
@@ -425,6 +411,13 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
         }
         updateCamera();
     });
+
+    toolbar->addSeparator();
+    m_coordLabel = new QLabel(toolbar);
+    m_coordLabel->setObjectName("coordLabel");
+    m_coordLabel->setToolTip(tr("Camera and selected reference position (game units)"));
+    toolbar->addWidget(m_coordLabel);
+    updateCoordinateReadout();
 
     layout->addWidget(toolbar);
 
@@ -487,41 +480,18 @@ NifViewportWidget::~NifViewportWidget()
         m_particleSystem->stop();
     }
 
-    if (glWidget && glWidget->context()) {
-        glWidget->makeCurrent();
+    // The GL objects belong to the widget's context and are reclaimed when Qt
+    // destroys it. Releasing them by hand here (or from a close/hide handler)
+    // faults intermittently, because the context is already being torn down
+    // while Qt still runs the close sequence. The pointers are cleared so a
+    // repaint arriving during teardown bails out instead of touching freed
+    // state.
+    shaderProgram = nullptr;
+    m_overlayShader = nullptr;
+    m_particleRenderer = nullptr;
 
-        delete m_particleRenderer;
-        m_particleRenderer = nullptr;
-
-        delete m_overlayShader;
-        m_overlayShader = nullptr;
-        delete shaderProgram;
-        shaderProgram = nullptr;
-
-        vbo.destroy();
-        ibo.destroy();
-        vao.destroy();
-    m_navmeshVBO.clear();
-    m_pathVBO.clear();
-    m_bboxVBO.clear();
-    m_gridVBO.clear();
-    m_highlightTriVBO.clear();
-    m_collisionVBO.clear();
-    m_cellGridVBO.clear();
-    m_cellRefVBO.clear();
-    m_nodeAxisVBO_R.clear();
-    m_nodeAxisVBO_G.clear();
-    m_nodeAxisVBO_B.clear();
-    m_translateGizmoVBO.clear();
-    m_rotateGizmoVBO.clear();
-    m_scaleGizmoVBO.clear();
-    m_pivotVBO.clear();
-    clearTextures();
-        if (defaultTexture) { delete defaultTexture; defaultTexture = nullptr; }
-
-    glWidget->doneCurrent();
-    }
     delete glWidget;
+    glWidget = nullptr;
     delete animState;
     delete nifAnimData;
     delete m_particleSystem;
@@ -662,6 +632,52 @@ void NifViewportWidget::setNavmeshData(const QVector<QVector3D>& triangles)
     glWidget->update();
 }
 
+void NifViewportWidget::setNavmeshTopologyData(const QVector<QVector3D>& vertices,
+                                               const QVector<QVector3D>& triangleFaces,
+                                               const QVector<QVector3D>& regularEdges,
+                                               const QVector<QVector3D>& coverEdges,
+                                               const QVector<QVector3D>& portalEdges,
+                                               const QVector<QVector3D>& waterEdges,
+                                               const QVector<QVector3D>& disconnectedFaces)
+{
+    navmeshVertices = vertices;
+    navmeshTriangles = triangleFaces;
+    navmeshRegularEdges = regularEdges;
+    navmeshCoverEdges = coverEdges;
+    navmeshPortalEdges = portalEdges;
+    navmeshWaterEdges = waterEdges;
+    navmeshDisconnectedFaces = disconnectedFaces;
+    navmeshEnabled = !navmeshTriangles.isEmpty() || !navmeshVertices.isEmpty();
+
+    m_navmeshVBO.dirty = true;
+    m_navmeshEdgesVBO.dirty = true;
+    m_navmeshCoverEdgesVBO.dirty = true;
+    m_navmeshPortalEdgesVBO.dirty = true;
+    m_navmeshWaterEdgesVBO.dirty = true;
+    m_navmeshVerticesVBO.dirty = true;
+    m_navmeshDisconnectedVBO.dirty = true;
+    glWidget->update();
+}
+
+void NifViewportWidget::setSelectedNavmeshVertex(int index)
+{
+    mSelectedNavmeshVertex = index;
+    m_navmeshVerticesVBO.dirty = true;
+    glWidget->update();
+}
+
+void NifViewportWidget::setSelectedNavmeshEdge(int v0, int v1)
+{
+    mSelectedNavmeshEdge = { v0, v1 };
+    m_navmeshEdgesVBO.dirty = true;
+    glWidget->update();
+}
+
+void NifViewportWidget::setSelectedNavmeshTriangle(int index)
+{
+    highlightNavmeshTriangle(index);
+}
+
 void NifViewportWidget::setPathData(const QVector<QVector3D>& waypoints)
 {
     pathWaypoints = waypoints;
@@ -693,17 +709,25 @@ void NifViewportWidget::setSelectedRefIndex(int index)
     if (index < -1 || index >= cellReferences.size()) {
         index = -1;
     }
-    if (mSelectedRefIndex == index) {
-        glWidget->update();
-        return;
-    }
+    const bool changed = (mSelectedRefIndex != index);
     mSelectedRefIndex = index;
     mHoverAxis = -1;
     mHoverRefIndex = -1;
     m_cellRefVBO.dirty = true;
     rebuildPivot();
     updatePivotInfo();
-    glWidget->update();
+    updateCoordinateReadout();
+    if (index >= 0)
+    {
+        mSelectedRefIndices.clear();
+        mSelectedRefIndices.append(index);
+    }
+    else
+    {
+        mSelectedRefIndices.clear();
+    }
+    if (changed)
+        glWidget->update();
 }
 
 void NifViewportWidget::focusOnReference(const QVector3D& gameUnitsPos)
@@ -724,6 +748,46 @@ void NifViewportWidget::setSelectedRefByDataIndex(int dataIndex)
         }
     }
     setSelectedRefIndex(-1);
+}
+
+void NifViewportWidget::setSelectedRefIndices(const QVector<int>& indices)
+{
+    QVector<int> cleaned;
+    for (int index : indices)
+    {
+        if (index >= 0 && index < cellReferences.size() && !cleaned.contains(index))
+            cleaned.append(index);
+    }
+    std::sort(cleaned.begin(), cleaned.end());
+    mSelectedRefIndex = cleaned.isEmpty() ? -1 : cleaned.last();
+    mSelectedRefIndices = cleaned;
+    mHoverAxis = -1;
+    mHoverRefIndex = -1;
+    m_cellRefVBO.dirty = true;
+    rebuildPivot();
+    updatePivotInfo();
+    updateCoordinateReadout();
+    QVector<int> dataIndices;
+    for (int index : cleaned)
+        dataIndices.append(cellReferences[index].dataIndex);
+    emit multiSelectionChanged(dataIndices);
+    if (glWidget) glWidget->update();
+}
+
+void NifViewportWidget::selectMarqueeRect(const QRect& rect)
+{
+    if (rect.width() < 3 && rect.height() < 3)
+        return;
+    const gizmo::ViewTransform t = currentViewTransform();
+    const QRect bounds = rect.normalized();
+    QVector<int> hits;
+    for (int i = 0; i < cellReferences.size(); ++i)
+    {
+        const QVector3D s = gizmo::worldToScreen(t, cellReferences[i].position);
+        if (bounds.contains(QPoint(qRound(s.x()), qRound(s.y()))))
+            hits.append(i);
+    }
+    setSelectedRefIndices(hits);
 }
 
 void NifViewportWidget::updateParticleSystem(const ParticleSystemData* data)
@@ -758,6 +822,14 @@ void NifViewportWidget::clear()
     shapeSkinBones.clear();
     shapeSkinWeights.clear();
     navmeshTriangles.clear();
+    navmeshVertices.clear();
+    navmeshRegularEdges.clear();
+    navmeshCoverEdges.clear();
+    navmeshPortalEdges.clear();
+    navmeshWaterEdges.clear();
+    navmeshDisconnectedFaces.clear();
+    mSelectedNavmeshVertex = -1;
+    mHighlightedTriangle = -1;
     pathWaypoints.clear();
     cellReferences.clear();
     mSelectedRefIndex = -1;
@@ -771,6 +843,12 @@ void NifViewportWidget::clear()
     m_meshDirty = false;
 
         m_navmeshVBO.clear();
+        m_navmeshEdgesVBO.clear();
+        m_navmeshCoverEdgesVBO.clear();
+        m_navmeshPortalEdgesVBO.clear();
+        m_navmeshWaterEdgesVBO.clear();
+        m_navmeshVerticesVBO.clear();
+        m_navmeshDisconnectedVBO.clear();
         m_pathVBO.clear();
         m_bboxVBO.clear();
         m_gridVBO.clear();
@@ -841,6 +919,10 @@ void NifViewportWidget::setupOpenGL()
     glWidget->makeCurrent();
 
     setupShaders();
+    if (!shaderProgram || !shaderProgram->isLinked()) {
+        glWidget->doneCurrent();
+        return;
+    }
 
     if (!m_overlayShader) {
         m_overlayShader = new QOpenGLShaderProgram(this);
@@ -1545,40 +1627,123 @@ void NifViewportWidget::renderMesh()
 
     QMatrix4x4 modelView = view * model;
 
-    if (navmeshEnabled && !navmeshTriangles.isEmpty()) {
-        if (m_navmeshVBO.dirty) {
-            QVector<OverlayVertex> verts;
-            verts.reserve(navmeshTriangles.size());
-            for (const auto& v : navmeshTriangles) {
-                verts.append({v, QVector3D(0.2f, 0.4f, 1.0f)});
-            }
-            m_navmeshVBO.build(verts, GL_TRIANGLES);
-        }
-
+    if (navmeshEnabled) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(0.0f, 1.0f);
 
-        m_navmeshVBO.draw(m_overlayShader, modelView);
+        // 1. Semi-transparent green/blue faces for reachable triangles
+        if (!navmeshTriangles.isEmpty()) {
+            if (m_navmeshVBO.dirty) {
+                QVector<OverlayVertex> verts;
+                verts.reserve(navmeshTriangles.size());
+                for (int i = 0; i < navmeshTriangles.size(); ++i) {
+                    // CK style: alternating subtle green/blue hue
+                    int triIdx = i / 3;
+                    QVector3D col = (triIdx % 2 == 0) ? QVector3D(0.0f, 0.9f, 0.46f) : QVector3D(0.0f, 0.6f, 1.0f);
+                    verts.append({navmeshTriangles[i], col});
+                }
+                m_navmeshVBO.build(verts, GL_TRIANGLES);
+            }
+            m_navmeshVBO.draw(m_overlayShader, modelView);
+        }
 
+        // 2. Disconnected island faces highlighted in bright red (#FF2222)
+        if (!navmeshDisconnectedFaces.isEmpty()) {
+            if (m_navmeshDisconnectedVBO.dirty) {
+                QVector<OverlayVertex> verts;
+                verts.reserve(navmeshDisconnectedFaces.size());
+                for (const auto& v : navmeshDisconnectedFaces) {
+                    verts.append({v, QVector3D(1.0f, 0.15f, 0.15f)});
+                }
+                m_navmeshDisconnectedVBO.build(verts, GL_TRIANGLES);
+            }
+            m_navmeshDisconnectedVBO.draw(m_overlayShader, modelView);
+        }
+
+        // 3. Highlighted active triangle (Orange #FF8000)
         if (mHighlightedTriangle >= 0 && mHighlightedTriangle * 3 + 2 < navmeshTriangles.size()) {
             if (m_highlightTriVBO.dirty) {
                 int t = mHighlightedTriangle * 3;
                 QVector<OverlayVertex> verts;
-                verts.append({navmeshTriangles[t], QVector3D(1.0f, 0.3f, 0.0f)});
-                verts.append({navmeshTriangles[t+1], QVector3D(1.0f, 0.3f, 0.0f)});
-                verts.append({navmeshTriangles[t+2], QVector3D(1.0f, 0.3f, 0.0f)});
+                verts.append({navmeshTriangles[t], QVector3D(1.0f, 0.5f, 0.0f)});
+                verts.append({navmeshTriangles[t+1], QVector3D(1.0f, 0.5f, 0.0f)});
+                verts.append({navmeshTriangles[t+2], QVector3D(1.0f, 0.5f, 0.0f)});
                 m_highlightTriVBO.build(verts, GL_TRIANGLES);
             }
             m_highlightTriVBO.draw(m_overlayShader, modelView);
         }
 
         glDisable(GL_POLYGON_OFFSET_FILL);
+
+        // 4. Edges rendering (Regular: dark blue/green, Cover: gold #FFD700, Portal: purple #AA00FF, Water: cyan #00FFFF)
+        glLineWidth(2.0f);
+        if (!navmeshRegularEdges.isEmpty()) {
+            if (m_navmeshEdgesVBO.dirty) {
+                QVector<OverlayVertex> verts;
+                verts.reserve(navmeshRegularEdges.size());
+                for (const auto& v : navmeshRegularEdges) {
+                    verts.append({v, QVector3D(0.1f, 0.2f, 0.4f)});
+                }
+                m_navmeshEdgesVBO.build(verts, GL_LINES);
+            }
+            m_navmeshEdgesVBO.draw(m_overlayShader, modelView);
+        }
+        if (!navmeshCoverEdges.isEmpty()) {
+            if (m_navmeshCoverEdgesVBO.dirty) {
+                QVector<OverlayVertex> verts;
+                verts.reserve(navmeshCoverEdges.size());
+                for (const auto& v : navmeshCoverEdges) {
+                    verts.append({v, QVector3D(1.0f, 0.84f, 0.0f)});
+                }
+                m_navmeshCoverEdgesVBO.build(verts, GL_LINES);
+            }
+            m_navmeshCoverEdgesVBO.draw(m_overlayShader, modelView);
+        }
+        if (!navmeshPortalEdges.isEmpty()) {
+            if (m_navmeshPortalEdgesVBO.dirty) {
+                QVector<OverlayVertex> verts;
+                verts.reserve(navmeshPortalEdges.size());
+                for (const auto& v : navmeshPortalEdges) {
+                    verts.append({v, QVector3D(0.7f, 0.0f, 1.0f)});
+                }
+                m_navmeshPortalEdgesVBO.build(verts, GL_LINES);
+            }
+            m_navmeshPortalEdgesVBO.draw(m_overlayShader, modelView);
+        }
+        if (!navmeshWaterEdges.isEmpty()) {
+            if (m_navmeshWaterEdgesVBO.dirty) {
+                QVector<OverlayVertex> verts;
+                verts.reserve(navmeshWaterEdges.size());
+                for (const auto& v : navmeshWaterEdges) {
+                    verts.append({v, QVector3D(0.0f, 1.0f, 1.0f)});
+                }
+                m_navmeshWaterEdgesVBO.build(verts, GL_LINES);
+            }
+            m_navmeshWaterEdgesVBO.draw(m_overlayShader, modelView);
+        }
+        glLineWidth(1.0f);
+
+        // 5. Vertices rendering (yellow points, or green/white)
+        if (!navmeshVertices.isEmpty()) {
+            if (m_navmeshVerticesVBO.dirty) {
+                QVector<OverlayVertex> verts;
+                verts.reserve(navmeshVertices.size());
+                for (int i = 0; i < navmeshVertices.size(); ++i) {
+                    QVector3D col = (i == mSelectedNavmeshVertex) ? QVector3D(1.0f, 0.0f, 0.0f) : QVector3D(1.0f, 1.0f, 0.2f);
+                    verts.append({navmeshVertices[i], col});
+                }
+                m_navmeshVerticesVBO.build(verts, GL_POINTS);
+            }
+            glPointSize(6.0f);
+            m_navmeshVerticesVBO.draw(m_overlayShader, modelView);
+            glPointSize(1.0f);
+        }
+
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glEnable(GL_DEPTH_TEST);
     }
-
     if (pathEnabled && pathWaypoints.size() >= 2) {
         if (m_pathVBO.dirty) {
             QVector<OverlayVertex> verts;
@@ -1606,9 +1771,17 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
 
+    // A repaint can still arrive while the widget tree is being destroyed, by
+    // which point the destructor has released the GL state; bail out instead of
+    // touching it.
+    if (!glWidget || !glWidget->context())
+        return;
+
     if (!shaderProgram) {
         setupOpenGL();
     }
+    if (!shaderProgram || !shaderProgram->isLinked())
+        return;
 
     QMatrix4x4 model;
     model.scale(0.01f);
@@ -1625,7 +1798,10 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
     QMatrix4x4 proj;
 
     glWidget->makeCurrent();
-    glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+    if (m_skyEnabled)
+        glClearColor(0.38f, 0.58f, 0.86f, 1.0f);
+    else
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
@@ -1907,40 +2083,49 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 
         glEnable(GL_DEPTH_TEST);
     }
-
     if (!cellReferences.isEmpty()) {
         if (m_cellRefVBO.dirty) {
             QVector<OverlayVertex> verts;
             const QVector3D refColor(0.0f, 1.0f, 0.0f);
-            for (int i = 0; i < cellReferences.size(); ++i) {
-                const ViewportCellRef& ref = cellReferences[i];
-                QVector3D pos = ref.position;
-                float armLen = 32.0f;
-                QVector3D color = refColor;
-                if (i == mSelectedRefIndex) {
-                    color = QVector3D(1.0f, 0.85f, 0.1f);
-                    armLen = 48.0f;
-                } else if (i == mHoverRefIndex) {
-                    color = QVector3D(1.0f, 1.0f, 1.0f);
-                }
-                if (ref.enabled) {
-                    QVector3D h1 = pos - QVector3D(armLen, 0, 0);
-                    QVector3D h2 = pos + QVector3D(armLen, 0, 0);
-                    QVector3D v1 = pos - QVector3D(0, 0, armLen);
-                    QVector3D v2 = pos + QVector3D(0, 0, armLen);
-                    verts.append({h1, color});
-                    verts.append({h2, color});
-                    verts.append({v1, color});
-                    verts.append({v2, color});
-                } else {
-                    QVector3D d1a = pos + QVector3D(-armLen, 0, -armLen);
-                    QVector3D d1b = pos + QVector3D(armLen, 0, armLen);
-                    QVector3D d2a = pos + QVector3D(armLen, 0, -armLen);
-                    QVector3D d2b = pos + QVector3D(-armLen, 0, armLen);
-                    verts.append({d1a, color});
-                    verts.append({d1b, color});
-                    verts.append({d2a, color});
-                    verts.append({d2b, color});
+            // Pass 0 draws the selected-outline halo (SelectedOutline from
+            // EditorColors.xml, parity.md §4.1) as a wider cross behind the
+            // marker; pass 1 draws the marker itself.
+            for (int pass = 0; pass < 2; ++pass)
+            {
+                for (int i = 0; i < cellReferences.size(); ++i) {
+                    const ViewportCellRef& ref = cellReferences[i];
+                    const bool selected = isRefSelected(i);
+                    if (selected != (pass == 0))
+                        continue;
+                    QVector3D pos = ref.position;
+                    // SelectedOutline primary is teal (23, 255, 232). Pass 0 is
+                    // the halo; pass 1 keeps the marker cross in classic gold.
+                    QVector3D color = QVector3D(0.09f, 1.0f, 0.91f);
+                    float armLen = (pass == 0) ? 56.0f : 48.0f;
+                    if (!selected)
+                    {
+                        color = (i == mHoverRefIndex) ? QVector3D(1.0f, 1.0f, 1.0f) : refColor;
+                        armLen = 32.0f;
+                    }
+                    if (ref.enabled) {
+                        QVector3D h1 = pos - QVector3D(armLen, 0, 0);
+                        QVector3D h2 = pos + QVector3D(armLen, 0, 0);
+                        QVector3D v1 = pos - QVector3D(0, 0, armLen);
+                        QVector3D v2 = pos + QVector3D(0, 0, armLen);
+                        verts.append({h1, color});
+                        verts.append({h2, color});
+                        verts.append({v1, color});
+                        verts.append({v2, color});
+                    } else {
+                        QVector3D d1a = pos + QVector3D(-armLen, 0, -armLen);
+                        QVector3D d1b = pos + QVector3D(armLen, 0, armLen);
+                        QVector3D d2a = pos + QVector3D(armLen, 0, -armLen);
+                        QVector3D d2b = pos + QVector3D(-armLen, 0, -armLen);
+                        verts.append({d1a, color});
+                        verts.append({d1b, color});
+                        verts.append({d2a, color});
+                        verts.append({d2b, color});
+                    }
                 }
             }
             m_cellRefVBO.build(verts, GL_LINES);
@@ -1950,6 +2135,40 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 
         m_cellRefVBO.draw(m_overlayShader, modelView);
 
+        glEnable(GL_DEPTH_TEST);
+    }
+    // Marquee selection rectangle: screen-space quad mapped back to model
+    // space so the existing overlay shader can draw it. Rebuilt every paint
+    // while the drag is live, because the corners move every mouse event.
+    if (mMarqueeSelecting)
+    {
+        const QSize size = glWidget ? glWidget->size() : QSize(1, 1);
+        const int w = qMax(1, size.width());
+        const int h = qMax(1, size.height());
+        const QRect bounds = QRect(mMarqueeStart, mMarqueeCurrent).normalized();
+        auto toModel = [&](const QPointF& p) {
+            return QVector3D(2.0f * static_cast<float>(p.x()) / w - 1.0f,
+                             1.0f - 2.0f * static_cast<float>(p.y()) / h,
+                             0.0f);
+        };
+        const QVector3D white(1.0f, 1.0f, 1.0f);
+        const QVector3D corners[4] = {
+            toModel(bounds.topLeft()), toModel(bounds.topRight()),
+            toModel(bounds.bottomRight()), toModel(bounds.bottomLeft())
+        };
+        QVector<OverlayVertex> marqueeVerts;
+        for (int i = 0; i < 4; ++i)
+        {
+            marqueeVerts.append({ corners[i], white });
+            marqueeVerts.append({ corners[(i + 1) % 4], white });
+        }
+        m_marqueeVBO.build(marqueeVerts, GL_LINES);
+        m_marqueeVBO.dirty = false;
+    }
+    if (m_marqueeVBO.vertexCount > 0) {
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(1.0f);
+        m_marqueeVBO.draw(m_overlayShader, QMatrix4x4());
         glEnable(GL_DEPTH_TEST);
     }
 
@@ -2185,22 +2404,61 @@ int NifViewportWidget::pickGizmoAxis(const QPoint& pos, const gizmo::ViewTransfo
     return -1;
 }
 
+QMatrix4x4 NifViewportWidget::refRotationMatrix(const ViewportCellRef& ref)
+{
+    QMatrix4x4 rotation;
+    const float toDeg = 57.2957795f;
+    rotation.rotate(ref.rotZ * toDeg, 0.0f, 0.0f, 1.0f);
+    rotation.rotate(ref.rotY * toDeg, 0.0f, 1.0f, 0.0f);
+    rotation.rotate(ref.rotX * toDeg, 1.0f, 0.0f, 1.0f);
+    return rotation;
+}
+
+QPair<QVector3D, QVector3D> NifViewportWidget::refObb(const ViewportCellRef& ref)
+{
+    // Markers alone occupy a 32-game-unit radius (matches the marker arms);
+    // scaling keeps the box proportional to the placed object.
+    const float half = 32.0f * ref.scale;
+    return { ref.position, QVector3D(half, half, half) };
+}
+
 int NifViewportWidget::pickRefMarker(const QPoint& pos, const gizmo::ViewTransform& t)
 {
+    const gizmo::PickRay ray = gizmo::pickRay(t, QPointF(pos));
     int best = -1;
-    float bestDist = 11.0f;
+    float bestDist = -1.0f;
+    for (int i = 0; i < cellReferences.size(); ++i)
+    {
+        const QPair<QVector3D, QVector3D> obb = refObb(cellReferences[i]);
+        const float dist = gizmo::rayObbDistance(
+            ray.origin, ray.direction, obb.first, obb.second,
+            refRotationMatrix(cellReferences[i]));
+        if (dist < 0.0f)
+            continue;
+        if (best < 0 || dist < bestDist)
+        {
+            best = i;
+            bestDist = dist;
+        }
+    }
+    if (best >= 0)
+        return best;
+
+    // Screen-space marker fallback: the 11px radius used before OBBs.
+    int fallback = -1;
+    float fallbackDist = 11.0f;
     const QPointF p(pos);
     for (int i = 0; i < cellReferences.size(); ++i) {
         const QVector3D s = gizmo::worldToScreen(t, cellReferences[i].position);
         const float dx = s.x() - p.x();
         const float dy = s.y() - p.y();
         const float dist = std::sqrt(dx * dx + dy * dy);
-        if (dist < bestDist) {
-            bestDist = dist;
-            best = i;
+        if (dist < fallbackDist) {
+            fallbackDist = dist;
+            fallback = i;
         }
     }
-    return best;
+    return fallback;
 }
 
 void NifViewportWidget::applyGizmoDrag(const QPoint& currentPos)
@@ -2246,6 +2504,7 @@ void NifViewportWidget::applyGizmoDrag(const QPoint& currentPos)
     emit refTransformPreview(cellReferences[mSelectedRefIndex].dataIndex,
                              ref.position, QVector3D(ref.rotX, ref.rotY, ref.rotZ), ref.scale);
     m_cellRefVBO.dirty = true;
+    updateCoordinateReadout();
     glWidget->update();
 }
 
@@ -2285,13 +2544,30 @@ void NifViewportWidget::mousePressEvent(QMouseEvent* event)
         }
         const int refIdx = pickRefMarker(event->pos(), t);
         if (refIdx >= 0) {
-            setSelectedRefIndex(refIdx);
-            emit refSelected(cellReferences[refIdx].dataIndex);
+            if (event->modifiers() & Qt::ShiftModifier)
+            {
+                // Shift+Click toggles set membership; the last member stays the
+                // gizmo anchor.
+                QVector<int> members = mSelectedRefIndices;
+                if (members.contains(refIdx))
+                    members.removeAll(refIdx);
+                else
+                    members.append(refIdx);
+                setSelectedRefIndices(members);
+            }
+            else
+            {
+                setSelectedRefIndex(refIdx);
+                emit refSelected(cellReferences[refIdx].dataIndex);
+            }
             return; // don't orbit
         }
-        dragging = true;
-        lastMousePos = event->pos();
-        setCursor(Qt::ClosedHandCursor);
+        // Drag on empty space starts a selection rectangle. A plain click falls
+        // through to orbiting, so click behavior is unchanged.
+        mMarqueeSelecting = true;
+        mMarqueeStart = event->pos();
+        mMarqueeCurrent = event->pos();
+        return;
     } else if (event->button() == Qt::RightButton && highlightEnabled) {
         if (shapeIndexRanges.isEmpty()) return;
         selectedShape++;
@@ -2306,7 +2582,7 @@ void NifViewportWidget::mousePressEvent(QMouseEvent* event)
         }
         rebuildPivot();
         updatePivotInfo();
-        glWidget->update();
+        if (glWidget) glWidget->update();
     }
 }
 
@@ -2314,6 +2590,13 @@ void NifViewportWidget::mouseMoveEvent(QMouseEvent* event)
 {
     if (mGizmoDragging && mGizmoAxis >= 0) {
         applyGizmoDrag(event->pos());
+        return;
+    }
+
+    if (mMarqueeSelecting) {
+        mMarqueeCurrent = event->pos();
+        m_marqueeVBO.dirty = true;
+        if (glWidget) glWidget->update();
         return;
     }
 
@@ -2333,7 +2616,7 @@ void NifViewportWidget::mouseMoveEvent(QMouseEvent* event)
         const int axis = pickGizmoAxis(event->pos(), t);
         if (axis != mHoverAxis) {
             mHoverAxis = axis;
-            glWidget->update();
+            if (glWidget) glWidget->update();
         }
         if (axis >= 0) {
             setCursor(Qt::SizeAllCursor);
@@ -2345,7 +2628,7 @@ void NifViewportWidget::mouseMoveEvent(QMouseEvent* event)
         if (refIdx != mHoverRefIndex) {
             mHoverRefIndex = refIdx;
             m_cellRefVBO.dirty = true;
-            glWidget->update();
+            if (glWidget) glWidget->update();
         }
         if (refIdx >= 0) {
             emit refHovered(cellReferences[refIdx].dataIndex);
@@ -2358,6 +2641,15 @@ void NifViewportWidget::mouseReleaseEvent(QMouseEvent* event)
     if (event->button() == Qt::LeftButton) {
         if (mGizmoDragging) {
             commitGizmoDrag();
+        }
+        if (mMarqueeSelecting) {
+            mMarqueeSelecting = false;
+            m_marqueeVBO.dirty = true;
+            const int dx = qAbs(mMarqueeCurrent.x() - mMarqueeStart.x());
+            const int dy = qAbs(mMarqueeCurrent.y() - mMarqueeStart.y());
+            if (dx > 2 || dy > 2)
+                selectMarqueeRect(QRect(mMarqueeStart, mMarqueeCurrent));
+            if (glWidget) glWidget->update();
         }
         dragging = false;
         unsetCursor();
@@ -2374,7 +2666,7 @@ void NifViewportWidget::wheelEvent(QWheelEvent* event)
 
 void NifViewportWidget::keyPressEvent(QKeyEvent* event)
 {
-    float moveSpeed = 0.5f / zoom;
+    float moveSpeed = (0.5f / zoom) * m_cameraSpeedMultiplier;
     float rotXRad = rotationX * 3.14159265f / 180.0f;
     float rotYRad = rotationY * 3.14159265f / 180.0f;
 
@@ -2452,9 +2744,9 @@ void NifViewportWidget::keyPressEvent(QKeyEvent* event)
             mainSplitter->widget(1)->setVisible(hierarchyVisible);
         }
         break;
-    default:
-        QWidget::keyPressEvent(event);
-        return;
+    case Qt::Key_F: // Drop selection to ground (parity.md §4.4)
+        emit dropSelectionToGroundRequested();
+        break;
     }
     updateCamera();
 }
@@ -2463,12 +2755,14 @@ bool NifViewportWidget::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == glWidget && event->type() == QEvent::KeyPress) {
         QKeyEvent* ke = static_cast<QKeyEvent*>(event);
-        if (ke->key() == Qt::Key_W || ke->key() == Qt::Key_A ||
-            ke->key() == Qt::Key_S || ke->key() == Qt::Key_D ||
-            ke->key() == Qt::Key_Home || ke->key() == Qt::Key_T ||
-            ke->key() == Qt::Key_Y || ke->key() == Qt::Key_M ||
-            ke->key() == Qt::Key_Q || ke->key() == Qt::Key_E ||
-            ke->key() == Qt::Key_R) {
+        if (ke->modifiers() & Qt::ControlModifier) {
+            if (ke->key() == Qt::Key_D) {
+                emit duplicateSelectionRequested();
+                return true;
+            }
+            return QWidget::eventFilter(obj, event);
+        }
+        if (ke->key() == Qt::Key_F) {
             keyPressEvent(ke);
             return true;
         }
@@ -2479,6 +2773,68 @@ bool NifViewportWidget::eventFilter(QObject* obj, QEvent* event)
 void NifViewportWidget::updateCamera()
 {
     glWidget->update();
+    updateCoordinateReadout();
+}
+
+void NifViewportWidget::nudgeCamera(float dx, float dy, float dz)
+{
+    cameraPos += QVector3D(dx, dy, dz);
+    updateCamera();
+}
+
+void NifViewportWidget::orbitCamera(float pitchDeltaDeg, float yawDeltaDeg)
+{
+    rotationX = qBound(-179.0f, rotationX + pitchDeltaDeg, 179.0f);
+    rotationY += yawDeltaDeg;
+    // Keep the readout from drifting unboundedly on long sessions.
+    if (rotationY > 360.0f)
+        rotationY -= 360.0f;
+    else if (rotationY < -360.0f)
+        rotationY += 360.0f;
+    updateCamera();
+}
+
+void NifViewportWidget::zoomCamera(float factor)
+{
+    zoom = qBound(0.05f, zoom * factor, 64.0f);
+    updateCamera();
+}
+
+void NifViewportWidget::resetCamera()
+{
+    rotationX = 0.0f;
+    rotationY = 0.0f;
+    zoom = 1.0f;
+    cameraPos = QVector3D(0.0f, 0.0f, 0.0f);
+    updateCamera();
+}
+
+
+QString NifViewportWidget::coordinateReadout() const
+{
+    return m_coordLabel ? m_coordLabel->text() : QString();
+}
+void NifViewportWidget::updateCoordinateReadout()
+{
+    if (!m_coordLabel) return;
+
+    QString text = tr("Cam (%1, %2, %3)")
+        .arg(cameraPos.x(), 0, 'f', 1)
+        .arg(cameraPos.y(), 0, 'f', 1)
+        .arg(cameraPos.z(), 0, 'f', 1);
+    if (mSelectedRefIndex >= 0 && mSelectedRefIndex < cellReferences.size())
+    {
+        const QVector3D& p = cellReferences[mSelectedRefIndex].position;
+        text += tr("   Ref (%1, %2, %3)")
+            .arg(p.x(), 0, 'f', 1)
+            .arg(p.y(), 0, 'f', 1)
+            .arg(p.z(), 0, 'f', 1);
+    }
+    else
+    {
+        text += tr("   Ref (-)");
+    }
+    m_coordLabel->setText(text);
 }
 
 void NifViewportWidget::toggleHierarchy()
@@ -3062,6 +3418,56 @@ void NifViewportWidget::setGpuSkinningEnabled(bool on)
     gpuSkinning = on;
     m_meshDirty = true;   // VBO vertex source + attributes change
     if (glWidget) glWidget->update();
+}
+
+void NifViewportWidget::setWireframeMode(bool enabled)
+{
+    if (wireframeMode == enabled) return;
+    wireframeMode = enabled;
+    auto* btn = findChild<QPushButton*>("wireframeBtn");
+    if (btn && btn->isChecked() != enabled) btn->setChecked(enabled);
+    if (glWidget) glWidget->update();
+    emit displayFlagsChanged();
+}
+
+void NifViewportWidget::setGridEnabled(bool enabled)
+{
+    if (gridEnabled == enabled) return;
+    gridEnabled = enabled;
+    m_gridVBO.dirty = true;
+    auto* btn = findChild<QPushButton*>("gridBtn");
+    if (btn && btn->isChecked() != enabled) btn->setChecked(enabled);
+    if (glWidget) glWidget->update();
+    emit displayFlagsChanged();
+}
+
+void NifViewportWidget::setBoundsEnabled(bool enabled)
+{
+    if (boundsEnabled == enabled) return;
+    boundsEnabled = enabled;
+    m_bboxVBO.dirty = true;
+    auto* btn = findChild<QPushButton*>("boundsBtn");
+    if (btn && btn->isChecked() != enabled) btn->setChecked(enabled);
+    if (glWidget) glWidget->update();
+    emit displayFlagsChanged();
+}
+
+void NifViewportWidget::setCollisionEnabled(bool enabled)
+{
+    if (collisionEnabled == enabled) return;
+    collisionEnabled = enabled;
+    auto* btn = findChild<QPushButton*>("collisionBtn");
+    if (btn && btn->isChecked() != enabled) btn->setChecked(enabled);
+    if (glWidget) glWidget->update();
+    emit displayFlagsChanged();
+}
+
+void NifViewportWidget::setSkyEnabled(bool enabled)
+{
+    if (m_skyEnabled == enabled) return;
+    m_skyEnabled = enabled;
+    if (glWidget) glWidget->update();
+    emit displayFlagsChanged();
 }
 
 void NifViewportWidget::applySkinnedShape(int s, const QMatrix4x4& ownerXform,

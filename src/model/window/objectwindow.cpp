@@ -1774,27 +1774,28 @@ void ObjectWindowModel::initCategories(Data* data)
     }
 
     addGroupNamed("Actors", {"NPC", "Creature", "Leveled Actor", "Leveled NPC", "Actor Values", "Voice Types",
-                                "Eyes", "Hair", "Idle Animation", "Leveled Creature List"});
-    addGroupNamed("Items", {"Armor", "Weapon", "Alchemy", "Ingredient", "Book", "Misc", "Container",
-                            "Enchantment", "Spell", "Magic Effect", "Ammo", "Key", "Soul Gem", "Scroll",
-                            "Potion", "Leveled Item", "Constructible Object", "Outfit",
-                            "Apparatus", "Clothing", "Form List", "Leveled Spell",
+                             "Body Part", "Head Part", "Eyes", "Hair", "Idle Animation", "Leveled Creature List"});
+    addGroupNamed("Items", {"Armor", "Weapon", "Book", "Misc", "Container",
+                            "Ammo", "Key", "Soul Gem", "Leveled Item", "Constructible Object", "Outfit",
+                            "Apparatus", "Clothing", "Form List",
                             "Lockpick", "Probe", "Repair Tool", "Leveled Item List"});
+    addGroupNamed("Magic", {"Spell", "Magic Effect", "Enchantment", "Potion", "Alchemy", "Ingredient",
+                            "Scroll", "Leveled Spell", "Shout"});
     addGroupNamed("World Objects", {"Static", "Activator", "Tree", "Movable Static", "Static Collection",
                                     "Door", "Furniture", "Flora", "Grass", "Debris", "Hazard", "Idle Marker",
                                     "Light", "Acoustic Space", "Image Space", "Explosion", "Projectile",
                                     "Texture Set"});
     addGroupNamed("Gameplay", {"Quest", "Package", "Global", "Game Setting", "Perk", "Class", "Faction",
-                               "Race", "Combat Style", "Encounter Zone", "Body Part", "Head Part", "Location",
+                               "Race", "Combat Style", "Encounter Zone", "Location", "Location Reference Type",
                                "Keyword", "Camera Path", "Camera Shot", "Impact Data", "Lens Flare",
-                               "Speech Challenge", "Birthsign", "Relationship", "Shout", "Movement Type", "Skill"});
+                               "Speech Challenge", "Birthsign", "Relationship", "Movement Type", "Skill"});
     addGroupNamed("Audio", {"Sound", "Music Type", "Music Track", "Voice Type", "Sound Marker", "Reverb", "Sound Generator"});
     addGroupNamed("Dialogue", {"Dialogue", "Info", "Topic", "Scene", "Message", "Note", "Terminal"});
-    addGroupNamed("World", {"Cell", "Worldspace", "Navmesh", "Landscape", "Reference", "Weather",
-                             "Land Texture", "Climate", "Region", "Road", "Path Grid"});
-    addGroupNamed("Miscellaneous", {"Location Reference Type", "Effect Shader", "Art Object", "Water Shader",
-                                    "Weather Shader", "Power", "Default Object", "Association Type",
-                                    "Biome", "Snap Template", "Material", "Material Type", "Load Screen", "Script",
+    addGroupNamed("Special", {"Cell", "Worldspace", "Navmesh", "Landscape", "Reference", "Weather",
+                              "Land Texture", "Climate", "Region", "Road", "Path Grid", "Water Shader", "Weather Shader"});
+    addGroupNamed("Space", {"Planet", "Biome", "Biome Type", "Biome Mask"});
+    addGroupNamed("Miscellaneous", {"Effect Shader", "Art Object", "Power", "Default Object", "Association Type",
+                                    "Snap Template", "Material", "Material Type", "Load Screen", "Script",
                                     "Animated Object", "Color"});
 }
 
@@ -1806,27 +1807,45 @@ QString ObjectWindowModel::formatFormId(quint32 formId) const
 void ObjectWindowModel::applyFilter(const QString& text)
 {
     mFilter = text;
-    QString lowerFilter = text.toLower();
+    rebuildAllRecords();
+
+    const QString trimmed = mFilter.trimmed();
+    if (trimmed.isEmpty())
+    {
+        emit layoutChanged();
+        return;
+    }
+
+    const bool isWildcard = trimmed.contains(QLatin1Char('*')) || trimmed.contains(QLatin1Char('?'));
+    QRegularExpression wildRe;
+    if (isWildcard)
+    {
+        wildRe = QRegularExpression(QRegularExpression::wildcardToRegularExpression(trimmed),
+                                     QRegularExpression::CaseInsensitiveOption);
+    }
+    const QString lowerFilter = trimmed.toLower();
 
     for (auto& cat : mCategories)
     {
-        if (lowerFilter.isEmpty())
+        QVector<VisibleRecord> filtered;
+        for (const auto& rec : cat.visibleRecords)
         {
-            rebuildAllRecords();
-        }
-        else
-        {
-            QVector<VisibleRecord> filtered;
-            for (const auto& rec : cat.visibleRecords)
+            bool hit = false;
+            if (isWildcard && wildRe.isValid())
             {
-                if (rec.editorId.toLower().contains(lowerFilter) ||
-                    rec.formId.toLower().contains(lowerFilter))
-                {
-                    filtered.append(rec);
-                }
+                hit = wildRe.match(rec.editorId).hasMatch() || wildRe.match(rec.formId).hasMatch();
             }
-            cat.visibleRecords = filtered;
+            else
+            {
+                hit = rec.editorId.toLower().contains(lowerFilter) ||
+                      rec.formId.toLower().contains(lowerFilter);
+            }
+            if (hit)
+            {
+                filtered.append(rec);
+            }
         }
+        cat.visibleRecords = filtered;
     }
 
     emit layoutChanged();
@@ -2991,4 +3010,38 @@ const QString& ObjectWindowModel::getRecordFormId(int categoryId, int recordInde
             return rec.formId;
     }
     return visibleRecords.isEmpty() ? empty : visibleRecords[0].formId;
+}
+
+bool ObjectWindowModel::findRecord(const QString& idOrFormId, int& outCategoryId, int& outRecordIndex, QModelIndex& outIndex) const
+{
+    if (idOrFormId.isEmpty())
+        return false;
+
+    bool isHex = false;
+    quint32 numericFid = 0;
+    QString cleanId = idOrFormId.trimmed();
+    if (cleanId.startsWith(QLatin1String("0x"), Qt::CaseInsensitive))
+        numericFid = cleanId.mid(2).toUInt(&isHex, 16);
+    else
+        numericFid = cleanId.toUInt(&isHex, 16);
+
+    QString formattedFid = isHex ? formatFormId(numericFid) : QString();
+
+    for (int catIdx = 0; catIdx < mCategories.size(); ++catIdx)
+    {
+        const auto& visibleRecords = mCategories[catIdx].visibleRecords;
+        for (const auto& rec : visibleRecords)
+        {
+            if (rec.editorId.compare(cleanId, Qt::CaseInsensitive) == 0 ||
+                rec.formId.compare(cleanId, Qt::CaseInsensitive) == 0 ||
+                (!formattedFid.isEmpty() && rec.formId.compare(formattedFid, Qt::CaseInsensitive) == 0))
+            {
+                outCategoryId = catIdx;
+                outRecordIndex = rec.actualIndex;
+                outIndex = getRecordIndexModel(catIdx, rec.actualIndex);
+                return true;
+            }
+        }
+    }
+    return false;
 }

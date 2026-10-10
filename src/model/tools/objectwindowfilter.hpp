@@ -24,7 +24,8 @@ struct FilterRule
         StartsWith,      // StartsWith
         EndsWith,        // EndsWith
         Range,           // MinValue..MaxValue
-        RegexMatch       // RegexMatch
+        RegexMatch,      // RegexMatch
+        Wildcard         // Wildcard (*, ?)
     };
 
     QString parameter;        // ParameterName, e.g. "EditorID", "Name", "Type"
@@ -33,8 +34,8 @@ struct FilterRule
     double minValue = 0.0;    // range lower bound
     double maxValue = 0.0;    // range upper bound
     bool isNegative = false;  // IsNegative (invert the match)
+    bool isConcatenatedOr = false; // IsConcatenatedOr (rule connects to next via OR)
     bool enabled = true;
-
     static Type typeFromString(const QString& text);
     static QString typeToString(Type type);
 

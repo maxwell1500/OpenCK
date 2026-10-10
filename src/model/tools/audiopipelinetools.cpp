@@ -69,17 +69,50 @@ QString AudioPipelineTools::lipDataFile(const QString& toolsDir)
     });
 }
 
+// Builds the LipGenerator command-line as the shipped Starfield tool
+// actually takes it (verified against the real LipGenerator.exe):
+//   LipGenerator <wav> <text> <actor.facefx> <actoranalysis.facefx>
+//                [-Language:<name>] [-OutputFileName:<path>]
+//                [-AnimationGroupName:<name>]
+// Optional values follow a colon; empty strings are omitted.
 QStringList AudioPipelineTools::lipGeneratorArguments(
     const QString& lipGeneratorPath, const QString& wavPath,
-    const QString& lipPath, const QString& dataFile, int sampleRate)
+    const QString& textPath, const QString& actorPath,
+    const QString& analysisPath, const QString& outputPath,
+    const QString& language, const QString& animationGroup)
 {
     QStringList args;
     args << lipGeneratorPath
-         << QStringLiteral("-wav") << wavPath
-         << QStringLiteral("-out") << lipPath
-         << QStringLiteral("-data") << dataFile
-         << QStringLiteral("-rate") << QString::number(sampleRate);
+         << wavPath
+         << textPath
+         << actorPath
+         << analysisPath;
+    if (!language.isEmpty())
+    {
+        args << QStringLiteral("-Language:") + language;
+    }
+    if (!outputPath.isEmpty())
+    {
+        args << QStringLiteral("-OutputFileName:") + outputPath;
+    }
+    if (!animationGroup.isEmpty())
+    {
+        args << QStringLiteral("-AnimationGroupName:") + animationGroup;
+    }
     return args;
+}
+
+// The .facefx actor + analysis file the pipeline needs. Starfield ships the
+// actors under Tools/FaceFX; the analysis file is what ffxc generates from
+// the actor, so it shares the base name.
+QString AudioPipelineTools::facefxActorPath(const QString& toolsDir,
+                                            const QString& actorName)
+{
+    const QString base = actorName.trimmed();
+    return findUnder(toolsDir, {
+        QStringLiteral("FaceFX/%1.facefx").arg(base),
+        QStringLiteral("FaceFX/FaceFX/%1.facefx").arg(base),
+    });
 }
 
 QStringList AudioPipelineTools::facefxArguments(const QString& ffxcPath,

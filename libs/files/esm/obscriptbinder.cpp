@@ -122,6 +122,7 @@ private:
     void bindFunction(const Statement& fn)
     {
         m_locals.clear();
+        m_insideFunction = true;
         for (const QString& p : fn.params)
         {
             declareLocal(p, fn.line, BindSymbolKind::Parameter);
@@ -134,6 +135,7 @@ private:
             }
         }
         m_locals.clear();
+        m_insideFunction = false;
     }
 
     void bindBlock(const std::vector<StmtPtr>& body)
@@ -193,6 +195,46 @@ private:
             break;
         case StmtKind::Function:
             bindFunction(s);
+            break;
+        case StmtKind::Header:
+            break;
+        case StmtKind::Property:
+            // A property is a member-visible name at any scope.
+            if (s.funcName.isEmpty())
+            {
+                break;
+            }
+            if (m_locals.contains(s.funcName))
+            {
+                error(QStringLiteral("property '%1' redeclares a local").arg(s.funcName),
+                      s.line);
+                break;
+            }
+            registerGlobal(s.funcName, s.line);
+            if (s.value)
+            {
+                bindExpression(s.value.get());
+            }
+            break;
+        case StmtKind::Local:
+            // `int x` at the top level is a script-wide property; the same
+            // syntax inside a function is a local.
+            if (s.funcName.isEmpty())
+            {
+                break;
+            }
+            if (m_insideFunction)
+            {
+                declareLocal(s.funcName, s.line, BindSymbolKind::Local);
+            }
+            else
+            {
+                registerGlobal(s.funcName, s.line);
+            }
+            if (s.value)
+            {
+                bindExpression(s.value.get());
+            }
             break;
         }
     }
@@ -254,6 +296,7 @@ private:
     QHash<QString, int> m_functionParamCount;
     QSet<QString> m_globals;
     QSet<QString> m_locals;
+    bool m_insideFunction = false;
     BindResult m_result;
 };
 

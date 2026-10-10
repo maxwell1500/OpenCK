@@ -254,11 +254,12 @@ NifBlockFile::NiTransformDataRaw flatToRaw(
             }));
         }
     } else if (!original.rotationGroups.isEmpty()) {
-        raw.numRotationKeys = original.numRotationKeys;
         const NifBlockFile::KeyGroup& src = original.rotationGroups.first();
-        raw.rotationGroups.append(editGroup(src, 4, [](const Nif::TransformKeyframe& kf, int, QVector<float>& out) {
+        NifBlockFile::KeyGroup editedGroup = editGroup(src, 4, [](const Nif::TransformKeyframe& kf, int, QVector<float>& out) {
             out << kf.rotation.w << kf.rotation.x << kf.rotation.y << kf.rotation.z;
-        }));
+        });
+        raw.numRotationKeys = editedGroup.count;
+        raw.rotationGroups.append(editedGroup);
     } else {
         raw.numRotationKeys = 0;
     }
@@ -792,34 +793,10 @@ bool NifAnimationWriter::writeKeyframesToNif(const QString& nifPath,
         return false;
     }
 
-    const QString tempPath = nifPath + QStringLiteral(".openck.tmp");
-    QFile::remove(tempPath);
-    if (!parser.save(tempPath)) {
-        LOG_ERROR(QString("NifAnimationWriter: failed to save NIF to temp file: %1").arg(tempPath));
-        QFile::remove(tempPath);
+    if (!parser.save(nifPath)) {
+        LOG_ERROR(QString("NifAnimationWriter: failed to atomically save NIF: %1").arg(nifPath));
         return false;
     }
-
-    QFile source(tempPath);
-    if (!source.open(QIODevice::ReadOnly)) {
-        QFile::remove(tempPath);
-        return false;
-    }
-    QSaveFile output(nifPath);
-    if (!output.open(QIODevice::WriteOnly)) {
-        source.close();
-        QFile::remove(tempPath);
-        return false;
-    }
-    const QByteArray bytes = source.readAll();
-    source.close();
-    const bool written = output.write(bytes) == bytes.size() && output.commit();
-    QFile::remove(tempPath);
-    if (!written) {
-        LOG_ERROR(QString("NifAnimationWriter: failed to atomically replace NIF: %1").arg(nifPath));
-        return false;
-    }
-
     LOG_INFO(QString("NifAnimationWriter: successfully wrote keyframes to NIF: %1").arg(nifPath));
     return true;
 }
@@ -878,6 +855,186 @@ bool NifAnimationWriter::setClipMarkersToNif(const QString& nifPath,
         return false;
     }
     return file.save(nifPath);
+}
+
+bool NifAnimationWriter::writeAnimationToNif(const QString& nifPath,
+                                            const NifAnimation& anim,
+                                            int* savedCount,
+                                            int* failedCount,
+                                            int* downgradedCount)
+{
+    int saved = 0;
+    int failed = 0;
+    int downgraded = 0;
+
+    if (NifBlockFile::isBethesdaNif(nifPath)) {
+        NifBlockFile file;
+        if (!file.load(nifPath)) {
+            LOG_ERROR(QString("NifAnimationWriter: failed to load %1").arg(nifPath));
+            if (savedCount) *savedCount = 0;
+            if (failedCount) *failedCount = 0;
+            if (downgradedCount) *downgradedCount = 0;
+            return false;
+        }
+
+        if (file.isNetImmerse()) {
+            LOG_WARNING(QString("NifAnimationWriter: %1 is a NetImmerse %2 container; its "
+                                "blocks are not addressable, so no animation was written")
+                            .arg(nifPath, file.headerVersion()));
+            if (savedCount) *savedCount = 0;
+            if (failedCount) *failedCount = 0;
+            if (downgradedCount) *downgradedCount = 0;
+            return false;
+        }
+
+        QSet<quint32> wantedControllers;
+        for (const QString& type : {QStringLiteral("NiTransformController"),
+                                    QStringLiteral("NiKeyframeController")}) {
+            const QList<int> indices = file.findBlocks(type);
+            for (int index : indices)
+                wantedControllers.insert(static_cast<quint32>(index));
+        }
+
+        const QList<int> sequences = file.findBlocks(QStringLiteral("NiControllerSequence"));
+        QMap<QString, QSet<quint32>> clipToControllers;
+        for (int sequenceIndex : sequences) {
+            QList<QPair<quint32, QString>> entries;
+            if (!file.decodeControllerSequence(file.block(sequenceIndex).data, entries))
+                continue;
+            for (const auto& entry : entries) {
+                clipToControllers[entry.second].insert(entry.first);
+            }
+        }
+
+        for (const AnimClip& clip : anim.clips) {
+            for (const AnimChannel& channel : clip.channels) {
+                const QString clipName = channel.type == QStringLiteral("NiKeyframeData")
+                    ? QString() : channel.type;
+                const QSet<quint32>& clipControllers = clipToControllers.value(clipName);
+
+                bool channelDowngraded = false;
+                const QVector<Nif::TransformKeyframe> keyframes = channelToKeyframes(channel);
+                const NifBlockFile::NiTransformDataRaw* rawPtr = channel.raw.valid ? &channel.raw : nullptr;
+
+                bool channelPatched = false;
+                for (int block = 0; block < file.count(); ++block) {
+                    QString name;
+                    quint32 controllerRef = 0xFFFFFFFFu;
+                    if (!file.nodeNetInfo(block, name, controllerRef)) continue;
+                    if (name != channel.boneName) continue;
+                    if (!wantedControllers.contains(controllerRef)) continue;
+                    if (!clipControllers.isEmpty() && !clipControllers.contains(controllerRef)) continue;
+
+                    if (patchControllerData(file, static_cast<int>(controllerRef), keyframes, rawPtr, &channelDowngraded)) {
+                        channelPatched = true;
+                    }
+                }
+
+                if (!channelPatched && !clipControllers.isEmpty()) {
+                    for (quint32 controllerRef : clipControllers) {
+                        if (!wantedControllers.contains(controllerRef)) continue;
+                        if (patchControllerData(file, static_cast<int>(controllerRef), keyframes, rawPtr, &channelDowngraded)) {
+                            channelPatched = true;
+                        }
+                    }
+                }
+
+                if (channelPatched) {
+                    ++saved;
+                    if (channelDowngraded) ++downgraded;
+                } else {
+                    ++failed;
+                }
+            }
+        }
+
+        if (!anim.markers.isEmpty()) {
+            QVector<NifBlockFile::TextKey> keys;
+            keys.reserve(anim.markers.size());
+            for (const AnimMarker& marker : anim.markers) {
+                keys.append({ static_cast<float>(marker.time), marker.name });
+            }
+            for (const QString& clipName : clipToControllers.keys()) {
+                file.setTextKeysForClip(clipName, keys);
+            }
+        }
+
+        if (savedCount) *savedCount = saved;
+        if (failedCount) *failedCount = failed;
+        if (downgradedCount) *downgradedCount = downgraded;
+
+        if (saved == 0) return false;
+        return file.save(nifPath);
+    }
+
+    // Internal dialect: load parser, update matching nodes, save atomically
+    Nif::NifParser parser;
+    if (!parser.load(nifPath)) {
+        LOG_ERROR(QString("NifAnimationWriter: failed to parse NIF for write-back: %1").arg(nifPath));
+        if (savedCount) *savedCount = 0;
+        if (failedCount) *failedCount = 0;
+        if (downgradedCount) *downgradedCount = 0;
+        return false;
+    }
+
+    Nif::Node* root = parser.getRoot();
+    if (!root) {
+        LOG_ERROR("NifAnimationWriter: NIF has no root node");
+        if (savedCount) *savedCount = 0;
+        if (failedCount) *failedCount = 0;
+        if (downgradedCount) *downgradedCount = 0;
+        return false;
+    }
+
+    for (const AnimClip& clip : anim.clips) {
+        for (const AnimChannel& channel : clip.channels) {
+            const QString clipName = channel.type == QStringLiteral("NiKeyframeData")
+                ? QString() : channel.type;
+            const QVector<Nif::TransformKeyframe> keyframes = channelToKeyframes(channel);
+
+            bool foundNode = false;
+            auto updateNode = [&](auto* node, auto&& self) -> bool {
+                if (!node) return false;
+                bool nodeMatches = (node->name == channel.boneName);
+                for (const auto& a : node->animations) {
+                    if (QString::number(a.targetNode) == channel.boneName)
+                        nodeMatches = true;
+                }
+                if (nodeMatches) {
+                    for (auto& a : node->animations) {
+                        if (!clipName.isEmpty() && a.clipName != clipName && a.clipName != clip.name)
+                            continue;
+                        a.keyframes = keyframes;
+                        foundNode = true;
+                        return true;
+                    }
+                    if (!foundNode && !node->animations.isEmpty()) {
+                        node->animations.first().keyframes = keyframes;
+                        foundNode = true;
+                        return true;
+                    }
+                }
+                for (auto* child : node->children) {
+                    if (self(child, self)) return true;
+                }
+                return false;
+            };
+            updateNode(root, updateNode);
+
+            if (foundNode) {
+                ++saved;
+            } else {
+                ++failed;
+            }
+        }
+    }
+
+    if (savedCount) *savedCount = saved;
+    if (failedCount) *failedCount = failed;
+    if (downgradedCount) *downgradedCount = downgraded;
+
+    if (saved == 0) return false;
+    return parser.save(nifPath);
 }
 
 void NifAnimationWriter::refreshChannelKeyframes(AnimChannel& channel)

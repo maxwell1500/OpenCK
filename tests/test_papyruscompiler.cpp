@@ -1,5 +1,6 @@
 #include <QTest>
-
+#include <QTemporaryDir>
+#include <QFile>
 #include "../../src/view/window/papyruscompiler.hpp"
 #include "../../libs/files/log/logger.hpp"
 
@@ -14,6 +15,8 @@ private slots:
     void testFullPath();
     void testWarningSeverity();
     void testNonDiagnosticLine();
+    void testSyntheticToolchain();
+    void testStarfieldToolchainDetection();
 };
 
 void TestPapyrusCompiler::initTestCase()
@@ -77,6 +80,52 @@ void TestPapyrusCompiler::testNonDiagnosticLine()
         QStringLiteral("Compiling 3 scripts..."), error));
     QVERIFY(!PapyrusCompiler::parseDiagnostic(
         QStringLiteral("No errors."), error));
+}
+void TestPapyrusCompiler::testSyntheticToolchain()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const QString compilerExe = dir.filePath(QStringLiteral("PapyrusCompiler.exe"));
+    {
+        QFile f(compilerExe);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(QByteArray(12 * 1024, '\0'));
+        f.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    }
+
+    const QString dll = dir.filePath(QStringLiteral("PCompiler.dll"));
+    {
+        QFile f2(dll);
+        QVERIFY(f2.open(QIODevice::WriteOnly));
+        f2.write("dll");
+    }
+
+    const QString xsd = dir.filePath(QStringLiteral("PapyrusProject.xsd"));
+    {
+        QFile f3(xsd);
+        QVERIFY(f3.open(QIODevice::WriteOnly));
+        f3.write("<schema/>");
+    }
+
+    PapyrusCompiler compiler;
+    QVERIFY(compiler.setCompilerPath(compilerExe));
+    QVERIFY(compiler.isStarfieldToolchain());
+    QCOMPARE(compiler.toolchainDirectory(), dir.path());
+    QCOMPARE(compiler.compilerDllPath(), dll);
+    QCOMPARE(compiler.projectSchemaPath(), xsd);
+}
+
+void TestPapyrusCompiler::testStarfieldToolchainDetection()
+{
+    const QString compilerPath = PapyrusCompiler::detectCompilerPath();
+    if (compilerPath.isEmpty()) {
+        QSKIP("No installed Papyrus compiler found on machine");
+    }
+
+    PapyrusCompiler compiler;
+    QVERIFY(compiler.setCompilerPath(compilerPath));
+    QVERIFY(!compiler.toolchainDirectory().isEmpty());
 }
 
 QTEST_MAIN(TestPapyrusCompiler)

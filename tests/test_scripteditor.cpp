@@ -1,4 +1,6 @@
 #include <QLabel>
+#include <QListWidget>
+#include <QPlainTextEdit>
 #include <QTest>
 
 #include "view/window/obscripthighlighter.hpp"
@@ -18,6 +20,10 @@ private slots:
     void testClassifyEscapedQuote();
     void testDialogValidSyntax();
     void testDialogInvalidSyntax();
+    void testDialogFlavorCatalog();
+    void testDialogSaveGateOnBadNative();
+    void testDialogCrossScriptWarning();
+    void testDialogGotoLine();
 };
 
 static bool hasSpan(const QVector<ObScriptHighlightSpan>& spans, int start,
@@ -103,6 +109,78 @@ void TestScriptEditor::testDialogInvalidSyntax()
     QLabel* status = dlg.findChild<QLabel*>();
     QVERIFY(status != nullptr);
     QVERIFY2(status->text().contains(QStringLiteral("Line")), qPrintable(status->text()));
+}
+
+void TestScriptEditor::testDialogFlavorCatalog()
+{
+    // The flavor selects which natives validate. Skyrim SE has wait(); with
+    // the cross-game builtins alone `wait()` is unknown.
+    ScriptEditorDialog dlg(QStringLiteral("Flavored"),
+                           QStringLiteral("function f()\n    wait(1.0)\nendfunction\n"),
+                           QStringLiteral("Skyrim Special Edition"), QStringList());
+    QVERIFY2(!dlg.hasBlockingError(), "Skyrim SE must know wait()");
+
+    ScriptEditorDialog other(QStringLiteral("Unflavored"),
+                             QStringLiteral("function f()\n    wait(1.0)\nendfunction\n"),
+                             QStringLiteral("Unknown"), QStringList());
+    QVERIFY(other.hasBlockingError() == false);
+    QListWidget* issues = other.findChild<QListWidget*>();
+    QVERIFY(issues != nullptr);
+}
+
+void TestScriptEditor::testDialogSaveGateOnBadNative()
+{
+    // AddItem() with no arguments is an arity error against the Skyrim SE
+    // catalog, so the dialog must refuse to save.
+    ScriptEditorDialog dlg(QStringLiteral("BadNative"),
+                           QStringLiteral("function f()\n    AddItem()\nendfunction\n"),
+                           QStringLiteral("Skyrim Special Edition"), QStringList());
+    QVERIFY2(dlg.hasBlockingError(),
+             "wrong arity against the flavor catalog must block saving");
+
+    QListWidget* issues = dlg.findChild<QListWidget*>();
+    QVERIFY(issues != nullptr);
+    QVERIFY(issues->count() > 0);
+}
+
+void TestScriptEditor::testDialogCrossScriptWarning()
+{
+    // A property typed with a script the plugin does not ship is a warning,
+    // not an error: it may come from a master file.
+    ScriptEditorDialog dlg(QStringLiteral("Ref"),
+                           QStringLiteral("OtherScript Property ref Auto\n"),
+                           QStringLiteral("Skyrim Special Edition"),
+                           QStringList());
+    QVERIFY(!dlg.hasBlockingError());
+    QListWidget* issues = dlg.findChild<QListWidget*>();
+    QVERIFY(issues != nullptr);
+    QCOMPARE(issues->count(), 1);
+
+    // Passing the script as known clears the warning.
+    ScriptEditorDialog known(QStringLiteral("Ref"),
+                             QStringLiteral("OtherScript Property ref Auto\n"),
+                             QStringLiteral("Skyrim Special Edition"),
+                             QStringList{QStringLiteral("OtherScript")});
+    QListWidget* knownIssues = known.findChild<QListWidget*>();
+    QVERIFY(knownIssues != nullptr);
+    QCOMPARE(knownIssues->count(), 0);
+}
+
+void TestScriptEditor::testDialogGotoLine()
+{
+    const QString source = QStringLiteral(
+        "ScriptName Nav extends Quest\n"
+        "Function A()\n"
+        "  int x = 1\n"
+        "EndFunction\n"
+        "Function B()\n"
+        "  int y = 2\n"
+        "EndFunction\n");
+    ScriptEditorDialog dlg(QStringLiteral("Nav"), source,
+                           QStringLiteral("Skyrim Special Edition"));
+    dlg.gotoLine(4);
+    const QTextCursor cursor = dlg.findChild<QPlainTextEdit*>()->textCursor();
+    QVERIFY(cursor.blockNumber() >= 2);
 }
 
 QTEST_MAIN(TestScriptEditor)

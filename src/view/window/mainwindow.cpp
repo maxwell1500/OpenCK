@@ -8,6 +8,7 @@
 #include "../../model/tools/questvalidator.hpp"
 #include "../../model/tools/coveragevalidator.hpp"
 #include "../../model/tools/undostack.hpp"
+#include "../../model/tools/macrocommand.hpp"
 #include "../../model/tools/addrecordcommand.hpp"
 #include "../../model/tools/blankrecordfactory.hpp"
 #include "../../model/world/idtable.hpp"
@@ -28,6 +29,8 @@
 #include "masterslistdialog.hpp"
 #include "conflictdialog.hpp"
 #include "nifviewportwidget.hpp"
+#include "gamepadnavigator.hpp"
+#include <QTimer>
 #include "scripteditorwidget.hpp"
 #include "scriptmanagerdialog.hpp"
 #include "dialogueeditorwidget.hpp"
@@ -71,6 +74,9 @@
 #include "exporttemplatesdialog.hpp"
 #include "bashedpatchdialog.hpp"
 #include "modmanagerdialog.hpp"
+#include "migrationdialog.hpp"
+#include "recorddiffdialog.hpp"
+#include "pluginmergedialog.hpp"
 #include "validationreportdialog.hpp"
 #include "inspectorwidget.hpp"
 #include "testlogdialog.hpp"
@@ -83,8 +89,15 @@
 #include "shortcuteditordialog.hpp"
 #include "toolbarcustomizationdialog.hpp"
 #include "thememanager.hpp"
+#include "../../../libs/files/ini/ckconfiginspector.hpp"
 
 #include <QInputDialog>
+#include <QActionGroup>
+#include <QSignalBlocker>
+#include <QTabWidget>
+#include <QTreeView>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QFileInfo>
 #include <QDir>
 #include <QDirIterator>
@@ -152,6 +165,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     mDockManager = new ads::CDockManager(this);
 
+    setupCanonicalMenus();
     setupEditMenu();
     setupTerrainMenu();
     setupPrimitivePreviewMenu();
@@ -223,11 +237,14 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-    // Widgets managed by Qt's parent-child system are automatically deleted
-    // when MainWindow is destroyed. Only delete objects NOT in the widget tree.
-    // (nifViewportWidget, scriptEditorWidget, dialogueEditorWidget, formIdEditorWidget,
-    //  objectWindowDock, landscapeEditor, objectPalette, landscapeDock are all
-    //  parented to 'this' and managed by Qt.)
+    // Hide first: closing the window is what releases the Render Window's
+    // OpenGL context, and destroying an initialized QOpenGLWidget that is still
+    // visible faults inside Qt's GL cleanup. File > Exit quits the application
+    // without closing the window, so this path is reached with it still on
+    // screen. Widgets parented to 'this' (the Render Window, the editor docks,
+    // the Object Window) are then destroyed by Qt.
+    hide();
+
     if (ui)
     {
         delete ui;
@@ -285,10 +302,7 @@ void MainWindow::setData(Data* data)
         
         // Create the 3D Viewport as the central widget (matches real CK layout)
         if (!nifViewportWidget)
-        {
-            nifViewportWidget = new NifViewportWidget(this);
-            setCentralWidget(nifViewportWidget);
-        }
+            ensureViewport();
 
         // Populate the viewport's cell references from the loaded document
         if (nifViewportWidget && mData)
@@ -361,7 +375,14 @@ void MainWindow::setData(Data* data)
                     mStatusSelectedObject->setText(QStringLiteral("X %1  Y %2  Z %3")
                         .arg(pos.x(), 0, 'f', 1).arg(pos.y(), 0, 'f', 1).arg(pos.z(), 0, 'f', 1));
             });
-            mViewportRefsConnected = true;
+
+            // Drop to Ground (F): snap each selected reference onto terrain.
+            connect(nifViewportWidget, &NifViewportWidget::dropSelectionToGroundRequested,
+                    this, &MainWindow::dropViewportSelectionToGround);
+
+            // Duplicate (Ctrl+D): clone each selected reference in place.
+            connect(nifViewportWidget, &NifViewportWidget::duplicateSelectionRequested,
+                    this, &MainWindow::duplicateViewportSelection);
         }
         
         // Create Object Window dock widget
@@ -509,6 +530,303 @@ void MainWindow::setData(Data* data)
     }
 }
 
+void MainWindow::ensureViewport()
+{
+    if (nifViewportWidget) return;
+
+    // The Render Window is the permanently pinned central ADS widget (as in
+    // the real CK): it cannot be closed, moved or floated, and every other
+    // dock attaches around it. QMainWindow::setCentralWidget() must not be
+    // used here - it would schedule the CDockManager itself for deletion.
+    nifViewportWidget = new NifViewportWidget(this);
+    auto* renderDock = new ads::CDockWidget(QStringLiteral("Render Window"));
+    renderDock->setWidget(nifViewportWidget, ads::CDockWidget::ForceNoScrollArea);
+    renderDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+    renderDock->setFeature(ads::CDockWidget::DockWidgetMovable, false);
+    renderDock->setFeature(ads::CDockWidget::DockWidgetFloatable, false);
+    mDockManager->setCentralWidget(renderDock);
+
+    bindViewportActions();
+}
+
+void MainWindow::bindViewportActions()
+{
+    if (!nifViewportWidget) return;
+
+    // Push the menu's current state into the new viewport...
+    nifViewportWidget->setGridEnabled(ui->actionToggleGrid->isChecked());
+    nifViewportWidget->setWireframeMode(ui->actionToggleWireframe->isChecked());
+    nifViewportWidget->setBoundsEnabled(ui->actionToggleBounds->isChecked());
+    nifViewportWidget->setSkyEnabled(ui->actionToggleSky->isChecked());
+    nifViewportWidget->setCollisionEnabled(ui->actionToggleCollision->isChecked());
+    nifViewportWidget->setCameraSpeedMultiplier(mCameraSpeed);
+
+    // Steam Deck / gamepad navigation. The navigator polls the pad from a
+    // timer and feeds the viewport's shared camera nudges, so a thumbstick
+    // behaves exactly like a mouse drag in the same direction.
+    if (!mGamepadNavigator)
+    {
+        mGamepadNavigator = new GamepadNavigator(this);
+        mGamepadNavigator->setViewport(nifViewportWidget);
+        auto* gamepadTimer = new QTimer(this);
+        gamepadTimer->setInterval(16);
+        connect(gamepadTimer, &QTimer::timeout, this, [this] {
+            if (mGamepadNavigator && nifViewportWidget)
+                mGamepadNavigator->advance(0.016);
+        });
+        gamepadTimer->start();
+    }
+    else
+    {
+        mGamepadNavigator->setViewport(nifViewportWidget);
+    }
+
+    // ...and keep the checkmarks in step with the viewport's own toolbar.
+    connect(nifViewportWidget, &NifViewportWidget::displayFlagsChanged, this, [this]() {
+        if (!nifViewportWidget) return;
+        auto sync = [](QAction* action, bool value) {
+            QSignalBlocker blocker(action);
+            action->setChecked(value);
+        };
+        sync(ui->actionToggleGrid, nifViewportWidget->isGridEnabled());
+        sync(ui->actionToggleWireframe, nifViewportWidget->isWireframeMode());
+        sync(ui->actionToggleBounds, nifViewportWidget->isBoundsEnabled());
+        sync(ui->actionToggleSky, nifViewportWidget->isSkyEnabled());
+        sync(ui->actionToggleCollision, nifViewportWidget->isCollisionEnabled());
+    });
+}
+
+void MainWindow::populateDocksMenu()
+{
+    if (!mDockManager) return;
+
+    // Show/Hide entries for every dock except the pinned Render Window. Docks
+    // are created lazily, so this runs each time the menu opens.
+    const auto docks = mDockManager->dockWidgetsMap();
+    for (ads::CDockWidget* dock : docks)
+    {
+        if (dock == mDockManager->centralWidget()) continue;
+        QAction* toggle = dock->toggleViewAction();
+        if (ui->menuDocks->actions().contains(toggle)) continue;
+        if (!mDockTogglesAdded)
+        {
+            ui->menuDocks->addSeparator();
+            mDockTogglesAdded = true;
+        }
+        ui->menuDocks->addAction(toggle);
+    }
+}
+
+void MainWindow::setupCanonicalMenus()
+{
+    // ---- Edit -------------------------------------------------------------
+    connect(ui->actionFindForms, &QAction::triggered, this,
+            &MainWindow::on_actionSearchAndReplace_triggered);
+
+    // ---- View: render-window toggles and camera speed ---------------------
+    connect(ui->actionToggleGrid, &QAction::toggled, this, [this](bool on) {
+        if (nifViewportWidget) nifViewportWidget->setGridEnabled(on);
+    });
+    connect(ui->actionToggleWireframe, &QAction::toggled, this, [this](bool on) {
+        if (nifViewportWidget) nifViewportWidget->setWireframeMode(on);
+    });
+    connect(ui->actionToggleBounds, &QAction::toggled, this, [this](bool on) {
+        if (nifViewportWidget) nifViewportWidget->setBoundsEnabled(on);
+    });
+    connect(ui->actionToggleSky, &QAction::toggled, this, [this](bool on) {
+        if (nifViewportWidget) nifViewportWidget->setSkyEnabled(on);
+    });
+    connect(ui->actionToggleCollision, &QAction::toggled, this, [this](bool on) {
+        if (nifViewportWidget) nifViewportWidget->setCollisionEnabled(on);
+    });
+
+    auto* speedGroup = new QActionGroup(this);
+    const struct { QAction* action; float multiplier; } speeds[] = {
+        { ui->actionCameraSpeedSlow, 0.5f },
+        { ui->actionCameraSpeedNormal, 1.0f },
+        { ui->actionCameraSpeedFast, 2.5f },
+    };
+    for (const auto& speed : speeds)
+    {
+        speed.action->setCheckable(true);
+        speedGroup->addAction(speed.action);
+        const float multiplier = speed.multiplier;
+        connect(speed.action, &QAction::triggered, this, [this, multiplier]() {
+            mCameraSpeed = multiplier;
+            if (nifViewportWidget) nifViewportWidget->setCameraSpeedMultiplier(multiplier);
+        });
+    }
+    ui->actionCameraSpeedNormal->setChecked(true);
+
+    connect(ui->actionRefreshViewport, &QAction::triggered, this, [this]() {
+        if (nifViewportWidget) nifViewportWidget->refreshMesh();
+    });
+
+    // ---- Category jumps: focus a record category in the Object Window -----
+    auto showCategory = [this](const QString& label) {
+        if (!objectWindowDock || !mDockManager)
+        {
+            QMessageBox::information(this, label,
+                tr("No document is currently loaded.\n\nOpen a plugin file first via File > Data."));
+            return;
+        }
+        if (ads::CDockWidget* dock = mDockManager->findDockWidget(QStringLiteral("Object Window")))
+        {
+            dock->toggleView(true);
+            dock->setAsCurrentTab();
+        }
+        if (QLineEdit* filter = objectWindowDock->getFilterEdit())
+            filter->clear();
+
+        QTreeView* tree = objectWindowDock->getTreeView();
+        QAbstractItemModel* model = tree ? tree->model() : nullptr;
+        if (!model) return;
+
+        const auto matches = [&label](const QModelIndex& idx) {
+            const QString text = idx.data(Qt::DisplayRole).toString();
+            return text == label || text.startsWith(label + QLatin1Char(' '))
+                || text.startsWith(label + QLatin1Char('('));
+        };
+        QModelIndex found;
+        for (int g = 0; g < model->rowCount() && !found.isValid(); ++g)
+        {
+            const QModelIndex group = model->index(g, 0);
+            if (matches(group)) { found = group; break; }
+            for (int c = 0; c < model->rowCount(group); ++c)
+            {
+                const QModelIndex category = model->index(c, 0, group);
+                if (matches(category)) { found = category; break; }
+            }
+        }
+        if (!found.isValid())
+        {
+            QMessageBox::information(this, label,
+                tr("The '%1' category is not available in the Object Window.").arg(label));
+            return;
+        }
+        for (QModelIndex p = found.parent(); p.isValid(); p = p.parent())
+            tree->expand(p);
+        tree->setCurrentIndex(found);
+        tree->scrollTo(found);
+        tree->setFocus();
+    };
+
+    // ---- Character / Gameplay / World / ObjectWindows ---------------------
+    connect(ui->actionHairEyes, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Hair")); });
+    connect(ui->actionCombatStyles, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Combat Style")); });
+    connect(ui->actionMagicEffects, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Magic Effect")); });
+    connect(ui->actionPerks, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Perk")); });
+    connect(ui->actionRegions, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Region")); });
+    connect(ui->actionClimate, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Climate")); });
+    connect(ui->actionAcousticSpaces, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Acoustic Space")); });
+    connect(ui->actionMusicTypes, &QAction::triggered, this, [showCategory]() { showCategory(QStringLiteral("Music Type")); });
+
+    connect(ui->actionSceneView, &QAction::triggered, this, [this]() {
+        if (!mInspectorDock)
+        {
+            QMessageBox::information(this, tr("Scene View"),
+                tr("No document is currently loaded.\n\nOpen a plugin file first via File > Data."));
+            return;
+        }
+        mInspectorDock->toggleView(mInspectorDock->isClosed());
+    });
+
+    // ---- Starfield tool windows -------------------------------------------
+    auto openStarfieldTools = [this](const QString& tabTitle) {
+        StarfieldToolsDialog dialog(this);
+        if (auto* tabs = dialog.findChild<QTabWidget*>())
+        {
+            for (int i = 0; i < tabs->count(); ++i)
+            {
+                if (tabs->tabText(i) == tabTitle)
+                {
+                    tabs->setCurrentIndex(i);
+                    break;
+                }
+            }
+        }
+        dialog.exec();
+    };
+    connect(ui->actionReflectionProbes, &QAction::triggered, this,
+            [openStarfieldTools]() { openStarfieldTools(QObject::tr("Reflection Probe")); });
+    connect(ui->actionStarMap, &QAction::triggered, this,
+            [openStarfieldTools]() { openStarfieldTools(QObject::tr("Galaxy")); });
+    connect(ui->actionPlanetGeneration, &QAction::triggered, this, [this]() {
+        PlanetEditorDialog dialog(this);
+        dialog.exec();
+    });
+
+    // ---- Terrain ----------------------------------------------------------
+    connect(ui->actionSaveLandscape, &QAction::triggered, this, [this]() {
+        if (!landscapeEditor)
+        {
+            QMessageBox::information(this, tr("Save Landscape"),
+                tr("No landscape editor is available.\n\nOpen a plugin file first via File > Data."));
+            return;
+        }
+        landscapeEditor->saveLandscapeToRecord();
+    });
+
+    // ---- Docks ------------------------------------------------------------
+    connect(ui->actionLockDocks, &QAction::toggled, this, [this](bool locked) {
+        mDockManager->lockDockWidgetFeaturesGlobally(
+            locked ? ads::CDockWidget::GloballyLockableFeatures
+                   : ads::CDockWidget::NoDockWidgetFeatures);
+    });
+    connect(ui->menuDocks, &QMenu::aboutToShow, this, &MainWindow::populateDocksMenu);
+
+    // ---- Help -------------------------------------------------------------
+    connect(ui->actionDocumentation, &QAction::triggered, this, [this]() {
+        QDir dir(QCoreApplication::applicationDirPath());
+        QString docsPath;
+        for (int depth = 0; depth < 5; ++depth)
+        {
+            if (dir.exists(QStringLiteral("docs")))
+            {
+                docsPath = dir.filePath(QStringLiteral("docs"));
+                break;
+            }
+            if (!dir.cdUp()) break;
+        }
+        if (docsPath.isEmpty() || !QDesktopServices::openUrl(QUrl::fromLocalFile(docsPath)))
+        {
+            QMessageBox::information(this, tr("Documentation"),
+                tr("No local documentation folder was found next to the application."));
+        }
+    });
+
+    connect(ui->actionGameDetection, &QAction::triggered, this, [this]() {
+        const QString ckDir = CkConfigInspector::detectCreationKitDirectory();
+        if (ckDir.isEmpty())
+        {
+            QMessageBox::information(this, tr("Game Detection"),
+                tr("No Creation Kit installation was detected.\n\n"
+                   "Set the OPENCK_DATA_DIR environment variable to a game Data "
+                   "directory or install location and try again."));
+            return;
+        }
+        CkConfigInspector inspector;
+        const bool loaded = inspector.loadFromDirectory(ckDir);
+        QString report = tr("Detected installation:\n%1\n\n").arg(QDir::toNativeSeparators(ckDir));
+        if (!loaded)
+        {
+            report += tr("No Creation Kit configuration files could be read from this location.");
+        }
+        else
+        {
+            report += tr("Archives listed: %1\n").arg(inspector.allArchives().size());
+            report += tr("Field of view: %1\n").arg(inspector.fov());
+            report += tr("Camera speed: %1\n").arg(inspector.cameraSpeed());
+            const QString compiler = inspector.papyrusCompiler();
+            report += tr("Papyrus compiler: %1\n")
+                          .arg(compiler.isEmpty() ? tr("(not configured)") : compiler);
+            report += tr("Editor colors: %1")
+                          .arg(inspector.hasColors() ? tr("loaded") : tr("not found"));
+        }
+        QMessageBox::information(this, tr("Game Detection"), report);
+    });
+}
+
 void MainWindow::setupEditMenu()
 {
     // Actions are already defined in the UI file, just connect them
@@ -558,6 +876,30 @@ void MainWindow::setupEditMenu()
     QAction* assetDepScanAction = new QAction(tr("Check Asset Dependencies..."), this);
     connect(assetDepScanAction, &QAction::triggered, this, &MainWindow::on_actionAssetDependencyScanner_triggered);
     ui->menuTools->addAction(assetDepScanAction);
+
+    // Cross-game migration: rebuild an archive in another game's container,
+    // or move a plugin's records into another game's plugin.
+    QAction* migrationAction = new QAction(tr("Cross-Game Migration..."), this);
+    connect(migrationAction, &QAction::triggered, this, [this]() {
+        MigrationDialog dialog(this);
+        dialog.exec();
+    });
+    ui->menuTools->addAction(migrationAction);
+
+    // Phase 10: record diff and three-way merge for version-controlled mods.
+    QAction* diffAction = new QAction(tr("Record Diff..."), this);
+    connect(diffAction, &QAction::triggered, this, [this]() {
+        RecordDiffDialog dialog(this);
+        dialog.exec();
+    });
+    ui->menuTools->addAction(diffAction);
+
+    QAction* mergeAction = new QAction(tr("Three-Way Plugin Merge..."), this);
+    connect(mergeAction, &QAction::triggered, this, [this]() {
+        PluginMergeDialog dialog(this);
+        dialog.exec();
+    });
+    ui->menuTools->addAction(mergeAction);
 
     // Add Batch Export action to Tools menu
     QAction* batchExportAction = new QAction(tr("Batch Export..."), this);
@@ -772,41 +1114,11 @@ void MainWindow::setupEditMenu()
             QString("LOD generation complete.\n\nFiles processed: %1").arg(processed));
     });
     ui->menuTools->addAction(lodGenAction);
+    ui->menuTerrain->addAction(lodGenAction);
 }
 
 void MainWindow::setupTerrainMenu()
 {
-    QAction* saveLandscapeAction = new QAction(tr("Save Landscape"), this);
-    saveLandscapeAction->setToolTip(tr("Save the current heightmap into the Land record of the selected cell"));
-    connect(saveLandscapeAction, &QAction::triggered, this, [this]() {
-        if (!landscapeEditor)
-        {
-            QMessageBox::information(this, "Save Landscape",
-                "No landscape editor is available.\n\nOpen the Landscape Editor first.");
-            return;
-        }
-        landscapeEditor->saveLandscapeToRecord();
-    });
-    ui->menuTerrain->addAction(saveLandscapeAction);
-
-    QAction* generateLandscapeAction = new QAction(tr("Generate Landscape..."), this);
-    connect(generateLandscapeAction, &QAction::triggered, this, [this]() {
-        if (!landscapeEditor)
-        {
-            QMessageBox::information(this, "Generate Landscape",
-                "No landscape editor is available.\n\nOpen the Landscape Editor first.");
-            return;
-        }
-        landscapeDock->toggleView(true);
-        landscapeEditor->raise();
-        landscapeEditor->activateWindow();
-    });
-    ui->menuTerrain->addAction(generateLandscapeAction);
-
-    QAction* openLandscapeEditorAction = new QAction(tr("Landscape Editor..."), this);
-    connect(openLandscapeEditorAction, &QAction::triggered, this, &MainWindow::on_actionLandscapeEditing_triggered);
-    ui->menuTerrain->addAction(openLandscapeEditorAction);
-
     // Papyrus Script Manager (File menu equivalent)
     QAction* scriptManagerAction = new QAction(tr("Script Manager..."), this);
     connect(scriptManagerAction, &QAction::triggered, this, [this]() {
@@ -996,16 +1308,8 @@ void MainWindow::applyShortcuts()
     ui->actionLoadLayout->setToolTip(tr("Load a saved window layout from a file"));
     
     // Refresh (F5)
-    auto* refreshAction = new QAction(tr("Refresh"), this);
-    refreshAction->setShortcut(mgr.get("Refresh"));
-    refreshAction->setToolTip(tr("Refresh Viewport (%1)").arg(mgr.get("Refresh").toString()));
-    connect(refreshAction, &QAction::triggered, this, [this]() {
-        if (nifViewportWidget) {
-            nifViewportWidget->refreshMesh();
-        }
-    });
-    ui->menuView->addAction(refreshAction);
-    mDynamicActions.append(refreshAction);
+    ui->actionRefreshViewport->setShortcut(mgr.get("Refresh"));
+    ui->actionRefreshViewport->setToolTip(tr("Refresh Viewport (%1)").arg(mgr.get("Refresh").toString()));
     
     // ========================================================================
     // WORLD MENU SHORTCUTS
@@ -1176,7 +1480,10 @@ void MainWindow::on_actionRedo_triggered()
 
 void MainWindow::on_actionExit_triggered()
 {
-    QCoreApplication::quit();
+    // Close rather than quit(): the close path saves the UI state and lets the
+    // OpenGL-backed docks tear down while the window is still valid. The
+    // application exits when the last window closes.
+    close();
 }
 
 void MainWindow::on_actionSaveLayout_triggered()
@@ -1286,7 +1593,7 @@ void MainWindow::on_actionDialogueTree_triggered()
 {
     if (mData)
     {
-        DialogueTreeEditor editor(mData, this);
+        DialogueTreeEditor editor(mData, [this] { return saveActiveDocument(); }, this);
         editor.exec();
     }
     else
@@ -1429,8 +1736,7 @@ void MainWindow::on_actionNifViewport_triggered()
     
     if (!nifViewportWidget)
     {
-        nifViewportWidget = new NifViewportWidget(this);
-        setCentralWidget(nifViewportWidget);
+        ensureViewport();
         LOG_INFO("3D Viewport created as central widget");
     }
     else
@@ -1552,12 +1858,24 @@ void MainWindow::runValidation()
         delete validator;
     }
 
+    QString dataDir = mData->getPaths().dataDir.absolutePath();
+    AssetValidator::ValidationReport assetReport = AssetValidator::validateAll(*mData, dataDir);
+    for (const auto& issue : assetReport.issues)
+    {
+        Message::Level level = Message::Info;
+        if (issue.severity == AssetValidator::ValidationIssue::Error)
+            level = Message::Error;
+        else if (issue.severity == AssetValidator::ValidationIssue::Warning)
+            level = Message::Warning;
+
+        messages.append(CkId(), QString("[%1] %2").arg(issue.category, issue.message), issue.recordId, level);
+    }
+
     if (mWarningsWidget)
     {
         mWarningsWidget->setMessages(messages);
         mWarningsDock->toggleView(true);
     }
-
     int count = 0;
     for (auto it = messages.begin(); it != messages.end(); ++it)
         ++count;
@@ -1578,9 +1896,14 @@ void MainWindow::on_actionAssetValidation_triggered()
     AssetValidator::ValidationReport report = AssetValidator::validateAll(*mData, dataDir);
 
     ValidationReportDialog dialog(report, this);
+    connect(&dialog, &ValidationReportDialog::navigateToRecord, this, [this](const QString& recordId) {
+        if (objectWindowDock)
+        {
+            objectWindowDock->selectRecord(recordId);
+        }
+    });
     dialog.exec();
 }
-
 void MainWindow::on_actionAssetDependencyScanner_triggered()
 {
     if (!mData)
@@ -1693,7 +2016,7 @@ void MainWindow::on_actionPluginMerge_triggered()
     LOG_DEBUG("Plugin Merge triggered");
     if (mData)
     {
-        PluginMergeDialog dialog(mData, this);
+        PluginMergeDialog dialog(this);
         dialog.exec();
     }
     else
@@ -3123,4 +3446,170 @@ void MainWindow::on_actionCheckIn_triggered()
             .arg(committed.stdoutText.trimmed()));
     LOG_INFO(QString("Check In: committed %1 file(s) in %2")
         .arg(relPaths.size()).arg(repoDir));
+}
+
+void MainWindow::dropViewportSelectionToGround()
+{
+    if (!mData || !nifViewportWidget)
+        return;
+
+    QVector<int> indices = nifViewportWidget->selectedRefIndices();
+    if (indices.isEmpty() && nifViewportWidget->selectedRefIndex() >= 0)
+        indices.append(nifViewportWidget->selectedRefIndex());
+    if (indices.isEmpty())
+        return;
+
+    auto& coll = mData->getRefrCollection();
+    auto* macro = new MacroCommand(QStringLiteral("Drop to Ground"));
+    bool anyChanged = false;
+
+    // Find ground elevation: prefer terrain height (LAND), fallback to Z=0.
+    auto sampleGroundZ = [this](float worldX, float worldY) -> float {
+        const int cellX = static_cast<int>(std::floor(worldX / 4096.0f));
+        const int cellY = static_cast<int>(std::floor(worldY / 4096.0f));
+        const auto& landColl = mData->getLandCollection();
+        for (int l = 0; l < landColl.size(); ++l)
+        {
+            const auto& land = landColl.getRecord(l).get();
+            if (land.cellX == cellX && land.cellY == cellY)
+            {
+                float ground = land.baseHeight;
+                if (land.hasHeightData)
+                {
+                    // Sample heightData[33][33] at relative cell offset
+                    float relX = (worldX - cellX * 4096.0f) / 4096.0f; // 0..1
+                    float relY = (worldY - cellY * 4096.0f) / 4096.0f; // 0..1
+                    int gx = qBound(0, static_cast<int>(relX * 32.0f), 32);
+                    int gy = qBound(0, static_cast<int>(relY * 32.0f), 32);
+                    ground += static_cast<float>(land.heightData[gy][gx]) * 8.0f;
+                }
+                return ground;
+            }
+        }
+        return 0.0f;
+    };
+
+    for (int vpIdx : indices)
+    {
+        const int dataIdx = (vpIdx >= 0 && vpIdx < coll.size())
+            ? mData->getRefrCollection().searchId(QString::number(coll.getRecord(vpIdx).get().formId, 16))
+            : -1;
+        const int targetIdx = (vpIdx >= 0 && vpIdx < coll.size()) ? vpIdx : dataIdx;
+        if (targetIdx < 0 || targetIdx >= coll.size())
+            continue;
+
+        RefrRecord original = coll.getRecord(targetIdx).get();
+        float groundZ = sampleGroundZ(original.posX, original.posY);
+        if (qAbs(original.posZ - groundZ) < 0.01f)
+            continue;
+
+        RefrRecord edited = original;
+        edited.posZ = groundZ;
+        auto* cmd = new EditRecordCommand<RefrRecord>(
+            &coll, targetIdx, original, edited,
+            QStringLiteral("Drop to Ground 0x%1").arg(edited.formId, 8, 16, QChar('0')));
+        macro->addCommand(cmd);
+        anyChanged = true;
+    }
+
+    if (anyChanged && mUndoStack)
+    {
+        mUndoStack->push(macro);
+        // Re-read references into viewport to update visual positions
+        QVector<ViewportCellRef> refs;
+        for (int i = 0; i < coll.size(); ++i)
+        {
+            const auto& rec = coll.getRecord(i).get();
+            if (coll.getRecord(i).isDeleted()) continue;
+            ViewportCellRef r;
+            r.position = QVector3D(rec.posX, rec.posY, rec.posZ);
+            r.enabled = !rec.initiallyDisabled;
+            r.dataIndex = i;
+            r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
+            r.scale = rec.scale;
+            refs.append(r);
+        }
+        nifViewportWidget->setCellReferences(refs);
+        updateStatus(tr("Dropped %1 object(s) to ground").arg(indices.size()));
+    }
+    else
+    {
+        delete macro;
+    }
+}
+
+void MainWindow::duplicateViewportSelection()
+{
+    if (!mData || !nifViewportWidget)
+        return;
+
+    QVector<int> indices = nifViewportWidget->selectedRefIndices();
+    if (indices.isEmpty() && nifViewportWidget->selectedRefIndex() >= 0)
+        indices.append(nifViewportWidget->selectedRefIndex());
+    if (indices.isEmpty())
+        return;
+
+    auto& coll = mData->getRefrCollection();
+    auto* table = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Refr_));
+    auto* macro = new MacroCommand(QStringLiteral("Duplicate in Viewport"));
+    bool anyAdded = false;
+    QVector<int> newIndices;
+
+    for (int vpIdx : indices)
+    {
+        if (vpIdx < 0 || vpIdx >= coll.size())
+            continue;
+
+        const RefrRecord& src = coll.getRecord(vpIdx).get();
+        quint32 newFormId = 0;
+        try {
+            newFormId = mData->createNewRecord(CkId::Type_Refr_, QString());
+        } catch (...) {
+            continue;
+        }
+        if (newFormId == 0) continue;
+
+        RefrRecord copy = src;
+        copy.formId = newFormId;
+        copy.editorId = QStringLiteral("REFR_%1").arg(newFormId, 8, 16, QChar('0')).toUpper();
+        copy.posX += 64.0f;
+        copy.posY += 64.0f;
+
+        const int appendIdx = coll.getAppendIndex(copy.editorId, CkId::Type_Refr_);
+        Record<RefrRecord> rec(State_ModifiedOnly, nullptr, &copy);
+        if (table)
+        {
+            macro->addCommand(new AddRecordCommand(table, &coll, appendIdx, rec,
+                QStringLiteral("Duplicate %1").arg(src.editorId)));
+            anyAdded = true;
+        }
+        quint32 parentCell = mData->parentCellOfRefr(src.formId);
+        if (parentCell != 0)
+            mData->setRefrParentCell(newFormId, parentCell);
+    }
+
+    if (anyAdded && mUndoStack)
+    {
+        mUndoStack->push(macro);
+        // Refresh viewport references
+        QVector<ViewportCellRef> refs;
+        for (int i = 0; i < coll.size(); ++i)
+        {
+            const auto& rec = coll.getRecord(i).get();
+            if (coll.getRecord(i).isDeleted()) continue;
+            ViewportCellRef r;
+            r.position = QVector3D(rec.posX, rec.posY, rec.posZ);
+            r.enabled = !rec.initiallyDisabled;
+            r.dataIndex = i;
+            r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
+            r.scale = rec.scale;
+            refs.append(r);
+        }
+        nifViewportWidget->setCellReferences(refs);
+        updateStatus(tr("Duplicated %1 object(s)").arg(indices.size()));
+    }
+    else
+    {
+        delete macro;
+    }
 }

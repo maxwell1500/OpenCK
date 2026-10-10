@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=OpenCK
+GenericName=Bethesda Plugin Editor
+Comment=Cross-platform Creation Kit replacement for Skyrim, Starfield and Morrowind plugins
+Exec=openck
+Icon=openck
+Terminal=false
+Categories=Development;Utility;IDE;
+Keywords=skyrim;starfield;morrowind;creationkit;esp;esm;modding;
+MimeType=application/x-esm;application/x-esp;application/x-esl;
+StartupNotify=true
+StartupWMClass=openck
+Actions=new-plugin;open-plugin;
+
+[Desktop Action new-plugin]
+Name=New Plugin
+Exec=openck --new
+
+[Desktop Action open-plugin]
+Name=Open Plugin
+Exec=openck

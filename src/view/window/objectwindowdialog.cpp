@@ -1,7 +1,11 @@
 #include "objectwindowdialog.hpp"
+#include "livesyncdialog.hpp"
+#include "../../model/tools/blenderbridge.hpp"
 
 #include "scripteditordialog.hpp"
 
+#include <QJsonArray>
+#include "useinfodialog.hpp"
 #include "../../model/window/objectwindow.hpp"
 #include "../../model/tools/objectwindowfilter.hpp"
 #include "../../model/world/data.hpp"
@@ -139,6 +143,35 @@
 #include <QFileDialog>
 
 namespace {
+
+// Maps a loaded game to the OBScript catalog flavor used for diagnostics.
+QString flavorNameFor(GameId game)
+{
+    switch (game)
+    {
+    case Game_SkyrimSpecialEdition:
+    case Game_SkyrimAnniversaryEdition:
+        return QStringLiteral("Skyrim Special Edition");
+    case Game_Skyrim:
+        return QStringLiteral("Skyrim");
+    case Game_Oblivion:
+        return QStringLiteral("Oblivion");
+    case Game_Morrowind:
+        return QStringLiteral("Morrowind");
+    case Game_FalloutNewVegas:
+        return QStringLiteral("Fallout New Vegas");
+    case Game_Fallout4:
+        return QStringLiteral("Fallout 4");
+    case Game_Starfield:
+        return QStringLiteral("Starfield");
+    case Game_None:
+    case Game_Fallout3:
+    case Game_NumGames:
+        break;
+    }
+    return QStringLiteral("Unknown");
+}
+
 
 template <typename RecordType>
 void openTransactionalForm(Data* data, const QString& formIdKey,
@@ -473,12 +506,41 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
 
         if (count <= 1)
         {
-            QAction* editAction = mContextMenu->addAction("Edit...");
-            QAction* cloneAction = mContextMenu->addAction("Clone");
-            QAction* deleteAction = mContextMenu->addAction("Delete");
+            QAction* editAction = mContextMenu->addAction(tr("Edit..."));
+            editAction->setShortcut(QKeySequence(Qt::Key_Return));
+            QAction* duplicateAction = mContextMenu->addAction(tr("Duplicate"));
+            duplicateAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+            QAction* deleteAction = mContextMenu->addAction(tr("Delete"));
+            deleteAction->setShortcut(QKeySequence(Qt::Key_Delete));
+
+            mContextMenu->addSeparator();
+
+            QAction* useInfoAction = mContextMenu->addAction(tr("Use Info..."));
+            useInfoAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_F));
+            connect(useInfoAction, &QAction::triggered, this, &ObjectWindowDialog::useInfoSelected);
+
+            QAction* findRenderAction = mContextMenu->addAction(tr("Find in Render Window"));
+            connect(findRenderAction, &QAction::triggered, this, &ObjectWindowDialog::findInRenderWindowSelected);
+
+            mContextMenu->addSeparator();
+
+            QAction* copyAction = mContextMenu->addAction(tr("Copy"));
+            copyAction->setShortcut(QKeySequence::Copy);
+            connect(copyAction, &QAction::triggered, this, &ObjectWindowDialog::copyRecord);
+
+            QAction* cutAction = mContextMenu->addAction(tr("Cut"));
+            cutAction->setShortcut(QKeySequence::Cut);
+            connect(cutAction, &QAction::triggered, this, &ObjectWindowDialog::cutRecord);
+
+            QAction* pasteAction = mContextMenu->addAction(tr("Paste"));
+            pasteAction->setShortcut(QKeySequence::Paste);
+            pasteAction->setEnabled(hasClipboardData());
+            connect(pasteAction, &QAction::triggered, this, &ObjectWindowDialog::pasteRecord);
+
+            mContextMenu->addSeparator();
 
             connect(editAction, &QAction::triggered, this, &ObjectWindowDialog::editSelected);
-            connect(cloneAction, &QAction::triggered, this, &ObjectWindowDialog::cloneSelected);
+            connect(duplicateAction, &QAction::triggered, this, &ObjectWindowDialog::cloneSelected);
             connect(deleteAction, &QAction::triggered, this, &ObjectWindowDialog::deleteSelected);
 
             // Add "Open in Blender" for records with 3D models
@@ -494,6 +556,12 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
             if (hasModel && BlenderLauncher::isBlenderAvailable()) {
                 QAction* blenderAction = mContextMenu->addAction("Open in Blender...");
                 connect(blenderAction, &QAction::triggered, this, &ObjectWindowDialog::openInBlender);
+
+                QAction* liveSyncAction = mContextMenu->addAction("Open in Blender (Live Sync)...");
+                liveSyncAction->setToolTip(
+                    "Open the mesh, skeleton and collision in Blender and watch "
+                    "what you save back into the plugin");
+                connect(liveSyncAction, &QAction::triggered, this, &ObjectWindowDialog::openInBlenderLiveSync);
 
                 QAction* previewAction = mContextMenu->addAction("Preview NIF...");
                 connect(previewAction, &QAction::triggered, this, &ObjectWindowDialog::previewNif);
@@ -766,7 +834,22 @@ void ObjectWindowDialog::editSelected()
             auto& record = collection.getRecord(recordIndex);
             ScriptRecord& rec = record.get();
             ScriptRecord originalState = rec;
-            ScriptEditorDialog dlg(rec.editorId, rec.scriptText, this);
+
+            // Script names in this plugin power the cross-script resolver;
+            // the flavor picks which native catalog the diagnostics use.
+            QStringList scriptNames;
+            for (int i = 0; i < collection.size(); ++i)
+            {
+                const QString otherId = collection.getRecord(i).get().editorId;
+                if (otherId != rec.editorId)
+                {
+                    scriptNames.append(otherId);
+                }
+            }
+
+            ScriptEditorDialog dlg(rec.editorId, rec.scriptText,
+                                   flavorNameFor(mData->getPaths().gameId),
+                                   scriptNames, this);
             if (dlg.exec() == QDialog::Accepted)
             {
                 ScriptRecord editedState = originalState;
@@ -1247,6 +1330,32 @@ void ObjectWindowDialog::editSelected()
         }
         break;
     }
+    case CkId::Type_Ligh_:
+    {
+        auto& collection = mData->getLighCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            LighRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openTransactionalForm(mData, formIdKey, QStringLiteral("LIGH"),
+                collection, recordIndex, rec, this);
+        }
+        break;
+    }
+    case CkId::Type_Wate_:
+    {
+        auto& collection = mData->getWateCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+        {
+            auto& record = collection.getRecord(recordIndex);
+            WateRecord& rec = record.get();
+            QString formIdKey = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
+            openTransactionalForm(mData, formIdKey, QStringLiteral("WATR"),
+                collection, recordIndex, rec, this);
+        }
+        break;
+    }
     case CkId::Type_Navm_:
     {
         auto& collection = mData->getNavmCollection();
@@ -1452,6 +1561,30 @@ void ObjectWindowDialog::refreshSavedFilters()
         }
     }
 
+    // Scan for shipped Creation Kit .filter files
+    QString filterDir;
+    if (mData)
+        filterDir = mData->getPaths().dataDir.absolutePath() + QStringLiteral("/DataViews/ObjectWindow/_common");
+    if (filterDir.isEmpty() || !QDir(filterDir).exists())
+    {
+        const QString envData = qEnvironmentVariable("OPENCK_DATA_DIR");
+        if (!envData.isEmpty())
+            filterDir = envData + QStringLiteral("/DataViews/ObjectWindow/_common");
+    }
+    if (filterDir.isEmpty() || !QDir(filterDir).exists())
+    {
+        filterDir = QStringLiteral("C:/XboxGames/Starfield/Content/Data/DataViews/ObjectWindow/_common");
+    }
+
+    if (QDir(filterDir).exists())
+    {
+        const QFileInfoList filterFiles = QDir(filterDir).entryInfoList({ QStringLiteral("*.filter") }, QDir::Files);
+        for (const QFileInfo& fi : filterFiles)
+        {
+            mSavedFilterCombo->addItem(fi.fileName(), fi.absoluteFilePath());
+        }
+    }
+
     const int restore = mSavedFilterCombo->findText(selectedName);
     mSavedFilterCombo->setCurrentIndex(restore >= 0 ? restore : 0);
     mSavedFilterCombo->blockSignals(false);
@@ -1486,9 +1619,35 @@ void ObjectWindowDialog::saveFilter()
 
 void ObjectWindowDialog::loadFilter()
 {
-    const QString name = mSavedFilterCombo
-        ? mSavedFilterCombo->currentText() : QString();
-    if (name.isEmpty()) return;
+    const int idx = mSavedFilterCombo ? mSavedFilterCombo->currentIndex() : -1;
+    if (idx < 0) return;
+
+    const QString filePath = mSavedFilterCombo->itemData(idx).toString();
+    const QString name = mSavedFilterCombo->itemText(idx);
+    if (name.isEmpty())
+    {
+        if (mModel) mModel->applyFilter(QString());
+        return;
+    }
+
+    if (!filePath.isEmpty() && QFile::exists(filePath))
+    {
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly))
+        {
+            const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+            const ObjectWindowFilter filter = ObjectWindowFilter::fromJson(doc.isObject() ? QJsonValue(doc.object()) : QJsonValue(doc.array()));
+            if (mModel)
+            {
+                mModel->applyObjectFilter(filter);
+            }
+            if (mStatusLabel)
+            {
+                mStatusLabel->setText(QString("Loaded filter file '%1' (%2 rules)").arg(name).arg(filter.count()));
+            }
+            return;
+        }
+    }
 
     QSettings settings;
     const QString text = settings.value(
@@ -1503,6 +1662,66 @@ void ObjectWindowDialog::loadFilter()
         if (mStatusLabel)
         {
             mStatusLabel->setText(QString("Loaded filter '%1'").arg(name));
+        }
+    }
+}
+
+void ObjectWindowDialog::useInfoSelected()
+{
+    const QModelIndex index = currentIndex();
+    if (!index.isValid() || !mModel || !mModel->isRecord(index))
+        return;
+
+    int categoryId = mModel->getCategoryIndex(index);
+    int recordIndex = mModel->getRecordIndex(index);
+    const QString formIdStr = mModel->getRecordFormId(categoryId, recordIndex);
+    const QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
+
+    bool ok = false;
+    quint32 formId = formIdStr.toUInt(&ok, 16);
+    if (!ok && formIdStr.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive))
+        formId = formIdStr.mid(2).toUInt(&ok, 16);
+
+    UseInfoDialog dlg(mData, formId, editorId, this);
+    connect(&dlg, &UseInfoDialog::referenceDoubleClicked, this, [this](quint32 refrId) {
+        selectRecord(QString("0x%1").arg(refrId, 8, 16, QChar('0')));
+    });
+    dlg.exec();
+}
+
+void ObjectWindowDialog::findInRenderWindowSelected()
+{
+    const QModelIndex index = currentIndex();
+    if (!index.isValid() || !mModel || !mModel->isRecord(index))
+        return;
+
+    int categoryId = mModel->getCategoryIndex(index);
+    int recordIndex = mModel->getRecordIndex(index);
+    const QString formIdStr = mModel->getRecordFormId(categoryId, recordIndex);
+    const QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
+
+    bool ok = false;
+    quint32 formId = formIdStr.toUInt(&ok, 16);
+    if (!ok && formIdStr.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive))
+        formId = formIdStr.mid(2).toUInt(&ok, 16);
+
+    CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
+    if (type == CkId::Type_Refr_ || type == CkId::Type_Achr_)
+    {
+        emit recordSelected(categoryId, recordIndex, editorId);
+        return;
+    }
+
+    if (mData)
+    {
+        const auto& refrs = mData->getRefrCollection();
+        for (int i = 0; i < refrs.size(); ++i)
+        {
+            if (refrs.getRecord(i).get().baseId == formId)
+            {
+                selectRecord(QString("0x%1").arg(refrs.getRecord(i).get().formId, 8, 16, QChar('0')));
+                return;
+            }
         }
     }
 }
@@ -1871,6 +2090,48 @@ void ObjectWindowDialog::openInBlender()
             "Failed to open file in Blender.\n\n"
             "Please ensure Blender is installed and the path is configured correctly.");
     }
+}
+
+void ObjectWindowDialog::openInBlenderLiveSync()
+{
+    QModelIndex index = mTreeView->currentIndex();
+    if (!index.isValid() || !mModel->isRecord(index))
+        return;
+
+    const int categoryId = mModel->getCategoryIndex(index);
+    const int recordIndex = mModel->getRecordIndex(index);
+    const QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
+    const QString modelPath = getModelPathForRecord(categoryId, recordIndex);
+
+    if (modelPath.isEmpty() || !QFileInfo::exists(modelPath))
+    {
+        QMessageBox::warning(this, "No Model",
+            QString("The record '%1' has no model file on disk:\n\n%2\n\n"
+                    "Set a model path in the editor first.")
+            .arg(editorId, modelPath));
+        return;
+    }
+
+    if (!mBlenderBridge)
+        mBlenderBridge = std::make_unique<BlenderBridge>(this);
+
+    QString error;
+    if (!mBlenderBridge->start(modelPath, QString(), &error))
+    {
+        QMessageBox::critical(this, "Blender Live-Sync",
+            QString("Could not start the live-sync session for %1:\n\n%2\n\n"
+                    "Install Blender 4.4+ with the NifTools addon and set the path in "
+                    "Preferences.")
+            .arg(editorId, error));
+        return;
+    }
+
+    // One session per editor: opening a second model stops watching the
+    // first, which is stated rather than silently replacing it.
+    LiveSyncDialog dialog(mBlenderBridge.get(), this);
+    dialog.exec();
+    LOG_INFO(QString("Live-sync session finished for %1 (%2)")
+                 .arg(editorId, modelPath));
 }
 
 void ObjectWindowDialog::previewNif()
@@ -2885,4 +3146,41 @@ ObjectWindowDialog::RecordLookupResult ObjectWindowDialog::getFormComponentsForI
     }
     }
     return result;
+}
+
+bool ObjectWindowDialog::selectRecord(const QString& idOrFormId)
+{
+    if (!mModel || !mTreeView || idOrFormId.isEmpty())
+        return false;
+
+    int categoryId = -1;
+    int recordIndex = -1;
+    QModelIndex modelIndex;
+
+    bool found = mModel->findRecord(idOrFormId, categoryId, recordIndex, modelIndex);
+    if (!found && mFilterEdit && !mFilterEdit->text().isEmpty())
+    {
+        mFilterEdit->clear();
+        found = mModel->findRecord(idOrFormId, categoryId, recordIndex, modelIndex);
+    }
+
+    if (!found || !modelIndex.isValid())
+        return false;
+
+    QModelIndex parent = modelIndex.parent();
+    while (parent.isValid())
+    {
+        mTreeView->expand(parent);
+        parent = parent.parent();
+    }
+
+    mTreeView->setCurrentIndex(modelIndex);
+    mTreeView->scrollTo(modelIndex, QAbstractItemView::PositionAtCenter);
+
+    QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
+    emit recordSelected(categoryId, recordIndex, editorId);
+
+    this->raise();
+    this->activateWindow();
+    return true;
 }

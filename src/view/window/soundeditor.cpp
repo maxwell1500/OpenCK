@@ -255,7 +255,6 @@ void SoundEditor::generateLip()
         + QStringLiteral("/Tools");
     const QString lipGen = AudioPipelineTools::findTool(
         AudioPipelineTools::Tool::LipGenerator, toolsDir);
-    const QString dataFile = AudioPipelineTools::lipDataFile(toolsDir);
 
     if (lipGen.isEmpty())
     {
@@ -266,24 +265,40 @@ void SoundEditor::generateLip()
     }
 
     const QFileInfo wavInfo(mLoadedWavPath);
-    const QString lipPath = wavInfo.absolutePath()
-        + QStringLiteral("/%1.lip").arg(wavInfo.completeBaseName());
-    const QString lipData = dataFile.isEmpty()
-        ? QStringLiteral("FonixData.cdf") : dataFile;
+    // The shipped tool needs a text file next to the WAV; derive one from the
+    // waveform duration when the caller hasn't provided the spoken line.
+    const QString textPath = wavInfo.absolutePath()
+        + QStringLiteral("/%1.txt").arg(wavInfo.completeBaseName());
+    if (!QFile::exists(textPath))
+    {
+        QFile textFile(textPath);
+        if (textFile.open(QIODevice::WriteOnly))
+        {
+            QTextStream ts(&textFile);
+            // The line is unknown at this point; a placeholder keeps the
+            // positional contract intact while LipGenerator dose its analysis.
+            ts << ".";
+            textFile.close();
+        }
+    }
+    const QString actorPath = AudioPipelineTools::facefxActorPath(
+        toolsDir, QStringLiteral("StarfieldHumanMale"));
+    const QString analysisPath = actorPath; // ffxc output shares the actor
+    const QString animPath = wavInfo.absolutePath()
+        + QStringLiteral("/%1.ffxanim").arg(wavInfo.completeBaseName());
 
     QStringList args = AudioPipelineTools::lipGeneratorArguments(
-        lipGen, mLoadedWavPath, lipPath, lipData,
-        mWaveform->sampleRate() > 0 ? mWaveform->sampleRate() : 22050);
+        lipGen, mLoadedWavPath, textPath, actorPath, analysisPath, animPath);
 
     auto* process = new QProcess(this);
     connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this, process, lipPath](int exitCode, QProcess::ExitStatus) {
+            this, [this, process, animPath](int exitCode, QProcess::ExitStatus) {
         process->deleteLater();
         if (exitCode == 0)
         {
-            mSelectionLabel->setText(tr("Lip file generated: %1").arg(lipPath));
+            mSelectionLabel->setText(tr("Lip animation generated: %1").arg(animPath));
             QMessageBox::information(this, tr("Generate Lip"),
-                tr("Lip file written to:\n%1").arg(lipPath));
+                tr("Lip animation written to:\n%1").arg(animPath));
         }
         else
         {

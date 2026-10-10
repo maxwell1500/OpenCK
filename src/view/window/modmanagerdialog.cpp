@@ -1,5 +1,6 @@
 #include "modmanagerdialog.hpp"
 #include "../../model/tools/modmanagerdetection.hpp"
+#include "../../../libs/files/filepaths.hpp"
 #include "logger.hpp"
 
 #include <QGroupBox>
@@ -8,7 +9,10 @@
 #include <QGridLayout>
 #include <QMessageBox>
 #include <QProcess>
+#include <QSettings>
 #include <QHeaderView>
+#include <QDir>
+#include <QTableWidgetItem>
 
 ModManagerDialog::ModManagerDialog(QWidget* parent)
     : QDialog(parent)
@@ -64,6 +68,42 @@ void ModManagerDialog::setupUI()
     profileLayout->addWidget(profileCombo, 1);
     mainLayout->addWidget(profileGroup);
 
+    auto* deploymentGroup = new QGroupBox("Deployed Files (Vortex)", this);
+    auto* deploymentLayout = new QGridLayout(deploymentGroup);
+
+    deploymentLayout->addWidget(new QLabel("Manifest:", deploymentGroup), 0, 0);
+    deploymentStatusLabel = new QLabel("-", deploymentGroup);
+    deploymentStatusLabel->setWordWrap(true);
+    deploymentLayout->addWidget(deploymentStatusLabel, 0, 1);
+
+    deploymentLayout->addWidget(new QLabel("Method:", deploymentGroup), 1, 0);
+    deploymentMethodLabel = new QLabel("-", deploymentGroup);
+    deploymentLayout->addWidget(deploymentMethodLabel, 1, 1);
+
+    deploymentTable = new QTableWidget(deploymentGroup);
+    deploymentTable->setColumnCount(4);
+    deploymentTable->setHorizontalHeaderLabels(
+        { "Deployed Path", "Source Mod", "Staged Copy", "Link" });
+    deploymentTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    deploymentTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    deploymentTable->horizontalHeader()->setSectionResizeMode(
+        3, QHeaderView::ResizeToContents);
+    deploymentLayout->addWidget(deploymentTable, 2, 0, 1, 2);
+
+    auto* resolveLayout = new QHBoxLayout();
+    resolveLayout->addWidget(new QLabel("Resolve asset:", deploymentGroup));
+    assetPathEdit = new QLineEdit(deploymentGroup);
+    assetPathEdit->setPlaceholderText("meshes/chair.nif");
+    resolveLayout->addWidget(assetPathEdit, 1);
+    auto* resolveButton = new QPushButton("Resolve", deploymentGroup);
+    resolveLayout->addWidget(resolveButton);
+    deploymentLayout->addLayout(resolveLayout, 3, 0, 1, 2);
+    assetResultLabel = new QLabel("-", deploymentGroup);
+    assetResultLabel->setWordWrap(true);
+    deploymentLayout->addWidget(assetResultLabel, 4, 0, 1, 2);
+
+    mainLayout->addWidget(deploymentGroup);
+
     auto* modsGroup = new QGroupBox("Installed Mods", this);
     auto* modsLayout = new QVBoxLayout(modsGroup);
     modListWidget = new QListWidget(modsGroup);
@@ -90,6 +130,7 @@ void ModManagerDialog::setupUI()
     connect(refreshButton, &QPushButton::clicked, this, &ModManagerDialog::onRefreshDetection);
     connect(openManagerButton, &QPushButton::clicked, this, &ModManagerDialog::onOpenModManager);
     connect(launchProfileButton, &QPushButton::clicked, this, &ModManagerDialog::onLaunchWithProfile);
+    connect(resolveButton, &QPushButton::clicked, this, &ModManagerDialog::onResolveAsset);
     connect(closeButton, &QPushButton::clicked, this, &QDialog::reject);
 }
 
@@ -165,6 +206,120 @@ void ModManagerDialog::populateUI()
 
     openManagerButton->setEnabled(true);
     launchProfileButton->setEnabled(true);
+
+    // Deployment state lives in the game's own data directory, independent
+    // of whether the manager itself is detected. The manager's own gamePath
+    // wins; otherwise fall back to OpenCK's configured data directory.
+    QString dataDir = info.gamePath;
+    if (dataDir.isEmpty())
+    {
+        QSettings conf(FilePaths::configFilePath(), QSettings::IniFormat);
+        conf.beginGroup(QStringLiteral("OpenCK"));
+        dataDir = conf.value(QStringLiteral("DataDirectory")).toString();
+        conf.endGroup();
+    }
+    populateDeployment(dataDir);
+}
+
+void ModManagerDialog::populateDeployment(const QString& gameDataDir)
+{
+    mDeployment = ModDeploymentResolver::VortexDeployment();
+    deploymentTable->setRowCount(0);
+    assetResultLabel->setText("-");
+
+    if (gameDataDir.isEmpty())
+    {
+        deploymentStatusLabel->setText("No game data directory known");
+        deploymentMethodLabel->setText("-");
+        return;
+    }
+
+    const QString manifestPath =
+        ModDeploymentResolver::findVortexDeployment(gameDataDir);
+    if (manifestPath.isEmpty())
+    {
+        deploymentStatusLabel->setText(
+            QString("No vortex.deployment.json in %1").arg(
+                QDir::toNativeSeparators(gameDataDir)));
+        deploymentMethodLabel->setText("-");
+        return;
+    }
+
+    if (!ModDeploymentResolver::readVortexDeployment(manifestPath, mDeployment))
+    {
+        deploymentStatusLabel->setText("Manifest unreadable");
+        deploymentMethodLabel->setText("-");
+        return;
+    }
+
+    deploymentStatusLabel->setText(
+        QString("%1 deployed file(s), game %2")
+            .arg(mDeployment.files.size())
+            .arg(mDeployment.gameId.isEmpty() ? QStringLiteral("?")
+                                              : mDeployment.gameId));
+    deploymentMethodLabel->setText(
+        mDeployment.deploymentMethod.isEmpty()
+            ? QStringLiteral("(unknown)")
+            : mDeployment.deploymentMethod);
+
+    deploymentTable->setRowCount(mDeployment.files.size());
+    for (int i = 0; i < mDeployment.files.size(); ++i)
+    {
+        const ModDeploymentResolver::DeployedFile& file = mDeployment.files.at(i);
+        const QString staged =
+            ModDeploymentResolver::sourceFilePath(mDeployment, file.relPath);
+        const QString deployed =
+            ModDeploymentResolver::deployedFilePath(mDeployment, file.relPath);
+        const QString link = staged.isEmpty() || deployed.isEmpty()
+            ? QString()
+            : ModDeploymentResolver::linkKindName(
+                  ModDeploymentResolver::linkStatus(staged, deployed));
+
+        deploymentTable->setItem(
+            i, 0, new QTableWidgetItem(QDir::toNativeSeparators(file.relPath)));
+        deploymentTable->setItem(i, 1, new QTableWidgetItem(file.source));
+        deploymentTable->setItem(
+            i, 2, new QTableWidgetItem(staged.isEmpty() ? QStringLiteral("-") : staged));
+        deploymentTable->setItem(
+            i, 3, new QTableWidgetItem(link.isEmpty() ? QStringLiteral("-") : link));
+    }
+    deploymentTable->resizeColumnsToContents();
+}
+
+void ModManagerDialog::onResolveAsset()
+{
+    const QString rel = assetPathEdit->text().trimmed();
+    if (rel.isEmpty())
+    {
+        assetResultLabel->setText("Enter a relative asset path first.");
+        return;
+    }
+
+    if (!mDeployment.isValid())
+    {
+        assetResultLabel->setText("No Vortex deployment loaded.");
+        return;
+    }
+
+    const QString deployed =
+        ModDeploymentResolver::deployedFilePath(mDeployment, rel);
+    if (deployed.isEmpty())
+    {
+        assetResultLabel->setText(
+            QString("'%1' is not deployed by any mod").arg(rel));
+        return;
+    }
+
+    const QString staged = ModDeploymentResolver::sourceFilePath(mDeployment, rel);
+    QString text = QString("Deployed: %1").arg(deployed);
+    if (!staged.isEmpty())
+    {
+        text += QString("\nStaged: %1 (%2)").arg(
+            staged,
+            ModDeploymentResolver::linkKindName(
+                ModDeploymentResolver::linkStatus(staged, deployed)));
+    }
+    assetResultLabel->setText(text);
 }
 
 void ModManagerDialog::onRefreshDetection()

@@ -1,5 +1,7 @@
 #include "preferencesdialog.hpp"
 
+#include "../../model/tools/gitrepository.hpp"
+
 #include "logger.hpp"
 #include "thememanager.hpp"
 #include "filepaths.hpp"
@@ -16,6 +18,7 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QSplitter>
+#include <QInputDialog>
 #include <QListWidgetItem>
 #include <QHeaderView>
 
@@ -152,6 +155,15 @@ QWidget* PreferencesDialog::createGeneralPage()
     mThemeCombo->addItem("Light", "Light");
     mThemeCombo->addItem("System", "System");
     appearanceForm->addRow("Theme:", mThemeCombo);
+
+    mUiScaleCombo = new QComboBox();
+    mUiScaleCombo->addItem("Desktop", "Desktop");
+    mUiScaleCombo->addItem("Touch (Steam Deck)", "Touch");
+    mUiScaleCombo->addItem("Compact", "Compact");
+    mUiScaleCombo->setToolTip(
+        "Touch enlarges fonts and controls for handheld screens; Compact "
+        "shrinks hit targets to fit more rows.");
+    appearanceForm->addRow("UI Scale:", mUiScaleCombo);
     form->addRow(appearanceGroup);
 
     return page;
@@ -356,10 +368,76 @@ QWidget* PreferencesDialog::createNetworkPage()
     auto* gform = new QFormLayout(group);
 
     mVersionControlCheck = new QCheckBox("Enable version control integration");
-    mVersionControlCheck->setEnabled(false);
+    mVersionControlCheck->setEnabled(true);
     gform->addRow("", mVersionControlCheck);
 
-    auto* note = new QLabel("Perforce and Git check-in/check-out are configured from the Tools menu and external tools.");
+    mGitRepoEdit = new QLineEdit();
+    mGitRepoEdit->setToolTip(tr("Working tree tracked by Git (usually the Data folder)"));
+    auto* repoRow = new QHBoxLayout();
+    repoRow->addWidget(mGitRepoEdit);
+    auto* repoBtn = new QPushButton(tr("Browse..."));
+    repoRow->addWidget(repoBtn);
+    connect(repoBtn, &QPushButton::clicked, this, [this]() {
+        const QString dir = QFileDialog::getExistingDirectory(
+            this, tr("Git Working Tree"), mGitRepoEdit->text());
+        if (!dir.isEmpty())
+        {
+            mGitRepoEdit->setText(dir);
+            onGitRepoChanged();
+        }
+    });
+    gform->addRow(tr("Repository:"), repoRow);
+
+    connect(mGitRepoEdit, &QLineEdit::editingFinished,
+            this, &PreferencesDialog::onGitRepoChanged);
+
+    mGitStatusLabel = new QLabel();
+    mGitStatusLabel->setWordWrap(true);
+    gform->addRow(tr("Status:"), mGitStatusLabel);
+
+    mGitBranchCombo = new QComboBox();
+    mGitBranchCombo->setEnabled(false);
+    connect(mGitBranchCombo, &QComboBox::currentTextChanged, this, [this]() {
+        if (mGitBranchUpdating || mGitBranchCombo->count() == 0)
+            return;
+        const QString repo = mGitRepoEdit->text().trimmed();
+        const QString branch = mGitBranchCombo->currentText();
+        if (!GitRepository::isRepository(repo))
+            return;
+        if (GitRepository::currentBranch(repo) == branch)
+            return;
+        const GitRepository::Result r = GitRepository::checkout(repo, branch);
+        if (!r.ok)
+            QMessageBox::warning(this, tr("Version Control"),
+                                 tr("Switch to %1 failed: %2")
+                                     .arg(branch, r.stderrText.trimmed()));
+        refreshGitPanel();
+    });
+    gform->addRow(tr("Branch:"), mGitBranchCombo);
+
+    auto* opsRow = new QHBoxLayout();
+    mGitRefreshBtn = new QPushButton(tr("Refresh"));
+    mGitCommitBtn = new QPushButton(tr("Commit..."));
+    mGitPullBtn = new QPushButton(tr("Pull"));
+    mGitPushBtn = new QPushButton(tr("Push"));
+    for (QPushButton* b : { mGitRefreshBtn, mGitCommitBtn, mGitPullBtn, mGitPushBtn })
+        b->setEnabled(false);
+    opsRow->addWidget(mGitRefreshBtn);
+    opsRow->addWidget(mGitCommitBtn);
+    opsRow->addWidget(mGitPullBtn);
+    opsRow->addWidget(mGitPushBtn);
+    opsRow->addStretch();
+    connect(mGitRefreshBtn, &QPushButton::clicked,
+            this, &PreferencesDialog::onGitRefresh);
+    connect(mGitCommitBtn, &QPushButton::clicked,
+            this, &PreferencesDialog::onGitCommit);
+    connect(mGitPullBtn, &QPushButton::clicked,
+            this, &PreferencesDialog::onGitPull);
+    connect(mGitPushBtn, &QPushButton::clicked,
+            this, &PreferencesDialog::onGitPush);
+    gform->addRow(tr("Operations:"), opsRow);
+
+    auto* note = new QLabel(tr("Perforce check-in/check-out is configured from the Tools menu and external tools."));
     note->setWordWrap(true);
     gform->addRow("", note);
 
@@ -390,6 +468,10 @@ void PreferencesDialog::loadSettings()
     int themeIndex = mThemeCombo->findData(theme);
     if (themeIndex >= 0)
         mThemeCombo->setCurrentIndex(themeIndex);
+    QString uiScale = conf.value("UiScale", "Desktop").toString();
+    int scaleIndex = mUiScaleCombo->findData(uiScale);
+    if (scaleIndex >= 0)
+        mUiScaleCombo->setCurrentIndex(scaleIndex);
     conf.endGroup();
 
     conf.beginGroup("Display");
@@ -438,7 +520,9 @@ void PreferencesDialog::loadSettings()
 
     conf.beginGroup("Network");
     mVersionControlCheck->setChecked(conf.value("bEnableVersionControl", false).toBool());
+    mGitRepoEdit->setText(conf.value("sGitWorkingTree", "").toString());
     conf.endGroup();
+    onGitRepoChanged();
 }
 
 void PreferencesDialog::saveSettings()
@@ -485,6 +569,7 @@ void PreferencesDialog::saveSettings()
 
     conf.beginGroup("Network");
     conf.setValue("bEnableVersionControl", mVersionControlCheck->isChecked());
+    conf.setValue("sGitWorkingTree", mGitRepoEdit->text());
     conf.endGroup();
 
     // The archive list used to be read but never written, so it stayed stuck at
@@ -508,9 +593,12 @@ void PreferencesDialog::saveSettings()
 
     QString themeName = mThemeCombo->currentData().toString();
     ThemeManager::Theme theme = ThemeManager::themeFromName(themeName);
+    QString uiScaleName = mUiScaleCombo->currentData().toString();
+    ThemeManager::Scale scale = ThemeManager::scaleFromName(uiScaleName);
     auto* app = qobject_cast<QApplication*>(QApplication::instance());
     if (app) {
-        ThemeManager::applyTheme(*app, theme);
+        ThemeManager::setTheme(*app, theme);
+        ThemeManager::setScale(*app, scale);
     }
 
     LOG_INFO("Preferences saved");
@@ -552,4 +640,137 @@ void PreferencesDialog::browseScriptSourceDir()
     );
     if (!dir.isEmpty())
         mScriptSourceDirEdit->setText(dir);
+}
+
+void PreferencesDialog::onGitRepoChanged()
+{
+    refreshGitPanel();
+}
+
+void PreferencesDialog::onGitRefresh()
+{
+    refreshGitPanel();
+}
+
+void PreferencesDialog::onGitCommit()
+{
+    const QString repo = mGitRepoEdit->text().trimmed();
+    if (repo.isEmpty() || !GitRepository::isRepository(repo))
+    {
+        QMessageBox::warning(this, tr("Version Control"),
+                             tr("Pick a folder inside a Git repository."));
+        return;
+    }
+
+    const GitRepository::Result status = GitRepository::status(repo);
+    QStringList paths;
+    for (const QString& line : status.stdoutText.split(QChar('\n'), Qt::SkipEmptyParts))
+    {
+        // Porcelain v1 short format: "XY <path>"; renames carry two paths.
+        if (line.size() < 4)
+            continue;
+        QString entry = line.mid(3).trimmed();
+        const int arrow = entry.indexOf(QLatin1String(" -> "));
+        if (arrow >= 0)
+            entry = entry.mid(arrow + 4);
+        paths.append(entry);
+    }
+    if (paths.isEmpty())
+    {
+        QMessageBox::information(this, tr("Version Control"),
+                                 tr("Nothing to commit."));
+        return;
+    }
+
+    bool ok = false;
+    const QString message = QInputDialog::getText(
+        this, tr("Commit %1 file(s)").arg(paths.size()),
+        tr("Commit message:"), QLineEdit::Normal,
+        QStringLiteral("OpenCK save"), &ok);
+    if (!ok || message.trimmed().isEmpty())
+        return;
+
+    if (!GitRepository::stageFiles(repo, paths).ok)
+    {
+        QMessageBox::warning(this, tr("Version Control"),
+                             tr("Staging failed; see the log."));
+        return;
+    }
+    const GitRepository::Result committed =
+        GitRepository::commitFiles(repo, paths, message);
+    if (!committed.ok)
+    {
+        QMessageBox::warning(this, tr("Version Control"),
+                             tr("Commit failed: %1").arg(committed.stderrText.trimmed()));
+        return;
+    }
+    refreshGitPanel();
+}
+
+void PreferencesDialog::onGitPull()
+{
+    const QString repo = mGitRepoEdit->text().trimmed();
+    if (repo.isEmpty() || !GitRepository::isRepository(repo))
+        return;
+    const GitRepository::Result r = GitRepository::pull(repo);
+    if (!r.ok)
+        QMessageBox::warning(this, tr("Version Control"),
+                             tr("Pull failed: %1").arg(r.stderrText.trimmed()));
+    refreshGitPanel();
+}
+
+void PreferencesDialog::onGitPush()
+{
+    const QString repo = mGitRepoEdit->text().trimmed();
+    if (repo.isEmpty() || !GitRepository::isRepository(repo))
+        return;
+    const GitRepository::Result r = GitRepository::push(repo);
+    if (!r.ok)
+        QMessageBox::warning(this, tr("Version Control"),
+                             tr("Push failed: %1").arg(r.stderrText.trimmed()));
+    refreshGitPanel();
+}
+
+// Repaints the whole git panel for the current repository path. Every
+// operation below calls back into here after a successful command.
+void PreferencesDialog::refreshGitPanel()
+{
+    const QString repo = mGitRepoEdit->text().trimmed();
+    const bool usable = mVersionControlCheck->isChecked()
+        && !repo.isEmpty() && GitRepository::isRepository(repo);
+
+    mGitStatusLabel->setText(usable ? QString() : tr("No Git repository selected."));
+    const bool available = usable && GitRepository::isAvailable();
+    mGitRefreshBtn->setEnabled(true);
+    mGitCommitBtn->setEnabled(available);
+    mGitPullBtn->setEnabled(available);
+    mGitPushBtn->setEnabled(available);
+
+    mGitBranchUpdating = true;
+    mGitBranchCombo->blockSignals(true);
+    mGitBranchCombo->clear();
+    if (available)
+    {
+        const QString current = GitRepository::currentBranch(repo);
+        mGitBranchCombo->addItems(GitRepository::branches(repo));
+        const int idx = mGitBranchCombo->findText(current);
+        mGitBranchCombo->setCurrentIndex(idx >= 0 ? idx : 0);
+    }
+    mGitBranchCombo->setEnabled(available && mGitBranchCombo->count() > 0);
+    mGitBranchCombo->blockSignals(false);
+    mGitBranchUpdating = false;
+
+    if (!usable)
+        return;
+    if (!GitRepository::isAvailable())
+    {
+        mGitStatusLabel->setText(
+            tr("Git is not on PATH; branch switching and remote operations are unavailable."));
+        return;
+    }
+    const GitRepository::Result status = GitRepository::status(repo);
+    mGitStatusLabel->setText(
+        tr("Branch %1\n%2").arg(GitRepository::currentBranch(repo),
+                              status.stdoutText.trimmed().isEmpty()
+                                  ? tr("(clean)") : status.stdoutText.trimmed()));
 }

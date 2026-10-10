@@ -2,6 +2,8 @@
 #define PREFERENCESDIALOG_HPP
 
 #include <QDialog>
+#include <QLabel>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QLineEdit>
 #include <QCheckBox>
@@ -26,6 +28,12 @@ private slots:
     void browseCompilerDir();
     void browseScriptSourceDir();
     void changePage(int index);
+    void onGitRepoChanged();
+    void refreshGitPanel();
+    void onGitRefresh();
+    void onGitCommit();
+    void onGitPull();
+    void onGitPush();
 
 private:
     void setupUI();
@@ -48,6 +56,7 @@ private:
 
     // Appearance (moved under General page as Theme)
     QComboBox* mThemeCombo;
+    QComboBox* mUiScaleCombo;
 
     // Display
     QDoubleSpinBox* mFovSpin;
@@ -81,6 +90,14 @@ private:
 
     // Network
     QCheckBox* mVersionControlCheck;
+    QLineEdit* mGitRepoEdit;
+    QLabel* mGitStatusLabel;
+    QComboBox* mGitBranchCombo;
+    QPushButton* mGitRefreshBtn;
+    QPushButton* mGitCommitBtn;
+    QPushButton* mGitPullBtn;
+    QPushButton* mGitPushBtn;
+    bool mGitBranchUpdating = false;
 };
 
 #endif // PREFERENCESDIALOG_HPP

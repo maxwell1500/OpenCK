@@ -83,6 +83,38 @@ public:
     void setData(Data* data);
     void setUndoStack(UndoStack* stack);
 
+    // Brush settings accessors
+    int getBrushSize() const { return brushSize; }
+    void setBrushSize(int size);
+    int getBrushStrength() const { return brushStrength; }
+    void setBrushStrength(int strength);
+    int getActiveBrushIndex() const { return activeBrushIndex; }
+    void setActiveBrushIndex(int index);
+    const QVector<BrushDefinition>& getBrushes() const { return brushes; }
+
+    // Terrain raycasting and brush projection
+    // Intersects ray with 3D heightmap and sets hover/brush ring position
+    bool raycastTerrain(const QVector3D& rayOrigin, const QVector3D& rayDir, int& outGridX, int& outGridY, float* outElevation = nullptr) const;
+    QPoint screenToTerrain(const QPoint& screenPos) const;
+    bool isBrushRingVisible() const { return mBrushRingVisible; }
+    QPoint brushRingPosition() const { return mBrushRingPos; }
+
+    // Landscape texture painting
+    enum class PaintMode { Sculpt, PaintTexture };
+    PaintMode getPaintMode() const { return mPaintMode; }
+    void setPaintMode(PaintMode mode) { mPaintMode = mode; }
+    int getActiveTextureLayerIndex() const { return mActiveTextureLayerIndex; }
+    void setActiveTextureLayerIndex(int idx) { mActiveTextureLayerIndex = idx; }
+    void paintTexture(int x, int y);
+
+    // Heightmap read access
+    const QVector<float>& getHeightmap() const { return heightmap; }
+    int getTerrainSize() const { return terrainSize; }
+    float getMinHeight() const { return minHeight; }
+    float getMaxHeight() const { return maxHeight; }
+    void applyBrush(int x, int y);
+    float getHeightAt(int x, int y) const;
+    void setHeightAt(int x, int y, float height);
     void saveHeightmap(LandRecord& rec);
     void applyHeightmap();
 
@@ -94,7 +126,6 @@ public:
     // Writes the water-plane height (XCLW) from the Water tab back into
     // the loaded CellRecord and marks it modified in the collection.
     void saveWaterToCell();
-
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
@@ -102,7 +133,8 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
-
+    bool eventFilter(QObject* obj, QEvent* event) override;
+    void leaveEvent(QEvent* event) override;
 private slots:
     void onBrushSizeChanged(int size);
     void onBrushStrengthChanged(int strength);
@@ -139,9 +171,6 @@ private:
     void loadHeightmap();
     void saveHeightmap();
     void renderTerrain();
-    void applyBrush(int x, int y);
-    float getHeightAt(int x, int y) const;
-    void setHeightAt(int x, int y, float height);
 
     void setupTextureLayersTab(QWidget* tab);
     void setupVegetationTab(QWidget* tab);
@@ -215,6 +244,16 @@ private:
     bool hasOriginalState;
     QRect strokeDirtyRect;
 
+    // Brush ring visual projection state
+    bool mBrushRingVisible = false;
+    QPoint mBrushRingPos{ -1, -1 };
+    QOpenGLBuffer ringVbo;
+    QOpenGLShaderProgram* ringShaderProgram = nullptr;
+    void renderBrushRing();
+
+    // Paint mode & texture quad painting state
+    PaintMode mPaintMode = PaintMode::Sculpt;
+    int mActiveTextureLayerIndex = 0;
     // Texture layer data
     QVector<TextureLayer> textureLayers;
 

@@ -17,6 +17,7 @@ QString BrushDefinition::operationToString(Operation op)
     case Operation::Stamp: return QStringLiteral("Stamp");
     case Operation::BuildUp: return QStringLiteral("BuildUp");
     case Operation::Subtractive: return QStringLiteral("Subtractive");
+    case Operation::Noise: return QStringLiteral("Noise");
     }
     return QStringLiteral("Sculpt");
 }
@@ -30,37 +31,107 @@ BrushDefinition::Operation BrushDefinition::stringToOperation(const QString& tex
     if (t.compare(QStringLiteral("Stamp"), Qt::CaseInsensitive) == 0) { if (ok) *ok = true; return Operation::Stamp; }
     if (t.compare(QStringLiteral("BuildUp"), Qt::CaseInsensitive) == 0) { if (ok) *ok = true; return Operation::BuildUp; }
     if (t.compare(QStringLiteral("Subtractive"), Qt::CaseInsensitive) == 0) { if (ok) *ok = true; return Operation::Subtractive; }
+    if (t.compare(QStringLiteral("Noise"), Qt::CaseInsensitive) == 0) { if (ok) *ok = true; return Operation::Noise; }
     if (ok) *ok = false;
     return Operation::Sculpt;
 }
 
-BrushDefinition BrushDefinition::fromJson(const QJsonObject& obj)
+BrushDefinition BrushDefinition::fromJson(const QJsonObject& obj, const QString& fallbackName)
 {
     BrushDefinition b;
     b.name = obj.value(QStringLiteral("name")).toString().trimmed();
     if (b.name.isEmpty()) {
         b.name = obj.value(QStringLiteral("Name")).toString().trimmed();
     }
+    if (b.name.isEmpty() && !fallbackName.isEmpty()) {
+        b.name = fallbackName;
+    }
 
     bool ok = false;
     const QString opText = obj.value(QStringLiteral("operation")).toString();
-    if (opText.isEmpty()) {
-        b.operation = stringToOperation(obj.value(QStringLiteral("Operation")).toString(), &ok);
-    } else {
+    if (!opText.isEmpty()) {
         b.operation = stringToOperation(opText, &ok);
-    }
-    if (!ok) {
-        // A brush with an unknown operation type is skipped by the caller
-        // unless it has an explicit operation; default to Sculpt and let the
-        // loader caller decide whether to keep it.
-        b.operation = Operation::Sculpt;
+    } else if (obj.contains(QStringLiteral("Operation"))) {
+        b.operation = stringToOperation(obj.value(QStringLiteral("Operation")).toString(), &ok);
     }
 
-    b.radius = obj.value(QStringLiteral("radius")).toDouble(obj.value(QStringLiteral("Radius")).toDouble(b.radius));
-    b.strength = obj.value(QStringLiteral("strength")).toDouble(obj.value(QStringLiteral("Strength")).toDouble(b.strength));
-    b.falloff = obj.value(QStringLiteral("falloff")).toDouble(obj.value(QStringLiteral("Falloff")).toDouble(b.falloff));
-    b.invert = obj.value(QStringLiteral("invert")).toBool(obj.value(QStringLiteral("Invert")).toBool(b.invert));
-    b.targetHeight = obj.value(QStringLiteral("targetHeight")).toDouble(obj.value(QStringLiteral("TargetHeight")).toDouble(b.targetHeight));
+    if (!ok) {
+        // Starfield boolean flags schema
+        if (obj.value(QStringLiteral("Flatten")).toBool(false)) {
+            b.operation = Operation::Flatten;
+            ok = true;
+        } else if (obj.value(QStringLiteral("Smooth")).toBool(false)) {
+            b.operation = Operation::Smooth;
+            ok = true;
+        } else if (obj.value(QStringLiteral("StampMode")).toBool(false)) {
+            b.operation = Operation::Stamp;
+            ok = true;
+        } else if (obj.value(QStringLiteral("BuildUp")).toBool(false)) {
+            b.operation = Operation::BuildUp;
+            ok = true;
+        } else if (obj.value(QStringLiteral("Subtractive")).toBool(false)) {
+            b.operation = Operation::Subtractive;
+            ok = true;
+        } else if (obj.value(QStringLiteral("Noise")).toBool(false)) {
+            b.operation = Operation::Noise;
+            ok = true;
+        } else if (obj.value(QStringLiteral("Sculpt")).toBool(false)) {
+            ok = true;
+        } else {
+            b.operation = Operation::Sculpt;
+        }
+    }
+
+    // Radius / Size
+    if (obj.contains(QStringLiteral("radius"))) {
+        b.radius = obj.value(QStringLiteral("radius")).toDouble(b.radius);
+    } else if (obj.contains(QStringLiteral("Radius"))) {
+        b.radius = obj.value(QStringLiteral("Radius")).toDouble(b.radius);
+    } else if (obj.contains(QStringLiteral("Size"))) {
+        b.radius = obj.value(QStringLiteral("Size")).toDouble(b.radius);
+    }
+
+    // Strength
+    if (obj.contains(QStringLiteral("strength"))) {
+        b.strength = obj.value(QStringLiteral("strength")).toDouble(b.strength);
+    } else if (obj.contains(QStringLiteral("Strength"))) {
+        b.strength = obj.value(QStringLiteral("Strength")).toDouble(b.strength);
+    }
+
+    // Falloff / FalloffProfile
+    if (obj.contains(QStringLiteral("falloff"))) {
+        b.falloff = obj.value(QStringLiteral("falloff")).toDouble(b.falloff);
+    } else if (obj.contains(QStringLiteral("Falloff"))) {
+        b.falloff = obj.value(QStringLiteral("Falloff")).toDouble(b.falloff);
+    } else if (obj.contains(QStringLiteral("FalloffProfile"))) {
+        b.falloff = obj.value(QStringLiteral("FalloffProfile")).toDouble(b.falloff);
+    }
+
+    // Invert
+    if (obj.contains(QStringLiteral("invert"))) {
+        b.invert = obj.value(QStringLiteral("invert")).toBool(b.invert);
+    } else if (obj.contains(QStringLiteral("Invert"))) {
+        b.invert = obj.value(QStringLiteral("Invert")).toBool(b.invert);
+    } else if (obj.contains(QStringLiteral("InvertSlopeInfluence"))) {
+        b.invert = obj.value(QStringLiteral("InvertSlopeInfluence")).toBool(b.invert);
+    }
+
+    // TargetHeight / SculptHeight
+    if (obj.contains(QStringLiteral("targetHeight"))) {
+        b.targetHeight = obj.value(QStringLiteral("targetHeight")).toDouble(b.targetHeight);
+    } else if (obj.contains(QStringLiteral("TargetHeight"))) {
+        b.targetHeight = obj.value(QStringLiteral("TargetHeight")).toDouble(b.targetHeight);
+    } else if (obj.contains(QStringLiteral("SculptHeight"))) {
+        b.targetHeight = obj.value(QStringLiteral("SculptHeight")).toDouble(b.targetHeight);
+    }
+
+    // Alpha mask
+    if (obj.contains(QStringLiteral("Alpha"))) {
+        b.alphaMask = obj.value(QStringLiteral("Alpha")).toString();
+    } else if (obj.contains(QStringLiteral("alpha"))) {
+        b.alphaMask = obj.value(QStringLiteral("alpha")).toString();
+    }
+
     return b;
 }
 
@@ -82,20 +153,36 @@ bool BrushDefinition::loadFile(const QString& path, QVector<BrushDefinition>& ou
         return false;
     }
 
-    QJsonArray arr;
-    if (doc.isArray()) {
-        arr = doc.array();
-    } else if (doc.isObject()) {
-        arr = doc.object().value(QStringLiteral("brushes")).toArray();
-    }
-
+    const QString fallbackName = QFileInfo(path).baseName();
     int count = 0;
-    for (const QJsonValue& v : arr) {
-        if (!v.isObject()) continue;
-        const BrushDefinition b = fromJson(v.toObject());
-        if (b.name.isEmpty()) continue;
-        out.append(b);
-        ++count;
+    if (doc.isArray()) {
+        const QJsonArray arr = doc.array();
+        for (const QJsonValue& v : arr) {
+            if (!v.isObject()) continue;
+            const BrushDefinition b = fromJson(v.toObject());
+            if (b.name.isEmpty()) continue;
+            out.append(b);
+            ++count;
+        }
+    } else if (doc.isObject()) {
+        const QJsonObject root = doc.object();
+        if (root.contains(QStringLiteral("brushes")) && root.value(QStringLiteral("brushes")).isArray()) {
+            const QJsonArray arr = root.value(QStringLiteral("brushes")).toArray();
+            for (const QJsonValue& v : arr) {
+                if (!v.isObject()) continue;
+                const BrushDefinition b = fromJson(v.toObject());
+                if (b.name.isEmpty()) continue;
+                out.append(b);
+                ++count;
+            }
+        } else {
+            // Single brush object format (.lbr as shipped by Bethesda Creation Kit)
+            const BrushDefinition b = fromJson(root, fallbackName);
+            if (!b.name.isEmpty()) {
+                out.append(b);
+                ++count;
+            }
+        }
     }
     LOG_DEBUG(QString("BrushDefinition::loadFile: loaded %1 brushes from %2").arg(count).arg(path));
     return count > 0;
@@ -152,6 +239,14 @@ QVector<BrushDefinition> BrushDefinition::builtin()
     subtractive.strength = 12.0;
     subtractive.falloff = 0.6;
     brushes.append(subtractive);
+
+    BrushDefinition noise;
+    noise.name = QStringLiteral("Noise");
+    noise.operation = Operation::Noise;
+    noise.radius = 5.0;
+    noise.strength = 8.0;
+    noise.falloff = 0.5;
+    brushes.append(noise);
 
     return brushes;
 }

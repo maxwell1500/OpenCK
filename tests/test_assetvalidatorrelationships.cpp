@@ -23,6 +23,8 @@
 #include "../../libs/files/esm/sounrecord.hpp"
 #include "../../libs/files/esm/statrecord.hpp"
 #include "../../libs/components/tier1_components.hpp"
+#include "../../src/model/window/objectwindow.hpp"
+#include "../../libs/files/esm/tes4.hpp"
 
 using ValidationIssue = AssetValidator::ValidationIssue;
 using ValidationReport = AssetValidator::ValidationReport;
@@ -383,6 +385,166 @@ private slots:
         const ValidationReport report =
             AssetValidator::validateAll(data, dataDir.path());
         QVERIFY(hasIssue(report, QStringLiteral("Relationship"), QStringLiteral("Cell01")));
+    }
+
+    // ---- series 7 validation rules -------------------------------------
+
+    void duplicateEditorIdsAreRejected()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+        StatRecord stat1;
+        stat1.formId = 0x100;
+        stat1.editorId = QStringLiteral("CommonChair");
+        stat1.modelPath = QStringLiteral("meshes/chair.nif");
+        data.getStatCollection().add(stat1);
+
+        // Collections key records by lowercased EditorID, so a true duplicate
+        // only exists across different collections (exactly the master/plugin
+        // collision the CK flags). Same ID, different letter case, STAT + NPC_.
+        NpcRecord npc2;
+        npc2.formId = 0x200;
+        npc2.editorId = QStringLiteral("commonchair");
+        data.getNpcCollection().add(npc2);
+
+        const ValidationReport report = AssetValidator::validateEditorIds(data);
+        QVERIFY(hasIssue(report, QStringLiteral("EditorID"), QStringLiteral("CommonChair")));
+    }
+
+    void uniqueEditorIdsAreAccepted()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+        StatRecord stat1;
+        stat1.formId = 0x100;
+        stat1.editorId = QStringLiteral("Chair01");
+        stat1.modelPath = QStringLiteral("meshes/chair.nif");
+        data.getStatCollection().add(stat1);
+
+        StatRecord stat2;
+        stat2.formId = 0x200;
+        stat2.editorId = QStringLiteral("Chair02");
+        stat2.modelPath = QStringLiteral("meshes/chair.nif");
+        data.getStatCollection().add(stat2);
+
+        const ValidationReport report = AssetValidator::validateEditorIds(data);
+        QCOMPARE(countCategory(report, QStringLiteral("EditorID")), 0);
+    }
+
+    void missingRequiredComponentsAreReported()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+
+        RefrRecord ref;
+        ref.formId = 0x300;
+        ref.editorId = QStringLiteral("BadRef");
+        ref.baseId = 0;
+        data.getRefrCollection().add(ref);
+
+        NpcRecord actor;
+        actor.formId = 0x400;
+        actor.editorId = QStringLiteral("BadActor");
+        actor.race = 0;
+        data.getNpcCollection().add(actor);
+
+        StatRecord stat;
+        stat.formId = 0x500;
+        stat.editorId = QStringLiteral("BadStat");
+        stat.modelPath = QString();
+        data.getStatCollection().add(stat);
+
+        const ValidationReport report = AssetValidator::validateRequiredComponents(data);
+        QVERIFY(hasIssue(report, QStringLiteral("Component"), QStringLiteral("BadRef")));
+        QVERIFY(hasIssue(report, QStringLiteral("Component"), QStringLiteral("BadActor")));
+        QVERIFY(hasIssue(report, QStringLiteral("Component"), QStringLiteral("BadStat")));
+    }
+
+    void validComponentsAreAccepted()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+
+        StatRecord base;
+        base.formId = 0x100;
+        base.editorId = QStringLiteral("BaseStat");
+        base.modelPath = QStringLiteral("meshes/stat.nif");
+        data.getStatCollection().add(base);
+
+        RefrRecord ref;
+        ref.formId = 0x200;
+        ref.editorId = QStringLiteral("GoodRef");
+        ref.baseId = 0x100;
+        data.getRefrCollection().add(ref);
+
+        const ValidationReport report = AssetValidator::validateRequiredComponents(data);
+        QCOMPARE(countCategory(report, QStringLiteral("Component")), 0);
+    }
+
+    void missingScriptReferenceIsReported()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+
+        QuestRecord quest;
+        quest.formId = 0x100;
+        quest.editorId = QStringLiteral("MyQuest");
+        quest.scriptIds.append(0x9999);
+        data.getQuestCollection().add(quest);
+
+        const ValidationReport report = AssetValidator::validateScripts(data);
+        QVERIFY(hasIssue(report, QStringLiteral("Script"), QStringLiteral("MyQuest")));
+    }
+
+    void masterIndexOutOfRangeIsReported()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+
+        QVector<MasterData> masters;
+        MasterData m1;
+        m1.name = QStringLiteral("Skyrim.esm");
+        masters.append(m1);
+        data.configureNewFile(GameFormat::Game::Skyrim, masters, QStringLiteral("Author"), 0x800);
+
+        StatRecord stat;
+        stat.formId = 0x05001234;
+        stat.editorId = QStringLiteral("StatWithBadMaster");
+        stat.modelPath = QStringLiteral("meshes/stat.nif");
+        data.getStatCollection().add(stat);
+
+        const ValidationReport report = AssetValidator::validateMasters(data);
+        QVERIFY(hasIssue(report, QStringLiteral("Master"), QStringLiteral("StatWithBadMaster")));
+    }
+
+    void findRecordLocatesByEditorIdAndFormId()
+    {
+        const FilePaths paths;
+        Data data(QStringList(), paths);
+        StatRecord stat;
+        stat.formId = 0x1234;
+        stat.editorId = QStringLiteral("SpecialRock");
+        stat.modelPath = QStringLiteral("meshes/rock.nif");
+        data.getStatCollection().add(stat);
+
+        ObjectWindowModel model;
+        model.setData(&data);
+        int catId = -1;
+        int recIdx = -1;
+        QModelIndex idx;
+
+        QVERIFY(model.findRecord(QStringLiteral("SpecialRock"), catId, recIdx, idx));
+        QVERIFY(idx.isValid());
+        QCOMPARE(recIdx, 0);
+
+        int catId2 = -1;
+        int recIdx2 = -1;
+        QModelIndex idx2;
+        QVERIFY(model.findRecord(QStringLiteral("0x00001234"), catId2, recIdx2, idx2));
+        QVERIFY(idx2.isValid());
+        QCOMPARE(recIdx2, 0);
+
+        QVERIFY(!model.findRecord(QStringLiteral("NoSuchRecord"), catId, recIdx, idx));
     }
 };
 

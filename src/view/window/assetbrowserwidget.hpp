@@ -10,6 +10,7 @@
 #include <QSplitter>
 #include <QLabel>
 #include <QMap>
+#include <QPlainTextEdit>
 #include <QPoint>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
@@ -17,6 +18,7 @@
 class QOpenGLContext;
 class QOffscreenSurface;
 class QOpenGLShaderProgram;
+class AssetToolCliBridge;
 
 #include "../../../model/tools/iconrenderer.hpp"
 
@@ -44,10 +46,14 @@ private slots:
     void onFileContextMenu(const QPoint& pos);
     void generateIcon();
     void importFbxAsNif();
+    void convertSelectionToDds();
+    void packageSelectionMaterial();
+    void showToolchainStatus();
 
 private:
     void setupUI();
     void setupConnections();
+    QString selectedFilePath() const;
     bool eventFilter(QObject* obj, QEvent* event) override;
     QString fileTypeForExtension(const QString& ext) const;
     void updatePreview(const QString& filePath);
@@ -67,7 +73,9 @@ private:
     QLabel* mPreviewLabel;
     QLabel* mPreviewImage;
     QLabel* mFileInfoLabel;
-
+    QLabel* mPipelineStatusLabel;
+    QPlainTextEdit* mPipelineLog;
+    AssetToolCliBridge* mCliBridge;
     QStringList mDataDirs;
     enum class FilterMode { All, Models, Textures, Sounds };
     FilterMode mCurrentFilter;

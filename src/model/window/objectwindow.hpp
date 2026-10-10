@@ -42,6 +42,7 @@ public:
     const QString& getRecordEditorId(int categoryId, int recordIndex) const;
     const QString& getRecordFormId(int categoryId, int recordIndex) const;
 
+    bool findRecord(const QString& idOrFormId, int& outCategoryId, int& outRecordIndex, QModelIndex& outIndex) const;
     bool isRecord(const QModelIndex& index) const;
 
 public slots:

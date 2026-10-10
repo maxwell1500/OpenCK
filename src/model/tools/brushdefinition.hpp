@@ -18,7 +18,8 @@ struct BrushDefinition
         Smooth,       // average heights with neighbors
         Stamp,        // apply a height profile from an alpha mask / circle
         BuildUp,      // additive build-up inside the brush footprint
-        Subtractive   // carve away terrain inside the brush footprint
+        Subtractive,  // carve away terrain inside the brush footprint
+        Noise         // pseudo-random displacement within brush footprint
     };
 
     static QString operationToString(Operation op);
@@ -31,9 +32,10 @@ struct BrushDefinition
     double falloff = 0.5;       // 0 = hard edge, 1 = very soft edge
     bool invert = false;        // for Sculpt: lower instead of raise
     double targetHeight = 0.0;  // for Flatten
+    QString alphaMask;          // optional alpha mask texture path (e.g. BrushAlphas\Circle.dds)
 
     // Parses a single brush object from JSON.
-    static BrushDefinition fromJson(const QJsonObject& obj);
+    static BrushDefinition fromJson(const QJsonObject& obj, const QString& fallbackName = QString());
 
     // Loads every brush defined in the given JSON file.
     // Returns true if the file parsed and contained at least one brush.

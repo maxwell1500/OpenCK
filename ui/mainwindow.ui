@@ -79,39 +79,68 @@
      <property name="title">
       <string>View</string>
      </property>
-      <addaction name="actionObjectWindow"/>
-      <addaction name="action3DViewport"/>
-      <addaction name="separator"/>
-      <addaction name="actionExpandAll"/>
-      <addaction name="actionCollapseAll"/>
+     <addaction name="actionToggleGrid"/>
+     <addaction name="actionToggleWireframe"/>
+     <addaction name="actionToggleBounds"/>
+     <addaction name="actionToggleSky"/>
+     <addaction name="actionToggleCollision"/>
+     <addaction name="separator"/>
+     <widget class="QMenu" name="menuCameraSpeeds">
+      <property name="title">
+       <string>Camera Speeds</string>
+      </property>
+      <addaction name="actionCameraSpeedSlow"/>
+      <addaction name="actionCameraSpeedNormal"/>
+      <addaction name="actionCameraSpeedFast"/>
+     </widget>
+     <addaction name="menuCameraSpeeds"/>
+     <addaction name="separator"/>
+     <addaction name="actionRefreshViewport"/>
+     <addaction name="separator"/>
+     <addaction name="actionExpandAll"/>
+     <addaction name="actionCollapseAll"/>
+    </widget>
+    <widget class="QMenu" name="menuCharacter">
+     <property name="title">
+      <string>Character</string>
+     </property>
+     <addaction name="actionNpcEditor"/>
+     <addaction name="actionRaceEditor"/>
+     <addaction name="actionClassEditor"/>
+     <addaction name="actionFactionEditor"/>
+     <addaction name="actionHairEyes"/>
+     <addaction name="separator"/>
+     <addaction name="actionDialogueEditor"/>
+     <addaction name="actionDialogueTree"/>
+     <addaction name="separator"/>
+     <addaction name="actionAnimationEditor"/>
+    </widget>
+    <widget class="QMenu" name="menuGameplay">
+     <property name="title">
+      <string>Gameplay</string>
+     </property>
+     <addaction name="actionQuestGraph"/>
+     <addaction name="actionAIPackages"/>
+     <addaction name="actionCombatStyles"/>
+     <addaction name="actionMagicEffects"/>
+     <addaction name="actionPerks"/>
+     <addaction name="separator"/>
+     <addaction name="actionSettings"/>
     </widget>
     <widget class="QMenu" name="menuWorld">
      <property name="title">
       <string>World</string>
      </property>
-      <addaction name="actionWorldspaces"/>
-      <addaction name="actionWorldView"/>
-      <addaction name="separator"/>
-      <addaction name="actionWeatherLight"/>
-      <addaction name="actionWater"/>
-      <addaction name="actionCellTransitions"/>
-      <addaction name="separator"/>
-      <addaction name="actionLandscapeEditing"/>
-     </widget>
-     <widget class="QMenu" name="menuCharacter">
-      <property name="title">
-       <string>Character</string>
-      </property>
-      <addaction name="actionDialogueEditor"/>
-      <addaction name="actionDialogueTree"/>
-      <addaction name="separator"/>
-      <addaction name="actionAnimationEditor"/>
-      <addaction name="separator"/>
-      <addaction name="actionNpcEditor"/>
-      <addaction name="actionRaceEditor"/>
-      <addaction name="actionClassEditor"/>
-      <addaction name="actionFactionEditor"/>
-     </widget>
+     <addaction name="actionWorldspaces"/>
+     <addaction name="actionCells"/>
+     <addaction name="actionWeatherLight"/>
+     <addaction name="actionWater"/>
+     <addaction name="actionRegions"/>
+     <addaction name="actionClimate"/>
+     <addaction name="actionCellTransitions"/>
+     <addaction name="separator"/>
+     <addaction name="actionLandscapeEditing"/>
+    </widget>
     <widget class="QMenu" name="menuObjectWindows">
      <property name="title">
       <string>ObjectWindows</string>
@@ -119,61 +148,77 @@
      <addaction name="actionObjectWindow"/>
      <addaction name="actionCells"/>
      <addaction name="actionObjectPalette"/>
+     <addaction name="actionSceneView"/>
+     <addaction name="actionFindForms"/>
     </widget>
-     <widget class="QMenu" name="menuRenderWindows">
-      <property name="title">
-       <string>RenderWindows</string>
-      </property>
-      <addaction name="action3DViewport"/>
-      <addaction name="actionScriptEditor"/>
-      <addaction name="actionMaterialEditor"/>
-      <addaction name="separator"/>
-      <addaction name="actionPreviewWindow"/>
-      <addaction name="actionLighting"/>
-     </widget>
+    <widget class="QMenu" name="menuRenderWindows">
+     <property name="title">
+      <string>RenderWindows</string>
+     </property>
+     <addaction name="action3DViewport"/>
+     <addaction name="actionPreviewWindow"/>
+     <addaction name="actionLighting"/>
+     <addaction name="actionReflectionProbes"/>
+     <addaction name="separator"/>
+     <addaction name="actionMaterialEditor"/>
+     <addaction name="actionScriptEditor"/>
+    </widget>
     <widget class="QMenu" name="menuNavmesh">
      <property name="title">
       <string>Navmesh</string>
      </property>
      <addaction name="actionNavmesh"/>
     </widget>
-     <widget class="QMenu" name="menuTerrain">
-      <property name="title">
-       <string>Terrain</string>
-      </property>
-     </widget>
+    <widget class="QMenu" name="menuTerrain">
+     <property name="title">
+      <string>Terrain</string>
+     </property>
+     <addaction name="actionSaveLandscape"/>
+     <addaction name="actionLandscapeEditing"/>
+    </widget>
     <widget class="QMenu" name="menuAudio">
      <property name="title">
       <string>Audio</string>
      </property>
      <addaction name="actionSoundEditor"/>
+     <addaction name="actionAcousticSpaces"/>
+     <addaction name="actionMusicTypes"/>
+    </widget>
+    <widget class="QMenu" name="menuGalaxy">
+     <property name="title">
+      <string>Galaxy</string>
+     </property>
+     <addaction name="actionPlanetGeneration"/>
+     <addaction name="actionStarMap"/>
     </widget>
     <widget class="QMenu" name="menuDocks">
      <property name="title">
       <string>Docks</string>
      </property>
      <addaction name="actionResetWindowLayout"/>
+     <addaction name="actionLockDocks"/>
      <addaction name="separator"/>
      <addaction name="actionSaveLayout"/>
      <addaction name="actionLoadLayout"/>
     </widget>
-     <widget class="QMenu" name="menuTheme">
-      <property name="title">
-       <string>Theme</string>
-      </property>
-      <addaction name="actionThemeDefault"/>
-      <addaction name="actionThemeLight"/>
-      <addaction name="actionThemeDark"/>
-     </widget>
-    <widget class="QMenu" name="menuGameplay">
-    <property name="title">
-     <string>Gameplay</string>
-    </property>
-    <addaction name="actionSettings"/>
-    <addaction name="separator"/>
-    <addaction name="actionQuestGraph"/>
-    <addaction name="actionAIPackages"/>
-   </widget>
+    <widget class="QMenu" name="menuTheme">
+     <property name="title">
+      <string>Theme</string>
+     </property>
+     <addaction name="actionThemeDark"/>
+     <addaction name="actionThemeLight"/>
+     <addaction name="actionThemeDefault"/>
+    </widget>
+    <widget class="QMenu" name="menuHelp">
+     <property name="title">
+      <string>Help</string>
+     </property>
+     <addaction name="actionDocumentation"/>
+     <addaction name="actionShortcuts"/>
+     <addaction name="actionGameDetection"/>
+     <addaction name="separator"/>
+     <addaction name="actionAbout"/>
+    </widget>
     <widget class="QMenu" name="menuPlugins">
      <property name="title">
       <string>Plugins</string>
@@ -191,28 +236,23 @@
      <addaction name="actionBnetLogout"/>
      <addaction name="actionBnetUpload"/>
     </widget>
-   <widget class="QMenu" name="menuHelp">
-    <property name="title">
-     <string>Help</string>
-    </property>
-    <addaction name="actionAbout"/>
-   </widget>
-       <addaction name="menuFile"/>
-       <addaction name="menuEdit"/>
-       <addaction name="menuView"/>
-       <addaction name="menuCharacter"/>
-       <addaction name="menuGameplay"/>
-       <addaction name="menuWorld"/>
-       <addaction name="menuObjectWindows"/>
-       <addaction name="menuRenderWindows"/>
-       <addaction name="menuNavmesh"/>
-       <addaction name="menuTerrain"/>
-       <addaction name="menuAudio"/>
-       <addaction name="menuDocks"/>
-       <addaction name="menuTheme"/>
-       <addaction name="menuHelp"/>
-       <addaction name="menuTools"/>
-       <addaction name="menuPlugins"/>
+    <addaction name="menuFile"/>
+    <addaction name="menuEdit"/>
+    <addaction name="menuView"/>
+    <addaction name="menuCharacter"/>
+    <addaction name="menuGameplay"/>
+    <addaction name="menuWorld"/>
+    <addaction name="menuObjectWindows"/>
+    <addaction name="menuRenderWindows"/>
+    <addaction name="menuNavmesh"/>
+    <addaction name="menuTerrain"/>
+    <addaction name="menuAudio"/>
+    <addaction name="menuGalaxy"/>
+    <addaction name="menuDocks"/>
+    <addaction name="menuTheme"/>
+    <addaction name="menuHelp"/>
+    <addaction name="menuTools"/>
+    <addaction name="menuPlugins"/>
   </widget>
    <widget class="QToolBar" name="mainToolBar">
     <attribute name="toolBarArea">
@@ -307,8 +347,6 @@
        <addaction name="actionArchiveBrowser"/>
        <addaction name="separator"/>
        <addaction name="actionModManager"/>
-       <addaction name="separator"/>
-       <addaction name="actionShortcuts"/>
       </widget>
      <action name="actionPreviewWindow">
       <property name="text">
@@ -691,14 +729,6 @@
       <string>Ctrl+L</string>
      </property>
      </action>
-    <action name="actionWorldView">
-     <property name="text">
-      <string>World View</string>
-     </property>
-     <property name="shortcut">
-      <string>Ctrl+Shift+W</string>
-     </property>
-    </action>
     <action name="actionObjectPalette">
      <property name="text">
       <string>Object Palette</string>
@@ -873,6 +903,154 @@
       <string>Shortcuts...</string>
      </property>
     </action>
+    <action name="actionFindForms">
+     <property name="text">
+      <string>Find Forms...</string>
+     </property>
+    </action>
+    <action name="actionToggleGrid">
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="text">
+      <string>Toggle Grid</string>
+     </property>
+    </action>
+    <action name="actionToggleWireframe">
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="text">
+      <string>Toggle Wireframe</string>
+     </property>
+    </action>
+    <action name="actionToggleBounds">
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="text">
+      <string>Toggle Bounds</string>
+     </property>
+    </action>
+    <action name="actionToggleSky">
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="text">
+      <string>Toggle Sky</string>
+     </property>
+    </action>
+    <action name="actionToggleCollision">
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="text">
+      <string>Toggle Collision</string>
+     </property>
+    </action>
+    <action name="actionCameraSpeedSlow">
+     <property name="text">
+      <string>Slow (0.5x)</string>
+     </property>
+    </action>
+    <action name="actionCameraSpeedNormal">
+     <property name="text">
+      <string>Normal (1.0x)</string>
+     </property>
+    </action>
+    <action name="actionCameraSpeedFast">
+     <property name="text">
+      <string>Fast (2.5x)</string>
+     </property>
+    </action>
+    <action name="actionRefreshViewport">
+     <property name="text">
+      <string>Refresh Viewport</string>
+     </property>
+    </action>
+    <action name="actionHairEyes">
+     <property name="text">
+      <string>Hair and Eyes...</string>
+     </property>
+    </action>
+    <action name="actionCombatStyles">
+     <property name="text">
+      <string>Combat Styles...</string>
+     </property>
+    </action>
+    <action name="actionMagicEffects">
+     <property name="text">
+      <string>Magic Effects...</string>
+     </property>
+    </action>
+    <action name="actionPerks">
+     <property name="text">
+      <string>Perks...</string>
+     </property>
+    </action>
+    <action name="actionRegions">
+     <property name="text">
+      <string>Regions...</string>
+     </property>
+    </action>
+    <action name="actionClimate">
+     <property name="text">
+      <string>Climate...</string>
+     </property>
+    </action>
+    <action name="actionSceneView">
+     <property name="text">
+      <string>Scene View (Inspector)</string>
+     </property>
+    </action>
+    <action name="actionReflectionProbes">
+     <property name="text">
+      <string>Reflection Probes...</string>
+     </property>
+    </action>
+    <action name="actionSaveLandscape">
+     <property name="text">
+      <string>Save Landscape</string>
+     </property>
+    </action>
+    <action name="actionAcousticSpaces">
+     <property name="text">
+      <string>Acoustic Spaces...</string>
+     </property>
+    </action>
+    <action name="actionMusicTypes">
+     <property name="text">
+      <string>Music Types...</string>
+     </property>
+    </action>
+    <action name="actionPlanetGeneration">
+     <property name="text">
+      <string>Planet Generation...</string>
+     </property>
+    </action>
+    <action name="actionStarMap">
+     <property name="text">
+      <string>Star Map...</string>
+     </property>
+    </action>
+    <action name="actionLockDocks">
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="text">
+      <string>Lock Docks</string>
+     </property>
+    </action>
+    <action name="actionDocumentation">
+     <property name="text">
+      <string>Documentation...</string>
+     </property>
+    </action>
+    <action name="actionGameDetection">
+     <property name="text">
+      <string>Game Detection...</string>
+     </property>
+    </action>
    </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources>
@@ -884,12 +1062,6 @@
      <signal>triggered()</signal>
      <receiver>MainWindow</receiver>
      <slot>on_actionLandscapeEditing_triggered()</slot>
-    </connection>
-    <connection>
-     <sender>actionWorldView</sender>
-     <signal>triggered()</signal>
-     <receiver>MainWindow</receiver>
-     <slot>on_actionWorldView_triggered()</slot>
     </connection>
    <connection>
     <sender>actionObjectPalette</sender>

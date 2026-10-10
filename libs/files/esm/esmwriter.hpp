@@ -38,7 +38,9 @@ public:
     void setTes3Scrd(const QByteArray& data) { header.tes3Scrd = data; }
     void setTes3Scrs(const QByteArray& data) { header.tes3Scrs = data; }
 
-    void save(QFile& file);
+    // Accepts any writable device: QFile for in-place writes, QSaveFile for
+    // atomic staged writes.
+    void save(QIODevice& device);
 
     // Record flags for the TES4 header (FileFlag::Master, FileFlag::LightMaster).
     // Defaults to 0 (a plain .esp). Preserved on save so an ESL/ESM keeps its

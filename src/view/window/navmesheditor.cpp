@@ -391,25 +391,63 @@ void NavmeshEditor::onGenerateNavmesh()
     mDetailDialog->raise();
     mDetailDialog->activateWindow();
 
-    QVector<QVector3D> displayTriangles;
-    for (const auto& tri : navData.triangles) {
-        if (tri.v0 >= 0 && tri.v0 < navData.vertices.size() &&
-            tri.v1 >= 0 && tri.v1 < navData.vertices.size() &&
-            tri.v2 >= 0 && tri.v2 < navData.vertices.size()) {
-            displayTriangles.append(navData.vertices[tri.v0]);
-            displayTriangles.append(navData.vertices[tri.v1]);
-            displayTriangles.append(navData.vertices[tri.v2]);
+    auto syncViewport = [this](const NavMeshData& data) {
+        if (!mViewport) return;
+        QVector<QVector3D> displayTriangles;
+        QVector<QVector3D> disconnectedTriangles;
+        QSet<int> disconnectedSet;
+        for (int t : data.disconnectedIslandTriangles) disconnectedSet.insert(t);
+
+        for (int i = 0; i < data.triangles.size(); ++i) {
+            const auto& tri = data.triangles[i];
+            if (tri.v0 >= 0 && tri.v0 < data.vertices.size() &&
+                tri.v1 >= 0 && tri.v1 < data.vertices.size() &&
+                tri.v2 >= 0 && tri.v2 < data.vertices.size()) {
+                if (disconnectedSet.contains(i)) {
+                    disconnectedTriangles.append(data.vertices[tri.v0]);
+                    disconnectedTriangles.append(data.vertices[tri.v1]);
+                    disconnectedTriangles.append(data.vertices[tri.v2]);
+                } else {
+                    displayTriangles.append(data.vertices[tri.v0]);
+                    displayTriangles.append(data.vertices[tri.v1]);
+                    displayTriangles.append(data.vertices[tri.v2]);
+                }
+            }
         }
-    }
-    mViewport->setNavmeshData(displayTriangles);
+
+        QVector<QVector3D> regularEdges, coverEdges, portalEdges, waterEdges;
+        for (const auto& edge : data.edges) {
+            if (edge.startVertex >= 0 && edge.startVertex < data.vertices.size() &&
+                edge.endVertex >= 0 && edge.endVertex < data.vertices.size()) {
+                QVector3D p1 = data.vertices[edge.startVertex];
+                QVector3D p2 = data.vertices[edge.endVertex];
+                if (edge.edgeType == NavEdgeType::Cover) {
+                    coverEdges << p1 << p2;
+                } else if (edge.edgeType == NavEdgeType::Portal) {
+                    portalEdges << p1 << p2;
+                } else if (edge.edgeType == NavEdgeType::WaterBoundary) {
+                    waterEdges << p1 << p2;
+                } else {
+                    regularEdges << p1 << p2;
+                }
+            }
+        }
+
+        mViewport->setNavmeshTopologyData(data.vertices, displayTriangles,
+                                          regularEdges, coverEdges, portalEdges, waterEdges,
+                                          disconnectedTriangles);
+    };
+
+    syncViewport(navData);
 
     if (mViewport) {
         connect(mDetailDialog, &NavmeshEditorDialog::triangleSelected,
                 mViewport, &NifViewportWidget::highlightNavmeshTriangle);
         connect(mDetailDialog, &NavmeshEditorDialog::pathChanged,
                 mViewport, &NifViewportWidget::setPathData);
+        connect(mDetailDialog, &NavmeshEditorDialog::navMeshUpdated,
+                this, syncViewport);
     }
-
     mStatusLabel->setText(QString("Generated navmesh: %1 vertices, %2 triangles")
         .arg(navData.vertices.size())
         .arg(navData.triangles.size()));

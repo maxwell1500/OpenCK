@@ -1,6 +1,8 @@
 #include "materialrecord.hpp"
 #include "esmreader.hpp"
 #include "esmwriter.hpp"
+#include <QJsonDocument>
+#include <QJsonObject>
 #include "../../components/tier1_components.hpp"
 
 void MaterialRecord::initComponents()
@@ -30,6 +32,21 @@ void MaterialRecord::load(ESMReader& esm, bool)
             case 'BNAM': bnam = esm.readZString(); break;
             case 'CNAM': cnam = esm.readZString(); break;
             case 'MNAM': texturePath = esm.readZString(); break;
+            case 'SLTS':
+            {
+                // OpenCK MATR extension: JSON object of slot -> texture path.
+                const QString json = esm.readZString();
+                textureSlots.clear();
+                QJsonParseError perr;
+                const QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8(), &perr);
+                if (perr.error == QJsonParseError::NoError && doc.isObject())
+                {
+                    const QJsonObject obj = doc.object();
+                    for (auto it = obj.constBegin(); it != obj.constEnd(); ++it)
+                        textureSlots.insert(it.key(), it.value().toString());
+                }
+                break;
+            }
             default:
             {
                 RawSubRecord raw;
@@ -59,6 +76,13 @@ void MaterialRecord::save(ESMWriter& esm) const
     esm.writeSubZString('BNAM', bnam);
     esm.writeSubZString('CNAM', cnam);
     esm.writeSubZString('MNAM', texturePath);
+    if (!textureSlots.isEmpty())
+    {
+        QJsonObject obj;
+        for (auto it = textureSlots.constBegin(); it != textureSlots.constEnd(); ++it)
+            obj.insert(it.key(), it.value());
+        esm.writeSubZString('SLTS', QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact)));
+    }
 
     for (const auto& raw : rawSubRecords)
     {
@@ -79,6 +103,7 @@ void MaterialRecord::blank()
     bnam.clear();
     cnam.clear();
     texturePath.clear();
+    textureSlots.clear();
     materialType = 0;
     value = 0;
     weight = 0;

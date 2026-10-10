@@ -212,6 +212,74 @@ int main()
         CHECK(close(gizmo::snapDegrees(352.0f, 15), 345.0f, 1e-6f));
         CHECK(close(gizmo::snapDegrees(-37.0f, 15), -30.0f, 1e-6f));
     }
+    // Test 7: screen ray + ray/box intersection.
+    {
+        gizmo::ViewTransform t = centeredTransform();
+        const gizmo::PickRay ray = gizmo::pickRay(t, QPointF(400.0, 300.0));
+        CHECK(close(ray.direction.length(), 1.0f, 1e-4f));
+        CHECK(close(ray.origin.z(), -50.0f, 1e-3f));
+
+        // Distance from ray.origin (z=-50) to box [-1, 1] is 49 world units.
+        CHECK(close(gizmo::rayAabbDistance(ray.origin, ray.direction,
+                                           QVector3D(-1.0f, -1.0f, -1.0f),
+                                           QVector3D(1.0f, 1.0f, 1.0f)),
+                    49.0f, 1e-3f));
+        CHECK(close(gizmo::rayObbDistance(ray.origin, ray.direction,
+                                          QVector3D(0.0f, 0.0f, 0.0f),
+                                          QVector3D(1.0f, 1.0f, 1.0f),
+                                          QMatrix4x4()),
+                    49.0f, 1e-3f));
+
+        // Offset box: misses the center ray.
+        CHECK(close(gizmo::rayAabbDistance(ray.origin, ray.direction,
+                                           QVector3D(50.0f, -1.0f, -1.0f),
+                                           QVector3D(51.0f, 1.0f, 1.0f)),
+                    -1.0f, 1e-6f));
+
+        // Rotated box around the ray still intersects near the near plane.
+        QMatrix4x4 rot;
+        rot.rotate(45.0f, 0.0f, 0.0f, 1.0f);
+        CHECK(gizmo::rayObbDistance(ray.origin, ray.direction,
+                                    QVector3D(0.0f, 0.0f, 0.0f),
+                                    QVector3D(10.0f, 10.0f, 10.0f), rot)
+              >= 0.0f);
+
+        // Identity rotation matches the axis-aligned case exactly.
+        const float aabb = gizmo::rayAabbDistance(ray.origin, ray.direction,
+                                                  QVector3D(-2.0f, -2.0f, -2.0f),
+                                                  QVector3D(2.0f, 2.0f, 2.0f));
+        CHECK(close(gizmo::rayObbDistance(ray.origin, ray.direction,
+                                          QVector3D(0.0f, 0.0f, 0.0f),
+                                          QVector3D(2.0f, 2.0f, 2.0f),
+                                          QMatrix4x4()),
+                    aabb, 1e-4f));
+    }
+    // Test 8: Möller-Trumbore ray/triangle and 33x33 heightmap terrain intersection.
+    {
+        const QVector3D rayOrigin(0.0f, 0.0f, 100.0f);
+        const QVector3D rayDir(0.0f, 0.0f, -1.0f);
+        const QVector3D v0(-50.0f, -50.0f, 10.0f);
+        const QVector3D v1(50.0f, -50.0f, 10.0f);
+        const QVector3D v2(0.0f, 50.0f, 10.0f);
+
+        float tTri = gizmo::rayTriangleDistance(rayOrigin, rayDir, v0, v1, v2);
+        CHECK(close(tTri, 90.0f, 1e-3f));
+
+        // Ray off to the side misses
+        const QVector3D missOrigin(100.0f, 100.0f, 100.0f);
+        CHECK(gizmo::rayTriangleDistance(missOrigin, rayDir, v0, v1, v2) < 0.0f);
+
+        // Test terrain grid (cell origin at 0, 0, base height 0.0f)
+        qint8 heightData[33][33] = {};
+        heightData[16][16] = 5; // +40 units at center
+        QVector3D hitPoint;
+        float tTerrain = gizmo::rayTerrainDistance(rayOrigin, rayDir, 0.0f, 0.0f, 0.0f, heightData, &hitPoint);
+        CHECK(tTerrain > 0.0f);
+        CHECK(close(hitPoint.x(), 0.0f, 1e-2f));
+        CHECK(close(hitPoint.y(), 0.0f, 1e-2f));
+        CHECK(hitPoint.z() >= 0.0f);
+    }
+
 
     if (gFailures == 0) {
         std::printf("test_gizmomath: all checks passed\n");

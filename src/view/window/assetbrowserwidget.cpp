@@ -38,6 +38,7 @@
 #include "../../model/tools/blenderlauncher.hpp"
 #include "../../model/tools/iconrenderer.hpp"
 #include "../../model/tools/fbximporter.hpp"
+#include "../../model/tools/assettoolcli.hpp"
 #include "logger.hpp"
 
 static double parseWavDuration(const QString& filePath)
@@ -111,6 +112,9 @@ AssetBrowserWidget::AssetBrowserWidget(QWidget* parent)
     , mPreviewLabel(nullptr)
     , mPreviewImage(nullptr)
     , mFileInfoLabel(nullptr)
+    , mPipelineStatusLabel(nullptr)
+    , mPipelineLog(nullptr)
+    , mCliBridge(nullptr)
     , mCurrentFilter(FilterMode::All)
     , mPreviewGLContext(nullptr)
     , mPreviewOffscreen(nullptr)
@@ -125,6 +129,20 @@ AssetBrowserWidget::AssetBrowserWidget(QWidget* parent)
     mSoundExts << "wav" << "mp3" << "ogg" << "flac" << "xwm";
 
     setupUI();
+
+    mCliBridge = new AssetToolCliBridge(this);
+    connect(mCliBridge, &AssetToolCliBridge::fileProcessed, this, [this](const QString& in, bool ok, const QString& msg) {
+        mPipelineLog->appendPlainText(QString("%1 %2 — %3").arg(ok ? QStringLiteral("[OK]") : QStringLiteral("[FAIL]"), in, msg));
+    });
+    connect(mCliBridge, &AssetToolCliBridge::pipelineStarted, this, [this](const QString& name, int n) {
+        mPipelineStatusLabel->setText(tr("Running %1 (%2 files)...").arg(name).arg(n));
+        mPipelineLog->appendPlainText(tr("Pipeline started: %1 (%2 files)").arg(name).arg(n));
+    });
+    connect(mCliBridge, &AssetToolCliBridge::pipelineFinished, this, [this](const AssetToolCliBridge::PipelineSummary& s) {
+        mPipelineStatusLabel->setText(s.summaryLine());
+        mPipelineLog->appendPlainText(s.summaryLine());
+    });
+
     setupConnections();
 }
 
@@ -247,6 +265,16 @@ void AssetBrowserWidget::setupUI()
     mMainSplitter->setStretchFactor(1, 1);
 
     mainLayout->addWidget(mMainSplitter, 1);
+
+    // Pipeline status panel (AssetTool / TextureTool / NifSkse bridge)
+    mPipelineStatusLabel = new QLabel(tr("No pipeline run yet."));
+    mPipelineStatusLabel->setWordWrap(true);
+    mPipelineLog = new QPlainTextEdit();
+    mPipelineLog->setReadOnly(true);
+    mPipelineLog->setMaximumHeight(110);
+    mPipelineLog->setPlaceholderText(tr("Asset pipeline output will appear here."));
+    mainLayout->addWidget(mPipelineStatusLabel);
+    mainLayout->addWidget(mPipelineLog);
 }
 
 void AssetBrowserWidget::setupConnections()
@@ -820,8 +848,15 @@ void AssetBrowserWidget::onFileContextMenu(const QPoint& pos)
 
     const bool isNif = filePath.endsWith(QStringLiteral(".nif"), Qt::CaseInsensitive);
     const bool isFbx = filePath.endsWith(QStringLiteral(".fbx"), Qt::CaseInsensitive);
+    const QFileInfo fi(filePath);
+    const bool isTexture = mTextureExts.contains(fi.suffix().toLower())
+        && fi.suffix().compare(QLatin1String("dds"), Qt::CaseInsensitive) != 0;
+    const bool isJson = filePath.endsWith(QStringLiteral(".json"), Qt::CaseInsensitive);
     QAction* iconAction = nullptr;
     QAction* fbxImportAction = nullptr;
+    QAction* convertDdsAction = nullptr;
+    QAction* packageMatAction = nullptr;
+    QAction* toolchainAction = nullptr;
     if (isNif) {
         menu.addSeparator();
         iconAction = menu.addAction(tr("Generate Icon..."));
@@ -830,6 +865,16 @@ void AssetBrowserWidget::onFileContextMenu(const QPoint& pos)
         menu.addSeparator();
         fbxImportAction = menu.addAction(tr("Import FBX as NIF..."));
     }
+    if (isTexture) {
+        menu.addSeparator();
+        convertDdsAction = menu.addAction(tr("Convert to DDS..."));
+    }
+    if (isJson) {
+        menu.addSeparator();
+        packageMatAction = menu.addAction(tr("Package Material..."));
+    }
+    menu.addSeparator();
+    toolchainAction = menu.addAction(tr("Toolchain Status..."));
 
     QAction* chosen = menu.exec(mFileList->viewport()->mapToGlobal(pos));
     if (chosen == copyPathAction) {
@@ -842,7 +887,74 @@ void AssetBrowserWidget::onFileContextMenu(const QPoint& pos)
     } else if (chosen == fbxImportAction && isFbx) {
         mPendingFbxPath = filePath;
         importFbxAsNif();
+    } else if (chosen == convertDdsAction && isTexture) {
+        convertSelectionToDds();
+    } else if (chosen == packageMatAction && isJson) {
+        packageSelectionMaterial();
+    } else if (chosen == toolchainAction) {
+        showToolchainStatus();
     }
+}
+
+QString AssetBrowserWidget::selectedFilePath() const
+{
+    const QModelIndex index = mFileList->currentIndex();
+    if (!index.isValid())
+        return QString();
+    return mFileModel->filePath(index);
+}
+
+void AssetBrowserWidget::convertSelectionToDds()
+{
+    const QString path = selectedFilePath();
+    if (path.isEmpty()) {
+        mPipelineStatusLabel->setText(tr("Select a texture file first."));
+        return;
+    }
+    const QFileInfo fi(path);
+    const QString outDir = fi.absolutePath();
+    if (!mCliBridge) return;
+    mPipelineStatusLabel->setText(tr("Converting %1 to DDS...").arg(fi.fileName()));
+    mCliBridge->convertTextures({ path }, outDir, QStringLiteral("dds"));
+}
+
+void AssetBrowserWidget::packageSelectionMaterial()
+{
+    const QString path = selectedFilePath();
+    if (path.isEmpty()) {
+        mPipelineStatusLabel->setText(tr("Select a material JSON file first."));
+        return;
+    }
+    if (!mCliBridge) return;
+
+    const QFileInfo fi(path);
+    const QString outDir = fi.absolutePath();
+
+    // Rule templates and textures live under the configured data directory.
+    QString rulesDir;
+    QString textureRoot;
+    if (!mDataDirs.isEmpty()) {
+        const QString dataDir = mDataDirs.first();
+        rulesDir = QDir(dataDir).absoluteFilePath(
+            QStringLiteral("EditorFiles/RuleTemplates/ShaderModels"));
+        textureRoot = QDir(dataDir).absoluteFilePath(QStringLiteral("textures"));
+    }
+
+    mPipelineStatusLabel->setText(tr("Packaging material %1...").arg(fi.fileName()));
+    mCliBridge->packageMaterials({ path }, rulesDir, outDir, textureRoot);
+}
+
+void AssetBrowserWidget::showToolchainStatus()
+{
+    if (!mCliBridge) return;
+    mPipelineStatusLabel->setText(tr("Checking toolchain..."));
+    const QStringList ids = mCliBridge->toolIds();
+    for (const QString& id : ids) {
+        const QString path = mCliBridge->detectTool(id);
+        mPipelineLog->appendPlainText(
+            id + (path.isEmpty() ? QStringLiteral(" — not found") : QStringLiteral(" — ") + path));
+    }
+    mPipelineStatusLabel->setText(tr("Toolchain check complete (%1 tools).").arg(ids.size()));
 }
 
 QString AssetBrowserWidget::fileTypeForExtension(const QString& ext) const
