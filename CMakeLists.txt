@@ -807,7 +807,6 @@ set(MODEL_SOURCES
     src/model/tools/recordmerger.cpp
     src/model/tools/pluginmerger.cpp
     src/model/tools/pluginsignature.cpp
-    src/model/tools/cloudsave.cpp
     src/model/tools/batchtools.cpp
     src/model/tools/lodgenerator.cpp
     src/model/tools/treelodgenerator.cpp
@@ -897,7 +896,6 @@ set(MODEL_HEADERS
     src/model/tools/recordmerger.hpp
     src/model/tools/pluginmerger.hpp
     src/model/tools/pluginsignature.hpp
-    src/model/tools/cloudsave.hpp
     src/model/tools/batchtools.hpp
     src/model/tools/brushdefinition.hpp
     src/model/tools/brushalphamask.hpp
