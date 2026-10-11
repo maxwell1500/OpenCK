@@ -299,7 +299,6 @@ ScriptEditorWidget::ScriptEditorWidget(QWidget* parent) :
         modified = true;
         performCompletion();
         refreshTypeSquiggles();
-        refreshSpellingSquiggles();
         if (m_lsp && m_lsp->isRunning() && !currentFileName.isEmpty())
             m_lsp->didChange(QStringLiteral("file:///") + currentFileName,
                              m_textEdit->toPlainText());
@@ -729,9 +728,7 @@ void ScriptEditorWidget::refreshTypeSquiggles()
         }
     }
 
-    if (!selections.isEmpty()) {
-        m_textEdit->setExtraSelections(selections);
-    }
+    m_textEdit->setExtraSelections(selections);
 }
 
 void ScriptEditorWidget::loadBuiltinDictionary()
@@ -866,6 +863,10 @@ void ScriptEditorWidget::refreshSpellingSquiggles()
         return;
 
     QList<QTextEdit::ExtraSelection> selections;
+    for (const auto& sel : m_textEdit->extraSelections()) {
+        if (sel.format.underlineColor() != QColor(255, 60, 60))
+            selections.append(sel);
+    }
 
     static const QRegularExpression wordRe(
         QStringLiteral("[A-Za-z]+(?:'[A-Za-z]+)*"));
@@ -892,9 +893,6 @@ void ScriptEditorWidget::refreshSpellingSquiggles()
         selections.append(sel);
     }
 
-    // Preserve type-checker squiggles already present.
-    const auto existing = m_textEdit->extraSelections();
-    selections.append(existing);
     m_textEdit->setExtraSelections(selections);
 }
 
