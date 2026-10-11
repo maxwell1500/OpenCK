@@ -31,6 +31,8 @@
 #include "nifviewportwidget.hpp"
 #include "gamepadnavigator.hpp"
 #include <QTimer>
+#include <QProgressDialog>
+#include <QThread>
 #include "scripteditorwidget.hpp"
 #include "scriptmanagerdialog.hpp"
 #include "dialogueeditorwidget.hpp"
@@ -2068,21 +2070,46 @@ void MainWindow::on_actionBnetLogin_triggered()
     creds.email = email;
     creds.password = password;
 
-    BnetClient client;
-    const BnetClient::LoginResult result = client.login(creds);
-    if (result.ok)
-    {
-        mBnetToken = result.token;
-        QSettings settings;
-        settings.setValue(QStringLiteral("bnet/displayName"), result.displayName);
-        QMessageBox::information(this, tr("Bethesda.net Login"),
-            tr("Logged in as %1.").arg(result.displayName));
-    }
-    else
-    {
-        QMessageBox::warning(this, tr("Bethesda.net Login"),
-            tr("Login failed: %1").arg(result.error));
-    }
+    QProgressDialog* progress = new QProgressDialog(tr("Logging in to Bethesda.net..."), QString(), 0, 0, this);
+    progress->setWindowTitle(tr("Bethesda.net Login"));
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setValue(0);
+    progress->show();
+
+    struct LoginHolder {
+        BnetClient::LoginResult result;
+    };
+    auto* holder = new LoginHolder();
+
+    QThread* thread = QThread::create([creds, holder]() {
+        BnetClient client;
+        holder->result = client.login(creds);
+    });
+
+    connect(thread, &QThread::finished, this, [this, thread, progress, holder]() {
+        BnetClient::LoginResult result = holder->result;
+        delete holder;
+        thread->deleteLater();
+        progress->close();
+        progress->deleteLater();
+
+        if (result.ok)
+        {
+            mBnetToken = result.token;
+            QSettings settings;
+            settings.setValue(QStringLiteral("bnet/displayName"), result.displayName);
+            QMessageBox::information(this, tr("Bethesda.net Login"),
+                tr("Logged in as %1.").arg(result.displayName));
+        }
+        else
+        {
+            QMessageBox::warning(this, tr("Bethesda.net Login"),
+                tr("Login failed: %1").arg(result.error));
+        }
+    });
+
+    thread->start();
 }
 
 void MainWindow::on_actionBnetLogout_triggered()
@@ -2094,9 +2121,16 @@ void MainWindow::on_actionBnetLogout_triggered()
         return;
     }
 
-    BnetClient client;
-    client.logout(mBnetToken);
+    const QString token = mBnetToken;
     mBnetToken.clear();
+
+    QThread* thread = QThread::create([token]() {
+        BnetClient client;
+        client.logout(token);
+    });
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    thread->start();
+
     QMessageBox::information(this, tr("Bethesda.net Logout"),
         tr("You have been logged out."));
 }
@@ -2137,19 +2171,45 @@ void MainWindow::on_actionBnetUpload_triggered()
     upload.pluginPath = QFileInfo(pluginPath).fileName();
     upload.fileData = data;
 
-    BnetClient client;
-    const BnetClient::UploadResult result = client.upload(upload);
-    if (result.ok)
-    {
-        QMessageBox::information(this, tr("Upload to Bethesda.net"),
-            tr("Upload successful (mod %1, file %2).")
-                .arg(result.modId, result.fileId));
-    }
-    else
-    {
-        QMessageBox::warning(this, tr("Upload to Bethesda.net"),
-            tr("Upload failed: %1").arg(result.error));
-    }
+    QProgressDialog* progress = new QProgressDialog(
+        tr("Uploading %1 to Bethesda.net...").arg(upload.pluginPath), QString(), 0, 0, this);
+    progress->setWindowTitle(tr("Upload to Bethesda.net"));
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setValue(0);
+    progress->show();
+
+    struct UploadHolder {
+        BnetClient::UploadResult result;
+    };
+    auto* holder = new UploadHolder();
+
+    QThread* thread = QThread::create([upload, holder]() {
+        BnetClient client;
+        holder->result = client.upload(upload);
+    });
+
+    connect(thread, &QThread::finished, this, [this, thread, progress, holder]() {
+        BnetClient::UploadResult result = holder->result;
+        delete holder;
+        thread->deleteLater();
+        progress->close();
+        progress->deleteLater();
+
+        if (result.ok)
+        {
+            QMessageBox::information(this, tr("Upload to Bethesda.net"),
+                tr("Upload successful (mod %1, file %2).")
+                    .arg(result.modId, result.fileId));
+        }
+        else
+        {
+            QMessageBox::warning(this, tr("Upload to Bethesda.net"),
+                tr("Upload failed: %1").arg(result.error));
+        }
+    });
+
+    thread->start();
 }
 
 void MainWindow::on_actionSoundEditor_triggered()
