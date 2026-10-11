@@ -70,10 +70,11 @@ endif()
 # Downloads the official Blender portable build for the current platform
 # and extracts it to ${CMAKE_BINARY_DIR}/blender/. The C++ BlenderLauncher
 # checks this path first, falling back to a system installation if missing.
-include(cmake/bundle_blender.cmake)
-
-# Bundle NifTools addon (GPL-2.0+) into the bundled Blender's addons directory
-include(cmake/bundle_niftools.cmake)
+option(OPENCK_BUNDLE_BLENDER "Download and bundle Blender DCC with OpenCK" OFF)
+if(OPENCK_BUNDLE_BLENDER)
+    include(cmake/bundle_blender.cmake)
+    include(cmake/bundle_niftools.cmake)
+endif()
 
 # ─── Library: openck_esm ───────────────────────────────────────────────────
 # ESM file reading/writing, record type definitions, game parsers

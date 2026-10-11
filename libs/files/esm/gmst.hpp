@@ -28,5 +28,9 @@ struct GameSetting
 };
 
 bool operator==(const GameSetting& l, const GameSetting& r);
+inline bool operator!=(const GameSetting& l, const GameSetting& r)
+{
+    return !(l == r);
+}
 
 #endif // GMST_H

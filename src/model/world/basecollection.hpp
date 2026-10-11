@@ -12,6 +12,11 @@
 
 class BaseRecord;
 class UndoStack;
+namespace openck {
+class FormComponents;
+class RecordEditSession;
+}
+
 
 class BaseCollection : public IRecordCollection
 {
@@ -70,6 +75,15 @@ public:
     virtual bool cloneRecordWithUndo(const QString& src, const QString& dest, UndoStack* undoStack) = 0;
     virtual void batchCloneWithUndo(const QVector<QString>& srcIds, const QVector<QString>& destIds, UndoStack* undoStack) = 0;
     virtual void batchSetEditorIdWithUndo(const QVector<QString>& srcIds, const QString& newEditorId, UndoStack* undoStack) = 0;
+
+    // Dynamic record access and editing without RTTI dynamic_cast cascades
+    virtual openck::FormComponents* getComponents(int /*index*/) { return nullptr; }
+    virtual void* getRecordPointer(int /*index*/) { return nullptr; }
+    virtual bool supportsBlankRecord() const { return false; }
+    virtual std::unique_ptr<BaseRecord> createBlankRecord(
+        const QString& /*editorId*/, quint32 /*formId*/) { return nullptr; }
+    virtual std::unique_ptr<BaseRecord> copyRecordForPaste(
+        int /*recordIndex*/, const QString& /*editorId*/, quint32 /*formId*/) { return nullptr; }
 
 protected:
 

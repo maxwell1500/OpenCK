@@ -23,6 +23,28 @@ struct HasRawSubRecords : std::false_type {};
 template<typename T>
 struct HasRawSubRecords<T, std::void_t<decltype(std::declval<T>().rawSubRecords)>> : std::true_type {};
 
+template<typename T, typename = void>
+struct IsBlankCreatable : std::false_type {};
+
+template<typename T>
+struct IsBlankCreatable<T, std::void_t<
+    decltype(std::declval<T&>().blank()),
+    decltype(std::declval<T&>().editorId = QString()),
+    decltype(std::declval<T&>().formId = quint32(0))>> : std::true_type {};
+
+template<typename T, typename = void>
+struct HasInitComponents : std::false_type {};
+
+template<typename T>
+struct HasInitComponents<T, std::void_t<
+    decltype(std::declval<T&>().initComponents())>> : std::true_type {};
+
+template<typename T, typename = void>
+struct HasEquality : std::false_type {};
+
+template<typename T>
+struct HasEquality<T, std::void_t<decltype(std::declval<const T&>() == std::declval<const T&>())>> : std::true_type {};
+
 const int NOT_FOUND = -1;
 
 template<typename ESXRecord>
@@ -134,6 +156,14 @@ public:
     bool cloneRecordWithUndo(const QString& src, const QString& dest, UndoStack* undoStack) override;
     void batchCloneWithUndo(const QVector<QString>& srcIds, const QVector<QString>& destIds, UndoStack* undoStack) override;
     void batchSetEditorIdWithUndo(const QVector<QString>& srcIds, const QString& newEditorId, UndoStack* undoStack) override;
+
+    openck::FormComponents* getComponents(int index) override;
+    void* getRecordPointer(int index) override;
+    bool supportsBlankRecord() const override;
+    std::unique_ptr<BaseRecord> createBlankRecord(
+        const QString& editorId, quint32 formId) override;
+    std::unique_ptr<BaseRecord> copyRecordForPaste(
+        int recordIndex, const QString& editorId, quint32 formId) override;
 };
 
 template<typename ESXRecord, typename IdAccessorT>
@@ -567,6 +597,78 @@ std::unique_ptr<BaseRecord> Collection<ESXRecord, IdAccessorT>::cloneRecordAt(in
         return nullptr;
 
     return src.clone();
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+openck::FormComponents* Collection<ESXRecord, IdAccessorT>::getComponents(int index)
+{
+    if (index < 0 || index >= size())
+        return nullptr;
+    if constexpr (HasFormComponents<ESXRecord>::value)
+        return &getRecord(index).get().components;
+    else
+        return nullptr;
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+void* Collection<ESXRecord, IdAccessorT>::getRecordPointer(int index)
+{
+    if (index < 0 || index >= size())
+        return nullptr;
+    return &getRecord(index).get();
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+bool Collection<ESXRecord, IdAccessorT>::supportsBlankRecord() const
+{
+    return IsBlankCreatable<ESXRecord>::value;
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+std::unique_ptr<BaseRecord> Collection<ESXRecord, IdAccessorT>::createBlankRecord(
+    const QString& editorId, quint32 formId)
+{
+    if constexpr (!IsBlankCreatable<ESXRecord>::value)
+    {
+        Q_UNUSED(editorId);
+        Q_UNUSED(formId);
+        return nullptr;
+    }
+    else
+    {
+        ESXRecord record;
+        record.blank();
+        record.editorId = editorId;
+        record.formId = formId;
+        if constexpr (HasInitComponents<ESXRecord>::value)
+            record.initComponents();
+        return std::make_unique<Record<ESXRecord>>(State_ModifiedOnly, nullptr, &record);
+    }
+}
+
+template<typename ESXRecord, typename IdAccessorT>
+std::unique_ptr<BaseRecord> Collection<ESXRecord, IdAccessorT>::copyRecordForPaste(
+    int recordIndex, const QString& editorId, quint32 formId)
+{
+    if (recordIndex < 0 || recordIndex >= size())
+        return nullptr;
+    if constexpr (!IsBlankCreatable<ESXRecord>::value)
+    {
+        Q_UNUSED(editorId);
+        Q_UNUSED(formId);
+        return nullptr;
+    }
+    else
+    {
+        std::unique_ptr<BaseRecord> copy = cloneRecordAt(recordIndex);
+        if (!copy)
+            return nullptr;
+        auto* typedCopy = static_cast<Record<ESXRecord>*>(copy.get());
+        typedCopy->get().editorId = editorId;
+        typedCopy->get().formId = formId;
+        typedCopy->state = State_ModifiedOnly;
+        return copy;
+    }
 }
 
 #endif // COLLECTION_H

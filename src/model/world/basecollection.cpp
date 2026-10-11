@@ -1,5 +1,4 @@
 #include "basecollection.hpp"
-
 #include <stdexcept>
 
 BaseCollection::BaseCollection()

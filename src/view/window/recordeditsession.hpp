@@ -74,7 +74,7 @@ public:
 
     void* workingRecord() override { return &m_working; }
 
-    bool hasChanges() const override { return m_working != m_before; }
+    bool hasChanges() const override { return !(m_working == m_before); }
 
     bool commit() override
     {
@@ -110,5 +110,6 @@ private:
 };
 
 } // namespace openck
+
 
 #endif // RECORDEDITSESSION_HPP

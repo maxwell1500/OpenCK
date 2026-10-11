@@ -210,20 +210,6 @@
 #include "../../../libs/files/esm/zoomrecord.hpp"
 
 namespace {
-template <typename T>
-bool tryResolveComponents(BaseCollection* coll, int recordIndex,
-                          openck::FormComponents*& components, void*& recordPtr)
-{
-    auto* typed = dynamic_cast<Collection<T>*>(coll);
-    if (!typed)
-        return false;
-    if (recordIndex < 0 || recordIndex >= typed->size())
-        return false;
-    auto& record = typed->getRecord(recordIndex).get();
-    components = &record.components;
-    recordPtr = &record;
-    return true;
-}
 
 template <typename T>
 bool tryResolveEditSession(BaseCollection* coll, int recordIndex,
@@ -245,11 +231,11 @@ bool tryResolveEditSession(BaseCollection* coll, int recordIndex,
 bool resolveComponents(BaseCollection* coll, int recordIndex,
                        openck::FormComponents*& components, void*& recordPtr)
 {
-#define RESOLVE_RECORD_TYPE(recType) \
-    if (tryResolveComponents<recType>(coll, recordIndex, components, recordPtr)) return true;
-    FOR_EACH_COMPONENT_RECORD_TYPE(RESOLVE_RECORD_TYPE)
-#undef RESOLVE_RECORD_TYPE
-    return false;
+    if (!coll || recordIndex < 0 || recordIndex >= coll->count())
+        return false;
+    recordPtr = coll->getRecordPointer(recordIndex);
+    components = coll->getComponents(recordIndex);
+    return recordPtr != nullptr;
 }
 
 bool resolveEditSession(BaseCollection* coll, int recordIndex,
