@@ -2,6 +2,7 @@
 #define QuestRECORD_H
 #include "records.hpp"
 #include "variant.hpp"
+#include "vmad.hpp"
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVector>
@@ -56,6 +57,8 @@ struct QuestRecord {
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;
     std::shared_ptr<QuestRecord> verbatimSnapshot;
+    VmadData vmad;
+    bool hasVmad = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
@@ -77,7 +80,8 @@ enum QuestReplayAction : quint8
     QRA_ObjectiveExtra = 9,
     QRA_AliasExtra = 10,
     QRA_QuestDesc = 11,
-    QRA_DialogueView = 12
+    QRA_DialogueView = 12,
+    QRA_Vmad = 13
 };
 
 inline bool operator==(const QuestRecord& l, const QuestRecord& r)
@@ -91,9 +95,9 @@ inline bool operator==(const QuestRecord& l, const QuestRecord& r)
         && l.stageFlags == r.stageFlags && l.objectiveFlags == r.objectiveFlags
         && l.aliasFlags == r.aliasFlags
         && l.stageExtra == r.stageExtra && l.objectiveExtra == r.objectiveExtra
-        && l.aliasExtra == r.aliasExtra && l.rawSubRecords == r.rawSubRecords;
+        && l.aliasExtra == r.aliasExtra && l.rawSubRecords == r.rawSubRecords
+        && l.hasVmad == r.hasVmad && (!l.hasVmad || l.vmad == r.vmad);
 }
-
 inline bool operator!=(const QuestRecord& l, const QuestRecord& r)
 {
     return !(l == r);

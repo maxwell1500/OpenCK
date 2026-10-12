@@ -82,6 +82,9 @@ void InfoRecord::load(ESMReader& esm, bool)
                 voiceFile = esm.readZString();
                 hasVmap = true;
                 break;
+            case 'VMAD':
+                hasVmad = vmad.load(esm);
+                break;
             default:
             {
                 RawSubRecord raw;
@@ -148,6 +151,8 @@ void InfoRecord::save(ESMWriter& esm) const
             esm.writeSubData<quint32>('TLOI', targetId);
         if (hasVmap || !voiceFile.isEmpty())
             esm.writeSubZString('VMAP', voiceFile);
+        if (hasVmad)
+            vmad.save(esm);
         for (const CtdaCondition& condition : conditions)
         {
             const QByteArray bytes = condition.pack();
@@ -181,6 +186,10 @@ void InfoRecord::save(ESMWriter& esm) const
         case 'VMAP':
             if (hasVmap || !voiceFile.isEmpty())
                 esm.writeSubZString('VMAP', voiceFile);
+            break;
+        case 'VMAD':
+            if (hasVmad)
+                vmad.save(esm);
             break;
         case 'CTDA':
             if (ctdaSeen < conditionOrder.size())
@@ -231,6 +240,8 @@ void InfoRecord::blank()
     hasCnam = false;
     hasTloi = false;
     hasVmap = false;
+    hasVmad = false;
+    vmad.clear();
     verbatimBody.clear();
     verbatimFlags = 0;
     verbatimSnapshot.reset();

@@ -78,6 +78,10 @@ void QuestRecord::load(ESMReader& esm, bool)
         switch (sub)
         {
             case 'EDID': editorId = esm.readZString(); hasEdid = true; pushAction(sub, QRA_Edid, -1); break;
+            case 'VMAD':
+                hasVmad = vmad.load(esm);
+                pushAction(sub, QRA_Vmad, -1);
+                break;
             case 'DNAM': rawPreserve(sub, &rawSubRecords); pushAction(sub, QRA_TopRaw, -1); break;
             case 'CTDA':
                 if (group == Objective)
@@ -294,6 +298,8 @@ void QuestRecord::save(ESMWriter& esm) const
         if (!dialogueView.isEmpty())
             esm.writeSubZString('NAM1', dialogueView);
 
+        if (hasVmad)
+            vmad.save(esm);
         for (const auto& raw : rawSubRecords)
         {
             esm.writeRawSubRecord(raw);
@@ -474,6 +480,10 @@ void QuestRecord::save(ESMWriter& esm) const
                 esm.writeSubZString('NAM1', dialogueView);
             }
             break;
+        case QRA_Vmad:
+            if (hasVmad)
+                vmad.save(esm);
+            break;
         default:
             break;
         }
@@ -547,6 +557,8 @@ void QuestRecord::blank()
     questDescRaw.clear();
     dialogueViewRaw.clear();
     hasEdid = false;
+    hasVmad = false;
+    vmad.clear();
     verbatimBody.clear();
     verbatimFlags = 0;
     verbatimSnapshot.reset();

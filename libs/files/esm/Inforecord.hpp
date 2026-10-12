@@ -3,6 +3,7 @@
 #include "records.hpp"
 #include "variant.hpp"
 #include "conditionrecord.hpp"
+#include "vmad.hpp"
 #include "../../components/formcomponents.hpp"
 #include <QString>
 #include <QVariant>
@@ -51,6 +52,8 @@ struct InfoRecord {
     QByteArray verbatimBody;
     quint32 verbatimFlags = 0;
     std::shared_ptr<InfoRecord> verbatimSnapshot;
+    VmadData vmad;
+    bool hasVmad = false;
     void load(ESMReader& esm, bool base);
     void save(ESMWriter& esm) const;
     void blank();
@@ -64,7 +67,8 @@ inline bool operator==(const InfoRecord& l, const InfoRecord& r)
         && l.conditionIds == r.conditionIds && l.conditions == r.conditions
         && l.scriptFragment == r.scriptFragment && l.targetId == r.targetId
         && l.scriptIds == r.scriptIds && l.rawSubRecords == r.rawSubRecords
-        && l.components == r.components;
+        && l.components == r.components
+        && l.hasVmad == r.hasVmad && (!l.hasVmad || l.vmad == r.vmad);
 }
 
 inline bool operator!=(const InfoRecord& l, const InfoRecord& r)

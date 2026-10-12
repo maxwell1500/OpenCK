@@ -828,6 +828,12 @@ target_link_libraries(test_conditionrecord PRIVATE openck_esm test_stubs Qt6::Te
 target_include_directories(test_conditionrecord PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_conditionrecord)
 
+# VMAD subrecords (Papyrus scripts/properties on QUST/INFO/KEYM/etc.)
+add_executable(test_vmad test_vmad.cpp)
+target_link_libraries(test_vmad PRIVATE openck_esm test_stubs Qt6::Test)
+target_include_directories(test_vmad PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_vmad)
+
 # Mod-manager detection (MO2 INI / Vortex JSON parsing)
 add_executable(test_modmanager test_modmanager.cpp)
 target_link_libraries(test_modmanager PRIVATE openck_model test_stubs Qt6::Test)

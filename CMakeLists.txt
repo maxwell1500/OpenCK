@@ -266,6 +266,7 @@ libs/files/esm/npcrecord.cpp
     libs/files/esm/pdclrecord.cpp
     libs/files/esm/pgrerecord.cpp
     libs/files/esm/conditionrecord.cpp
+    libs/files/esm/vmad.cpp
     libs/files/esm/phzdrecord.cpp
     libs/files/esm/pkinrecord.cpp
     libs/files/esm/pmftrecord.cpp
@@ -372,6 +373,7 @@ set(ESM_HEADERS
     libs/files/esm/idlemarkerrecord.hpp
     libs/files/esm/imagespacerecord.hpp
     libs/files/esm/conditionrecord.hpp
+    libs/files/esm/vmad.hpp
     libs/files/esm/keymrecord.hpp
     libs/files/esm/keywordrecord.hpp
     libs/files/esm/lighrecord.hpp
