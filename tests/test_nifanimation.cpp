@@ -15,6 +15,7 @@
 #include "../../libs/files/nif/nifblockfile.hpp"
 #include "model/tools/nifanimationstate.hpp"
 #include "animationeditor.hpp"
+#include "model/tools/setkeyframepropertiescommand.hpp"
 
 class TestNifAnimation : public QObject
 {
@@ -39,6 +40,7 @@ private slots:
     void testRealArchiveKeyframeCodecRoundTrip();
     void testUneditedSaveIsByteIdentical();
     void testSyntheticNifEditorPersistence();
+    void testSetKeyframePropertiesCommand();
 
 private:
     static NifAnimation sampleAnimation();
@@ -466,6 +468,37 @@ void TestNifAnimation::testBlendWithStoredQuats()
     QVERIFY(qAbs(blended[0].qy - plain[0].qy) < 0.0001f);
     QVERIFY(qAbs(blended[0].ry - plain[0].ry) < 0.0001f);
 }
+void TestNifAnimation::testSetKeyframePropertiesCommand()
+{
+    NifAnimation anim;
+    AnimClip clip;
+    clip.name = QStringLiteral("Idle");
+    AnimChannel ch;
+    ch.boneName = QStringLiteral("Bip01 Head");
+    AnimKeyframe kf1;
+    kf1.time = 0.5f;
+    kf1.tx = 10.0f; kf1.ty = 20.0f; kf1.tz = 30.0f;
+    kf1.rx = 1.0f; kf1.ry = 2.0f; kf1.rz = 3.0f;
+    ch.keyframes.append(kf1);
+    clip.channels.append(ch);
+    anim.clips.append(clip);
+
+    AnimKeyframe kfEdited = kf1;
+    kfEdited.tx = 100.0f;
+    kfEdited.rx = 45.0f;
+
+    SetKeyframePropertiesCommand cmd(&anim, QStringLiteral("Idle"),
+                                     QStringLiteral("Bip01 Head"), 0.5f,
+                                     kf1, kfEdited);
+    cmd.execute();
+    QCOMPARE(anim.clips[0].channels[0].keyframes[0].tx, 100.0f);
+    QCOMPARE(anim.clips[0].channels[0].keyframes[0].rx, 45.0f);
+
+    cmd.undo();
+    QCOMPARE(anim.clips[0].channels[0].keyframes[0].tx, 10.0f);
+    QCOMPARE(anim.clips[0].channels[0].keyframes[0].rx, 1.0f);
+}
+
 
 void TestNifAnimation::testNifKeyframeWriteBack()
 {

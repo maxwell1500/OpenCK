@@ -762,6 +762,7 @@ set(MODEL_SOURCES
     src/model/tools/movekeyframecommand.cpp
     src/model/tools/addkeyframecommand.cpp
     src/model/tools/removekeyframecommand.cpp
+    src/model/tools/setkeyframepropertiescommand.cpp
     src/model/tools/navmeshgenerator.cpp
     src/model/tools/navmeshtoolkit.cpp
     src/model/tools/nifanimationstate.cpp
@@ -850,6 +851,7 @@ set(MODEL_HEADERS
     src/model/tools/movekeyframecommand.hpp
     src/model/tools/addkeyframecommand.hpp
     src/model/tools/removekeyframecommand.hpp
+    src/model/tools/setkeyframepropertiescommand.hpp
     src/model/tools/commandundoadapter.hpp
     src/model/tools/recordeditcommand.hpp
     src/model/tools/editrecordcommand.hpp

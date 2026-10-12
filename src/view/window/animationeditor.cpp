@@ -26,6 +26,7 @@
 #include "../../model/tools/movekeyframecommand.hpp"
 #include "../../model/tools/addkeyframecommand.hpp"
 #include "../../model/tools/removekeyframecommand.hpp"
+#include "../../model/tools/setkeyframepropertiescommand.hpp"
 #include "../../model/tools/commandundoadapter.hpp"
 #include "timeline.hpp"
 #include "nodegraphwidget.hpp"
@@ -730,18 +731,12 @@ void AnimationEditor::onPropertyChanged()
 {
     if (mSelectedBone.isEmpty() || !mAnimation || mSelectedClip < 0) return;
 
-    // NOTE: Property edits are applied directly to keyframes without going
-    // through the undo stack. Undo only affects keyframe add/move/remove
-    // operations. Implementing undo for property edits would require a
-    // dedicated SetKeyframePropertiesCommand for each change.
-
     const QString clipName = mAnimation->clips[mSelectedClip].name;
 
-    // Find and update the keyframe directly (property panel edits are immediate)
     auto& clip = mAnimation->clips[mSelectedClip];
     for (auto& ch : clip.channels) {
         if (ch.boneName != mSelectedBone) continue;
-        for (auto& kf : ch.keyframes) {
+        for (const auto& kf : ch.keyframes) {
             if (qFuzzyCompare(kf.time, mSelectedTime)) {
                 AnimKeyframe edited = kf;
                 edited.tx = static_cast<float>(mPropTxSpin->value());
@@ -750,8 +745,16 @@ void AnimationEditor::onPropertyChanged()
                 edited.rx = static_cast<float>(mPropRxSpin->value());
                 edited.ry = static_cast<float>(mPropRySpin->value());
                 edited.rz = static_cast<float>(mPropRzSpin->value());
-                NifAnimationWriter::channelSetKeyframeValue(ch, kf.time, edited);
-                Q_UNUSED(clipName)
+
+                if (edited.tx != kf.tx || edited.ty != kf.ty || edited.tz != kf.tz ||
+                    edited.rx != kf.rx || edited.ry != kf.ry || edited.rz != kf.rz)
+                {
+                    auto* cmd = new SetKeyframePropertiesCommand(
+                        mAnimation, clipName, ch.boneName, kf.time, kf, edited,
+                        tr("Edit keyframe properties for '%1' at %2s")
+                            .arg(ch.boneName).arg(kf.time, 0, 'f', 3));
+                    mUndoStack->push(new CommandUndoAdapter(cmd));
+                }
                 return;
             }
         }
