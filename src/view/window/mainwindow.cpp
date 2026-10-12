@@ -269,16 +269,30 @@ bool MainWindow::saveActiveDocument()
     // report is one click away.
     if (mValidateBeforeSave && mData)
     {
+        Messages recordMessages(Message::Warning);
+        NpcValidator().validate(*mData, recordMessages);
+        WeaponValidator().validate(*mData, recordMessages);
+        QuestValidator().validate(*mData, recordMessages);
+        CoverageValidator().validate(*mData, recordMessages);
+
+        int recordErrors = 0;
+        for (const auto& msg : recordMessages) {
+            if (msg.level == Message::Error)
+                ++recordErrors;
+        }
+
         const QString dataDir = mData->getPaths().dataDir.absolutePath();
         const AssetValidator::ValidationReport report =
             AssetValidator::validateAll(*mData, dataDir);
-        if (AssetValidator::shouldBlockSave(report))
+        const int totalErrors = recordErrors + report.errors();
+
+        if (totalErrors > 0)
         {
             const QMessageBox::StandardButton answer = QMessageBox::warning(
                 this, tr("Save Anyway?"),
-                tr("Validation found %1 error(s) in this plugin.\n\n"
+                tr("Validation found %1 error(s) in this plugin (%2 record error(s), %3 asset error(s)).\n\n"
                    "Saving anyway may produce a plugin the game cannot load.")
-                    .arg(report.errors()),
+                    .arg(totalErrors).arg(recordErrors).arg(report.errors()),
                 QMessageBox::Save | QMessageBox::Cancel, QMessageBox::Save);
             if (answer != QMessageBox::Save)
                 return false;
