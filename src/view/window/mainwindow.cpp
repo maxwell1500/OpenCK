@@ -335,6 +335,8 @@ void MainWindow::setData(Data* data)
                 r.dataIndex = i;
                 r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
                 r.scale = rec.scale;
+                r.baseFormId = rec.baseId;
+                r.modelPath = mData->getModelPathForFormId(rec.baseId);
                 refs.append(r);
             }
             nifViewportWidget->setCellReferences(refs);
@@ -3601,6 +3603,8 @@ void MainWindow::dropViewportSelectionToGround()
             r.dataIndex = i;
             r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
             r.scale = rec.scale;
+            r.baseFormId = rec.baseId;
+            r.modelPath = mData->getModelPathForFormId(rec.baseId);
             refs.append(r);
         }
         nifViewportWidget->setCellReferences(refs);
@@ -3677,6 +3681,8 @@ void MainWindow::duplicateViewportSelection()
             r.dataIndex = i;
             r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
             r.scale = rec.scale;
+            r.baseFormId = rec.baseId;
+            r.modelPath = mData->getModelPathForFormId(rec.baseId);
             refs.append(r);
         }
         nifViewportWidget->setCellReferences(refs);

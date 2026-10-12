@@ -46,6 +46,8 @@ struct ViewportCellRef {
     int dataIndex = -1;                              // index into Data refrCollection, -1 if not backed
     float rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;     // radians (matches RefrRecord on-disk)
     float scale = 1.0f;
+    quint32 baseFormId = 0;                          // Base record form ID (STAT, FURN, DOOR, etc.)
+    QString modelPath;                               // Relative NIF mesh path
 };
 
 namespace Nif {

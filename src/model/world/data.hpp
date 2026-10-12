@@ -288,6 +288,7 @@ public:
     bool removeMaster(const QString& name);
     bool hasMaster(const QString& name) const;
     QVector<MasterData> getMasters() const;
+    QString getModelPathForFormId(quint32 formId) const;
 
     /// \brief True if this record type is a known, game-specific record of
     /// the detected game (recognized even when not yet implemented).

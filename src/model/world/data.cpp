@@ -1514,6 +1514,33 @@ QVector<MasterData> Data::getMasters() const
 {
     return reader ? reader->getHeader().masters : m_fallbackHeader.masters;
 }
+QString Data::getModelPathForFormId(quint32 formId) const
+{
+    if (formId == 0)
+        return QString();
+
+    auto findModel = [formId](const auto& coll) -> QString {
+        for (int i = 0; i < coll.size(); ++i) {
+            const auto& rec = coll.getRecord(i).get();
+            if (rec.formId == formId)
+                return rec.modelPath;
+        }
+        return QString();
+    };
+
+    QString path;
+    if (!(path = findModel(statCollection)).isEmpty()) return path;
+    if (!(path = findModel(doorCollection)).isEmpty()) return path;
+    if (!(path = findModel(furnCollection)).isEmpty()) return path;
+    if (!(path = findModel(actiCollection)).isEmpty()) return path;
+    if (!(path = findModel(contCollection)).isEmpty()) return path;
+    if (!(path = findModel(treeCollection)).isEmpty()) return path;
+    if (!(path = findModel(florCollection)).isEmpty()) return path;
+    if (!(path = findModel(miscCollection)).isEmpty()) return path;
+
+    return QString();
+}
+
 
 
 int Data::preload(const QString& filename, bool base_)

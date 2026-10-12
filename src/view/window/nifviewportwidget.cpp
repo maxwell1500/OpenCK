@@ -2107,24 +2107,57 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
                         color = (i == mHoverRefIndex) ? QVector3D(1.0f, 1.0f, 1.0f) : refColor;
                         armLen = 32.0f;
                     }
+                    const QMatrix4x4 rot = refRotationMatrix(ref);
+                    const float half = (selected ? 36.0f : 28.0f) * qMax(0.1f, ref.scale);
+
+                    // 3D oriented bounding box corners
+                    const QVector3D localCorners[8] = {
+                        QVector3D(-half, -half, -half),
+                        QVector3D( half, -half, -half),
+                        QVector3D( half,  half, -half),
+                        QVector3D(-half,  half, -half),
+                        QVector3D(-half, -half,  half),
+                        QVector3D( half, -half,  half),
+                        QVector3D( half,  half,  half),
+                        QVector3D(-half,  half,  half)
+                    };
+                    QVector3D worldCorners[8];
+                    for (int c = 0; c < 8; ++c) {
+                        worldCorners[c] = pos + rot.map(localCorners[c]);
+                    }
+
+                    // 12 edges of the oriented bounding box
+                    static const int boxEdges[24] = {
+                        0,1, 1,2, 2,3, 3,0,
+                        4,5, 5,6, 6,7, 7,4,
+                        0,4, 1,5, 2,6, 3,7
+                    };
+                    for (int e = 0; e < 12; ++e) {
+                        verts.append({ worldCorners[boxEdges[e * 2]], color });
+                        verts.append({ worldCorners[boxEdges[e * 2 + 1]], color });
+                    }
+
+                    // Center cross marker
                     if (ref.enabled) {
-                        QVector3D h1 = pos - QVector3D(armLen, 0, 0);
-                        QVector3D h2 = pos + QVector3D(armLen, 0, 0);
-                        QVector3D v1 = pos - QVector3D(0, 0, armLen);
-                        QVector3D v2 = pos + QVector3D(0, 0, armLen);
+                        QVector3D h1 = pos - rot.map(QVector3D(armLen, 0, 0));
+                        QVector3D h2 = pos + rot.map(QVector3D(armLen, 0, 0));
+                        QVector3D v1 = pos - rot.map(QVector3D(0, 0, armLen));
+                        QVector3D v2 = pos + rot.map(QVector3D(0, 0, armLen));
                         verts.append({h1, color});
                         verts.append({h2, color});
                         verts.append({v1, color});
                         verts.append({v2, color});
-                    } else {
-                        QVector3D d1a = pos + QVector3D(-armLen, 0, -armLen);
-                        QVector3D d1b = pos + QVector3D(armLen, 0, armLen);
-                        QVector3D d2a = pos + QVector3D(armLen, 0, -armLen);
-                        QVector3D d2b = pos + QVector3D(-armLen, 0, -armLen);
-                        verts.append({d1a, color});
-                        verts.append({d1b, color});
-                        verts.append({d2a, color});
-                        verts.append({d2b, color});
+                    }
+
+                    // Selected or hovered references display their local orientation axes
+                    if (selected || i == mHoverRefIndex) {
+                        const float axisLen = half * 1.5f;
+                        verts.append({ pos, QVector3D(1.0f, 0.2f, 0.2f) });
+                        verts.append({ pos + rot.map(QVector3D(axisLen, 0, 0)), QVector3D(1.0f, 0.2f, 0.2f) });
+                        verts.append({ pos, QVector3D(0.2f, 1.0f, 0.2f) });
+                        verts.append({ pos + rot.map(QVector3D(0, axisLen, 0)), QVector3D(0.2f, 1.0f, 0.2f) });
+                        verts.append({ pos, QVector3D(0.2f, 0.2f, 1.0f) });
+                        verts.append({ pos + rot.map(QVector3D(0, 0, axisLen)), QVector3D(0.2f, 0.2f, 1.0f) });
                     }
                 }
             }
