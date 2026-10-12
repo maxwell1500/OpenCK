@@ -564,7 +564,7 @@ const Header& ESMReader::getHeader() const
     return header;
 }
 
-Header ESMReader::getHeader()
+Header& ESMReader::getHeader()
 {
     return header;
 }

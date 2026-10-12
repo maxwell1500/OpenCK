@@ -16,6 +16,7 @@
 #include "../../model/world/idcollection.hpp"
 #include "../../model/world/record.hpp"
 #include "../../model/world/ckid.hpp"
+#include "../../src/model/world/data.hpp"
 
 class TestDataModel : public QObject
 {
@@ -35,6 +36,7 @@ private slots:
     void testCollection_SearchById();
     void testCollection_RemoveRecord();
     void testRecord_State_Transitions();
+    void testMasterManagement();
 };
 
 void TestDataModel::testNpcRecord_DefaultValues()
@@ -252,6 +254,33 @@ void TestDataModel::testStringToType()
     QCOMPARE(CkId::stringToType(QStringLiteral("WRLD")), CkId::Type_WRLD_);
     QCOMPARE(CkId::stringToType(QStringLiteral("NONSENSE")), CkId::Type_None);
     QCOMPARE(CkId::stringToType(QString()), CkId::Type_None);
+}
+
+void TestDataModel::testMasterManagement()
+{
+    FilePaths paths;
+    Data data(QStringList{}, paths);
+    QCOMPARE(data.getMasters().size(), 0);
+
+    data.addMaster(QStringLiteral("Skyrim.esm"), 123456);
+    QVERIFY(data.hasMaster(QStringLiteral("Skyrim.esm")));
+    QVERIFY(data.hasMaster(QStringLiteral("skyrim.esm")));
+    QCOMPARE(data.getMasters().size(), 1);
+    QCOMPARE(data.getMasters()[0].name, QStringLiteral("Skyrim.esm"));
+    QCOMPARE(data.getMasters()[0].size, static_cast<quint64>(123456));
+
+    data.addMaster(QStringLiteral("Dawnguard.esm"), 654321);
+    QCOMPARE(data.getMasters().size(), 2);
+
+    data.addMaster(QStringLiteral("Skyrim.esm"), 999);
+    QCOMPARE(data.getMasters().size(), 2);
+
+    QVERIFY(data.removeMaster(QStringLiteral("Skyrim.esm")));
+    QCOMPARE(data.getMasters().size(), 1);
+    QVERIFY(!data.hasMaster(QStringLiteral("Skyrim.esm")));
+    QVERIFY(data.hasMaster(QStringLiteral("Dawnguard.esm")));
+
+    QVERIFY(!data.removeMaster(QStringLiteral("NonExistent.esm")));
 }
 
 QTEST_MAIN(TestDataModel)

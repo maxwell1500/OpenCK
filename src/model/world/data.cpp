@@ -1445,6 +1445,76 @@ void Data::configureNewFile(GameFormat::Game game, const QVector<MasterData>& ma
     m_fallbackHeader.masters = masters;
     mNextLocalId = qMax<quint32>(nextObjectId, 0x800u);
 }
+void Data::addMaster(const QString& name, quint64 size)
+{
+    if (name.isEmpty() || hasMaster(name))
+        return;
+
+    MasterData md(name, size);
+    if (reader)
+    {
+        reader->getHeader().masters.append(md);
+    }
+    m_fallbackHeader.masters.append(md);
+
+    MetaData meta;
+    meta.editorId = name;
+    metaData.appendRecord(Record<MetaData>(State::State_ModifiedOnly, 0, &meta));
+
+    LOG_INFO(QString("Added master file dependency: %1").arg(name));
+}
+
+bool Data::removeMaster(const QString& name)
+{
+    if (name.isEmpty())
+        return false;
+
+    bool removed = false;
+    auto filter = [&](QVector<MasterData>& list) {
+        for (int i = 0; i < list.size(); ++i) {
+            if (list[i].name.compare(name, Qt::CaseInsensitive) == 0) {
+                list.removeAt(i);
+                removed = true;
+                break;
+            }
+        }
+    };
+
+    if (reader)
+    {
+        filter(reader->getHeader().masters);
+    }
+    filter(m_fallbackHeader.masters);
+
+    int metaIdx = metaData.searchId(name);
+    if (metaIdx >= 0)
+    {
+        metaData.removeRows(metaIdx, 1);
+    }
+
+    if (removed)
+    {
+        LOG_INFO(QString("Removed master file dependency: %1").arg(name));
+    }
+    return removed;
+}
+
+bool Data::hasMaster(const QString& name) const
+{
+    const QVector<MasterData> masters = getMasters();
+    for (const auto& m : masters)
+    {
+        if (m.name.compare(name, Qt::CaseInsensitive) == 0)
+            return true;
+    }
+    return false;
+}
+
+QVector<MasterData> Data::getMasters() const
+{
+    return reader ? reader->getHeader().masters : m_fallbackHeader.masters;
+}
+
 
 int Data::preload(const QString& filename, bool base_)
 {

@@ -92,7 +92,7 @@ public:
     void skip(int bytes);
 
     const Header& getHeader() const;
-    Header getHeader();
+    Header& getHeader();
 
     const Strings& getStrings() const;
 

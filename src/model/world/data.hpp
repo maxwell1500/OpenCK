@@ -284,6 +284,10 @@ public:
 
     void configureNewFile(GameFormat::Game game, const QVector<MasterData>& masters,
                           const QString& author, quint32 nextObjectId);
+    void addMaster(const QString& name, quint64 size = 0);
+    bool removeMaster(const QString& name);
+    bool hasMaster(const QString& name) const;
+    QVector<MasterData> getMasters() const;
 
     /// \brief True if this record type is a known, game-specific record of
     /// the detected game (recognized even when not yet implemented).

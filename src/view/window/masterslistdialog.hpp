@@ -14,6 +14,9 @@ class MastersListDialog : public QDialog
 public:
     explicit MastersListDialog(Data* data, QWidget* parent = nullptr);
     ~MastersListDialog();
+private slots:
+    void onAddMaster();
+    void onRemoveMaster();
 
 private:
     void populateMasters();
@@ -21,6 +24,8 @@ private:
     Data* mData;
     QListWidget* mastersList;
     QLabel* statusLabel;
+    QPushButton* addMasterBtn;
+    QPushButton* removeMasterBtn;
 };
 
 #endif // MASTERSLISTDIALOG_H
