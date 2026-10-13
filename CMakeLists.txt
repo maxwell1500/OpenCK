@@ -599,6 +599,7 @@ set(FILES_SOURCES
     src/crashhandler.cpp
     libs/files/data/dataexporter2.cpp
     libs/files/data/dataimporter2.cpp
+    libs/files/data/zipreader.cpp
     libs/files/data/zipwriter.cpp
     libs/files/data/csvsnippet.cpp
     libs/files/nif/nifparser.cpp
@@ -637,6 +638,7 @@ set(FILES_HEADERS
     src/crashhandler.hpp
     libs/files/data/dataexporter.hpp
     libs/files/data/dataimporter.hpp
+    libs/files/data/zipreader.hpp
     libs/files/data/zipwriter.hpp
     libs/files/data/csvsnippet.hpp
     libs/files/log/logger.hpp

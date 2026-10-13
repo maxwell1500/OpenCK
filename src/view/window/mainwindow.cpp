@@ -29,6 +29,7 @@
 #include "windowlayout.hpp"
 #include "masterslistdialog.hpp"
 #include "conflictdialog.hpp"
+#include "../../../libs/files/nif/matfile.hpp"
 #include "nifviewportwidget.hpp"
 #include "gamepadnavigator.hpp"
 #include "recordeditsession.hpp"
@@ -3849,6 +3850,11 @@ void MainWindow::loadCellIntoViewport(quint32 cellFormId)
     mLoadedCellFormId = cellFormId;
     if (!mData || !nifViewportWidget) return;
     nifViewportWidget->setDataDir(mData->getPaths().dataDir.absolutePath());
+    // Base-game materials ship as JSON in the Creation Kit's
+    // Tools\ContentResources.zip; point the material reader at it so those
+    // materials resolve like loose ones.
+    MatFile::setContentResources(mData->getPaths().programDir.absolutePath()
+                                 + QStringLiteral("/Tools/ContentResources.zip"));
     QVector<ViewportCellRef> cellRefs;
     const auto& coll = mData->getRefrCollection();
     QVector3D avgPos(0, 0, 0);

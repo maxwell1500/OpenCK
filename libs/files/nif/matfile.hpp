@@ -10,10 +10,11 @@
 //
 // Two sources exist. A LOOSE .mat (any file a mod ships under materials\) is
 // self-contained, so its texture set is readable directly. Base-game materials
-// are not on disk at all: their objects live in materialsbeta.cdb, an opaque
-// container in `Starfield - Materials.ba2` that nothing public parses. This
-// reader therefore only resolves loose files and reports the rest as absent,
-// which keeps the caller's proxy-geometry fallback honest.
+// are not shipped loose either, but the Creation Kit redistributes them as
+// JSON in Tools\ContentResources.zip, so set the path with
+// setContentResources() and the same reader covers the base game too. Anything
+// found in neither place is reported as absent, which keeps the caller's
+// proxy-geometry fallback honest.
 class MatFile
 {
 public:
@@ -27,8 +28,15 @@ public:
     // Finds the loose file backing a material path taken from a NIF (e.g.
     // "Materials\\Common\\Metal\\MetalAluminum01.mat"). Tries the path as given
     // under dataDir, then any file with the same base name under dataDir's
-    // materials\ tree. Returns an empty string when only an archive holds it.
+    // materials\ tree, and finally the Creation Kit's ContentResources.zip set
+    // with setContentResources(). Returns an empty string when no source
+    // holds it.
     static QString findLoose(const QString& materialPath, const QString& dataDir);
+
+    // Points the reader at a Creation Kit install's Tools\ContentResources.zip.
+    // Opened lazily on first use, so passing a path that does not exist is
+    // fine. Pass an empty path to forget a previously set one.
+    static void setContentResources(const QString& zipPath);
 
     // Convenience: colour-map path for a material referenced by a NIF, or an
     // empty string.

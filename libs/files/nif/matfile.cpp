@@ -1,5 +1,7 @@
 #include "matfile.hpp"
 
+#include "../data/zipreader.hpp"
+
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -20,17 +22,26 @@ struct MatObject
     QMap<int, QString> files; // slot index -> texture file name
 };
 
-// Objects whose parent is a texture-set root own the texture file names.
+// An object's role is carried by its name ("<Family>_TextureSet1"), which is
+// the only reliable marker of either schema: a loose mod .mat names the parent
+// file ("...\\texturesets.mat") while the Creation Kit's dumps it as a
+// resource id ("res:DC239E25:...").
+const QRegularExpression textureSetNameRe(QStringLiteral("_TextureSet\\d+$", QRegularExpression::CaseInsensitiveOption));
+const QRegularExpression roleSuffixRe(QStringLiteral("_(Material|TextureSet|Layer|Blender|UVStream)\\d+$", QRegularExpression::CaseInsensitiveOption));
+
 bool isTextureSet(const MatObject& o)
 {
+    if (o.name.contains(textureSetNameRe))
+        return true;
+    // Fall back to the parent-file spelling used by loose files.
     return o.parent.endsWith(QLatin1String("texturesets.mat"), Qt::CaseInsensitive);
 }
 
-// Objects whose parent is the layered-material root name the material family
-// that their sibling texture sets are prefixed with.
+// The object named after the family alone is the root the sibling texture sets
+// are prefixed with.
 bool isLayeredRoot(const MatObject& o)
 {
-    return o.parent.endsWith(QLatin1String("layeredmaterials.mat"), Qt::CaseInsensitive);
+    return !o.name.isEmpty() && !o.name.contains(roleSuffixRe);
 }
 
 QString nameOf(const QJsonObject& component)
@@ -97,6 +108,25 @@ void collectFamily(const QVector<MatObject>& objects, const QString& family,
 
 } // namespace
 
+// The Creation Kit redistributes the base game's authored .mat files as JSON in
+// Tools\ContentResources.zip (~48k files). Indexing it costs one pass over the
+// central directory, so it is opened on first use rather than at startup.
+namespace {
+QString g_contentResourcesPath;
+ZipReader* g_contentResources = nullptr;
+bool g_contentResourcesTried = false;
+
+ZipReader* contentResources()
+{
+    if (!g_contentResourcesTried) {
+        g_contentResourcesTried = true;
+        if (!g_contentResourcesPath.isEmpty())
+            g_contentResources = new ZipReader(g_contentResourcesPath);
+    }
+    return g_contentResources;
+}
+} // namespace
+
 QMap<int, QString> MatFile::textureSlots(const QString& absPath)
 {
     QMap<int, QString> out;
@@ -114,11 +144,21 @@ QMap<int, QString> MatFile::textureSlots(const QString& absPath)
     // Take the root layered material's family first so that LOD-only texture
     // sets cannot shadow the full-resolution one.
     for (int i = 0; i < objects.size(); ++i) {
-        if (!isLayeredRoot(objects.at(i)) || objects.at(i).name.isEmpty())
+        const MatObject& root = objects.at(i);
+        if (!isLayeredRoot(root) || root.name.isEmpty())
             continue;
-        collectFamily(objects, objects.at(i).name, out);
+        collectFamily(objects, root.name, out);
         if (!out.isEmpty())
             return out;
+        // A root may be a variation on an existing material file, so its
+        // texture sets are named after that file rather than after it
+        // ("DecalMetalBevels01n" -> "DecalMetalBevels01_TextureSet1").
+        const QString stem = QFileInfo(root.parent).completeBaseName();
+        if (!stem.isEmpty() && stem.compare(root.name, Qt::CaseInsensitive) != 0) {
+            collectFamily(objects, stem, out);
+            if (!out.isEmpty())
+                return out;
+        }
     }
 
     // Single-material files declare no layered root, so use whatever is there.
@@ -153,7 +193,37 @@ QString MatFile::findLoose(const QString& materialPath, const QString& dataDir)
                     QDir::Files, QDirIterator::Subdirectories);
     if (it.hasNext())
         return it.next();
+
+    // Base-game materials ship only inside the Creation Kit's
+    // ContentResources.zip, so pull out the single entry we need and cache it
+    // next to the extracted meshes and textures.
+    if (ZipReader* zr = contentResources()) {
+        const QString cache = QDir::cleanPath(dataDir + QLatin1String("/.openck_cache/materials/") + rel);
+        if (QFileInfo::exists(cache))
+            return cache;
+
+        // Entries in the archive use forward slashes.
+        const QByteArray body = zr->readEntry(QString(rel).replace(QLatin1Char('\\'), QLatin1Char('/')));
+        if (body.isEmpty())
+            return QString();
+
+        QDir().mkpath(QFileInfo(cache).absolutePath());
+        QFile out(cache);
+        if (!out.open(QIODevice::WriteOnly) || out.write(body) != body.size())
+            return QString();
+        return cache;
+    }
     return QString();
+}
+
+void MatFile::setContentResources(const QString& zipPath)
+{
+    if (g_contentResourcesPath != zipPath) {
+        g_contentResourcesPath = zipPath;
+        delete g_contentResources;
+        g_contentResources = nullptr;
+        g_contentResourcesTried = false;
+    }
 }
 
 QString MatFile::colorTexture(const QString& materialPath, const QString& dataDir)
