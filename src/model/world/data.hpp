@@ -2148,6 +2148,8 @@ private:
     {
         qint64 end = 0;
         quint32 type = 0;
+        quint32 cellFormId = 0;
+        quint32 worldspaceFormId = 0;
     };
     QVector<GrupFrame> m_grupStack;
     bool inCellChildrenGroup(qint64 pos) const;

@@ -117,6 +117,7 @@ public:
     // 6 = cell children, 8/9 = persistent/temporary children, ...). Callers
     // use it to reconstruct the source's grouping without tracking labels.
     quint32 lastGrupType() const { return mLastGrupType; }
+    quint32 lastGrupLabel() const { return mLastGrupLabel; }
     void skipToGrupEnd();
 
     template<typename T>
@@ -204,6 +205,7 @@ private:
     qint64 mLastRecordBodySize = 0;
     qint64 mGrupEnd = 0;
     quint32 mLastGrupType = 0;
+    quint32 mLastGrupLabel = 0;
 
     uchar* m_mapped = nullptr;
     qint64 m_mappedSize = 0;

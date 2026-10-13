@@ -779,6 +779,7 @@ void NifViewportWidget::setCellReferences(const QVector<ViewportCellRef>& refs)
         mSelectedRefIndex = -1;
     }
     m_cellRefVBO.dirty = true;
+    m_cellRefSolidVBO.dirty = true;
     m_cellGridVBO.dirty = true;
     glWidget->update();
 }
@@ -793,6 +794,7 @@ void NifViewportWidget::setSelectedRefIndex(int index)
     mHoverAxis = -1;
     mHoverRefIndex = -1;
     m_cellRefVBO.dirty = true;
+    m_cellRefSolidVBO.dirty = true;
     rebuildPivot();
     updatePivotInfo();
     updateCoordinateReadout();
@@ -843,6 +845,7 @@ void NifViewportWidget::setSelectedRefIndices(const QVector<int>& indices)
     mHoverAxis = -1;
     mHoverRefIndex = -1;
     m_cellRefVBO.dirty = true;
+    m_cellRefSolidVBO.dirty = true;
     rebuildPivot();
     updatePivotInfo();
     updateCoordinateReadout();
@@ -938,6 +941,7 @@ void NifViewportWidget::clear()
         m_axisVBO_B.clear();
         m_cellGridVBO.clear();
         m_cellRefVBO.clear();
+        m_cellRefSolidVBO.clear();
         m_nodeAxisVBO_R.clear();
         m_nodeAxisVBO_G.clear();
         m_nodeAxisVBO_B.clear();
@@ -1570,25 +1574,11 @@ void NifViewportWidget::renderMesh()
     vbo.bind();
     ibo.bind();
 
-    QMatrix4x4 model;
-    model.scale(0.01f);
+    const gizmo::ViewTransform t = currentViewTransform();
 
-    float rotXRad = rotationX * 3.14159265f / 180.0f;
-    float rotYRad = rotationY * 3.14159265f / 180.0f;
-
-    QMatrix4x4 rotXMatrix;
-    rotXMatrix.rotate(rotXRad, 1.0f, 0.0f, 0.0f);
-
-    QMatrix4x4 rotYMatrix;
-    rotYMatrix.rotate(rotYRad, 0.0f, 1.0f, 0.0f);
-
-    QMatrix4x4 view = rotYMatrix * rotXMatrix;
-    view.scale(zoom);
-    view.translate(-cameraPos);
-
-    shaderProgram->setUniformValue("mModel", model);
-    shaderProgram->setUniformValue("mView", view);
-    shaderProgram->setUniformValue("mProjection", QMatrix4x4());
+    shaderProgram->setUniformValue("mModel", t.model);
+    shaderProgram->setUniformValue("mView", t.view);
+    shaderProgram->setUniformValue("mProjection", t.proj);
     shaderProgram->setUniformValue("lightDir", mLightDir);
     shaderProgram->setUniformValue("lightColor", mLightColor);
     shaderProgram->setUniformValue("ambientStrength", mDefaultLighting ? 0.75f : mAmbientStrength);
@@ -1708,14 +1698,14 @@ void NifViewportWidget::renderMesh()
     vao.release();
     shaderProgram->release();
 
-    QMatrix4x4 modelView = view * model;
+    const QMatrix4x4 modelView = t.modelView();
+    const QMatrix4x4 mvp = t.proj * modelView;
 
     if (navmeshEnabled) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(0.0f, 1.0f);
-
         // 1. Semi-transparent green/blue faces for reachable triangles
         if (!navmeshTriangles.isEmpty()) {
             if (m_navmeshVBO.dirty) {
@@ -1729,7 +1719,7 @@ void NifViewportWidget::renderMesh()
                 }
                 m_navmeshVBO.build(verts, GL_TRIANGLES);
             }
-            m_navmeshVBO.draw(m_overlayShader, modelView);
+            m_navmeshVBO.draw(m_overlayShader, mvp);
         }
 
         // 2. Disconnected island faces highlighted in bright red (#FF2222)
@@ -1742,7 +1732,7 @@ void NifViewportWidget::renderMesh()
                 }
                 m_navmeshDisconnectedVBO.build(verts, GL_TRIANGLES);
             }
-            m_navmeshDisconnectedVBO.draw(m_overlayShader, modelView);
+            m_navmeshDisconnectedVBO.draw(m_overlayShader, mvp);
         }
 
         // 3. Highlighted active triangle (Orange #FF8000)
@@ -1755,7 +1745,7 @@ void NifViewportWidget::renderMesh()
                 verts.append({navmeshTriangles[t+2], QVector3D(1.0f, 0.5f, 0.0f)});
                 m_highlightTriVBO.build(verts, GL_TRIANGLES);
             }
-            m_highlightTriVBO.draw(m_overlayShader, modelView);
+            m_highlightTriVBO.draw(m_overlayShader, mvp);
         }
 
         glDisable(GL_POLYGON_OFFSET_FILL);
@@ -1771,7 +1761,7 @@ void NifViewportWidget::renderMesh()
                 }
                 m_navmeshEdgesVBO.build(verts, GL_LINES);
             }
-            m_navmeshEdgesVBO.draw(m_overlayShader, modelView);
+            m_navmeshEdgesVBO.draw(m_overlayShader, mvp);
         }
         if (!navmeshCoverEdges.isEmpty()) {
             if (m_navmeshCoverEdgesVBO.dirty) {
@@ -1782,7 +1772,7 @@ void NifViewportWidget::renderMesh()
                 }
                 m_navmeshCoverEdgesVBO.build(verts, GL_LINES);
             }
-            m_navmeshCoverEdgesVBO.draw(m_overlayShader, modelView);
+            m_navmeshCoverEdgesVBO.draw(m_overlayShader, mvp);
         }
         if (!navmeshPortalEdges.isEmpty()) {
             if (m_navmeshPortalEdgesVBO.dirty) {
@@ -1793,7 +1783,7 @@ void NifViewportWidget::renderMesh()
                 }
                 m_navmeshPortalEdgesVBO.build(verts, GL_LINES);
             }
-            m_navmeshPortalEdgesVBO.draw(m_overlayShader, modelView);
+            m_navmeshPortalEdgesVBO.draw(m_overlayShader, mvp);
         }
         if (!navmeshWaterEdges.isEmpty()) {
             if (m_navmeshWaterEdgesVBO.dirty) {
@@ -1804,7 +1794,7 @@ void NifViewportWidget::renderMesh()
                 }
                 m_navmeshWaterEdgesVBO.build(verts, GL_LINES);
             }
-            m_navmeshWaterEdgesVBO.draw(m_overlayShader, modelView);
+            m_navmeshWaterEdgesVBO.draw(m_overlayShader, mvp);
         }
         glLineWidth(1.0f);
 
@@ -1820,7 +1810,7 @@ void NifViewportWidget::renderMesh()
                 m_navmeshVerticesVBO.build(verts, GL_POINTS);
             }
             glPointSize(6.0f);
-            m_navmeshVerticesVBO.draw(m_overlayShader, modelView);
+            m_navmeshVerticesVBO.draw(m_overlayShader, mvp);
             glPointSize(1.0f);
         }
 
@@ -1841,7 +1831,7 @@ void NifViewportWidget::renderMesh()
         glDisable(GL_DEPTH_TEST);
         glLineWidth(3.0f);
 
-        m_pathVBO.draw(m_overlayShader, modelView);
+        m_pathVBO.draw(m_overlayShader, mvp);
 
         glLineWidth(1.0f);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -1866,19 +1856,12 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
     if (!shaderProgram || !shaderProgram->isLinked())
         return;
 
-    QMatrix4x4 model;
-    model.scale(0.01f);
-    float rotXRad = rotationX * 3.14159265f / 180.0f;
-    float rotYRad = rotationY * 3.14159265f / 180.0f;
-    QMatrix4x4 rotXMatrix;
-    rotXMatrix.rotate(rotXRad, 1.0f, 0.0f, 0.0f);
-    QMatrix4x4 rotYMatrix;
-    rotYMatrix.rotate(rotYRad, 0.0f, 1.0f, 0.0f);
-    QMatrix4x4 view = rotYMatrix * rotXMatrix;
-    view.scale(zoom);
-    view.translate(-cameraPos);
-    QMatrix4x4 modelView = view * model;
-    QMatrix4x4 proj;
+    const gizmo::ViewTransform t = currentViewTransform();
+    const QMatrix4x4 model = t.model;
+    const QMatrix4x4 view = t.view;
+    const QMatrix4x4 proj = t.proj;
+    const QMatrix4x4 modelView = t.modelView();
+    const QMatrix4x4 mvp = proj * modelView;
 
     glWidget->makeCurrent();
     const QColor clearCol = (m_skyEnabled || !mDefaultLighting) ? mSkyColor : QColor(90, 130, 180);
@@ -1891,7 +1874,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 
     renderMesh();
 
-    drawNodeAxis(modelView);
+    drawNodeAxis(mvp);
 
     if (boundsEnabled && !shapeBounds.isEmpty()) {
         if (m_bboxVBO.dirty) {
@@ -1934,7 +1917,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
             m_bboxVBO.build(verts, GL_LINES);
         }
 
-        m_bboxVBO.draw(m_overlayShader, modelView);
+        m_bboxVBO.draw(m_overlayShader, mvp);
     }
 
     if (collisionEnabled && nifParser && nifParser->getRoot()
@@ -2052,7 +2035,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         glDisable(GL_DEPTH_TEST);
         glLineWidth(1.0f);
 
-        m_collisionVBO.draw(m_overlayShader, modelView);
+        m_collisionVBO.draw(m_overlayShader, mvp);
 
         glLineWidth(1.0f);
         glEnable(GL_DEPTH_TEST);
@@ -2073,7 +2056,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
                 m_gridVBO.build(verts, GL_LINES);
             }
 
-            m_gridVBO.draw(m_overlayShader, modelView);
+            m_gridVBO.draw(m_overlayShader, mvp);
         }
 
         if (axisEnabled) {
@@ -2098,9 +2081,9 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 
             glLineWidth(2.0f);
 
-            m_axisVBO_R.draw(m_overlayShader, modelView);
-            m_axisVBO_G.draw(m_overlayShader, modelView);
-            m_axisVBO_B.draw(m_overlayShader, modelView);
+            m_axisVBO_R.draw(m_overlayShader, mvp);
+            m_axisVBO_G.draw(m_overlayShader, mvp);
+            m_axisVBO_B.draw(m_overlayShader, mvp);
 
             glLineWidth(1.0f);
         }
@@ -2114,7 +2097,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         }
         glDisable(GL_DEPTH_TEST);
         glLineWidth(2.0f);
-        m_pivotVBO.draw(m_overlayShader, modelView);
+        m_pivotVBO.draw(m_overlayShader, mvp);
         glLineWidth(1.0f);
         glEnable(GL_DEPTH_TEST);
     }
@@ -2159,97 +2142,127 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         glDisable(GL_DEPTH_TEST);
 
         glLineWidth(2.0f);
-        m_cellGridVBO.draw(m_overlayShader, modelView);
+        m_cellGridVBO.draw(m_overlayShader, mvp);
         glLineWidth(1.0f);
 
         glEnable(GL_DEPTH_TEST);
     }
     if (!cellReferences.isEmpty()) {
-        if (m_cellRefVBO.dirty) {
-            QVector<OverlayVertex> verts;
-            const QVector3D refColor(0.0f, 1.0f, 0.0f);
-            // Pass 0 draws the selected-outline halo (SelectedOutline from
-            // EditorColors.xml, parity.md §4.1) as a wider cross behind the
-            // marker; pass 1 draws the marker itself.
-            for (int pass = 0; pass < 2; ++pass)
-            {
-                for (int i = 0; i < cellReferences.size(); ++i) {
-                    const ViewportCellRef& ref = cellReferences[i];
-                    const bool selected = isRefSelected(i);
-                    if (selected != (pass == 0))
-                        continue;
-                    QVector3D pos = ref.position;
-                    // SelectedOutline primary is teal (23, 255, 232). Pass 0 is
-                    // the halo; pass 1 keeps the marker cross in classic gold.
-                    QVector3D color = QVector3D(0.09f, 1.0f, 0.91f);
-                    float armLen = (pass == 0) ? 56.0f : 48.0f;
-                    if (!selected)
-                    {
-                        color = (i == mHoverRefIndex) ? QVector3D(1.0f, 1.0f, 1.0f) : refColor;
-                        armLen = 32.0f;
-                    }
-                    const QMatrix4x4 rot = refRotationMatrix(ref);
-                    const float half = (selected ? 36.0f : 28.0f) * qMax(0.1f, ref.scale);
+        if (m_cellRefVBO.dirty || m_cellRefSolidVBO.dirty) {
+            QVector<OverlayVertex> lineVerts;
+            QVector<OverlayVertex> solidVerts;
 
-                    // 3D oriented bounding box corners
-                    const QVector3D localCorners[8] = {
-                        QVector3D(-half, -half, -half),
-                        QVector3D( half, -half, -half),
-                        QVector3D( half,  half, -half),
-                        QVector3D(-half,  half, -half),
-                        QVector3D(-half, -half,  half),
-                        QVector3D( half, -half,  half),
-                        QVector3D( half,  half,  half),
-                        QVector3D(-half,  half,  half)
-                    };
-                    QVector3D worldCorners[8];
-                    for (int c = 0; c < 8; ++c) {
-                        worldCorners[c] = pos + rot.map(localCorners[c]);
-                    }
+            // 6 faces of an oriented box: 2 triangles per face (36 indices)
+            static const int boxFaces[36] = {
+                // Bottom (-Z)
+                0, 2, 1,  0, 3, 2,
+                // Top (+Z)
+                4, 5, 6,  4, 6, 7,
+                // Front (-Y)
+                0, 1, 5,  0, 5, 4,
+                // Back (+Y)
+                2, 3, 7,  2, 7, 6,
+                // Left (-X)
+                0, 4, 7,  0, 7, 3,
+                // Right (+X)
+                1, 6, 5,  1, 2, 6
+            };
+            static const float faceShade[6] = {
+                0.40f, 0.95f, 0.70f, 0.55f, 0.60f, 0.80f
+            };
+            static const int boxEdges[24] = {
+                0,1, 1,2, 2,3, 3,0,
+                4,5, 5,6, 6,7, 7,4,
+                0,4, 1,5, 2,6, 3,7
+            };
 
-                    // 12 edges of the oriented bounding box
-                    static const int boxEdges[24] = {
-                        0,1, 1,2, 2,3, 3,0,
-                        4,5, 5,6, 6,7, 7,4,
-                        0,4, 1,5, 2,6, 3,7
-                    };
-                    for (int e = 0; e < 12; ++e) {
-                        verts.append({ worldCorners[boxEdges[e * 2]], color });
-                        verts.append({ worldCorners[boxEdges[e * 2 + 1]], color });
-                    }
+            for (int i = 0; i < cellReferences.size(); ++i) {
+                const ViewportCellRef& ref = cellReferences[i];
+                const bool selected = isRefSelected(i);
+                const bool hovered = (i == mHoverRefIndex);
+                const QVector3D pos = ref.position;
+                const QMatrix4x4 rot = refRotationMatrix(ref);
+                const float half = (selected ? 36.0f : 28.0f) * qMax(0.1f, ref.scale);
 
-                    // Center cross marker
-                    if (ref.enabled) {
-                        QVector3D h1 = pos - rot.map(QVector3D(armLen, 0, 0));
-                        QVector3D h2 = pos + rot.map(QVector3D(armLen, 0, 0));
-                        QVector3D v1 = pos - rot.map(QVector3D(0, 0, armLen));
-                        QVector3D v2 = pos + rot.map(QVector3D(0, 0, armLen));
-                        verts.append({h1, color});
-                        verts.append({h2, color});
-                        verts.append({v1, color});
-                        verts.append({v2, color});
-                    }
+                QVector3D baseCol(0.40f, 0.60f, 0.85f);
+                QVector3D edgeCol(0.15f, 0.25f, 0.40f);
+                float armLen = 32.0f;
+                if (selected) {
+                    baseCol = QVector3D(0.20f, 0.90f, 0.95f);
+                    edgeCol = QVector3D(0.0f, 1.0f, 1.0f);
+                    armLen = 52.0f;
+                } else if (hovered) {
+                    baseCol = QVector3D(0.95f, 0.95f, 1.0f);
+                    edgeCol = QVector3D(1.0f, 1.0f, 1.0f);
+                    armLen = 40.0f;
+                }
 
-                    // Selected or hovered references display their local orientation axes
-                    if (selected || i == mHoverRefIndex) {
-                        const float axisLen = half * 1.5f;
-                        verts.append({ pos, QVector3D(1.0f, 0.2f, 0.2f) });
-                        verts.append({ pos + rot.map(QVector3D(axisLen, 0, 0)), QVector3D(1.0f, 0.2f, 0.2f) });
-                        verts.append({ pos, QVector3D(0.2f, 1.0f, 0.2f) });
-                        verts.append({ pos + rot.map(QVector3D(0, axisLen, 0)), QVector3D(0.2f, 1.0f, 0.2f) });
-                        verts.append({ pos, QVector3D(0.2f, 0.2f, 1.0f) });
-                        verts.append({ pos + rot.map(QVector3D(0, 0, axisLen)), QVector3D(0.2f, 0.2f, 1.0f) });
+                // 3D oriented bounding box corners in local space
+                const QVector3D localCorners[8] = {
+                    QVector3D(-half, -half, -half),
+                    QVector3D( half, -half, -half),
+                    QVector3D( half,  half, -half),
+                    QVector3D(-half,  half, -half),
+                    QVector3D(-half, -half,  half),
+                    QVector3D( half, -half,  half),
+                    QVector3D( half,  half,  half),
+                    QVector3D(-half,  half,  half)
+                };
+                QVector3D worldCorners[8];
+                for (int c = 0; c < 8; ++c) {
+                    worldCorners[c] = pos + rot.map(localCorners[c]);
+                }
+
+                // Solid shaded faces
+                for (int f = 0; f < 6; ++f) {
+                    const QVector3D faceCol = baseCol * faceShade[f];
+                    for (int v = 0; v < 6; ++v) {
+                        solidVerts.append({ worldCorners[boxFaces[f * 6 + v]], faceCol });
                     }
                 }
+
+                // Wireframe edges
+                for (int e = 0; e < 12; ++e) {
+                    lineVerts.append({ worldCorners[boxEdges[e * 2]], edgeCol });
+                    lineVerts.append({ worldCorners[boxEdges[e * 2 + 1]], edgeCol });
+                }
+
+                // Center cross marker
+                if (ref.enabled) {
+                    const QVector3D h1 = pos - rot.map(QVector3D(armLen, 0, 0));
+                    const QVector3D h2 = pos + rot.map(QVector3D(armLen, 0, 0));
+                    const QVector3D v1 = pos - rot.map(QVector3D(0, 0, armLen));
+                    const QVector3D v2 = pos + rot.map(QVector3D(0, 0, armLen));
+                    lineVerts.append({h1, edgeCol});
+                    lineVerts.append({h2, edgeCol});
+                    lineVerts.append({v1, edgeCol});
+                    lineVerts.append({v2, edgeCol});
+                }
+
+                // Selected / hovered orientation axes
+                if (selected || hovered) {
+                    const float axisLen = half * 1.6f;
+                    lineVerts.append({ pos, QVector3D(1.0f, 0.2f, 0.2f) });
+                    lineVerts.append({ pos + rot.map(QVector3D(axisLen, 0, 0)), QVector3D(1.0f, 0.2f, 0.2f) });
+                    lineVerts.append({ pos, QVector3D(0.2f, 1.0f, 0.2f) });
+                    lineVerts.append({ pos + rot.map(QVector3D(0, axisLen, 0)), QVector3D(0.2f, 1.0f, 0.2f) });
+                    lineVerts.append({ pos, QVector3D(0.2f, 0.2f, 1.0f) });
+                    lineVerts.append({ pos + rot.map(QVector3D(0, 0, axisLen)), QVector3D(0.2f, 0.2f, 1.0f) });
+                }
             }
-            m_cellRefVBO.build(verts, GL_LINES);
+
+            m_cellRefSolidVBO.build(solidVerts, GL_TRIANGLES);
+            m_cellRefVBO.build(lineVerts, GL_LINES);
         }
 
-        glDisable(GL_DEPTH_TEST);
-
-        m_cellRefVBO.draw(m_overlayShader, modelView);
-
+        // Draw solid 3D reference shapes with depth test
         glEnable(GL_DEPTH_TEST);
+        m_cellRefSolidVBO.draw(m_overlayShader, mvp);
+
+        // Draw wireframe outlines with slight line width
+        glLineWidth(1.5f);
+        m_cellRefVBO.draw(m_overlayShader, mvp);
+        glLineWidth(1.0f);
     }
     // Marquee selection rectangle: screen-space quad mapped back to model
     // space so the existing overlay shader can draw it. Rebuilt every paint
@@ -2288,7 +2301,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 
     // Standalone preview primitive (cube/cylinder/plane/sphere)
     if (m_primitiveVBO.vertexCount > 0) {
-        m_primitiveVBO.draw(m_overlayShader, modelView);
+        m_primitiveVBO.draw(m_overlayShader, mvp);
     }
 
     // Transform gizmo for the selected reference
@@ -2300,9 +2313,9 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         const float len = gizmo::worldSizeForPixels(t, 90.0f);
         glDisable(GL_DEPTH_TEST);
         glLineWidth(2.5f);
-        if (mEditMode == EditMode::Move)      { buildTranslateGizmo(len, ref.position, mHoverAxis); m_translateGizmoVBO.draw(m_overlayShader, modelView); }
-        else if (mEditMode == EditMode::Rotate){ buildRotateGizmo(len, ref.position, mHoverAxis);   m_rotateGizmoVBO.draw(m_overlayShader, modelView); }
-        else if (mEditMode == EditMode::Scale){ buildScaleGizmo(len, ref.position, mHoverAxis);     m_scaleGizmoVBO.draw(m_overlayShader, modelView); }
+        if (mEditMode == EditMode::Move)      { buildTranslateGizmo(len, ref.position, mHoverAxis); m_translateGizmoVBO.draw(m_overlayShader, mvp); }
+        else if (mEditMode == EditMode::Rotate){ buildRotateGizmo(len, ref.position, mHoverAxis);   m_rotateGizmoVBO.draw(m_overlayShader, mvp); }
+        else if (mEditMode == EditMode::Scale){ buildScaleGizmo(len, ref.position, mHoverAxis);     m_scaleGizmoVBO.draw(m_overlayShader, mvp); }
         glLineWidth(1.0f);
         glEnable(GL_DEPTH_TEST);
     }
@@ -2357,6 +2370,11 @@ void NifViewportWidget::setEditMode(EditMode mode)
 
 gizmo::ViewTransform NifViewportWidget::currentViewTransform() const
 {
+    const float w = glWidget ? static_cast<float>(glWidget->width()) : 800.0f;
+    const float h = glWidget ? qMax(1.0f, static_cast<float>(glWidget->height())) : 600.0f;
+    const float aspect = w / h;
+    const float halfExtent = 50.0f / qMax(0.01f, zoom);
+
     QMatrix4x4 model;
     model.scale(0.01f);
     float rotXRad = rotationX * 3.14159265f / 180.0f;
@@ -2366,10 +2384,11 @@ gizmo::ViewTransform NifViewportWidget::currentViewTransform() const
     QMatrix4x4 rotYMatrix;
     rotYMatrix.rotate(rotYRad, 0.0f, 1.0f, 0.0f);
     QMatrix4x4 view = rotYMatrix * rotXMatrix;
-    view.scale(zoom);
     view.translate(-cameraPos);
+
     QMatrix4x4 proj;
-    return { view, model, proj, glWidget ? glWidget->size() : QSize() };
+    proj.ortho(-halfExtent * aspect, halfExtent * aspect, -halfExtent, halfExtent, -5000.0f, 5000.0f);
+    return { view, model, proj, glWidget ? glWidget->size() : QSize(800, 600) };
 }
 
 void NifViewportWidget::buildTranslateGizmo(float len, const QVector3D& origin, int highlightAxis)
@@ -2618,6 +2637,7 @@ void NifViewportWidget::applyGizmoDrag(const QPoint& currentPos)
     emit refTransformPreview(cellReferences[mSelectedRefIndex].dataIndex,
                              ref.position, QVector3D(ref.rotX, ref.rotY, ref.rotZ), ref.scale);
     m_cellRefVBO.dirty = true;
+    m_cellRefSolidVBO.dirty = true;
     updateCoordinateReadout();
     glWidget->update();
 }
@@ -2742,6 +2762,7 @@ void NifViewportWidget::mouseMoveEvent(QMouseEvent* event)
         if (refIdx != mHoverRefIndex) {
             mHoverRefIndex = refIdx;
             m_cellRefVBO.dirty = true;
+            m_cellRefSolidVBO.dirty = true;
             if (glWidget) glWidget->update();
         }
         if (refIdx >= 0) {
@@ -3034,7 +3055,7 @@ void NifViewportWidget::updateNodeMetadata()
     nodeInfoLabel->setText(info);
 }
 
-void NifViewportWidget::drawNodeAxis(const QMatrix4x4& modelView)
+void NifViewportWidget::drawNodeAxis(const QMatrix4x4& mvp)
 {
     if (!selectedNode || !nodeCumulativeTransforms.contains(selectedNode)) return;
 
@@ -3064,9 +3085,9 @@ void NifViewportWidget::drawNodeAxis(const QMatrix4x4& modelView)
     glLineWidth(3.0f);
     glDisable(GL_DEPTH_TEST);
 
-    m_nodeAxisVBO_R.draw(m_overlayShader, modelView);
-    m_nodeAxisVBO_G.draw(m_overlayShader, modelView);
-    m_nodeAxisVBO_B.draw(m_overlayShader, modelView);
+    m_nodeAxisVBO_R.draw(m_overlayShader, mvp);
+    m_nodeAxisVBO_G.draw(m_overlayShader, mvp);
+    m_nodeAxisVBO_B.draw(m_overlayShader, mvp);
 
     glLineWidth(1.0f);
     glEnable(GL_DEPTH_TEST);

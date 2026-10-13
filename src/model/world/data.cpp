@@ -1410,7 +1410,7 @@ bool Data::inCellChildrenGroup(qint64 pos) const
 {
     for (const GrupFrame& f : m_grupStack)
     {
-        if (f.type == 6 && pos < f.end)
+        if ((f.type == 6 || f.type == 8 || f.type == 9 || f.type == 10) && pos < f.end)
             return true;
     }
     return false;
@@ -1651,7 +1651,16 @@ bool Data::continueLoading(Messages& messages)
             // inCellChildrenGroup() reflects only groups still open here.
             while (!m_grupStack.isEmpty() && m_grupStack.last().end <= pos)
                 m_grupStack.removeLast();
-
+            if (!m_grupStack.isEmpty())
+            {
+                m_lastCellFormId = m_grupStack.last().cellFormId;
+                m_lastWorldspaceFormId = m_grupStack.last().worldspaceFormId;
+            }
+            else
+            {
+                m_lastCellFormId = 0;
+                m_lastWorldspaceFormId = 0;
+            }
 
             if (m_currentGame == GameFormat::Game::Morrowind)
             {
@@ -1674,9 +1683,31 @@ bool Data::continueLoading(Messages& messages)
             {
             switch (name)
             {
-            case 'GRUP': reader->skipGrupHeader();
-                m_grupStack.append({ reader->grupEnd(), reader->lastGrupType() });
+            case 'GRUP': {
+                reader->skipGrupHeader();
+                const quint32 gtype = reader->lastGrupType();
+                const quint32 glabel = reader->lastGrupLabel();
+                quint32 cellFid = 0;
+                quint32 wsFid = 0;
+                if (!m_grupStack.isEmpty())
+                {
+                    cellFid = m_grupStack.last().cellFormId;
+                    wsFid = m_grupStack.last().worldspaceFormId;
+                }
+                if (gtype == 1) // World Children: label is WRLD FormID
+                {
+                    wsFid = glabel;
+                    m_lastWorldspaceFormId = wsFid;
+                }
+                else if (gtype == 6 || gtype == 8 || gtype == 9 || gtype == 10) // Cell Children: label is CELL FormID
+                {
+                    cellFid = glabel;
+                    if (cellFid != 0)
+                        m_lastCellFormId = cellFid;
+                }
+                m_grupStack.append({ reader->grupEnd(), gtype, cellFid, wsFid });
                 break;
+            }
             case 'GMST': gameSettings.load(*reader, base);     break;
             case 'NPC_': npcCollection.load(*reader, base);    break;
             case 'WEAP': weaponCollection.load(*reader, base); break;
@@ -1716,8 +1747,7 @@ bool Data::continueLoading(Messages& messages)
                 if (cellCollection.size() > 0)
                 {
                     const quint32 cfid = cellCollection.getRecord(cellCollection.size() - 1).get().formId;
-                    if (!base)
-                        m_lastCellFormId = cfid;
+                    m_lastCellFormId = cfid;
                     m_cellParentWorldspace[cfid] = m_lastWorldspaceFormId;
                 }
                 break;
@@ -1731,7 +1761,16 @@ bool Data::continueLoading(Messages& messages)
                 break;
             case 'LCTN': locationCollection.load(*reader, base); break;
             case 'PNDT': planetCollection.load(*reader, base); break;
-            case 'REFR': refrCollection.load(*reader, base); break;
+            case 'REFR': {
+                const int prevSize = refrCollection.size();
+                refrCollection.load(*reader, base);
+                if (refrCollection.size() > prevSize && m_lastCellFormId != 0)
+                {
+                    const quint32 rfid = refrCollection.getRecord(refrCollection.size() - 1).get().formId;
+                    m_recordParentCell[rfid] = m_lastCellFormId;
+                }
+                break;
+            }
             case 'MATL': materialCollection.load(*reader, base); break;
             case 'LAND': landCollection.load(*reader, base); break;
             case 'SOUN': sounCollection.load(*reader, base); break;
@@ -1946,15 +1985,19 @@ bool Data::continueLoading(Messages& messages)
             // Record the edited plugin's own load order (masters are only
             // indexed, and materialized records parse with base=true, so
             // neither pollutes it). The save path replays this sequence.
-            if (name != static_cast<NAME>('GRUP') && name != 0 && !base)
+            if (name != static_cast<NAME>('GRUP') && name != 0)
             {
                 const quint32 fid = reader->currentFormId();
-                m_pluginOrder.append({ name, fid });
-                m_childIndexDirty = true;
+                if (!base)
+                {
+                    m_pluginOrder.append({ name, fid });
+                    m_childIndexDirty = true;
+                }
                 // Attribute placed records to the enclosing CELL so the save
-                // path can rebuild the cell-children groups in file order.
+                // path can rebuild the cell-children groups in file order and
+                // the viewport / Cell View can find them.
                 const bool isReference = name == NAME('REFR') || name == NAME('ACHR');
-                if (isReference)
+                if (isReference && m_lastCellFormId != 0)
                     m_recordParentCell[fid] = m_lastCellFormId;
                 else if (m_lastCellFormId != 0 && inCellChildrenGroup(pos))
                     m_recordParentCell[fid] = m_lastCellFormId;

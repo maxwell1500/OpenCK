@@ -222,7 +222,7 @@ private:
     void buildHierarchyTree();
     void populateTreeItem(QTreeWidgetItem* parentItem, Nif::Node* node, const QMatrix4x4& parentTransform);
     void updateNodeMetadata();
-    void drawNodeAxis(const QMatrix4x4& modelView);
+    void drawNodeAxis(const QMatrix4x4& mvp);
 
     QOpenGLWidget* glWidget;
     std::unique_ptr<Nif::NifParser> nifParser;
@@ -315,6 +315,7 @@ private:
     OverlayVBO m_axisVBO_R, m_axisVBO_G, m_axisVBO_B;
     OverlayVBO m_cellGridVBO;
     OverlayVBO m_cellRefVBO;
+    OverlayVBO m_cellRefSolidVBO;
     OverlayVBO m_nodeAxisVBO_R, m_nodeAxisVBO_G, m_nodeAxisVBO_B;
     OverlayVBO m_primitiveVBO;
     OverlayVBO m_marqueeVBO;

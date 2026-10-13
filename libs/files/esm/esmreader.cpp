@@ -220,7 +220,7 @@ void ESMReader::skipGrupHeader()
         mLastGrupType = readType<quint32>(true);    // flags
         return;
     }
-    readType<quint32>(true);    // label
+    mLastGrupLabel = readType<quint32>(true);    // label
     mLastGrupType = readType<quint32>(true);    // group type
     readType<quint8>(true);        // vc day
     readType<quint8>(true);        // vc month
