@@ -469,6 +469,11 @@ void ObjectWindowDialog::setupUI()
         this, &ObjectWindowDialog::loadColumnLayout);
     connect(deleteLayoutButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteColumnLayout);
     refreshColumnLayouts();
+    connect(mTreeView, &QTreeView::expanded, this, [this](const QModelIndex& idx) {
+        if (mModel && mModel->canFetchMore(idx)) {
+            mModel->fetchMore(idx);
+        }
+    });
     connect(mTreeView, &QTreeView::doubleClicked, this, &ObjectWindowDialog::onDoubleClick);
     connect(mTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
         [this](const QModelIndex& current, const QModelIndex&) {
@@ -783,8 +788,25 @@ void ObjectWindowDialog::addRecordInSelectedCategory()
 void ObjectWindowDialog::editSelected()
 {
     QModelIndex index = mTreeView->currentIndex();
-    if (!index.isValid() || !mModel->isRecord(index))
+    if (!index.isValid())
         return;
+
+    if (!mModel->isRecord(index))
+    {
+        if (mTreeView->isExpanded(index))
+        {
+            mTreeView->collapse(index);
+        }
+        else
+        {
+            mTreeView->expand(index);
+            if (mModel && mModel->canFetchMore(index))
+            {
+                mModel->fetchMore(index);
+            }
+        }
+        return;
+    }
 
     int categoryId = mModel->getCategoryIndex(index);
     int recordIndex = mModel->getRecordIndex(index);
@@ -1960,9 +1982,27 @@ void ObjectWindowDialog::cloneSelected()
 
 void ObjectWindowDialog::onDoubleClick(const QModelIndex& index)
 {
-    if (!index.isValid() || mModel->isRecord(index))
+    if (!index.isValid())
+        return;
+
+    if (mModel->isRecord(index))
     {
         editSelected();
+    }
+    else
+    {
+        if (mTreeView->isExpanded(index))
+        {
+            mTreeView->collapse(index);
+        }
+        else
+        {
+            mTreeView->expand(index);
+            if (mModel && mModel->canFetchMore(index))
+            {
+                mModel->fetchMore(index);
+            }
+        }
     }
 }
 

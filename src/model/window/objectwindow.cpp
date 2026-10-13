@@ -2582,6 +2582,37 @@ int ObjectWindowModel::rowCount(const QModelIndex& parent) const
 
     return 0;
 }
+bool ObjectWindowModel::hasChildren(const QModelIndex& parent) const
+{
+    if (!mData)
+        return false;
+
+    if (!parent.isValid())
+        return !mGroups.isEmpty();
+
+    quintptr internal = parent.internalId();
+    if (internal == kGroupInternalId)
+    {
+        int groupRow = parent.row();
+        if (groupRow < 0 || groupRow >= mGroups.size())
+            return false;
+        return !mGroups[groupRow].categoryIndices.isEmpty();
+    }
+
+    if (internal & kRecordBit)
+        return false;
+
+    int groupRow = static_cast<int>((internal >> 16) & 0xFFFF);
+    int categoryRow = parent.row();
+    if (groupRow < 0 || groupRow >= mGroups.size())
+        return false;
+    const auto& group = mGroups[groupRow];
+    if (categoryRow < 0 || categoryRow >= group.categoryIndices.size())
+        return false;
+    int flatId = group.categoryIndices[categoryRow];
+    const auto& cat = mCategories[flatId];
+    return !cat.visibleRecords.isEmpty() || cat.pendingMaterialize || cat.totalRecords > 0;
+}
 
 int ObjectWindowModel::columnCount(const QModelIndex& /*parent*/) const
 {
@@ -2669,7 +2700,8 @@ void ObjectWindowModel::appendMaterializedRows(int groupRow, int categoryRow, in
     if (added.isEmpty())
         return;
 
-    beginInsertRows(parent, firstNew, firstNew + added.size() - 1);
+    const int startRow = cat.visibleRecords.size();
+    beginInsertRows(parent, startRow, startRow + added.size() - 1);
     cat.visibleRecords.append(added);
     endInsertRows();
 }
@@ -2702,6 +2734,7 @@ void ObjectWindowModel::materializeTick()
         mMaterializeTimer.stop();
         Category& cat = mCategories[mJob.flatId];
         cat.pendingMaterialize = false;
+        cat.parsedCount = cat.totalRecords;
         mJob.active = false;
         if (parentIdx.isValid())
             emit dataChanged(parentIdx, parentIdx);
@@ -2760,7 +2793,10 @@ void ObjectWindowModel::fetchMore(const QModelIndex& parent)
     else
     {
         cat.pendingMaterialize = false;
+        cat.parsedCount = cat.totalRecords;
         mJob.active = false;
+        if (parent.isValid())
+            emit dataChanged(parent, parent);
     }
 }
 

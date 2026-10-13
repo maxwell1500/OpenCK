@@ -31,6 +31,7 @@ public:
     // Deferred-master categories (indexed but not yet parsed) report their
     // records through canFetchMore/fetchMore: expanding the category
     // materializes the record type from the master index.
+    bool hasChildren(const QModelIndex& parent = QModelIndex()) const override;
     bool canFetchMore(const QModelIndex& parent) const override;
     void fetchMore(const QModelIndex& parent) override;
 
