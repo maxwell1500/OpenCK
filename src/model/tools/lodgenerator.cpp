@@ -541,8 +541,7 @@ LodGenerator::LodResult LodGenerator::generateLodLevels(Nif::NifParser& nif, con
             Nif::NifParser lodNif;
             Nif::Node* lodRoot = new Nif::Node();
             lodRoot->name = root->name;
-            lodRoot->position = root->position;
-            lodRoot->rotation = root->rotation;
+            lodRoot->transform = root->transform;
             lodNif.setRoot(lodRoot);
 
             for (const auto& origShape : originalShapes)

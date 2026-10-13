@@ -484,6 +484,16 @@ static void generateBoundingCollisionShapes(Node* root) {
     root->collisionShapes.append(cs);
 }
 
+// Carries a NifAVObject's local TRS onto a flat Node/TriShape. The rotation is
+// a 3x3 row-major matrix, not Euler angles, so it is copied rather than
+// converted.
+static void copyAvTransform(const NifAVObject& av, NodeTransform& out)
+{
+    out.position = Vector3{av.localTranslation.x, av.localTranslation.y, av.localTranslation.z};
+    out.setRotationFromRows(av.rotationMatrix);
+    out.scale = av.localScale;
+}
+
 static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* nifRootNode,
                             Node* ourRoot, QMap<quint32, Node*>* refToNodeOut = nullptr)
 {
@@ -505,6 +515,7 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
                 if (nifAvObj) {
                     Node* childNode = new Node();
                     childNode->name = nifAvObj->name;
+                    copyAvTransform(*nifAvObj, childNode->transform);
                     ourRoot->children.append(childNode);
                     refToNode[nifAvObj->dataRef] = childNode;
                     stack.push(std::make_pair(nifAvObj, childNode));
@@ -528,6 +539,17 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
             if (shapeData && !shapeData->vertices.isEmpty()) {
                 TriShape shape;
                 shape.name = avObj->name;
+                copyAvTransform(*triShape, shape.transform);
+
+                // The BSGeometry's shader ref points at the 12-byte shell
+                // that names this shape's .mat file, which is the entry
+                // point to the real textures. It is NOT a texture path.
+                if (triShape->refShader != 0xFFFFFFFFu) {
+                    auto* mat = dynamic_cast<NifMaterialRef*>(
+                        blocks.value(triShape->refShader));
+                    if (mat)
+                        shape.materialPath = mat->materialPath;
+                }
 
                 // Extract vertices, UVs, normals, vertex colors
                 for (int i = 0; i < shapeData->vertices.size(); ++i) {
@@ -695,6 +717,7 @@ static void extractGeometry(const QMap<quint32, NifObject*>& blocks, NifNode* ni
             if (childAvObj) {
                 Node* childNode = new Node();
                 childNode->name = childAvObj->name;
+                copyAvTransform(*childAvObj, childNode->transform);
 
                 // Check for LOD node
                 auto lodNode = dynamic_cast<NifLODNode*>(childObj);
@@ -1207,7 +1230,9 @@ static bool parseHeaderVariant(QFile& file, Header& h, bool hasUnknownInt)
 // NiObjectNET + NiAVObject prefix shared by NiNode/BSGeometry at BS172:
 // name index, extra-data list, controller, flags, TRS, collision ref.
 // Advances the reader past the prefix; name/flags out.
-bool parseAvPrefix(Reader& r, const Header& h, QString& nameOut, quint32& flagsOut)
+bool parseAvPrefix(Reader& r, const Header& h, QString& nameOut, quint32& flagsOut,
+                   NiPoint3* translationOut = nullptr, float rotRowsOut[3][3] = nullptr,
+                   float* scaleOut = nullptr)
 {
     // A name is a sized string below 20.1.0.1 and a header-string-table index
     // from there on. Only the version can tell them apart: in a file that does
@@ -1242,7 +1267,24 @@ bool parseAvPrefix(Reader& r, const Header& h, QString& nameOut, quint32& flagsO
     } else {
         return false;
     }
-    r.skip(12 + 36 + 4);           // translation, rotation (Matrix33), scale
+    // TRS. Translation is vanilla; the rotation is a 3x3 row-major matrix
+    // (nine floats, not Euler angles); scale is a single uniform float. All
+    // are optional so the geometry-only callers below stay unchanged.
+    if (translationOut)
+        *translationOut = NiPoint3{r.f32(), r.f32(), r.f32()};
+    else
+        r.skip(12);
+    if (rotRowsOut) {
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
+                rotRowsOut[row][col] = r.f32();
+    } else {
+        r.skip(36);
+    }
+    if (scaleOut)
+        *scaleOut = r.f32();
+    else
+        r.skip(4);
     if (h.version <= 67240448u) r.skip(12);          // velocity
     if (h.bsVersion <= 34) {                         // properties
         const quint32 n = r.u32();
@@ -1263,13 +1305,24 @@ NifNode* parseNode(QFile& file, const Header& h, quint32 index, qint64& consumed
 
     QString name;
     quint32 flags = 0;
-    if (!parseAvPrefix(r, h, name, flags)) return nullptr;
+    NiPoint3 translation{0.0f, 0.0f, 0.0f};
+    float rotRows[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
+    float nodeScale = 1.0f;
+    if (!parseAvPrefix(r, h, name, flags, &translation, rotRows, &nodeScale))
+        return nullptr;
     const quint32 numChildren = r.u32();
     if (!r.ok || numChildren > 100000) return nullptr;
     NifNode* node = new NifNode();
     node->className = QStringLiteral("NiNode");
     node->dataRef = index;
     node->name = name;
+    // The NifNode block carries the transform so the extractor can pull it
+    // out later without re-reading the file.
+    node->localTranslation = translation;
+    node->localScale = nodeScale;
+    for (int row = 0; row < 3; ++row)
+        for (int col = 0; col < 3; ++col)
+            node->rotationMatrix[row][col] = rotRows[row][col];
     for (quint32 i = 0; i < numChildren; ++i) {
         const qint32 ref = r.i32();
         if (!r.ok) { delete node; return nullptr; }
@@ -1307,18 +1360,40 @@ NifTriShape* parseGeometry(QFile& file, const Header& h, quint32 index,
 
     QString name;
     quint32 flags = 0;
-    if (!parseAvPrefix(r, h, name, flags)) return nullptr;
+    NiPoint3 translation{0.0f, 0.0f, 0.0f};
+    float rotRows[3][3] = {{1,0,0},{0,1,0},{0,0,1}};
+    float nodeScale = 1.0f;
+    if (!parseAvPrefix(r, h, name, flags, &translation, rotRows, &nodeScale))
+        return nullptr;
     r.skip(16);                    // bounding sphere
     r.skip(24);                    // bounding box
-    for (int i = 0; i < 3; ++i) {
-        const qint32 ref = r.i32();  // skin, shader, alpha
-        if (!r.ok || ref < -1 || ref >= static_cast<qint32>(h.numBlocks)) return nullptr;
+    // skin, shader, alpha - the shader ref is the material link: the block it
+    // points at carries the .mat path, so without it no shape can ever be
+    // textured.
+    quint32 refSkin = 0xFFFFFFFFu, refShader = 0xFFFFFFFFu, refAlpha = 0xFFFFFFFFu;
+    {
+        const qint32 refs[3] = {r.i32(), r.i32(), r.i32()};
+        if (!r.ok || refs[0] < -1 || refs[1] < -1 || refs[2] < -1) return nullptr;
+        if (refs[0] >= static_cast<qint32>(h.numBlocks)
+            || refs[1] >= static_cast<qint32>(h.numBlocks)
+            || refs[2] >= static_cast<qint32>(h.numBlocks)) return nullptr;
+        refSkin = static_cast<quint32>(refs[0]);
+        refShader = static_cast<quint32>(refs[1]);
+        refAlpha = static_cast<quint32>(refs[2]);
     }
     NifTriShape* shape = new NifTriShape();
     shape->className = QStringLiteral("BSGeometry");
     shape->dataRef = index;
     shape->name = name;
     shape->refGeometryData = 0xFFFFFFFFu;   // no local data block
+    shape->refSkin = refSkin;
+    shape->refShader = refShader;
+    shape->refAlpha = refAlpha;
+    shape->localTranslation = translation;
+    shape->localScale = nodeScale;
+    for (int row = 0; row < 3; ++row)
+        for (int col = 0; col < 3; ++col)
+            shape->rotationMatrix[row][col] = rotRows[row][col];
     for (int slot = 0; slot < 4; ++slot) {
         if (r.u8() == 0) continue;          // empty slot
         if (!r.ok) { delete shape; return nullptr; }
@@ -1366,6 +1441,30 @@ NifSkinAttach* parseSkinAttach(QFile& file, const Header& h, quint32 index, qint
     if (!r.ok) { delete attach; return nullptr; }
     consumed = file.pos() - start;
     return attach;
+}
+
+// Starfield BSLightingShaderProperty is a 12-byte shell: a u32 index into
+// the header string table naming the .mat file, two reserved fields.
+// (Verified on the base-game NIF: one shader per BSGeometry, 1:1.)
+NifMaterialRef* parseLightingShader(QFile& file, const Header& h, quint32 index, qint64& consumed)
+{
+    QDataStream s(&file);
+    s.setByteOrder(QDataStream::LittleEndian);
+    Reader r{ s, file.size() };
+    if (!file.seek(h.offsets[index])) return nullptr;
+    const qint64 start = file.pos();
+
+    const quint32 stringIndex = r.u32();
+    r.skip(8);                     // reserved (guessed to be 0)
+    if (!r.ok) return nullptr;
+
+    auto* mat = new NifMaterialRef();
+    mat->className = QStringLiteral("BSLightingShaderProperty");
+    mat->dataRef = index;
+    if (stringIndex < static_cast<quint32>(h.strings.size()))
+        mat->materialPath = h.strings.at(stringIndex);
+    consumed = file.pos() - start;
+    return mat;
 }
 
 NifBSSkinInstance* parseSkinInstance(QFile& file, const Header& h, quint32 index, qint64& consumed)
@@ -1987,6 +2086,11 @@ static bool loadRealNifGamebryo(NifParser& parser, const QString& fileName)
         } else if (type == QLatin1String("SkinAttach")) {
             qint64 consumed = 0;
             obj = Gamebryo::parseSkinAttach(file, header, i, consumed);
+            if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
+                { delete obj; obj = new NifObject(); }
+        } else if (type == QLatin1String("BSLightingShaderProperty")) {
+            qint64 consumed = 0;
+            obj = Gamebryo::parseLightingShader(file, header, i, consumed);
             if (!obj || consumed != static_cast<qint64>(header.blockSize[i]))
                 { delete obj; obj = new NifObject(); }
         } else {

@@ -7,6 +7,7 @@
 #include <QMap>
 #include <QByteArray>
 #include <QHash>
+#include <QtGui/QMatrix4x4>
 
 #include <memory>
 
@@ -99,8 +100,42 @@ struct SkinBone {
     Node* boneNode = nullptr;  // resolved scene node, null until linked
 };
 
+// Local TRS as NIF stores it on every NiAVObject: a 3x3 row-major rotation
+// matrix, a translation, and a uniform scale. Euler angles would lose every
+// orientation the shipped meshes use that is not axis-aligned.
+struct NodeTransform {
+    QMatrix3x3 rotation{};
+    Vector3 position = {0, 0, 0};
+    float scale = 1.0f;
+
+    void setRotationFromRows(const float m[3][3])
+    {
+        rotation.setToIdentity();
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
+                rotation(row, col) = m[row][col];
+    }
+
+    // Composition order: scale, then rotate, then translate.
+    QMatrix4x4 localMatrix() const
+    {
+        const float* r = rotation.constData();
+        QMatrix4x4 m(r[0], r[1], r[2], 0.0f,
+                     r[3], r[4], r[5], 0.0f,
+                     r[6], r[7], r[8], 0.0f,
+                     0.0f, 0.0f, 0.0f, 1.0f);
+        m.translate(position.x, position.y, position.z);
+        if (scale != 1.0f)
+            m.scale(scale, scale, scale);
+        return m;
+    }
+};
+
 struct TriShape {
     QString name;
+    // A Bethesda BSGeometry shell carries its own TRS; without it every mesh
+    // shell collapses onto its parent node's origin.
+    NodeTransform transform;
     QVector<Vector3> vertices;
     QVector<Vector2> uvs;
     QVector<Vector3> normals;
@@ -109,6 +144,11 @@ struct TriShape {
 
     QVector<SkinBone> skinBones;
     QVector<SkinVertexWeight> skinWeights;
+
+    // Starfield: the .mat file this shape's BSLightingShaderProperty names.
+    // The material graph behind it decides the visible textures, so this is
+    // the entry point for texturing, not a texture path itself.
+    QString materialPath;
 
     bool isSkinned() const { return !skinBones.isEmpty() && !skinWeights.isEmpty(); }
 
@@ -163,15 +203,14 @@ struct NifParticleSystemSettings {
 };
 
 struct Node {
+    NodeTransform transform;
+
     QString name;
     QVector<Node*> children;
     QVector<TriShape> shapes;
     QVector<CollisionShape> collisionShapes;
     QVector<NifParticleSystemSettings> particleSystems;
-    Vector3 position = {0, 0, 0};
-    Vector3 rotation = {0, 0, 0};
 
-    // Animation data
     QVector<NiKeyframeController> animations;
     bool hasAnimation = false;
 

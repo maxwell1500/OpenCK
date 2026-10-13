@@ -202,7 +202,7 @@ TerrainLodGenerator::TerrainLodResult TerrainLodGenerator::generateTerrainMesh(
     Nif::NifParser nif;
     Nif::Node* root = new Nif::Node();
     root->name = QString("Terrain_%1_%2").arg(land.cellX).arg(land.cellY);
-    root->position = {0.0f, 0.0f, 0.0f};
+    root->transform.position = {0.0f, 0.0f, 0.0f};
     nif.setRoot(root);
 
     Nif::TriShape terrainShape;
@@ -303,8 +303,17 @@ TerrainLodGenerator::TerrainLodResult TerrainLodGenerator::generateWorldLod(
         Nif::NifParser refNif;
         Nif::Node* refRoot = new Nif::Node();
         refRoot->name = QString("REFR_%1").arg(refr.formId, 0, 16);
-        refRoot->position = {refr.posX, refr.posY, refr.posZ};
-        refRoot->rotation = {refr.rotX, refr.rotY, refr.rotZ};
+        refRoot->transform.position = {refr.posX, refr.posY, refr.posZ};
+        // REFR rotations are stored as Euler radians; the pipeline reads a
+        // matrix, so build it in YXZ order to match the previous cube-applied
+        // sequence (z, then y, then x).
+        QMatrix4x4 euler;
+        euler.rotate(refr.rotZ * 180.0f / 3.14159265f, 0.0f, 0.0f, 1.0f);
+        euler.rotate(refr.rotY * 180.0f / 3.14159265f, 0.0f, 1.0f, 0.0f);
+        euler.rotate(refr.rotX * 180.0f / 3.14159265f, 1.0f, 0.0f, 0.0f);
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 3; ++col)
+                refRoot->transform.rotation(row, col) = euler(row, col);
         refNif.setRoot(refRoot);
 
         Nif::TriShape refShape;

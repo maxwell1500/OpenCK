@@ -260,8 +260,8 @@ bool TreeLodGenerator::createBillboardNif(const QString& treeNifPath,
     Nif::NifParser parser;
     Nif::Node* root = new Nif::Node();
     root->name = "BillboardRoot";
-    root->position = {0, 0, 0};
-    root->rotation = {0, 0, 0};
+    root->transform.position = {0, 0, 0};
+    root->transform.rotation.setToIdentity();
     root->isBillboardNode = true;
 
     Nif::TriShape quad;

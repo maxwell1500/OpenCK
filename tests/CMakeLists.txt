@@ -428,6 +428,13 @@ add_executable(nifwalkdump ../tools/nifwalkdump.cpp)
 target_link_libraries(nifwalkdump PRIVATE openck_files Qt6::Core)
 target_include_directories(nifwalkdump PRIVATE ${TEST_INCLUDE_DIRS})
 
+# Reports what NifParser loads for a NIF (nodes, shapes, vertices, triangles,
+# and whether any node transform is non-identity). A diagnostic, not a test:
+# the input is a .nif on disk and the useful output is the counts.
+add_executable(nifgeomprobe ../tools/nifgeomprobe.cpp)
+target_link_libraries(nifgeomprobe PRIVATE openck_files Qt6::Core)
+target_include_directories(nifgeomprobe PRIVATE ${TEST_INCLUDE_DIRS})
+
 # BTDX v2 GNRL writer round-trip (create -> open/extract).
 add_executable(test_ba2write test_ba2write.cpp)
 target_link_libraries(test_ba2write PRIVATE openck_model test_stubs Qt6::Test)
@@ -1152,6 +1159,7 @@ get_property(OPENCK_CTEST_TARGETS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY
 set(OPENCK_STANDALONE_TOOLS
     make_testplugin
     nifwalkdump
+    nifgeomprobe
     test_fullscale_roundtrip
     test_meshresolve
     test_subrecord_diff)

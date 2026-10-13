@@ -74,6 +74,16 @@ public:
     QList<quint32> children;
     QList<quint32> controllers;
 
+    // Local TRS as NIF stores on every NiAVObject: a 3x3 row-major
+    // rotation matrix, a translation, and a uniform scale. The Gamebryo
+    // reader fills these; without them every node is forced to identity
+    // and multi-part meshes collapse onto their parent's origin.
+    float rotationMatrix[3][3] = {{1.0f, 0.0f, 0.0f},
+                                  {0.0f, 1.0f, 0.0f},
+                                  {0.0f, 0.0f, 1.0f}};
+    NiPoint3 localTranslation{0.0f, 0.0f, 0.0f};
+    float localScale = 1.0f;
+
     void parse(QIODevice& device, quint32 version, const QByteArray& fileHeader) override;
     void write(QIODevice& device, quint32 version) const override;
     void parseChildren(QIODevice& device, quint32 version);
@@ -125,6 +135,11 @@ public:
     bool hasUVs = true;
     bool hasTangents = true;
     bool hasVertexColors = false;
+    // Skin/shader/alpha block refs recorded by the Gamebryo reader. The
+    // shader ref names this shape's .mat file.
+    quint32 refSkin = 0xFFFFFFFFu;
+    quint32 refShader = 0xFFFFFFFFu;
+    quint32 refAlpha = 0xFFFFFFFFu;
     // External .mesh streams referenced by Starfield BSGeometry slots
     // (meshes live in BA2s). Filled by the Gamebryo reader; resolved to
     // vertex data by Nif::MeshArchiveResolver.
@@ -323,6 +338,16 @@ public:
         float scale = 1.0f;     // ~1.0 in all samples
     };
     QVector<Bone> bones;
+};
+
+// Starfield BSLightingShaderProperty is a 12-byte shell whose only live field
+// is an index into the header string table naming a .mat file. The material
+// graph behind that file decides the visible textures, so a shape without one
+// of these can never be textured. This is the Gamebryo-era reading;
+// NifBSLightingShaderProperty (below) is the flat record older streams carry.
+class NifMaterialRef : public NifObject {
+public:
+    QString materialPath;
 };
 
 class NifSkinAttach : public NifObject {

@@ -256,14 +256,7 @@ static void extractNodeGeometry(Nif::Node* node, const QMatrix4x4& parentTransfo
 {
     if (!node) return;
 
-    QMatrix4x4 localTransform;
-    localTransform.translate(node->position.x, node->position.y, node->position.z);
-    float rx = node->rotation.x * 180.0f / 3.14159265f;
-    float ry = node->rotation.y * 180.0f / 3.14159265f;
-    float rz = node->rotation.z * 180.0f / 3.14159265f;
-    localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
-    localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
-    localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+    QMatrix4x4 localTransform = node->transform.localMatrix();
 
     QMatrix4x4 cumulativeTransform = parentTransform * localTransform;
 
@@ -276,13 +269,18 @@ static void extractNodeGeometry(Nif::Node* node, const QMatrix4x4& parentTransfo
             shape.recalculateNormals();
         }
 
+        // Shape-local TRS on top of the node chain. Positions use `map()`
+        // (translation matters) and normals use `mapVector()` (it does not).
+        const QMatrix4x4 shapeTransform =
+            cumulativeTransform * shape.transform.localMatrix();
+
         for (int vi = 0; vi < shape.vertices.size(); ++vi) {
             const auto& v = shape.vertices[vi];
-            model.vertices.append(cumulativeTransform.map(QVector3D(v.x, v.y, v.z)));
+            model.vertices.append(shapeTransform.map(QVector3D(v.x, v.y, v.z)));
 
             if (vi < shape.normals.size()) {
                 const auto& n = shape.normals[vi];
-                model.normals.append(cumulativeTransform.mapVector(QVector3D(n.x, n.y, n.z)).normalized());
+                model.normals.append(shapeTransform.mapVector(QVector3D(n.x, n.y, n.z)).normalized());
             } else {
                 model.normals.append(QVector3D(0.0f, 1.0f, 0.0f));
             }
@@ -1681,14 +1679,7 @@ void NifViewportWidget::buildMeshFromNode(Nif::Node* node, const QMatrix4x4& par
         return;
     }
 
-    QMatrix4x4 localTransform;
-    localTransform.translate(node->position.x, node->position.y, node->position.z);
-    float rx = node->rotation.x * 180.0f / 3.14159265f;
-    float ry = node->rotation.y * 180.0f / 3.14159265f;
-    float rz = node->rotation.z * 180.0f / 3.14159265f;
-    localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
-    localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
-    localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+    QMatrix4x4 localTransform = node->transform.localMatrix();
 
     QMatrix4x4 cumulativeTransform = parentTransform * localTransform;
     nodeCumulativeTransforms[node] = cumulativeTransform;
@@ -1702,12 +1693,16 @@ void NifViewportWidget::buildMeshFromNode(Nif::Node* node, const QMatrix4x4& par
             shape.recalculateNormals();
         }
 
+        QMatrix4x4 shapeTransform = cumulativeTransform * shape.transform.localMatrix();
+
         for (int vi = 0; vi < shape.vertices.size(); ++vi) {
             const auto& vertex = shape.vertices[vi];
-            vertices.append(QVector3D(vertex.x, vertex.y, vertex.z));
+            vertices.append(shapeTransform.map(QVector3D(vertex.x, vertex.y, vertex.z)));
 
             if (vi < shape.normals.size()) {
-                normals.append(QVector3D(shape.normals[vi].x, shape.normals[vi].y, shape.normals[vi].z));
+                const auto& n = shape.normals[vi];
+                normals.append(shapeTransform.mapVector(
+                    QVector3D(n.x, n.y, n.z)).normalized());
             } else {
                 normals.append(QVector3D(0.0f, 1.0f, 0.0f));
             }
@@ -3728,14 +3723,7 @@ void NifViewportWidget::populateTreeItem(QTreeWidgetItem* parentItem, Nif::Node*
 {
     if (!node) return;
 
-    QMatrix4x4 localTransform;
-    localTransform.translate(node->position.x, node->position.y, node->position.z);
-    float rx = node->rotation.x * 180.0f / 3.14159265f;
-    float ry = node->rotation.y * 180.0f / 3.14159265f;
-    float rz = node->rotation.z * 180.0f / 3.14159265f;
-    localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
-    localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
-    localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+    QMatrix4x4 localTransform = node->transform.localMatrix();
 
     QMatrix4x4 cumulativeTransform = parentTransform * localTransform;
     nodeCumulativeTransforms[node] = cumulativeTransform;
@@ -3771,7 +3759,7 @@ void NifViewportWidget::updateNodeMetadata()
 
     int shapeCount = selectedNode->shapes.size();
     int childCount = selectedNode->children.size();
-    Nif::Vector3 pos = selectedNode->position;
+    const Nif::Vector3 pos = selectedNode->transform.position;
 
     QString info = QString("Name: %1\nShapes: %2\nPosition: (%3, %4, %5)\nChildren: %6")
         .arg(selectedNode->name.isEmpty() ? tr("<unnamed>") : selectedNode->name)
@@ -4159,14 +4147,7 @@ void NifViewportWidget::applyAnimationFrame()
         [&](Nif::Node* node, const QMatrix4x4& parentTransform) {
         if (!node) return;
 
-        QMatrix4x4 localTransform;
-        localTransform.translate(node->position.x, node->position.y, node->position.z);
-        float rx = node->rotation.x * 180.0f / 3.14159265f;
-        float ry = node->rotation.y * 180.0f / 3.14159265f;
-        float rz = node->rotation.z * 180.0f / 3.14159265f;
-        localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
-        localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
-        localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+        QMatrix4x4 localTransform = node->transform.localMatrix();
 
         if (frameMap.contains(node->name)) {
             const TransformKeyframe& f = frameMap[node->name];
