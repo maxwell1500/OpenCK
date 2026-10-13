@@ -366,9 +366,6 @@ void ESMReader::decompressCurrentRecord(int compressedSize)
     m_inDecomp = true;
     esm.inCompressedBuffer = true;
 
-    LOG_DEBUG(QString("ESMReader: decompressed record: %1 bytes -> %2 bytes")
-        .arg(compressedSize)
-        .arg(m_decompData.size()));
 }
 
 void ESMReader::restoreStreamFromCompression()

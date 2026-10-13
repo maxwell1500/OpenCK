@@ -1644,9 +1644,6 @@ bool Data::continueLoading(Messages& messages)
         {
             // Peek the next 4 bytes to detect compression before reading
             quint32 firstBytes = reader->peekType<quint32>();
-            LOG_DEBUG(QString("continueLoading: filePos=0x%1 peek=0x%2")
-                .arg(pos, 0, 16)
-                .arg(firstBytes, 8, 16, QChar('0')));
             name = reader->readName();
             reader->setCurrentRecordName(name);
 
@@ -1655,11 +1652,6 @@ bool Data::continueLoading(Messages& messages)
             while (!m_grupStack.isEmpty() && m_grupStack.last().end <= pos)
                 m_grupStack.removeLast();
 
-            LOG_DEBUG(QString("Loading record type: %1%2%3%4")
-                .arg(QChar(static_cast<char>((name >> 24) & 0xFF)))
-                .arg(QChar(static_cast<char>((name >> 16) & 0xFF)))
-                .arg(QChar(static_cast<char>((name >> 8) & 0xFF)))
-                .arg(QChar(static_cast<char>(name & 0xFF))));
 
             if (m_currentGame == GameFormat::Game::Morrowind)
             {

@@ -3786,9 +3786,7 @@ QString MainWindow::resolveNifFilePath(const QString& relPath) const
 
     const QString candidate2 = dataDir + "/" + norm;
     if (QFileInfo::exists(candidate2)) return candidate2;
-
-    AssetResolver resolver(dataDir);
-    return resolver.absoluteLoosePath(relPath, dataDir);
+    return QString();
 }
 
 void MainWindow::loadCellIntoViewport(quint32 cellFormId)
