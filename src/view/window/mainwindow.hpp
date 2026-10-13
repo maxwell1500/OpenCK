@@ -64,7 +64,10 @@ public:
     void hideProgress();
     void dropViewportSelectionToGround();
     void duplicateViewportSelection();
-
+    void deleteViewportSelection();
+    void loadCellIntoViewport(quint32 cellFormId);
+    void editReferenceByDataIndex(int dataIndex);
+    void onObjectDroppedIntoCell(quint32 baseFormId, const QString& baseEditorId, const QVector3D& worldPos);
 signals:
     void actionData_triggered();
     void actionSave_triggered();
@@ -184,9 +187,8 @@ private:
     void saveUiState();
     void restoreUiState();
 
-    void loadCellIntoViewport(quint32 cellFormId);
     QString resolveNifFilePath(const QString& relPath) const;
-
+    quint32 mLoadedCellFormId = 0;
     Ui::mainwindow *ui;
     Data* mData;
     Document* mDocument = nullptr;

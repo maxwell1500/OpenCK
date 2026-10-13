@@ -31,6 +31,8 @@
 #include "conflictdialog.hpp"
 #include "nifviewportwidget.hpp"
 #include "gamepadnavigator.hpp"
+#include "recordeditsession.hpp"
+#include "qtformdialogmanager.hpp"
 #include <QTimer>
 #include <QProgressDialog>
 #include <QThread>
@@ -403,6 +405,21 @@ void MainWindow::setData(Data* data)
             // Duplicate (Ctrl+D): clone each selected reference in place.
             connect(nifViewportWidget, &NifViewportWidget::duplicateSelectionRequested,
                     this, &MainWindow::duplicateViewportSelection);
+
+            // Delete (Del): remove each selected reference.
+            connect(nifViewportWidget, &NifViewportWidget::deleteSelectionRequested,
+                    this, &MainWindow::deleteViewportSelection);
+
+            // Double click reference: open reference properties dialog.
+            connect(nifViewportWidget, &NifViewportWidget::refDoubleClicked,
+                    this, [this](quint32 baseFormId, int dataIndex) {
+                Q_UNUSED(baseFormId);
+                editReferenceByDataIndex(dataIndex);
+            });
+
+            // Drag and drop from Object Window into 3D viewport.
+            connect(nifViewportWidget, &NifViewportWidget::objectDroppedIntoCell,
+                    this, &MainWindow::onObjectDroppedIntoCell);
         }
         
         // Create Object Window dock widget
@@ -514,8 +531,8 @@ void MainWindow::setData(Data* data)
                     mStatusSelectedObject->setText(QStringLiteral("%1: %2")
                         .arg(lookup.recordType, eid));
 
-                // Preview selected object in the 3D Render Viewport
-                if (nifViewportWidget)
+                // Preview selected object in the 3D Render Viewport ONLY if no cell is currently loaded
+                if (nifViewportWidget && mLoadedCellFormId == 0)
                 {
                     nifViewportWidget->setCellReferences({});
                     QString modelPath = objectWindowDock->getModelPathForRecord(cat, rec);
@@ -3747,23 +3764,29 @@ void MainWindow::duplicateViewportSelection()
     if (anyAdded && mUndoStack)
     {
         mUndoStack->push(macro);
-        // Refresh viewport references
-        QVector<ViewportCellRef> refs;
-        for (int i = 0; i < coll.size(); ++i)
+        if (mLoadedCellFormId != 0)
         {
-            const auto& rec = coll.getRecord(i).get();
-            if (coll.getRecord(i).isDeleted()) continue;
-            ViewportCellRef r;
-            r.position = QVector3D(rec.posX, rec.posY, rec.posZ);
-            r.enabled = !rec.initiallyDisabled;
-            r.dataIndex = i;
-            r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
-            r.scale = rec.scale;
-            r.baseFormId = rec.baseId;
-            r.modelPath = mData->getModelPathForFormId(rec.baseId);
-            refs.append(r);
+            loadCellIntoViewport(mLoadedCellFormId);
         }
-        nifViewportWidget->setCellReferences(refs);
+        else
+        {
+            QVector<ViewportCellRef> refs;
+            for (int i = 0; i < coll.size(); ++i)
+            {
+                const auto& rec = coll.getRecord(i).get();
+                if (coll.getRecord(i).isDeleted()) continue;
+                ViewportCellRef r;
+                r.position = QVector3D(rec.posX, rec.posY, rec.posZ);
+                r.enabled = !rec.initiallyDisabled;
+                r.dataIndex = i;
+                r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
+                r.scale = rec.scale;
+                r.baseFormId = rec.baseId;
+                r.modelPath = mData->getModelPathForFormId(rec.baseId);
+                refs.append(r);
+            }
+            nifViewportWidget->setCellReferences(refs);
+        }
         updateStatus(tr("Duplicated %1 object(s)").arg(indices.size()));
     }
     else
@@ -3781,6 +3804,7 @@ QString MainWindow::resolveNifFilePath(const QString& relPath) const
 
 void MainWindow::loadCellIntoViewport(quint32 cellFormId)
 {
+    mLoadedCellFormId = cellFormId;
     if (!mData || !nifViewportWidget) return;
     nifViewportWidget->setDataDir(mData->getPaths().dataDir.absolutePath());
     QVector<ViewportCellRef> cellRefs;
@@ -3847,4 +3871,113 @@ void MainWindow::loadCellIntoViewport(quint32 cellFormId)
     }
     updateStatus(tr("Cell 0x%1: loaded %2 reference(s)")
         .arg(cellFormId, 8, 16, QChar('0')).arg(cellRefs.size()));
+}
+
+void MainWindow::deleteViewportSelection()
+{
+    if (!mData || !nifViewportWidget) return;
+    QVector<int> indices = nifViewportWidget->selectedRefIndices();
+    if (indices.isEmpty() && nifViewportWidget->selectedRefIndex() >= 0)
+        indices.append(nifViewportWidget->selectedRefIndex());
+    if (indices.isEmpty()) return;
+
+    auto& coll = mData->getRefrCollection();
+    QStringList editorIds;
+    for (int idx : indices) {
+        if (idx >= 0 && idx < coll.size()) {
+            editorIds.append(coll.getRecord(idx).get().editorId);
+        }
+    }
+    if (editorIds.isEmpty()) return;
+
+    for (const QString& eid : editorIds) {
+        coll.removeRecordWithUndo(eid, mUndoStack);
+    }
+
+    nifViewportWidget->clearSelection();
+    if (mLoadedCellFormId != 0) {
+        loadCellIntoViewport(mLoadedCellFormId);
+    }
+    updateStatus(tr("Deleted %1 reference(s)").arg(editorIds.size()));
+}
+
+void MainWindow::editReferenceByDataIndex(int dataIndex)
+{
+    if (!mData || dataIndex < 0) return;
+    auto& refrs = mData->getRefrCollection();
+    if (dataIndex >= refrs.size()) return;
+    const auto& ref = refrs.getRecord(dataIndex).get();
+
+    auto session = std::make_unique<openck::TypedRecordEditSession<RefrRecord>>(
+        &refrs, dataIndex, mData->getUndoStack(), QStringLiteral("Edit Placed Reference"));
+    openck::QtFormDialogManager::instance().openOrFocus(
+        QStringLiteral("0x%1").arg(ref.formId, 8, 16, QChar('0')),
+        QStringLiteral("REFR"),
+        std::move(session),
+        this,
+        mData);
+}
+
+void MainWindow::onObjectDroppedIntoCell(quint32 baseFormId, const QString& baseEditorId, const QVector3D& worldPos)
+{
+    if (!mData || !nifViewportWidget) return;
+    if (mLoadedCellFormId == 0) {
+        const auto& cells = mData->getCellCollection();
+        if (cells.size() > 0) {
+            mLoadedCellFormId = cells.getRecord(0).get().formId;
+        } else {
+            updateStatus(tr("Cannot drop object: No cell is currently loaded. Open a cell in Cell View first."));
+            return;
+        }
+    }
+
+    auto& coll = mData->getRefrCollection();
+    auto* table = qobject_cast<IdTable*>(mData->getTableModel(CkId::Type_Refr_));
+
+    quint32 newFormId = 0;
+    try {
+        newFormId = mData->createNewRecord(CkId::Type_Refr_, QString());
+    } catch (...) {
+        return;
+    }
+    if (newFormId == 0) return;
+
+    RefrRecord newRef;
+    newRef.blank();
+    newRef.formId = newFormId;
+    newRef.editorId = QStringLiteral("REFR_%1").arg(newFormId, 8, 16, QChar('0')).toUpper();
+    newRef.baseId = baseFormId;
+    newRef.posX = worldPos.x();
+    newRef.posY = worldPos.y();
+    newRef.posZ = worldPos.z();
+    newRef.rotX = 0.0f;
+    newRef.rotY = 0.0f;
+    newRef.rotZ = 0.0f;
+    newRef.scale = 1.0f;
+    newRef.initiallyDisabled = false;
+
+    const int appendIdx = coll.getAppendIndex(newRef.editorId, CkId::Type_Refr_);
+    Record<RefrRecord> rec(State_ModifiedOnly, nullptr, &newRef);
+
+    if (table && mUndoStack) {
+        auto* cmd = new AddRecordCommand(table, &coll, appendIdx, rec,
+            QStringLiteral("Place %1 in Cell").arg(baseEditorId.isEmpty() ? QStringLiteral("Object") : baseEditorId));
+        mUndoStack->push(cmd);
+    } else {
+        coll.insertRecord(rec, appendIdx, CkId::Type_Refr_);
+    }
+
+    mData->setRefrParentCell(newFormId, mLoadedCellFormId);
+
+    loadCellIntoViewport(mLoadedCellFormId);
+    int newIdx = coll.searchId(newRef.editorId);
+    if (newIdx >= 0) {
+        nifViewportWidget->setSelectedRefByDataIndex(newIdx);
+    }
+    updateStatus(tr("Placed %1 (0x%2) in cell at (%3, %4, %5)")
+        .arg(baseEditorId.isEmpty() ? QStringLiteral("Object") : baseEditorId)
+        .arg(newFormId, 8, 16, QChar('0'))
+        .arg(worldPos.x(), 0, 'f', 1)
+        .arg(worldPos.y(), 0, 'f', 1)
+        .arg(worldPos.z(), 0, 'f', 1));
 }

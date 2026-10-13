@@ -220,13 +220,20 @@ void ViewMediator::dataDialogAccepted(const QStringList& files, const QString& s
 
 void ViewMediator::showSaveDialog()
 {
+    Document* current = docMed.getCurrentDocument();
+    if (current && !current->getSavePath().isEmpty() && !current->isNewFile())
+    {
+        emit saveDocument(current->getSavePath());
+        return;
+    }
+
     QFileDialog saveDialog;
     saveDialog.setAcceptMode(QFileDialog::AcceptSave);
     saveDialog.setModal(true);
     saveDialog.setDirectory(dataPath);
 
     emit saveDocument(saveDialog.getSaveFileName(
-        nullptr, "Save Plugin File", "", "Elder Scrolls Plugin fies (*.esp)")
+        nullptr, "Save Plugin File", "", "Bethesda plugin files (*.esp *.esm *.esl);;All files (*)")
     );
 }
 
@@ -260,7 +267,7 @@ void ViewMediator::showSaveAsDialog()
     QString defaultName = current ? current->getSavePath() : dataPath;
 
     emit saveDocument(saveDialog.getSaveFileName(
-        nullptr, "Save Plugin As", defaultName, "Elder Scrolls Plugin files (*.esp)")
+        nullptr, "Save Plugin As", defaultName, "Bethesda plugin files (*.esp *.esm *.esl);;All files (*)")
     );
 }
 

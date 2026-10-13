@@ -28,6 +28,8 @@ public:
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
+    QStringList mimeTypes() const override;
+    QMimeData* mimeData(const QModelIndexList& indexes) const override;
     // Deferred-master categories (indexed but not yet parsed) report their
     // records through canFetchMore/fetchMore: expanding the category
     // materializes the record type from the master index.

@@ -107,9 +107,11 @@ signals:
     // document and performs the atomic write-back.
     void dropSelectionToGroundRequested();
     void duplicateSelectionRequested();
+    void deleteSelectionRequested();
+    void refDoubleClicked(quint32 baseFormId, int dataIndex);
+    void objectDroppedIntoCell(quint32 baseFormId, const QString& editorId, const QVector3D& worldPos);
     void displayFlagsChanged();
     void multiSelectionChanged(const QVector<int>& dataIndices);
-
 public:
     void setSelectedRefIndex(int index);
     void setSelectedRefByDataIndex(int dataIndex);
@@ -119,7 +121,7 @@ public:
     void setSelectedRefIndices(const QVector<int>& indices);
     void selectMarqueeRect(const QRect& rect);
     void focusOnReference(const QVector3D& gameUnitsPos);
-
+    void clearSelection();
 protected:
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
@@ -128,8 +130,11 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void wheelEvent(QWheelEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
-
 public:
     void updateCamera();
     void onFilterChanged(int index);

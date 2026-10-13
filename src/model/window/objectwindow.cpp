@@ -6,7 +6,8 @@
 #include "../tools/objectwindowfilter.hpp"
 
 #include <QJsonObject>
-
+#include <QMimeData>
+#include <QDataStream>
 ObjectWindowModel::ObjectWindowModel(QObject* parent)
     : QAbstractItemModel(parent),
       mData(nullptr)
@@ -2889,9 +2890,44 @@ Qt::ItemFlags ObjectWindowModel::flags(const QModelIndex& index) const
         return Qt::ItemFlag::ItemIsDropEnabled;
 
     if (isRecordNode(index))
-        return QAbstractItemModel::flags(index) | Qt::ItemFlag::ItemIsSelectable;
+        return QAbstractItemModel::flags(index) | Qt::ItemFlag::ItemIsSelectable | Qt::ItemFlag::ItemIsDragEnabled;
 
     return QAbstractItemModel::flags(index) | Qt::ItemFlag::ItemIsEnabled;
+}
+
+QStringList ObjectWindowModel::mimeTypes() const
+{
+    return { QStringLiteral("application/x-openck-record"), QStringLiteral("text/plain") };
+}
+
+QMimeData* ObjectWindowModel::mimeData(const QModelIndexList& indexes) const
+{
+    auto* mime = new QMimeData();
+    for (const QModelIndex& idx : indexes)
+    {
+        if (idx.isValid() && isRecordNode(idx) && idx.column() == 0)
+        {
+            int catId = getCategoryIndex(idx);
+            int recIdx = getRecordIndex(idx);
+            if (catId >= 0 && recIdx >= 0)
+            {
+                const QString& formIdStr = getRecordFormId(catId, recIdx);
+                const QString& editorId = getRecordEditorId(catId, recIdx);
+                int typeId = getCategoryType(catId);
+
+                QByteArray data;
+                QDataStream stream(&data, QIODevice::WriteOnly);
+                bool ok = false;
+                quint32 formId = formIdStr.toUInt(&ok, 16);
+                stream << static_cast<qint32>(typeId) << formId << editorId;
+
+                mime->setData(QStringLiteral("application/x-openck-record"), data);
+                mime->setText(editorId.isEmpty() ? formIdStr : editorId);
+                return mime;
+            }
+        }
+    }
+    return mime;
 }
 
 int ObjectWindowModel::flatCategoryId(int groupRow, int categoryRow) const

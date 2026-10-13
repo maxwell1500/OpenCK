@@ -200,6 +200,30 @@ void TestMainWindow::testViewportDropToGroundAndDuplicate()
     // Redo duplicate
     data.getUndoStack()->redo();
     QCOMPARE(coll.size(), countBefore + 1);
+
+    // 3. Delete in Viewport test
+    viewport->setSelectedRefIndex(countBefore);
+    window.deleteViewportSelection();
+    QCOMPARE(coll.size(), countBefore);
+
+    // Undo delete
+    QVERIFY(data.getUndoStack()->canUndo());
+    data.getUndoStack()->undo();
+    QCOMPARE(coll.size(), countBefore + 1);
+
+    // Redo delete
+    data.getUndoStack()->redo();
+    QCOMPARE(coll.size(), countBefore);
+
+    // 4. Drag and Drop into Viewport test
+    window.loadCellIntoViewport(cell.formId);
+    window.onObjectDroppedIntoCell(0x5678, QStringLiteral("NewStatObj"), QVector3D(250.0f, 350.0f, 0.0f));
+    QCOMPARE(coll.size(), countBefore + 1);
+    const auto& dropped = coll.getRecord(coll.size() - 1).get();
+    QCOMPARE(dropped.baseId, 0x5678u);
+    QCOMPARE(dropped.posX, 250.0f);
+    QCOMPARE(dropped.posY, 350.0f);
+    QCOMPARE(data.parentCellOfRefr(dropped.formId), cell.formId);
 }
 
 void TestMainWindow::initTestCase()

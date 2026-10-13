@@ -425,7 +425,8 @@ void ObjectWindowDialog::setupUI()
     mTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     mTreeView->setRootIsDecorated(true);
     mTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
-
+    mTreeView->setDragEnabled(true);
+    mTreeView->setDragDropMode(QAbstractItemView::DragOnly);
     mModel = new ObjectWindowModel(this);
     mModel->setData(mData);
     mTreeView->setModel(mModel);

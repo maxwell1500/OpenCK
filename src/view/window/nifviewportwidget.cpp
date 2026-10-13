@@ -51,8 +51,12 @@
 #include <QActionGroup>
 #include <QSpinBox>
 #include <QDoubleSpinBox>
+#include <QMimeData>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QMenu>
 #include "mesheditordialog.hpp"
-
 #include <cmath>
 #include <cstddef>
 #include <functional>
@@ -217,7 +221,10 @@ struct CellModel {
     QVector<QVector2D> uvs;
     QVector<quint32> indices;
     QVector<CellModelSubShape> shapes;
-
+    QVector3D boundsMin;
+    QVector3D boundsMax;
+    QVector3D centerOffset;
+    QVector3D extents;
     QOpenGLBuffer vbo{QOpenGLBuffer::VertexBuffer};
     QOpenGLBuffer ibo{QOpenGLBuffer::IndexBuffer};
     bool gpuReady = false;
@@ -458,6 +465,22 @@ CellModel* NifViewportWidget::getOrLoadCellModel(const QString& modelPath)
         return nullptr;
     }
 
+    if (!model->vertices.isEmpty()) {
+        QVector3D bmin( 1e9f,  1e9f,  1e9f);
+        QVector3D bmax(-1e9f, -1e9f, -1e9f);
+        for (const auto& v : model->vertices) {
+            bmin.setX(std::min(bmin.x(), v.x()));
+            bmin.setY(std::min(bmin.y(), v.y()));
+            bmin.setZ(std::min(bmin.z(), v.z()));
+            bmax.setX(std::max(bmax.x(), v.x()));
+            bmax.setY(std::max(bmax.y(), v.y()));
+            bmax.setZ(std::max(bmax.z(), v.z()));
+        }
+        model->boundsMin = bmin;
+        model->boundsMax = bmax;
+        model->centerOffset = (bmin + bmax) * 0.5f;
+        model->extents = (bmax - bmin) * 0.5f;
+    }
     const QString nifDir = QFileInfo(resolved).absolutePath();
     uploadCellModelGpu(*model, nifDir);
 
@@ -713,7 +736,9 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
 
     mainSplitter = new QSplitter(Qt::Horizontal, this);
 
+    setAcceptDrops(true);
     glWidget = new QOpenGLWidget(this);
+    glWidget->setAcceptDrops(true);
     glWidget->setMouseTracking(true);
     glWidget->setFocusPolicy(Qt::StrongFocus);
     glWidget->installEventFilter(this);
@@ -2924,9 +2949,21 @@ QMatrix4x4 NifViewportWidget::refRotationMatrix(const ViewportCellRef& ref)
 
 QPair<QVector3D, QVector3D> NifViewportWidget::refObb(const ViewportCellRef& ref)
 {
-    // Markers alone occupy a 32-game-unit radius (matches the marker arms);
-    // scaling keeps the box proportional to the placed object.
-    const float half = 32.0f * ref.scale;
+    float scale = (ref.scale > 0.001f) ? ref.scale : 1.0f;
+    if (!ref.modelPath.isEmpty()) {
+        QString norm = ref.modelPath;
+        norm.replace(QLatin1Char('\\'), QLatin1Char('/'));
+        while (norm.startsWith(QLatin1Char('/')))
+            norm.remove(0, 1);
+        auto it = s_cellModelCache.find(norm);
+        if (it != s_cellModelCache.end() && it.value() && it.value()->loaded) {
+            const auto& m = it.value();
+            QVector3D worldCenter = ref.position + refRotationMatrix(ref).map(m->centerOffset * scale);
+            QVector3D extents = m->extents * scale;
+            return { worldCenter, extents };
+        }
+    }
+    const float half = 32.0f * scale;
     return { ref.position, QVector3D(half, half, half) };
 }
 
@@ -3150,11 +3187,43 @@ void NifViewportWidget::mouseReleaseEvent(QMouseEvent* event)
             if (glWidget) glWidget->update();
         }
     }
+    if (event->button() == Qt::RightButton) {
+        const int dx = qAbs(event->pos().x() - lastMousePos.x());
+        const int dy = qAbs(event->pos().y() - lastMousePos.y());
+        if (dx < 6 && dy < 6) {
+            const gizmo::ViewTransform t = currentViewTransform();
+            const int refIdx = pickRefMarker(event->pos(), t);
+            if (refIdx >= 0 && refIdx < cellReferences.size()) {
+                setSelectedRefIndex(refIdx);
+                emit refSelected(cellReferences[refIdx].dataIndex);
+
+                QMenu menu(this);
+                QAction* actEdit = menu.addAction(tr("Edit Properties..."));
+                menu.addSeparator();
+                QAction* actDup = menu.addAction(tr("Duplicate\tCtrl+D"));
+                QAction* actDel = menu.addAction(tr("Delete\tDel"));
+                QAction* actDrop = menu.addAction(tr("Drop to Ground\tF"));
+
+                QAction* chosen = menu.exec(event->globalPosition().toPoint());
+                if (chosen == actEdit) {
+                    emit refDoubleClicked(cellReferences[refIdx].baseFormId, cellReferences[refIdx].dataIndex);
+                } else if (chosen == actDup) {
+                    emit duplicateSelectionRequested();
+                } else if (chosen == actDel) {
+                    emit deleteSelectionRequested();
+                } else if (chosen == actDrop) {
+                    emit dropSelectionToGroundRequested();
+                }
+                dragging = false;
+                unsetCursor();
+                return;
+            }
+        }
+    }
     dragging = false;
     unsetCursor();
     QWidget::mouseReleaseEvent(event);
 }
-
 void NifViewportWidget::wheelEvent(QWheelEvent* event)
 {
     zoom *= (event->angleDelta().y() > 0) ? 1.1f : 0.9f;
@@ -3245,27 +3314,130 @@ void NifViewportWidget::keyPressEvent(QKeyEvent* event)
     case Qt::Key_F: // Drop selection to ground (parity.md §4.4)
         emit dropSelectionToGroundRequested();
         break;
+    case Qt::Key_Delete:
+        emit deleteSelectionRequested();
+        break;
+    case Qt::Key_Return:
+    case Qt::Key_Enter:
+        if (mSelectedRefIndex >= 0 && mSelectedRefIndex < cellReferences.size()) {
+            emit refDoubleClicked(cellReferences[mSelectedRefIndex].baseFormId, cellReferences[mSelectedRefIndex].dataIndex);
+        }
+        break;
     }
     updateCamera();
 }
 
 bool NifViewportWidget::eventFilter(QObject* obj, QEvent* event)
 {
-    if (obj == glWidget && event->type() == QEvent::KeyPress) {
-        QKeyEvent* ke = static_cast<QKeyEvent*>(event);
-        if (ke->modifiers() & Qt::ControlModifier) {
-            if (ke->key() == Qt::Key_D) {
-                emit duplicateSelectionRequested();
+    if (obj == glWidget) {
+        if (event->type() == QEvent::KeyPress) {
+            QKeyEvent* ke = static_cast<QKeyEvent*>(event);
+            if (ke->modifiers() & Qt::ControlModifier) {
+                if (ke->key() == Qt::Key_D) {
+                    emit duplicateSelectionRequested();
+                    return true;
+                }
+                return QWidget::eventFilter(obj, event);
+            }
+            if (ke->key() == Qt::Key_F || ke->key() == Qt::Key_Delete ||
+                ke->key() == Qt::Key_Return || ke->key() == Qt::Key_Enter) {
+                keyPressEvent(ke);
                 return true;
             }
-            return QWidget::eventFilter(obj, event);
         }
-        if (ke->key() == Qt::Key_F) {
-            keyPressEvent(ke);
+        else if (event->type() == QEvent::MouseButtonDblClick) {
+            auto* me = static_cast<QMouseEvent*>(event);
+            mouseDoubleClickEvent(me);
+            return true;
+        }
+        else if (event->type() == QEvent::DragEnter) {
+            auto* de = static_cast<QDragEnterEvent*>(event);
+            dragEnterEvent(de);
+            return true;
+        }
+        else if (event->type() == QEvent::DragMove) {
+            auto* dm = static_cast<QDragMoveEvent*>(event);
+            dragMoveEvent(dm);
+            return true;
+        }
+        else if (event->type() == QEvent::Drop) {
+            auto* de = static_cast<QDropEvent*>(event);
+            dropEvent(de);
             return true;
         }
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void NifViewportWidget::mouseDoubleClickEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        const gizmo::ViewTransform t = currentViewTransform();
+        const int refIdx = pickRefMarker(event->pos(), t);
+        if (refIdx >= 0 && refIdx < cellReferences.size()) {
+            emit refDoubleClicked(cellReferences[refIdx].baseFormId, cellReferences[refIdx].dataIndex);
+            return;
+        }
+    }
+    QWidget::mouseDoubleClickEvent(event);
+}
+
+void NifViewportWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasFormat(QStringLiteral("application/x-openck-record"))) {
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+void NifViewportWidget::dragMoveEvent(QDragMoveEvent* event)
+{
+    if (event->mimeData()->hasFormat(QStringLiteral("application/x-openck-record"))) {
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+void NifViewportWidget::dropEvent(QDropEvent* event)
+{
+    if (event->mimeData()->hasFormat(QStringLiteral("application/x-openck-record"))) {
+        QByteArray data = event->mimeData()->data(QStringLiteral("application/x-openck-record"));
+        QDataStream stream(&data, QIODevice::ReadOnly);
+        qint32 typeId = 0;
+        quint32 formId = 0;
+        QString editorId;
+        stream >> typeId >> formId >> editorId;
+
+        const gizmo::ViewTransform t = currentViewTransform();
+        const QPoint dropPoint = event->position().toPoint();
+        const gizmo::PickRay ray = gizmo::pickRay(t, QPointF(dropPoint));
+
+        QVector3D dropPos(0.0f, 0.0f, 0.0f);
+        if (std::abs(ray.direction.z()) > 1e-4f) {
+            float s = -ray.origin.z() / ray.direction.z();
+            if (s > 0.0f) {
+                dropPos = ray.origin + ray.direction * s;
+            } else {
+                dropPos = ray.origin + ray.direction * 500.0f;
+            }
+        } else {
+            dropPos = ray.origin + ray.direction * 500.0f;
+        }
+
+        event->acceptProposedAction();
+        emit objectDroppedIntoCell(formId, editorId, dropPos);
+    }
+}
+
+void NifViewportWidget::clearSelection()
+{
+    mSelectedRefIndex = -1;
+    mSelectedRefIndices.clear();
+    mHoverRefIndex = -1;
+    mGizmoDragging = false;
+    if (glWidget) glWidget->update();
 }
 
 void NifViewportWidget::updateCamera()
