@@ -16,6 +16,7 @@
 
 #include "../../libs/files/nif/nifparser.hpp"
 #include "../../libs/files/nif/nifskinning.hpp"
+#include "../../libs/files/nif/matfile.hpp"
 #include "../../libs/files/nif/ddsdecoder.hpp"
 #include "../../libs/files/nifanim/nifanimation.hpp"
 #include "../../libs/files/nif/particle/particleeffects.hpp"
@@ -212,6 +213,7 @@ struct CellModelSubShape {
     float specularExponent = 32.0f;
     float opacity = 1.0f;
     QString texturePath;
+    QString materialPath;
     QOpenGLTexture* texture = nullptr;
 };
 
@@ -314,6 +316,7 @@ static void extractNodeGeometry(Nif::Node* node, const QMatrix4x4& parentTransfo
         sub.emissionColor = QVector3D(shape.emissionColor.r, shape.emissionColor.g, shape.emissionColor.b);
         sub.opacity = shape.baseColor.a;
         sub.texturePath = shape.texture;
+        sub.materialPath = shape.materialPath;
         model.shapes.append(sub);
     }
 
@@ -370,6 +373,12 @@ void NifViewportWidget::uploadCellModelGpu(CellModel& model, const QString& nifD
     model.ibo.release();
 
     for (auto& shape : model.shapes) {
+        // Starfield NIFs name a .mat instead of a texture; when that .mat is a
+        // loose file its texture set is readable, otherwise the shape stays
+        // untextured and falls back to its material colour.
+        if (shape.texturePath.isEmpty() && !shape.materialPath.isEmpty())
+            shape.texturePath = MatFile::colorTexture(shape.materialPath, mDataDir);
+
         if (!shape.texturePath.isEmpty() && !shape.texture) {
             QString resolvedTex;
             if (QFileInfo::exists(shape.texturePath)) {

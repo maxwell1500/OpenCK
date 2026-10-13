@@ -116,18 +116,17 @@ struct NodeTransform {
                 rotation(row, col) = m[row][col];
     }
 
-    // Composition order: scale, then rotate, then translate.
+    // Composition order: scale the local point, then rotate it, then translate
+    // the result. Qt's translate()/scale() right-multiply, so the translation
+    // matrix has to be multiplied in from the left to end up outermost.
     QMatrix4x4 localMatrix() const
     {
-        const float* r = rotation.constData();
-        QMatrix4x4 m(r[0], r[1], r[2], 0.0f,
-                     r[3], r[4], r[5], 0.0f,
-                     r[6], r[7], r[8], 0.0f,
-                     0.0f, 0.0f, 0.0f, 1.0f);
-        m.translate(position.x, position.y, position.z);
+        QMatrix4x4 m(rotation);
         if (scale != 1.0f)
             m.scale(scale, scale, scale);
-        return m;
+        QMatrix4x4 translated;
+        translated.translate(position.x, position.y, position.z);
+        return translated * m;
     }
 };
 

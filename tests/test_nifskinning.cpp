@@ -871,11 +871,7 @@ void TestNifSkinning::testSkeletonLink()
     std::function<void(const Nif::Node*, const QMatrix4x4&, const Nif::Node*)> walk =
         [&](const Nif::Node* n, const QMatrix4x4& p, const Nif::Node* par) {
             if (!n) return;
-            QMatrix4x4 local;
-            local.translate(n->position.x, n->position.y, n->position.z);
-            local.rotate(n->rotation.z * 180.0f / 3.14159265f, 0, 0, 1);
-            local.rotate(n->rotation.y * 180.0f / 3.14159265f, 0, 1, 0);
-            local.rotate(n->rotation.x * 180.0f / 3.14159265f, 1, 0, 0);
+            const QMatrix4x4 local = n->transform.localMatrix();
             const QMatrix4x4 w = p * local;
             world.insert(n, w);
             parent.insert(n, par);
@@ -957,7 +953,7 @@ void TestNifSkinning::testSkeletonLink()
     for (int b = 0; b < nb; ++b)
         if (subtree.contains(head->skinBones[b].boneNode)) affectedBones.insert(b);
 
-    const_cast<Nif::Node*>(boneNode)->position.y += 0.25f;
+    const_cast<Nif::Node*>(boneNode)->transform.position.y += 0.25f;
     walk(parser.getRoot(), QMatrix4x4(), nullptr);   // rebuild world in place
 
     QVector<QVector3D> pos1(vc), nrm1(vc);
@@ -1034,11 +1030,7 @@ void TestNifSkinning::testSkinnedAnimationStateGate()
     std::function<void(const Nif::Node*, const QMatrix4x4&)> walk =
         [&](const Nif::Node* n, const QMatrix4x4& p) {
             if (!n) return;
-            QMatrix4x4 local;
-            local.translate(n->position.x, n->position.y, n->position.z);
-            local.rotate(n->rotation.z * 180.0f / 3.14159265f, 0, 0, 1);
-            local.rotate(n->rotation.y * 180.0f / 3.14159265f, 0, 1, 0);
-            local.rotate(n->rotation.x * 180.0f / 3.14159265f, 1, 0, 0);
+            const QMatrix4x4 local = n->transform.localMatrix();
             const QMatrix4x4 w = p * local;
             world.insert(n, w);
             for (const Nif::Node* c : n->children) walk(c, w);
@@ -1114,26 +1106,29 @@ void TestNifSkinning::testSkinnedAnimationStateGate()
 
     AnimKeyframe rest;
     rest.time = 0.0f;
-    rest.tx = boneNode->position.x;
-    rest.ty = boneNode->position.y;
-    rest.tz = boneNode->position.z;
-    rest.rx = boneNode->rotation.x;
-    rest.ry = boneNode->rotation.y;
-    rest.rz = boneNode->rotation.z;
-    rest.sx = rest.sy = rest.sz = 1.0f;
-    rest.hasQuat = false;
+    rest.tx = boneNode->transform.position.x;
+    rest.ty = boneNode->transform.position.y;
+    rest.tz = boneNode->transform.position.z;
+    const QQuaternion restQuat = QQuaternion::fromRotationMatrix(boneNode->transform.rotation);
+    rest.qw = restQuat.scalar();
+    rest.qx = restQuat.x();
+    rest.qy = restQuat.y();
+    rest.qz = restQuat.z();
+    rest.sx = rest.sy = rest.sz = boneNode->transform.scale;
+    rest.hasQuat = true;
     AnimKeyframe shifted;
     shifted.time = 4.0f;
     shifted.tx = rest.tx + 0.5f;
     shifted.ty = rest.ty;
     shifted.tz = rest.tz;
-    shifted.rx = rest.rx;
-    shifted.ry = rest.ry;
-    shifted.rz = rest.rz;
+    shifted.qw = rest.qw;
+    shifted.qx = rest.qx;
+    shifted.qy = rest.qy;
+    shifted.qz = rest.qz;
     shifted.sx = rest.sx;
     shifted.sy = rest.sy;
     shifted.sz = rest.sz;
-    shifted.hasQuat = false;
+    shifted.hasQuat = true;
 
     AnimChannel ch;
     ch.boneName = boneNode->name;
@@ -1164,14 +1159,7 @@ void TestNifSkinning::testSkinnedAnimationStateGate()
     std::function<void(const Nif::Node*, const QMatrix4x4&)> walkAnim0 =
         [&](const Nif::Node* n, const QMatrix4x4& p) {
             if (!n) return;
-            QMatrix4x4 localTransform;
-            localTransform.translate(n->position.x, n->position.y, n->position.z);
-            float rx = n->rotation.x * 180.0f / 3.14159265f;
-            float ry = n->rotation.y * 180.0f / 3.14159265f;
-            float rz = n->rotation.z * 180.0f / 3.14159265f;
-            localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
-            localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
-            localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+            QMatrix4x4 localTransform = n->transform.localMatrix();
             const auto it = byName0.find(n->name);
             if (it != byName0.end()) {
                 const TransformKeyframe& f = it.value();
@@ -1215,14 +1203,7 @@ void TestNifSkinning::testSkinnedAnimationStateGate()
     std::function<void(const Nif::Node*, const QMatrix4x4&)> walkAnim =
         [&](const Nif::Node* n, const QMatrix4x4& p) {
             if (!n) return;
-            QMatrix4x4 localTransform;
-            localTransform.translate(n->position.x, n->position.y, n->position.z);
-            float rx = n->rotation.x * 180.0f / 3.14159265f;
-            float ry = n->rotation.y * 180.0f / 3.14159265f;
-            float rz = n->rotation.z * 180.0f / 3.14159265f;
-            localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
-            localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
-            localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+            QMatrix4x4 localTransform = n->transform.localMatrix();
             const auto it = byNameF.find(n->name);
             if (it != byNameF.end()) {
                 const TransformKeyframe& f = it.value();
@@ -1248,12 +1229,12 @@ void TestNifSkinning::testSkinnedAnimationStateGate()
     blendWith(worldAnim, posAnim);
 
     // Direct local perturb gives the expected result of the the same animation.
-    const_cast<Nif::Node*>(boneNode)->position.x += 0.5f;
+    const_cast<Nif::Node*>(boneNode)->transform.position.x += 0.5f;
     world.clear();
     walk(parser.getRoot(), QMatrix4x4());
     QVector<QVector3D> expected;
     blendWith(world, expected);
-    const_cast<Nif::Node*>(boneNode)->position.x -= 0.5f;
+    const_cast<Nif::Node*>(boneNode)->transform.position.x -= 0.5f;
     world.clear();
     walk(parser.getRoot(), QMatrix4x4());
 

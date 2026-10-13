@@ -1026,6 +1026,11 @@ target_include_directories(test_opallist PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_opallist)
 
 # DDS texture decoder (BC1/2/3/4/5 + uncompressed)
+add_executable(test_matfile test_matfile.cpp)
+target_link_libraries(test_matfile PRIVATE openck_files test_stubs Qt6::Test)
+target_include_directories(test_matfile PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_matfile)
+
 add_executable(test_ddsdecoder test_ddsdecoder.cpp)
 target_link_libraries(test_ddsdecoder PRIVATE openck_files test_stubs Qt6::Test)
 target_include_directories(test_ddsdecoder PRIVATE ${TEST_INCLUDE_DIRS})

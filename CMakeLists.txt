@@ -603,6 +603,7 @@ set(FILES_SOURCES
     libs/files/data/csvsnippet.cpp
     libs/files/nif/nifparser.cpp
     libs/files/nif/nifblockfile.cpp
+    libs/files/nif/matfile.cpp
     libs/files/nif/nifskinning.cpp
     libs/files/nif/ddsencoder.cpp
     libs/files/nif/ddsdecoder.cpp
