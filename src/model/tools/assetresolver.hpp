@@ -29,6 +29,12 @@ public:
     // loose or unknown. Lets a caller extract the entry instead of only knowing
     // that it exists somewhere.
     QString archiveContaining(const QString& relativePath) const;
+    // Resolves a relative asset path (mesh or texture) to a file on disk:
+    // 1. Checks loose files in dataDir (and subfolders meshes/ or textures/)
+    // 2. Checks local cache dir (<dataDir>/.openck_cache/)
+    // 3. On-demand searches and extracts from BSA or BA2 archives in dataDir
+    // Returns absolute file path on disk, or empty QString if not found.
+    static QString resolveOrExtract(const QString& relativePath, const QString& dataDir);
 
     // All known relative asset paths (normalized, backslash separators).
     const QStringList& allPaths() const { return mPaths; }

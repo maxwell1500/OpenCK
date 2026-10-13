@@ -1537,7 +1537,13 @@ QString Data::getModelPathForFormId(quint32 formId) const
     if (!(path = findModel(treeCollection)).isEmpty()) return path;
     if (!(path = findModel(florCollection)).isEmpty()) return path;
     if (!(path = findModel(miscCollection)).isEmpty()) return path;
-
+    if (!(path = findModel(msttCollection)).isEmpty()) return path;
+    if (!(path = findModel(lighCollection)).isEmpty()) return path;
+    if (!(path = findModel(alchCollection)).isEmpty()) return path;
+    if (!(path = findModel(ingrCollection)).isEmpty()) return path;
+    if (!(path = findModel(bookCollection)).isEmpty()) return path;
+    if (!(path = findModel(weaponCollection)).isEmpty()) return path;
+    if (!(path = findModel(armorCollection)).isEmpty()) return path;
     return QString();
 }
 

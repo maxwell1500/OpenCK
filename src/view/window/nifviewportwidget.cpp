@@ -24,6 +24,7 @@
 #include "particlerenderer.hpp"
 #include "logger.hpp"
 
+#include "../../model/tools/assetresolver.hpp"
 #include <QOpenGLShaderProgram>
 #include <QOpenGLBuffer>
 #include <QOpenGLVertexArrayObject>
@@ -196,6 +197,271 @@ QImage NifViewportWidget::loadTextureImage(const QString& path)
     if (!img.isNull()) return img;
     img = DdsDecoder::decodeFile(path);
     return img;
+}
+
+struct CellModelSubShape {
+    int indexStart = 0;
+    int indexCount = 0;
+    QVector3D baseColor{0.8f, 0.8f, 0.8f};
+    QVector3D specularColor{0.2f, 0.2f, 0.2f};
+    QVector3D emissionColor{0.0f, 0.0f, 0.0f};
+    float specularExponent = 32.0f;
+    float opacity = 1.0f;
+    QString texturePath;
+    QOpenGLTexture* texture = nullptr;
+};
+
+struct CellModel {
+    QVector<QVector3D> vertices;
+    QVector<QVector3D> normals;
+    QVector<QVector2D> uvs;
+    QVector<quint32> indices;
+    QVector<CellModelSubShape> shapes;
+
+    QOpenGLBuffer vbo{QOpenGLBuffer::VertexBuffer};
+    QOpenGLBuffer ibo{QOpenGLBuffer::IndexBuffer};
+    bool gpuReady = false;
+    bool loaded = false;
+    bool failed = false;
+
+    void cleanup() {
+        if (vbo.isCreated()) vbo.destroy();
+        if (ibo.isCreated()) ibo.destroy();
+        for (auto& s : shapes) {
+            if (s.texture) {
+                delete s.texture;
+                s.texture = nullptr;
+            }
+        }
+        shapes.clear();
+        vertices.clear();
+        normals.clear();
+        uvs.clear();
+        indices.clear();
+        gpuReady = false;
+    }
+};
+
+static QHash<QString, std::shared_ptr<CellModel>> s_cellModelCache;
+
+static void extractNodeGeometry(Nif::Node* node, const QMatrix4x4& parentTransform,
+                                CellModel& model)
+{
+    if (!node) return;
+
+    QMatrix4x4 localTransform;
+    localTransform.translate(node->position.x, node->position.y, node->position.z);
+    float rx = node->rotation.x * 180.0f / 3.14159265f;
+    float ry = node->rotation.y * 180.0f / 3.14159265f;
+    float rz = node->rotation.z * 180.0f / 3.14159265f;
+    localTransform.rotate(rz, 0.0f, 0.0f, 1.0f);
+    localTransform.rotate(ry, 0.0f, 1.0f, 0.0f);
+    localTransform.rotate(rx, 1.0f, 0.0f, 0.0f);
+
+    QMatrix4x4 cumulativeTransform = parentTransform * localTransform;
+
+    for (int si = 0; si < node->shapes.size(); ++si) {
+        auto& shape = node->shapes[si];
+        const int indexStart = model.indices.size();
+        const unsigned int vertexOffset = static_cast<unsigned int>(model.vertices.size());
+
+        if (shape.normals.isEmpty()) {
+            shape.recalculateNormals();
+        }
+
+        for (int vi = 0; vi < shape.vertices.size(); ++vi) {
+            const auto& v = shape.vertices[vi];
+            model.vertices.append(cumulativeTransform.map(QVector3D(v.x, v.y, v.z)));
+
+            if (vi < shape.normals.size()) {
+                const auto& n = shape.normals[vi];
+                model.normals.append(cumulativeTransform.mapVector(QVector3D(n.x, n.y, n.z)).normalized());
+            } else {
+                model.normals.append(QVector3D(0.0f, 1.0f, 0.0f));
+            }
+
+            if (vi < shape.uvs.size()) {
+                model.uvs.append(QVector2D(shape.uvs[vi].u, shape.uvs[vi].v));
+            } else {
+                model.uvs.append(QVector2D(0.0f, 0.0f));
+            }
+        }
+
+        if (!shape.indices.isEmpty()) {
+            for (unsigned int idx : shape.indices) {
+                model.indices.append(vertexOffset + idx);
+            }
+        } else {
+            for (unsigned int i = 0; i + 2 < shape.vertices.size(); i += 3) {
+                model.indices.append(vertexOffset + i);
+                model.indices.append(vertexOffset + i + 1);
+                model.indices.append(vertexOffset + i + 2);
+            }
+        }
+
+        CellModelSubShape sub;
+        sub.indexStart = indexStart;
+        sub.indexCount = model.indices.size() - indexStart;
+        sub.baseColor = QVector3D(qBound(0.0f, shape.baseColor.r, 1.0f),
+                                  qBound(0.0f, shape.baseColor.g, 1.0f),
+                                  qBound(0.0f, shape.baseColor.b, 1.0f));
+        sub.specularColor = QVector3D(shape.specularColor.r, shape.specularColor.g, shape.specularColor.b);
+        sub.emissionColor = QVector3D(shape.emissionColor.r, shape.emissionColor.g, shape.emissionColor.b);
+        sub.opacity = shape.baseColor.a;
+        sub.texturePath = shape.texture;
+        model.shapes.append(sub);
+    }
+
+    for (Nif::Node* child : node->children) {
+        extractNodeGeometry(child, cumulativeTransform, model);
+    }
+}
+
+void NifViewportWidget::setDataDir(const QString& dir)
+{
+    if (mDataDir != dir) {
+        mDataDir = dir;
+        for (auto it = s_cellModelCache.begin(); it != s_cellModelCache.end(); ++it) {
+            if (it.value()) it.value()->cleanup();
+        }
+        s_cellModelCache.clear();
+        m_cellRefVBO.dirty = true;
+        m_cellRefSolidVBO.dirty = true;
+        if (glWidget) glWidget->update();
+    }
+}
+
+void NifViewportWidget::uploadCellModelGpu(CellModel& model, const QString& nifDir)
+{
+    if (model.vertices.isEmpty() || model.indices.isEmpty() || model.gpuReady)
+        return;
+
+    // Interleaved layout: Pos(3) + Normal(3) + TexCoord(2) + Color(4) = 12 floats (48 bytes)
+    QVector<float> interleaved;
+    interleaved.reserve(model.vertices.size() * 12);
+    for (int i = 0; i < model.vertices.size(); ++i) {
+        interleaved.append(model.vertices[i].x());
+        interleaved.append(model.vertices[i].y());
+        interleaved.append(model.vertices[i].z());
+        interleaved.append(model.normals[i].x());
+        interleaved.append(model.normals[i].y());
+        interleaved.append(model.normals[i].z());
+        interleaved.append(model.uvs[i].x());
+        interleaved.append(model.uvs[i].y());
+        interleaved.append(1.0f);
+        interleaved.append(1.0f);
+        interleaved.append(1.0f);
+        interleaved.append(1.0f);
+    }
+
+    model.vbo.create();
+    model.vbo.bind();
+    model.vbo.allocate(interleaved.constData(), interleaved.size() * sizeof(float));
+    model.vbo.release();
+
+    model.ibo.create();
+    model.ibo.bind();
+    model.ibo.allocate(model.indices.constData(), model.indices.size() * sizeof(quint32));
+    model.ibo.release();
+
+    for (auto& shape : model.shapes) {
+        if (!shape.texturePath.isEmpty() && !shape.texture) {
+            QString resolvedTex;
+            if (QFileInfo::exists(shape.texturePath)) {
+                resolvedTex = shape.texturePath;
+            } else {
+                if (!nifDir.isEmpty()) {
+                    const QString cand = nifDir + "/" + QFileInfo(shape.texturePath).fileName();
+                    if (QFileInfo::exists(cand))
+                        resolvedTex = cand;
+                }
+                if (resolvedTex.isEmpty() && !mDataDir.isEmpty()) {
+                    resolvedTex = AssetResolver::resolveOrExtract(shape.texturePath, mDataDir);
+                    if (resolvedTex.isEmpty() &&
+                        !shape.texturePath.startsWith("textures/", Qt::CaseInsensitive) &&
+                        !shape.texturePath.startsWith("textures\\", Qt::CaseInsensitive))
+                    {
+                        resolvedTex = AssetResolver::resolveOrExtract(QStringLiteral("textures/") + shape.texturePath, mDataDir);
+                    }
+                }
+            }
+
+            if (!resolvedTex.isEmpty() && QFileInfo::exists(resolvedTex)) {
+                QImage img = loadTextureImage(resolvedTex);
+                if (!img.isNull()) {
+                    shape.texture = new QOpenGLTexture(img);
+                    applyFilterToTexture(*shape.texture);
+                }
+            }
+        }
+    }
+
+    model.gpuReady = true;
+}
+
+CellModel* NifViewportWidget::getOrLoadCellModel(const QString& modelPath)
+{
+    if (modelPath.isEmpty())
+        return nullptr;
+
+    QString norm = modelPath;
+    norm.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    while (norm.startsWith(QLatin1Char('/')))
+        norm.remove(0, 1);
+
+    auto it = s_cellModelCache.find(norm);
+    if (it != s_cellModelCache.end()) {
+        CellModel* m = it.value().get();
+        if (m->failed) return nullptr;
+        if (!m->gpuReady && m->loaded) {
+            uploadCellModelGpu(*m, QString());
+        }
+        return m->gpuReady ? m : nullptr;
+    }
+
+    auto model = std::make_shared<CellModel>();
+    s_cellModelCache.insert(norm, model);
+
+    QString resolved;
+    if (QFileInfo::exists(norm)) {
+        resolved = norm;
+    } else {
+        resolved = AssetResolver::resolveOrExtract(norm, mDataDir);
+        if (resolved.isEmpty() && !norm.startsWith("meshes/", Qt::CaseInsensitive)) {
+            resolved = AssetResolver::resolveOrExtract(QStringLiteral("meshes/") + norm, mDataDir);
+        }
+    }
+
+    if (resolved.isEmpty() || !QFileInfo::exists(resolved)) {
+        model->failed = true;
+        return nullptr;
+    }
+
+    Nif::NifParser parser;
+    if (!parser.load(resolved)) {
+        model->failed = true;
+        return nullptr;
+    }
+
+    Nif::Node* root = parser.getRoot();
+    if (!root) {
+        model->failed = true;
+        return nullptr;
+    }
+
+    QMatrix4x4 identity;
+    extractNodeGeometry(root, identity, *model);
+
+    model->loaded = !model->vertices.isEmpty() && !model->indices.isEmpty();
+    if (!model->loaded) {
+        model->failed = true;
+        return nullptr;
+    }
+
+    const QString nifDir = QFileInfo(resolved).absolutePath();
+    uploadCellModelGpu(*model, nifDir);
+
+    return model->gpuReady ? model.get() : nullptr;
 }
 
 NifViewportWidget::NifViewportWidget(QWidget* parent) :
@@ -1413,6 +1679,16 @@ void NifViewportWidget::ensureTexture(int index, const QString& path)
     if (img.isNull()) {
         img = DdsDecoder::decodeFile(resolvedPath);
     }
+    if (img.isNull() && !mDataDir.isEmpty()) {
+        QString ext = AssetResolver::resolveOrExtract(path, mDataDir);
+        if (ext.isEmpty() && !path.startsWith(QLatin1String("textures/"), Qt::CaseInsensitive)
+            && !path.startsWith(QLatin1String("textures\\"), Qt::CaseInsensitive)) {
+            ext = AssetResolver::resolveOrExtract(QStringLiteral("textures/") + path, mDataDir);
+        }
+        if (!ext.isEmpty()) {
+            img = loadTextureImage(ext);
+        }
+    }
     if (img.isNull()) {
         LOG_WARNING(QString("Failed to load texture: %1").arg(path));
         return;
@@ -2153,6 +2429,87 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         glEnable(GL_DEPTH_TEST);
     }
     if (!cellReferences.isEmpty()) {
+        QVector<bool> refHasModel(cellReferences.size(), false);
+
+        // 1. Render actual 3D textured models for references that have meshes
+        shaderProgram->bind();
+        shaderProgram->setUniformValue("mProjection", proj);
+        shaderProgram->setUniformValue("mView", view);
+        shaderProgram->setUniformValue("lightDir", mLightDir);
+        shaderProgram->setUniformValue("lightColor", mLightColor);
+        shaderProgram->setUniformValue("ambientStrength", mDefaultLighting ? 0.75f : mAmbientStrength);
+        shaderProgram->setUniformValue("specularStrength", 1.0f);
+        shaderProgram->setUniformValue("uSkinned", false);
+        shaderProgram->setUniformValue("tex", 0);
+        ensureDefaultTexture();
+
+        glEnable(GL_DEPTH_TEST);
+        vao.bind();
+
+        const int stride = 12 * sizeof(float);
+
+        for (int i = 0; i < cellReferences.size(); ++i) {
+            const ViewportCellRef& ref = cellReferences[i];
+            if (!ref.enabled) continue;
+
+            CellModel* model = getOrLoadCellModel(ref.modelPath);
+            if (!model || !model->gpuReady) continue;
+
+            refHasModel[i] = true;
+
+            QMatrix4x4 modelMat;
+            modelMat.translate(ref.position);
+            modelMat *= refRotationMatrix(ref);
+            modelMat.scale(ref.scale);
+
+            shaderProgram->setUniformValue("mModel", modelMat);
+
+            model->vbo.bind();
+            model->ibo.bind();
+
+            shaderProgram->enableAttributeArray(0);
+            shaderProgram->setAttributeBuffer(0, GL_FLOAT, 0, 3, stride);
+            shaderProgram->enableAttributeArray(1);
+            shaderProgram->setAttributeBuffer(1, GL_FLOAT, 3 * sizeof(float), 3, stride);
+            shaderProgram->enableAttributeArray(2);
+            shaderProgram->setAttributeBuffer(2, GL_FLOAT, 6 * sizeof(float), 2, stride);
+            shaderProgram->enableAttributeArray(3);
+            shaderProgram->setAttributeBuffer(3, GL_FLOAT, 8 * sizeof(float), 4, stride);
+
+            const bool selected = isRefSelected(i);
+            const bool hovered = (i == mHoverRefIndex);
+
+            for (const auto& sub : model->shapes) {
+                QVector3D col = sub.baseColor;
+                if (selected) {
+                    col = QVector3D(0.2f, 0.85f, 1.0f);
+                } else if (hovered) {
+                    col = QVector3D(1.0f, 1.0f, 1.0f);
+                }
+                shaderProgram->setUniformValue("objectColor", col);
+                shaderProgram->setUniformValue("specularColor", sub.specularColor);
+                shaderProgram->setUniformValue("emissionColor", selected ? QVector3D(0.15f, 0.25f, 0.35f) : sub.emissionColor);
+                shaderProgram->setUniformValue("shininess", sub.specularExponent);
+                shaderProgram->setUniformValue("opacity", sub.opacity);
+
+                if (sub.texture && sub.texture->isCreated()) {
+                    sub.texture->bind(0);
+                    shaderProgram->setUniformValue("useTexture", true);
+                } else {
+                    defaultTexture->bind(0);
+                    shaderProgram->setUniformValue("useTexture", false);
+                }
+
+                glDrawElements(GL_TRIANGLES, sub.indexCount, GL_UNSIGNED_INT,
+                               reinterpret_cast<void*>(static_cast<quintptr>(sub.indexStart * sizeof(quint32))));
+            }
+
+            model->vbo.release();
+            model->ibo.release();
+        }
+
+        shaderProgram->release();
+
         if (m_cellRefVBO.dirty || m_cellRefSolidVBO.dirty) {
             QVector<OverlayVertex> lineVerts;
             QVector<OverlayVertex> solidVerts;
@@ -2185,6 +2542,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
                 const ViewportCellRef& ref = cellReferences[i];
                 const bool selected = isRefSelected(i);
                 const bool hovered = (i == mHoverRefIndex);
+                const bool hasModel = refHasModel.value(i, false);
                 const QVector3D pos = ref.position;
                 const QMatrix4x4 rot = refRotationMatrix(ref);
                 const float half = (selected ? 36.0f : 28.0f) * qMax(0.1f, ref.scale);
@@ -2218,22 +2576,26 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
                     worldCorners[c] = pos + rot.map(localCorners[c]);
                 }
 
-                // Solid shaded faces
-                for (int f = 0; f < 6; ++f) {
-                    const QVector3D faceCol = baseCol * faceShade[f];
-                    for (int v = 0; v < 6; ++v) {
-                        solidVerts.append({ worldCorners[boxFaces[f * 6 + v]], faceCol });
+                // Solid shaded faces only for unmodeled references
+                if (!hasModel) {
+                    for (int f = 0; f < 6; ++f) {
+                        const QVector3D faceCol = baseCol * faceShade[f];
+                        for (int v = 0; v < 6; ++v) {
+                            solidVerts.append({ worldCorners[boxFaces[f * 6 + v]], faceCol });
+                        }
                     }
                 }
 
-                // Wireframe edges
-                for (int e = 0; e < 12; ++e) {
-                    lineVerts.append({ worldCorners[boxEdges[e * 2]], edgeCol });
-                    lineVerts.append({ worldCorners[boxEdges[e * 2 + 1]], edgeCol });
+                // Wireframe edges: for unmodeled refs, or when selected / hovered
+                if (!hasModel || selected || hovered) {
+                    for (int e = 0; e < 12; ++e) {
+                        lineVerts.append({ worldCorners[boxEdges[e * 2]], edgeCol });
+                        lineVerts.append({ worldCorners[boxEdges[e * 2 + 1]], edgeCol });
+                    }
                 }
 
-                // Center cross marker
-                if (ref.enabled) {
+                // Center cross marker: for unmodeled refs
+                if (!hasModel && ref.enabled) {
                     const QVector3D h1 = pos - rot.map(QVector3D(armLen, 0, 0));
                     const QVector3D h2 = pos + rot.map(QVector3D(armLen, 0, 0));
                     const QVector3D v1 = pos - rot.map(QVector3D(0, 0, armLen));
@@ -2261,16 +2623,20 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         }
 
         // Draw solid 3D reference shapes with depth test and polygon offset to eliminate Z-fighting
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(1.0f, 1.0f);
-        m_cellRefSolidVBO.draw(m_overlayShader, mvp);
-        glDisable(GL_POLYGON_OFFSET_FILL);
+        if (m_cellRefSolidVBO.vertexCount > 0) {
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(1.0f, 1.0f);
+            m_cellRefSolidVBO.draw(m_overlayShader, mvp);
+            glDisable(GL_POLYGON_OFFSET_FILL);
+        }
 
         // Draw wireframe outlines cleanly in front
-        glLineWidth(1.5f);
-        m_cellRefVBO.draw(m_overlayShader, mvp);
-        glLineWidth(1.0f);
+        if (m_cellRefVBO.vertexCount > 0) {
+            glLineWidth(1.5f);
+            m_cellRefVBO.draw(m_overlayShader, mvp);
+            glLineWidth(1.0f);
+        }
     }
     // Marquee selection rectangle: screen-space quad mapped back to model
     // space so the existing overlay shader can draw it. Rebuilt every paint

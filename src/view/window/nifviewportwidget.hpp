@@ -73,8 +73,10 @@ struct OverlayVBO {
     void draw(QOpenGLShaderProgram* shader, const QMatrix4x4& mvp);
     void clear();
 };
+struct CellModel;
 
 class NifViewportWidget : public QWidget
+
 {
     Q_OBJECT
 
@@ -160,6 +162,8 @@ public:
     int selectedNavmeshVertex() const { return mSelectedNavmeshVertex; }
     int selectedNavmeshTriangle() const { return mHighlightedTriangle; }
     void setCellReferences(const QVector<ViewportCellRef>& refs);
+    void setDataDir(const QString& dir);
+    QString dataDir() const { return mDataDir; }
 
     // Renders a standalone preview primitive (cube/cylinder/plane/sphere)
     // centered at the origin, replacing any loaded NIF mesh display.
@@ -444,8 +448,11 @@ private:
     // base mesh bounds transformed by rotation and scale.
     static QMatrix4x4 refRotationMatrix(const ViewportCellRef& ref);
     static QPair<QVector3D, QVector3D> refObb(const ViewportCellRef& ref);
+    void uploadCellModelGpu(CellModel& model, const QString& nifDir);
+    CellModel* getOrLoadCellModel(const QString& modelPath);
     int pickRefMarker(const QPoint& pos, const gizmo::ViewTransform& t);
     void applyGizmoDrag(const QPoint& currentPos);
+    QString mDataDir;
     void commitGizmoDrag();
     gizmo::ViewTransform currentViewTransform() const;
 };

@@ -3775,26 +3775,14 @@ void MainWindow::duplicateViewportSelection()
 QString MainWindow::resolveNifFilePath(const QString& relPath) const
 {
     if (relPath.isEmpty() || !mData) return QString();
-    if (QFileInfo::exists(relPath)) return relPath;
-
     const QString dataDir = mData->getPaths().dataDir.absolutePath();
-    const QString candidate1 = dataDir + "/" + relPath;
-    if (QFileInfo::exists(candidate1)) return candidate1;
-
-    const QString norm = relPath.startsWith(QLatin1String("meshes/"), Qt::CaseInsensitive) ||
-                         relPath.startsWith(QLatin1String("meshes\\"), Qt::CaseInsensitive)
-        ? relPath
-        : QStringLiteral("meshes/") + relPath;
-
-    const QString candidate2 = dataDir + "/" + norm;
-    if (QFileInfo::exists(candidate2)) return candidate2;
-    return QString();
+    return AssetResolver::resolveOrExtract(relPath, dataDir);
 }
 
 void MainWindow::loadCellIntoViewport(quint32 cellFormId)
 {
     if (!mData || !nifViewportWidget) return;
-
+    nifViewportWidget->setDataDir(mData->getPaths().dataDir.absolutePath());
     QVector<ViewportCellRef> cellRefs;
     const auto& coll = mData->getRefrCollection();
     QVector3D avgPos(0, 0, 0);
