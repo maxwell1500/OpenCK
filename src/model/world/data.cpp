@@ -1519,6 +1519,15 @@ QString Data::getModelPathForFormId(quint32 formId) const
     if (formId == 0)
         return QString();
 
+    // The 15 collections below are walked linearly on every call, and a cell
+    // asks once per reference, so an unindexed miss costs O(collections x
+    // records) per reference. A resolved path never changes once the record
+    // is in memory, so memoizing turns repeat lookups into O(1). The cache is
+    // mutable because this is a lookup on a const Data.
+    auto memo = m_modelPathCache.constFind(formId);
+    if (memo != m_modelPathCache.constEnd())
+        return memo.value();
+
     auto findModel = [formId](const auto& coll) -> QString {
         for (int i = 0; i < coll.size(); ++i) {
             const auto& rec = coll.getRecord(i).get();
@@ -1529,21 +1538,21 @@ QString Data::getModelPathForFormId(quint32 formId) const
     };
 
     QString path;
-    if (!(path = findModel(statCollection)).isEmpty()) return path;
-    if (!(path = findModel(doorCollection)).isEmpty()) return path;
-    if (!(path = findModel(furnCollection)).isEmpty()) return path;
-    if (!(path = findModel(actiCollection)).isEmpty()) return path;
-    if (!(path = findModel(contCollection)).isEmpty()) return path;
-    if (!(path = findModel(treeCollection)).isEmpty()) return path;
-    if (!(path = findModel(florCollection)).isEmpty()) return path;
-    if (!(path = findModel(miscCollection)).isEmpty()) return path;
-    if (!(path = findModel(msttCollection)).isEmpty()) return path;
-    if (!(path = findModel(lighCollection)).isEmpty()) return path;
-    if (!(path = findModel(alchCollection)).isEmpty()) return path;
-    if (!(path = findModel(ingrCollection)).isEmpty()) return path;
-    if (!(path = findModel(bookCollection)).isEmpty()) return path;
-    if (!(path = findModel(weaponCollection)).isEmpty()) return path;
-    if (!(path = findModel(armorCollection)).isEmpty()) return path;
+    if (!(path = findModel(statCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(doorCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(furnCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(actiCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(contCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(treeCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(florCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(miscCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(msttCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(lighCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(alchCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(ingrCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(bookCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(weaponCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+    if (!(path = findModel(armorCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
     if (m_masterIndexByFormId.contains(formId))
     {
         const int idx = m_masterIndexByFormId.value(formId);
@@ -1577,22 +1586,24 @@ QString Data::getModelPathForFormId(quint32 formId) const
                     }
                 }
         }
-        if (!(path = findModel(statCollection)).isEmpty()) return path;
-        if (!(path = findModel(doorCollection)).isEmpty()) return path;
-        if (!(path = findModel(furnCollection)).isEmpty()) return path;
-        if (!(path = findModel(actiCollection)).isEmpty()) return path;
-        if (!(path = findModel(contCollection)).isEmpty()) return path;
-        if (!(path = findModel(treeCollection)).isEmpty()) return path;
-        if (!(path = findModel(florCollection)).isEmpty()) return path;
-        if (!(path = findModel(miscCollection)).isEmpty()) return path;
-        if (!(path = findModel(msttCollection)).isEmpty()) return path;
-        if (!(path = findModel(lighCollection)).isEmpty()) return path;
-        if (!(path = findModel(alchCollection)).isEmpty()) return path;
-        if (!(path = findModel(ingrCollection)).isEmpty()) return path;
-        if (!(path = findModel(bookCollection)).isEmpty()) return path;
-        if (!(path = findModel(weaponCollection)).isEmpty()) return path;
-        if (!(path = findModel(armorCollection)).isEmpty()) return path;
+        if (!(path = findModel(statCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(doorCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(furnCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(actiCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(contCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(treeCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(florCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(miscCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(msttCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(lighCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(alchCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(ingrCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(bookCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(weaponCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
+        if (!(path = findModel(armorCollection)).isEmpty()) { m_modelPathCache.insert(formId, path); return path; }
     }
+    // Misses are deliberately not memoized: records arrive through several
+    // paths (add*, paste, undo) and a cached miss would outlive the record.
     return QString();
 }
 

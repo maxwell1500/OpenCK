@@ -1895,6 +1895,9 @@ private:
     };
     QVector<MasterIndexEntry> m_masterIndex;
     QHash<quint32, int> m_masterIndexByFormId;
+    // Memo for getModelPathForFormId. Mutable because that lookup is
+    // const and a resolved path never changes once the record is loaded.
+    mutable QHash<quint32, QString> m_modelPathCache;
     QStringList m_deferredMasterFiles;
     QString m_lastPreloadPath;
     GameFormat::Game m_currentGame = GameFormat::Game::Unknown;
