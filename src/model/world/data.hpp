@@ -1894,6 +1894,7 @@ private:
         int fileIndex;
     };
     QVector<MasterIndexEntry> m_masterIndex;
+    QHash<quint32, int> m_masterIndexByFormId;
     QStringList m_deferredMasterFiles;
     QString m_lastPreloadPath;
     GameFormat::Game m_currentGame = GameFormat::Game::Unknown;

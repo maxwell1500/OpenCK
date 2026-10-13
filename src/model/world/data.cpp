@@ -1544,6 +1544,55 @@ QString Data::getModelPathForFormId(quint32 formId) const
     if (!(path = findModel(bookCollection)).isEmpty()) return path;
     if (!(path = findModel(weaponCollection)).isEmpty()) return path;
     if (!(path = findModel(armorCollection)).isEmpty()) return path;
+    if (m_masterIndexByFormId.contains(formId))
+    {
+        const int idx = m_masterIndexByFormId.value(formId);
+        if (idx >= 0 && idx < m_masterIndex.size())
+        {
+            const MasterIndexEntry entry = m_masterIndex[idx];
+            if (entry.fileIndex >= 0 && entry.fileIndex < m_deferredMasterFiles.size())
+            {
+                ESMReader r(m_deferredMasterFiles[entry.fileIndex], paths);
+                r.open();
+                r.seekTo(entry.offset);
+                    auto* self = const_cast<Data*>(this);
+                    switch (entry.type)
+                    {
+                        case 'STAT': self->statCollection.load(r, true); break;
+                        case 'DOOR': self->doorCollection.load(r, true); break;
+                        case 'FURN': self->furnCollection.load(r, true); break;
+                        case 'ACTI': self->actiCollection.load(r, true); break;
+                        case 'CONT': self->contCollection.load(r, true); break;
+                        case 'TREE': self->treeCollection.load(r, true); break;
+                        case 'FLOR': self->florCollection.load(r, true); break;
+                        case 'MISC': self->miscCollection.load(r, true); break;
+                        case 'MSTT': self->msttCollection.load(r, true); break;
+                        case 'LIGH': self->lighCollection.load(r, true); break;
+                        case 'ALCH': self->alchCollection.load(r, true); break;
+                        case 'INGR': self->ingrCollection.load(r, true); break;
+                        case 'BOOK': self->bookCollection.load(r, true); break;
+                        case 'WEAP': self->weaponCollection.load(r, true); break;
+                        case 'ARMO': self->armorCollection.load(r, true); break;
+                        default: break;
+                    }
+                }
+        }
+        if (!(path = findModel(statCollection)).isEmpty()) return path;
+        if (!(path = findModel(doorCollection)).isEmpty()) return path;
+        if (!(path = findModel(furnCollection)).isEmpty()) return path;
+        if (!(path = findModel(actiCollection)).isEmpty()) return path;
+        if (!(path = findModel(contCollection)).isEmpty()) return path;
+        if (!(path = findModel(treeCollection)).isEmpty()) return path;
+        if (!(path = findModel(florCollection)).isEmpty()) return path;
+        if (!(path = findModel(miscCollection)).isEmpty()) return path;
+        if (!(path = findModel(msttCollection)).isEmpty()) return path;
+        if (!(path = findModel(lighCollection)).isEmpty()) return path;
+        if (!(path = findModel(alchCollection)).isEmpty()) return path;
+        if (!(path = findModel(ingrCollection)).isEmpty()) return path;
+        if (!(path = findModel(bookCollection)).isEmpty()) return path;
+        if (!(path = findModel(weaponCollection)).isEmpty()) return path;
+        if (!(path = findModel(armorCollection)).isEmpty()) return path;
+    }
     return QString();
 }
 
@@ -1622,6 +1671,7 @@ int Data::preload(const QString& filename, bool base_)
         for (const RecordIndexEntry& entry : fileIndex)
         {
             m_masterIndex.push_back({ entry.type, entry.formId, entry.offset, masterFileIdx });
+            m_masterIndexByFormId.insert(entry.formId, m_masterIndex.size() - 1);
         }
         LOG_INFO(QString("Data::preload: indexed master %1: %2 records in %3 ms")
             .arg(filename)

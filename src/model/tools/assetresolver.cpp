@@ -213,12 +213,21 @@ QString AssetResolver::resolveOrExtract(const QString& relativePath, const QStri
     ArchiveEntryRef ref = s_index.value(canon);
     if (ref.archivePath.isEmpty() && !s_scanned)
     {
-        QDir dir(dataDir);
-        const QStringList archives = dir.entryList({QStringLiteral("*.ba2"), QStringLiteral("*.bsa")}, QDir::Files);
-        for (const QString& archFile : archives)
+        QStringList searchDirs = { dataDir };
+        QDir baseDir(dataDir);
+        if (baseDir.exists(QStringLiteral("Data")))
+            searchDirs.append(baseDir.filePath(QStringLiteral("Data")));
+        if (baseDir.exists(QStringLiteral("DLC")))
+            searchDirs.append(baseDir.filePath(QStringLiteral("DLC")));
+
+        for (const QString& sDir : searchDirs)
         {
-            const QString fullArch = dir.filePath(archFile);
-            if (archFile.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive))
+            QDir dir(sDir);
+            const QStringList archives = dir.entryList({QStringLiteral("*.ba2"), QStringLiteral("*.bsa")}, QDir::Files);
+            for (const QString& archFile : archives)
+            {
+                const QString fullArch = dir.filePath(archFile);
+                if (archFile.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive))
             {
                 Ba2Archive ba2;
                 if (ba2.open(fullArch))
@@ -256,6 +265,7 @@ QString AssetResolver::resolveOrExtract(const QString& relativePath, const QStri
                     }
                 }
             }
+        }
         }
         s_scanned = true;
         ref = s_index.value(canon);

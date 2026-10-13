@@ -105,7 +105,7 @@ struct FilePaths
 
         if (defaultPaths.contains(game) && !defaultPaths[game].isEmpty())
         {
-            dataDir.setPath(defaultPaths[game]);
+            programDir.setPath(defaultPaths[game]);
         }
 
         if (gameId == Game_None)

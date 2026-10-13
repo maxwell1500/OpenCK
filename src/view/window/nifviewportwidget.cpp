@@ -1244,9 +1244,9 @@ void NifViewportWidget::setSelectedRefIndex(int index)
 
 void NifViewportWidget::focusOnReference(const QVector3D& gameUnitsPos)
 {
-    cameraPos = gameUnitsPos * 0.01f;  // cameraPos lives in view space where model scales 0.01
-    if (qAbs(rotationX) < 5.0f) {
-        rotationX = -60.0f;
+    cameraPos = gameUnitsPos;
+    if (qAbs(rotationX) < 5.0f && qAbs(rotationY) < 5.0f) {
+        rotationX = -35.0f;
         rotationY = -45.0f;
     }
     updateCamera();
@@ -1530,6 +1530,7 @@ void NifViewportWidget::setupShaders()
         void main()
         {
             vec3 normal = normalize(vNormal);
+            if (!gl_FrontFacing) normal = -normal;
             vec3 lightDirection = normalize(lightDir);
 
             float ambient = ambientStrength;
@@ -2936,21 +2937,38 @@ gizmo::ViewTransform NifViewportWidget::currentViewTransform() const
     const float w = glWidget ? static_cast<float>(glWidget->width()) : 800.0f;
     const float h = glWidget ? qMax(1.0f, static_cast<float>(glWidget->height())) : 600.0f;
     const float aspect = w / h;
-    const float halfExtent = 50.0f / qMax(0.01f, zoom);
+
+    const bool isCellMode = (!cellReferences.isEmpty() || m_terrain.hasTerrain);
 
     QMatrix4x4 model;
-    model.scale(0.01f);
-    float rotXRad = rotationX * 3.14159265f / 180.0f;
-    float rotYRad = rotationY * 3.14159265f / 180.0f;
-    QMatrix4x4 rotXMatrix;
-    rotXMatrix.rotate(rotXRad, 1.0f, 0.0f, 0.0f);
-    QMatrix4x4 rotYMatrix;
-    rotYMatrix.rotate(rotYRad, 0.0f, 1.0f, 0.0f);
-    QMatrix4x4 view = rotYMatrix * rotXMatrix;
-    view.translate(-cameraPos);
-
+    QMatrix4x4 view;
     QMatrix4x4 proj;
-    proj.ortho(-halfExtent * aspect, halfExtent * aspect, -halfExtent, halfExtent, -5000.0f, 5000.0f);
+
+    if (isCellMode)
+    {
+        proj.perspective(60.0f, aspect, 10.0f, 250000.0f);
+
+        const float dist = 1200.0f / qMax(0.05f, zoom);
+        view.translate(0.0f, 0.0f, -dist);
+        view.rotate(rotationX, 1.0f, 0.0f, 0.0f);
+        view.rotate(rotationY, 0.0f, 0.0f, 1.0f);
+        view.translate(-cameraPos);
+    }
+    else
+    {
+        const float halfExtent = 50.0f / qMax(0.01f, zoom);
+        model.scale(0.01f);
+        float rotXRad = rotationX * 3.14159265f / 180.0f;
+        float rotYRad = rotationY * 3.14159265f / 180.0f;
+        QMatrix4x4 rotXMatrix;
+        rotXMatrix.rotate(rotXRad, 1.0f, 0.0f, 0.0f);
+        QMatrix4x4 rotYMatrix;
+        rotYMatrix.rotate(rotYRad, 0.0f, 1.0f, 0.0f);
+        view = rotYMatrix * rotXMatrix;
+        view.translate(-cameraPos);
+        proj.ortho(-halfExtent * aspect, halfExtent * aspect, -halfExtent, halfExtent, -5000.0f, 5000.0f);
+    }
+
     return { view, model, proj, glWidget ? glWidget->size() : QSize(800, 600) };
 }
 
@@ -3106,7 +3124,7 @@ QMatrix4x4 NifViewportWidget::refRotationMatrix(const ViewportCellRef& ref)
     const float toDeg = 57.2957795f;
     rotation.rotate(ref.rotZ * toDeg, 0.0f, 0.0f, 1.0f);
     rotation.rotate(ref.rotY * toDeg, 0.0f, 1.0f, 0.0f);
-    rotation.rotate(ref.rotX * toDeg, 1.0f, 0.0f, 1.0f);
+    rotation.rotate(ref.rotX * toDeg, 1.0f, 0.0f, 0.0f);
     return rotation;
 }
 
@@ -3396,15 +3414,15 @@ void NifViewportWidget::wheelEvent(QWheelEvent* event)
 
 void NifViewportWidget::keyPressEvent(QKeyEvent* event)
 {
-    float moveSpeed = (0.5f / zoom) * m_cameraSpeedMultiplier;
+    const bool isCellMode = (!cellReferences.isEmpty() || m_terrain.hasTerrain);
+    float moveSpeed = (isCellMode ? 64.0f : 0.5f / zoom) * m_cameraSpeedMultiplier;
     float rotXRad = rotationX * 3.14159265f / 180.0f;
     float rotYRad = rotationY * 3.14159265f / 180.0f;
 
     QVector3D forward(-sinf(rotYRad) * cosf(rotXRad),
-                      sinf(rotXRad),
-                      -cosf(rotYRad) * cosf(rotXRad));
-    QVector3D right(cosf(rotYRad), 0.0f, -sinf(rotYRad));
-
+                      cosf(rotYRad) * cosf(rotXRad),
+                      sinf(rotXRad));
+    QVector3D right(cosf(rotYRad), sinf(rotYRad), 0.0f);
     switch (event->key()) {
     case Qt::Key_Q:
         if (mSelectedRefIndex >= 0) {
