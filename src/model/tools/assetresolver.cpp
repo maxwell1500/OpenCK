@@ -210,10 +210,54 @@ QString AssetResolver::resolveOrExtract(const QString& relativePath, const QStri
     }
 
     const QString canon = canonical(norm);
+
+    // Archives are indexed lazily, one open() per archive, because a single
+    // open() parses that archive's whole name table. The shipped install has
+    // 107 BA2s and roughly 750k entries between them; indexing every one of
+    // them on the first lookup blocks the UI thread for the length of a cell
+    // load. The archive *names* are cheap, so cache those instead and open
+    // each on demand, stopping at the first archive that holds the path.
+    auto indexArchive = [canon, index = &s_index](const QString& fullArch, bool ba2) -> bool {
+        if (s_index.contains(canon))
+            return true;                        // already found
+        if (ba2) {
+            Ba2Archive a;
+            if (!a.open(fullArch))
+                return false;
+            const auto& entries = a.entries();
+            for (int i = 0; i < entries.size(); ++i) {
+                const QString c = canonical(entries[i].relativePath);
+                if (!s_index.contains(c))
+                    s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
+            }
+            if (a.isTexture()) {
+                const auto& tx = a.textureEntries();
+                for (int i = 0; i < tx.size(); ++i) {
+                    const QString c = canonical(tx[i].relativePath);
+                    if (!s_index.contains(c))
+                        s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
+                }
+            }
+        } else {
+            BsaArchive a;
+            if (!a.open(fullArch))
+                return false;
+            const auto& entries = a.entries();
+            for (int i = 0; i < entries.size(); ++i) {
+                const QString c = canonical(entries[i].fullPath);
+                if (!s_index.contains(c))
+                    s_index.insert(c, {fullArch, static_cast<quint32>(i), false});
+            }
+        }
+        return s_index.contains(canon);
+    };
+
     ArchiveEntryRef ref = s_index.value(canon);
     if (ref.archivePath.isEmpty() && !s_scanned)
     {
-        QStringList searchDirs = { dataDir };
+        // Mesh archives first: a NIF never lands in a Textures*.ba2, and those
+        // are the largest ones, so trying them first wastes the most time.
+        QStringList searchDirs{dataDir};
         QDir baseDir(dataDir);
         if (baseDir.exists(QStringLiteral("Data")))
             searchDirs.append(baseDir.filePath(QStringLiteral("Data")));
@@ -227,45 +271,14 @@ QString AssetResolver::resolveOrExtract(const QString& relativePath, const QStri
             for (const QString& archFile : archives)
             {
                 const QString fullArch = dir.filePath(archFile);
-                if (archFile.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive))
-            {
-                Ba2Archive ba2;
-                if (ba2.open(fullArch))
-                {
-                    const auto& entries = ba2.entries();
-                    for (int i = 0; i < entries.size(); ++i)
-                    {
-                        const QString c = canonical(entries[i].relativePath);
-                        if (!s_index.contains(c))
-                            s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
-                    }
-                    if (ba2.isTexture())
-                    {
-                        const auto& txEntries = ba2.textureEntries();
-                        for (int i = 0; i < txEntries.size(); ++i)
-                        {
-                            const QString c = canonical(txEntries[i].relativePath);
-                            if (!s_index.contains(c))
-                                s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
-                        }
-                    }
-                }
+                const bool ba2 = archFile.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive);
+                if (!ba2 && !archFile.endsWith(QStringLiteral(".bsa"), Qt::CaseInsensitive))
+                    continue;
+                if (indexArchive(fullArch, ba2))
+                    break;                      // found; stop opening archives
             }
-            else if (archFile.endsWith(QStringLiteral(".bsa"), Qt::CaseInsensitive))
-            {
-                BsaArchive bsa;
-                if (bsa.open(fullArch))
-                {
-                    const auto& entries = bsa.entries();
-                    for (int i = 0; i < entries.size(); ++i)
-                    {
-                        const QString c = canonical(entries[i].fullPath);
-                        if (!s_index.contains(c))
-                            s_index.insert(c, {fullArch, static_cast<quint32>(i), false});
-                    }
-                }
-            }
-        }
+            if (s_index.contains(canon))
+                break;
         }
         s_scanned = true;
         ref = s_index.value(canon);

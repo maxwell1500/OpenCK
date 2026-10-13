@@ -1070,6 +1070,15 @@ void NifViewportWidget::setCellReferences(const QVector<ViewportCellRef>& refs)
     m_cellRefVBO.dirty = true;
     m_cellRefSolidVBO.dirty = true;
     m_cellGridVBO.dirty = true;
+    // Loading a model parses a NIF, streams a .mesh out of a BA2 and uploads
+    // GPU buffers. Doing that from inside paintEvent means the first frame of
+    // every new cell blocks the UI thread once per unique model. Warm the cache
+    // here instead: it is still the UI thread, but it happens once, and the
+    // subsequent frames are pure draws.
+    for (const ViewportCellRef& ref : cellReferences) {
+        if (ref.enabled && !ref.modelPath.isEmpty())
+            getOrLoadCellModel(ref.modelPath);
+    }
     glWidget->update();
 }
 
