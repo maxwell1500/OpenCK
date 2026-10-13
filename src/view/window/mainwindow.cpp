@@ -517,6 +517,7 @@ void MainWindow::setData(Data* data)
                 // Preview selected object in the 3D Render Viewport
                 if (nifViewportWidget)
                 {
+                    nifViewportWidget->setCellReferences({});
                     QString modelPath = objectWindowDock->getModelPathForRecord(cat, rec);
                     bool loaded = false;
                     if (!modelPath.isEmpty() && mData)
@@ -536,6 +537,7 @@ void MainWindow::setData(Data* data)
                         if (type == CkId::Type_Weap_) prim = PrimitiveMeshGenerator::Type::Cylinder;
                         else if (type == CkId::Type_Spel_ || type == CkId::Type_Ligh_) prim = PrimitiveMeshGenerator::Type::Sphere;
                         else if (type == CkId::Type_Acti_ || type == CkId::Type_Door_) prim = PrimitiveMeshGenerator::Type::Cylinder;
+                        else if (type == CkId::Type_Npc_ || type == CkId::Type_Crea_) prim = PrimitiveMeshGenerator::Type::Cylinder;
                         nifViewportWidget->showPreviewPrimitive(prim, 50.0f);
                     }
                 }

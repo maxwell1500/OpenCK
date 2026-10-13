@@ -186,9 +186,22 @@ public:
     bool isCollisionEnabled() const { return collisionEnabled; }
     void setSkyEnabled(bool enabled);
     bool isSkyEnabled() const { return m_skyEnabled; }
+
+    enum class TimeOfDay {
+        Noon,       // Bright midday sun
+        Morning,    // Warm golden dawn
+        Sunset,     // Dusk / orange sunset
+        Night       // Cool blue moonlight
+    };
+
+    void setTimeOfDay(TimeOfDay tod);
+    TimeOfDay timeOfDay() const { return mTimeOfDay; }
+    void setDefaultLightingEnabled(bool enabled);
+    bool isDefaultLightingEnabled() const { return mDefaultLighting; }
+    void resetViewToObject();
+
     void setCameraSpeedMultiplier(float mult) { m_cameraSpeedMultiplier = mult; }
     float cameraSpeedMultiplier() const { return m_cameraSpeedMultiplier; }
-
     /// Current free-fly camera position, in game units.
     QVector3D cameraPosition() const { return cameraPos; }
 
@@ -263,6 +276,12 @@ private:
     bool collisionEnabled = false;
     float m_cameraSpeedMultiplier = 1.0f;
     bool m_skyEnabled = false;
+    TimeOfDay mTimeOfDay = TimeOfDay::Noon;
+    bool mDefaultLighting = true;
+    QVector3D mLightDir = QVector3D(0.4f, 1.0f, 0.3f);
+    QVector3D mLightColor = QVector3D(1.0f, 0.98f, 0.92f);
+    float mAmbientStrength = 0.65f;
+    QColor mSkyColor = QColor(107, 153, 217);
     bool navmeshEnabled = false;
     QVector<QVector3D> navmeshTriangles;
     QVector<QVector3D> navmeshVertices;

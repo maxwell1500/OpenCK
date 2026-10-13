@@ -353,6 +353,26 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     toolbar->addWidget(gridBtn);
     connect(gridBtn, &QPushButton::toggled, this, &NifViewportWidget::setGridEnabled);
 
+    toolbar->addSeparator();
+    auto* todLabel = new QLabel(tr("Sun:"), toolbar);
+    toolbar->addWidget(todLabel);
+
+    auto* todCombo = new QComboBox(toolbar);
+    todCombo->setObjectName("todCombo");
+    todCombo->addItems({tr("Day (Noon)"), tr("Morning (Dawn)"), tr("Sunset (Dusk)"), tr("Night")});
+    todCombo->setCurrentIndex(0);
+    toolbar->addWidget(todCombo);
+    connect(todCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int idx) {
+        setTimeOfDay(static_cast<TimeOfDay>(idx));
+    });
+
+    auto* defaultLightBtn = new QPushButton(tr("Light (A)"), toolbar);
+    defaultLightBtn->setCheckable(true);
+    defaultLightBtn->setChecked(mDefaultLighting);
+    defaultLightBtn->setObjectName("defaultLightBtn");
+    defaultLightBtn->setToolTip(tr("Toggle Creation Kit bright default lighting"));
+    toolbar->addWidget(defaultLightBtn);
+    connect(defaultLightBtn, &QPushButton::toggled, this, &NifViewportWidget::setDefaultLightingEnabled);
     auto* axisBtn = new QPushButton(tr("Axis"));
     axisBtn->setCheckable(true);
     axisBtn->setObjectName("axisBtn");
@@ -507,10 +527,12 @@ void NifViewportWidget::loadNif(const QString& fileName)
         currentNifFile = fileName;
         nifFileDir = QFileInfo(fileName).absolutePath();
         LOG_INFO("NIF loaded successfully");
+        clearPreviewPrimitive();
         buildMesh();
         buildHierarchyTree();
         initAnimationState();
         initParticleSystems();
+        resetViewToObject();
         glWidget->update();
     } else {
         LOG_ERROR("Failed to load NIF");
@@ -593,18 +615,75 @@ void NifViewportWidget::showPreviewPrimitive(PrimitiveMeshGenerator::Type type, 
 
     QVector<OverlayVertex> verts;
     verts.reserve(mesh.vertices.size());
-    const QVector3D color(0.55f, 0.75f, 0.95f);
-    for (const QVector3D& v : mesh.vertices)
+    const QVector3D baseColor(0.85f, 0.88f, 0.94f);
+
+    // Compute face normals and light shading so the primitive has clear 3D definition
+    for (int i = 0; i + 2 < mesh.vertices.size(); i += 3)
     {
-        verts.append({ v, color });
+        const QVector3D& v0 = mesh.vertices[i];
+        const QVector3D& v1 = mesh.vertices[i + 1];
+        const QVector3D& v2 = mesh.vertices[i + 2];
+        QVector3D normal = QVector3D::crossProduct(v1 - v0, v2 - v0).normalized();
+        float diff = qMax(0.25f, QVector3D::dotProduct(normal, mLightDir.normalized()));
+        QVector3D faceColor = baseColor * (0.45f + 0.55f * diff);
+
+        verts.append({ v0, faceColor });
+        verts.append({ v1, faceColor });
+        verts.append({ v2, faceColor });
     }
-    if (m_primitiveVBO.dirty || m_primitiveVBO.vertexCount != verts.size())
-    {
-        m_primitiveVBO.build(verts, GL_TRIANGLES);
-    }
+
+    m_primitiveVBO.build(verts, GL_TRIANGLES);
+    resetViewToObject();
     glWidget->update();
     LOG_INFO(QString("Showing preview primitive (%1 triangles)")
         .arg(mesh.triangleCount()));
+}
+
+void NifViewportWidget::resetViewToObject()
+{
+    cameraPos = QVector3D(0.0f, 0.0f, 0.0f);
+    zoom = 1.0f;
+    rotationX = 20.0f;
+    rotationY = 45.0f;
+    if (glWidget) glWidget->update();
+}
+
+void NifViewportWidget::setTimeOfDay(TimeOfDay tod)
+{
+    mTimeOfDay = tod;
+    switch (tod) {
+    case TimeOfDay::Noon:
+        mLightDir = QVector3D(0.4f, 1.0f, 0.3f).normalized();
+        mLightColor = QVector3D(1.0f, 0.98f, 0.92f);
+        mAmbientStrength = 0.65f;
+        mSkyColor = QColor(107, 153, 217);
+        break;
+    case TimeOfDay::Morning:
+        mLightDir = QVector3D(-0.8f, 0.4f, 0.3f).normalized();
+        mLightColor = QVector3D(1.0f, 0.80f, 0.55f);
+        mAmbientStrength = 0.50f;
+        mSkyColor = QColor(153, 122, 140);
+        break;
+    case TimeOfDay::Sunset:
+        mLightDir = QVector3D(0.85f, 0.30f, -0.3f).normalized();
+        mLightColor = QVector3D(1.0f, 0.60f, 0.35f);
+        mAmbientStrength = 0.45f;
+        mSkyColor = QColor(140, 89, 115);
+        break;
+    case TimeOfDay::Night:
+        mLightDir = QVector3D(-0.3f, 0.85f, -0.4f).normalized();
+        mLightColor = QVector3D(0.45f, 0.55f, 0.80f);
+        mAmbientStrength = 0.30f;
+        mSkyColor = QColor(20, 26, 46);
+        break;
+    }
+    if (glWidget) glWidget->update();
+}
+
+void NifViewportWidget::setDefaultLightingEnabled(bool enabled)
+{
+    mDefaultLighting = enabled;
+    if (glWidget) glWidget->update();
 }
 
 void NifViewportWidget::clearPreviewPrimitive()
@@ -995,6 +1074,7 @@ void NifViewportWidget::setupShaders()
         out vec4 FragColor;
 
         uniform vec3 lightDir;
+        uniform vec3 lightColor;
         uniform vec3 objectColor;
         uniform float shininess;
         uniform vec3 emissionColor;
@@ -1019,7 +1099,7 @@ void NifViewportWidget::setupShaders()
 
             vec4 texColor = useTexture ? texture(tex, vTexCoord) : vec4(1.0);
             vec3 materialColor = objectColor * vColor.rgb;
-            vec3 lit = (ambient + diffuse) * materialColor * texColor.rgb + spec * specularColor;
+            vec3 lit = (ambient * materialColor + diffuse * lightColor * materialColor) * texColor.rgb + spec * specularColor;
             vec3 result = lit + emissionColor * materialColor;
 
             FragColor = vec4(result, texColor.a * vColor.a * opacity);
@@ -1032,12 +1112,13 @@ void NifViewportWidget::setupShaders()
 
     shaderProgram->bind();
 
-    shaderProgram->setUniformValue("lightDir", QVector3D(0.5f, 1.0f, 0.3f));
+    shaderProgram->setUniformValue("lightDir", mLightDir);
+    shaderProgram->setUniformValue("lightColor", mLightColor);
     shaderProgram->setUniformValue("shininess", 32.0f);
     shaderProgram->setUniformValue("objectColor", QVector3D(0.7f, 0.7f, 0.8f));
     shaderProgram->setUniformValue("emissionColor", QVector3D(0.0f, 0.0f, 0.0f));
     shaderProgram->setUniformValue("opacity", 1.0f);
-    shaderProgram->setUniformValue("ambientStrength", 0.3f);
+    shaderProgram->setUniformValue("ambientStrength", 0.65f);
     shaderProgram->setUniformValue("specularStrength", 1.0f);
     shaderProgram->setUniformValue("specularColor", QVector3D(0.0f, 0.0f, 0.0f));
 
@@ -1508,7 +1589,9 @@ void NifViewportWidget::renderMesh()
     shaderProgram->setUniformValue("mModel", model);
     shaderProgram->setUniformValue("mView", view);
     shaderProgram->setUniformValue("mProjection", QMatrix4x4());
-    shaderProgram->setUniformValue("lightDir", QVector3D(0.5f, 1.0f, 0.3f));
+    shaderProgram->setUniformValue("lightDir", mLightDir);
+    shaderProgram->setUniformValue("lightColor", mLightColor);
+    shaderProgram->setUniformValue("ambientStrength", mDefaultLighting ? 0.75f : mAmbientStrength);
     shaderProgram->setUniformValue("shininess", 32.0f);
     shaderProgram->setUniformValue("tex", 0);
 
@@ -1798,10 +1881,8 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
     QMatrix4x4 proj;
 
     glWidget->makeCurrent();
-    if (m_skyEnabled)
-        glClearColor(0.38f, 0.58f, 0.86f, 1.0f);
-    else
-        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+    const QColor clearCol = (m_skyEnabled || !mDefaultLighting) ? mSkyColor : QColor(90, 130, 180);
+    glClearColor(clearCol.redF(), clearCol.greenF(), clearCol.blueF(), 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
