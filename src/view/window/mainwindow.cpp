@@ -20,6 +20,7 @@
 #include "../../model/tools/plugincompactor.hpp"
 #include "../../model/tools/formidcompactor.hpp"
 #include "../../model/tools/bnetclient.hpp"
+#include "../../model/tools/assetresolver.hpp"
 #include "../../model/doc/messages.hpp"
 #include "../../model/doc/document.hpp"
 #include "filepaths.hpp"
@@ -359,6 +360,7 @@ void MainWindow::setData(Data* data)
                 const QString id = QStringLiteral("0x%1").arg(rec.formId, 8, 16, QChar('0'));
                 if (mStatusSelectedObject) mStatusSelectedObject->setText(QStringLiteral("REFR %1").arg(id));
                 if (mInspectorWidget) mInspectorWidget->showComponents(&rec.components, QStringLiteral("Reference %1").arg(id));
+                if (mCellViewPanel) mCellViewPanel->selectRefByFormId(rec.formId);
             });
 
             // Live transform readout in the status bar while dragging
@@ -443,6 +445,22 @@ void MainWindow::setData(Data* data)
                 }
             });
 
+            // Double clicking a ref in Cell View centers the 3D viewport on it
+            connect(mCellViewPanel, &CellViewPanel::refDoubleClicked,
+                    this, [this](quint32 formId) {
+                if (!mData || !nifViewportWidget) return;
+                const int idx = mData->getRefrCollection().searchId(
+                    QStringLiteral("%1").arg(formId, 8, 16, QLatin1Char('0')));
+                if (idx >= 0)
+                {
+                    nifViewportWidget->setSelectedRefByDataIndex(idx);
+                }
+            });
+
+            // Selecting or double-clicking a cell loads its references into the viewport
+            connect(mCellViewPanel, &CellViewPanel::cellSelected, this, &MainWindow::loadCellIntoViewport);
+            connect(mCellViewPanel, &CellViewPanel::cellDoubleClicked, this, &MainWindow::loadCellIntoViewport);
+
             // Cell View cursor position -> status bar cell coords
             connect(mCellViewPanel, &CellViewPanel::cursorWorldPos,
                     this, [this](const QPointF& wp) {
@@ -495,6 +513,32 @@ void MainWindow::setData(Data* data)
                 if (mStatusSelectedObject)
                     mStatusSelectedObject->setText(QStringLiteral("%1: %2")
                         .arg(lookup.recordType, eid));
+
+                // Preview selected object in the 3D Render Viewport
+                if (nifViewportWidget)
+                {
+                    QString modelPath = objectWindowDock->getModelPathForRecord(cat, rec);
+                    bool loaded = false;
+                    if (!modelPath.isEmpty() && mData)
+                    {
+                        QString resolved = resolveNifFilePath(modelPath);
+                        if (!resolved.isEmpty() && QFileInfo::exists(resolved))
+                        {
+                            nifViewportWidget->loadNif(resolved);
+                            loaded = true;
+                        }
+                    }
+                    if (!loaded)
+                    {
+                        // Render an informative 3D preview primitive matching the category type
+                        PrimitiveMeshGenerator::Type prim = PrimitiveMeshGenerator::Type::Cube;
+                        CkId::Type type = static_cast<CkId::Type>(objectWindowDock->getCategoryType(cat));
+                        if (type == CkId::Type_Weap_) prim = PrimitiveMeshGenerator::Type::Cylinder;
+                        else if (type == CkId::Type_Spel_ || type == CkId::Type_Ligh_) prim = PrimitiveMeshGenerator::Type::Sphere;
+                        else if (type == CkId::Type_Acti_ || type == CkId::Type_Door_) prim = PrimitiveMeshGenerator::Type::Cylinder;
+                        nifViewportWidget->showPreviewPrimitive(prim, 50.0f);
+                    }
+                }
             });
         }
         
@@ -2341,14 +2385,27 @@ void MainWindow::on_actionWorldspaces_triggered()
 {
     if (mData)
     {
-        WorldspacesDialog dialog(mData, this);
-        dialog.exec();
+        auto* dialog = new WorldspacesDialog(mData, this);
+        connect(dialog, &WorldspacesDialog::worldspaceSelected, this, [this](const QString& wsId) {
+            if (mCellViewPanel)
+            {
+                mCellViewPanel->setCurrentWorldspace(wsId);
+                if (mCellViewDock)
+                {
+                    mCellViewDock->toggleView(true);
+                    mCellViewDock->setAsCurrentTab();
+                }
+            }
+        });
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->show();
     }
     else
     {
         LOG_INFO("Worldspaces: No data loaded");
     }
 }
+
 
 void MainWindow::on_actionCells_triggered()
 {
@@ -3711,4 +3768,95 @@ void MainWindow::duplicateViewportSelection()
     {
         delete macro;
     }
+}
+
+QString MainWindow::resolveNifFilePath(const QString& relPath) const
+{
+    if (relPath.isEmpty() || !mData) return QString();
+    if (QFileInfo::exists(relPath)) return relPath;
+
+    const QString dataDir = mData->getPaths().dataDir.absolutePath();
+    const QString candidate1 = dataDir + "/" + relPath;
+    if (QFileInfo::exists(candidate1)) return candidate1;
+
+    const QString norm = relPath.startsWith(QLatin1String("meshes/"), Qt::CaseInsensitive) ||
+                         relPath.startsWith(QLatin1String("meshes\\"), Qt::CaseInsensitive)
+        ? relPath
+        : QStringLiteral("meshes/") + relPath;
+
+    const QString candidate2 = dataDir + "/" + norm;
+    if (QFileInfo::exists(candidate2)) return candidate2;
+
+    AssetResolver resolver(dataDir);
+    return resolver.absoluteLoosePath(relPath, dataDir);
+}
+
+void MainWindow::loadCellIntoViewport(quint32 cellFormId)
+{
+    if (!mData || !nifViewportWidget) return;
+
+    QVector<ViewportCellRef> cellRefs;
+    const auto& coll = mData->getRefrCollection();
+    QVector3D avgPos(0, 0, 0);
+    int matchCount = 0;
+
+    // Find cell record to check interior vs exterior
+    const auto& cells = mData->getCellCollection();
+    int cellIdx = cells.searchId(QStringLiteral("%1").arg(cellFormId, 8, 16, QLatin1Char('0')));
+    const CellRecord* cell = (cellIdx >= 0) ? &cells.getRecord(cellIdx).get() : nullptr;
+    const bool isInterior = cell ? ((cell->flags & 1) != 0) : false;
+    const qint32 cx = cell ? static_cast<qint32>(cell->cellX) : 0;
+    const qint32 cy = cell ? static_cast<qint32>(cell->cellY) : 0;
+    constexpr double kCellUnits = 4096.0;
+
+    for (int i = 0; i < coll.size(); ++i)
+    {
+        if (coll.getRecord(i).isDeleted()) continue;
+        const auto& rec = coll.getRecord(i).get();
+
+        bool match = false;
+        if (cellFormId == 0)
+        {
+            match = true;
+        }
+        else
+        {
+            const quint32 pCell = mData->parentCellOfRefr(rec.formId);
+            if (pCell != 0 && pCell == cellFormId)
+            {
+                match = true;
+            }
+            else if (!isInterior && cell)
+            {
+                const qint32 gx = static_cast<qint32>(std::floor(rec.posX / kCellUnits));
+                const qint32 gy = static_cast<qint32>(std::floor(rec.posY / kCellUnits));
+                if (gx == cx && gy == cy)
+                    match = true;
+            }
+        }
+
+        if (match)
+        {
+            ViewportCellRef r;
+            r.position = QVector3D(rec.posX, rec.posY, rec.posZ);
+            r.enabled = !rec.initiallyDisabled;
+            r.dataIndex = i;
+            r.rotX = rec.rotX; r.rotY = rec.rotY; r.rotZ = rec.rotZ;
+            r.scale = rec.scale;
+            r.baseFormId = rec.baseId;
+            r.modelPath = mData->getModelPathForFormId(rec.baseId);
+            cellRefs.append(r);
+            avgPos += r.position;
+            ++matchCount;
+        }
+    }
+
+    nifViewportWidget->setCellReferences(cellRefs);
+    if (matchCount > 0)
+    {
+        avgPos /= static_cast<float>(matchCount);
+        nifViewportWidget->focusOnReference(avgPos);
+    }
+    updateStatus(tr("Cell 0x%1: loaded %2 reference(s)")
+        .arg(cellFormId, 8, 16, QChar('0')).arg(cellRefs.size()));
 }

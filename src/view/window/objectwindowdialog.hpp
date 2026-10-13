@@ -75,7 +75,8 @@ public:
     QLineEdit* getFilterEdit() const { return mFilterEdit; }
     CellRecord* getSelectedCell() const;
     bool selectRecord(const QString& idOrFormId);
-
+    QString getModelPathForRecord(int categoryId, int recordIndex) const;
+    int getCategoryType(int categoryId) const;
     struct RecordLookupResult {
         openck::FormComponents* components = nullptr;
         void* recordPtr = nullptr;
@@ -102,7 +103,6 @@ private:
     void addRecordInSelectedCategory();
     void updateAddButton(const QModelIndex& index);
     int getSelectedCategoryId(const QModelIndex& index) const;
-    QString getModelPathForRecord(int categoryId, int recordIndex) const;
     void refreshSavedFilters();
     void refreshColumnLayouts();
     QByteArray captureColumnState() const;

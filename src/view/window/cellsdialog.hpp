@@ -113,7 +113,7 @@ signals:
 public slots:
     void selectCellByFormId(quint32 cellFormId);
     void selectRefByFormId(quint32 refrFormId);
-
+    bool setCurrentWorldspace(const QString& editorId);
 private slots:
     void onWorldspaceChanged(int index);
     void onCellSelected(const QModelIndex& index);

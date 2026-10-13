@@ -7,6 +7,8 @@
 
 class Data;
 
+class WorldspaceTableModel;
+
 class WorldspacesDialog : public QDialog
 {
     Q_OBJECT
@@ -14,10 +16,18 @@ class WorldspacesDialog : public QDialog
 public:
     explicit WorldspacesDialog(Data* data, QWidget* parent = nullptr);
 
+signals:
+    void worldspaceSelected(const QString& editorId);
+
+private slots:
+    void onOpenInCellView();
+    void onEditDetails();
+    void onItemDoubleClicked(const QModelIndex& index);
+
 private:
     Data* mData;
     QTreeView* mTreeView;
-    QAbstractItemModel* mModel;
+    WorldspaceTableModel* mModel;
 };
 
 #endif // WORLDSACEDIALOG_HPP

@@ -184,6 +184,9 @@ private:
     void saveUiState();
     void restoreUiState();
 
+    void loadCellIntoViewport(quint32 cellFormId);
+    QString resolveNifFilePath(const QString& relPath) const;
+
     Ui::mainwindow *ui;
     Data* mData;
     Document* mDocument = nullptr;

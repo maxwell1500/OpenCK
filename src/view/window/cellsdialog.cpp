@@ -820,6 +820,21 @@ void CellViewPanel::selectRefByFormId(quint32 refrFormId)
         }
     }
 }
+bool CellViewPanel::setCurrentWorldspace(const QString& editorId)
+{
+    if (!mWorldspaceCombo) return false;
+    for (int i = 0; i < mWorldspaceCombo->count(); ++i)
+    {
+        if (mWorldspaceCombo->itemData(i).toString().compare(editorId, Qt::CaseInsensitive) == 0
+            || mWorldspaceCombo->itemText(i).compare(editorId, Qt::CaseInsensitive) == 0)
+        {
+            mWorldspaceCombo->setCurrentIndex(i);
+            return true;
+        }
+    }
+    return false;
+}
+
 
 void CellViewPanel::onWorldspaceChanged(int index)
 {

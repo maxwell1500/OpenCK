@@ -2005,6 +2005,11 @@ void ObjectWindowDialog::onDoubleClick(const QModelIndex& index)
         }
     }
 }
+int ObjectWindowDialog::getCategoryType(int categoryId) const
+{
+    return mModel ? mModel->getCategoryType(categoryId) : 0;
+}
+
 
 QString ObjectWindowDialog::getModelPathForRecord(int categoryId, int recordIndex) const
 {
@@ -2078,6 +2083,27 @@ QString ObjectWindowDialog::getModelPathForRecord(int categoryId, int recordInde
     case CkId::Type_Cont_:
     {
         auto& collection = mData->getContCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+            return collection.getRecord(recordIndex).get().modelPath;
+        break;
+    }
+    case CkId::Type_Door_:
+    {
+        auto& collection = mData->getDoorCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+            return collection.getRecord(recordIndex).get().modelPath;
+        break;
+    }
+    case CkId::Type_Furn_:
+    {
+        auto& collection = mData->getFurnCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+            return collection.getRecord(recordIndex).get().modelPath;
+        break;
+    }
+    case CkId::Type_Flor_:
+    {
+        auto& collection = mData->getFlorCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
             return collection.getRecord(recordIndex).get().modelPath;
         break;
