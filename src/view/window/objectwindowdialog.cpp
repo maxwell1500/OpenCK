@@ -367,6 +367,7 @@ void ObjectWindowDialog::setupUI()
     filterLayout->addWidget(new QLabel("Filter:"));
     mFilterEdit = new QLineEdit();
     mFilterEdit->setPlaceholderText("Search by Editor ID or Form ID...");
+    mFilterEdit->setClearButtonEnabled(true);
     filterLayout->addWidget(mFilterEdit, 1);
 
     mSavedFilterCombo = new QComboBox();

@@ -21,6 +21,30 @@ void placeIfUnplaced(ads::CDockManager* manager, const QString& name,
         manager->addDockWidget(area, dock);
     if (visible)
         dock->toggleView(true);
+    else
+        dock->toggleView(false);
+}
+
+void placeTabIfUnplaced(ads::CDockManager* manager, const QString& name,
+                        const QString& targetDockName, ads::DockWidgetArea fallbackArea,
+                        bool visible)
+{
+    ads::CDockWidget* dock = manager->findDockWidget(name);
+    if (!dock)
+        return;
+
+    if (!dock->dockAreaWidget())
+    {
+        ads::CDockWidget* targetDock = manager->findDockWidget(targetDockName);
+        if (targetDock && targetDock->dockAreaWidget())
+            manager->addDockWidgetTabToArea(dock, targetDock->dockAreaWidget());
+        else
+            manager->addDockWidget(fallbackArea, dock);
+    }
+    if (visible)
+        dock->toggleView(true);
+    else
+        dock->toggleView(false);
 }
 
 } // namespace
@@ -30,15 +54,26 @@ void WindowLayout::applyDefaultLayout(QMainWindow* window)
     auto* manager = window->findChild<ads::CDockManager*>();
     if (!manager) return;
 
-    // Object Window left; Cell View and Inspector right; Warnings, Object
-    // Palette and Landscape Editor along the bottom. The Render Window is the
-    // pinned central dock and is never moved.
+    // Object Window left (prominent primary browser)
     placeIfUnplaced(manager, QStringLiteral("Object Window"), ads::LeftDockWidgetArea, true);
+
+    // Cell View right (primary reference list)
     placeIfUnplaced(manager, QStringLiteral("Cell View"), ads::RightDockWidgetArea, true);
-    placeIfUnplaced(manager, QStringLiteral("Inspector"), ads::RightDockWidgetArea, true);
-    placeIfUnplaced(manager, QStringLiteral("Warnings"), ads::BottomDockWidgetArea, true);
-    placeIfUnplaced(manager, QStringLiteral("Object Palette"), ads::BottomDockWidgetArea, true);
-    placeIfUnplaced(manager, QStringLiteral("Landscape Editor"), ads::BottomDockWidgetArea, false);
+
+    // Inspector tabbed behind Cell View on the right
+    placeTabIfUnplaced(manager, QStringLiteral("Inspector"), QStringLiteral("Cell View"),
+                       ads::RightDockWidgetArea, false);
+
+    // Warnings bottom (hidden until errors/warnings occur)
+    placeIfUnplaced(manager, QStringLiteral("Warnings"), ads::BottomDockWidgetArea, false);
+
+    // Object Palette tabbed with Warnings at bottom (hidden by default)
+    placeTabIfUnplaced(manager, QStringLiteral("Object Palette"), QStringLiteral("Warnings"),
+                       ads::BottomDockWidgetArea, false);
+
+    // Landscape Editor tabbed at bottom (hidden until triggered from menu)
+    placeTabIfUnplaced(manager, QStringLiteral("Landscape Editor"), QStringLiteral("Warnings"),
+                       ads::BottomDockWidgetArea, false);
 }
 
 void WindowLayout::saveLayout(QMainWindow* window, QSettings& settings)

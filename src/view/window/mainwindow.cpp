@@ -462,15 +462,21 @@ void MainWindow::setData(Data* data)
             mWarningsDock = new ads::CDockWidget("Warnings");
             mWarningsDock->setWidget(mWarningsWidget);
             mDockManager->addDockWidget(ads::BottomDockWidgetArea, mWarningsDock);
+            mWarningsDock->toggleView(false);
         }
 
-        // Create Inspector dock widget
+        // Create Inspector dock widget tabbed behind Cell View
         if (!mInspectorWidget)
         {
             mInspectorWidget = new InspectorWidget(this);
             mInspectorDock = new ads::CDockWidget("Inspector");
             mInspectorDock->setWidget(mInspectorWidget);
-            mDockManager->addDockWidget(ads::RightDockWidgetArea, mInspectorDock);
+            if (mCellViewDock && mCellViewDock->dockAreaWidget())
+                mDockManager->addDockWidgetTabToArea(mInspectorDock, mCellViewDock->dockAreaWidget());
+            else
+                mDockManager->addDockWidget(ads::RightDockWidgetArea, mInspectorDock);
+            mInspectorDock->toggleView(false);
+
             connect(objectWindowDock, &ObjectWindowDialog::recordSelected,
                     this, [this](int cat, int rec, const QString& eid) {
                 auto lookup = objectWindowDock->getFormComponentsForIndex(cat, rec);
@@ -479,6 +485,10 @@ void MainWindow::setData(Data* data)
                         .arg(lookup.recordType)
                         .arg(eid);
                     mInspectorWidget->showComponents(lookup.components, title);
+                    if (mInspectorDock) {
+                        mInspectorDock->toggleView(true);
+                        mInspectorDock->setAsCurrentTab();
+                    }
                 } else {
                     mInspectorWidget->clear();
                 }
@@ -488,14 +498,19 @@ void MainWindow::setData(Data* data)
             });
         }
         
-        // Create Landscape Editor dock widget
+        // Create Landscape Editor dock widget tabbed at bottom
         if (!landscapeEditor)
         {
             landscapeEditor = new LandscapeEditor(this);
             landscapeEditor->setData(mData);
             landscapeDock = new ads::CDockWidget("Landscape Editor");
             landscapeDock->setWidget(landscapeEditor);
-            mDockManager->addDockWidget(ads::BottomDockWidgetArea, landscapeDock);
+            if (mWarningsDock && mWarningsDock->dockAreaWidget())
+                mDockManager->addDockWidgetTabToArea(landscapeDock, mWarningsDock->dockAreaWidget());
+            else
+                mDockManager->addDockWidget(ads::BottomDockWidgetArea, landscapeDock);
+            landscapeDock->toggleView(false);
+
             connect(landscapeDock, &ads::CDockWidget::visibilityChanged, this, [this](bool visible) {
                 if (!visible && landscapeEditor)
                 {
@@ -504,13 +519,17 @@ void MainWindow::setData(Data* data)
             });
         }
         
-        // Create Object Palette dock widget
+        // Create Object Palette dock widget tabbed at bottom
         if (!objectPalette)
         {
             objectPalette = new ObjectPalette(mData, this);
             auto* paletteDockWidget = new ads::CDockWidget("Object Palette");
             paletteDockWidget->setWidget(objectPalette);
-            mDockManager->addDockWidget(ads::BottomDockWidgetArea, paletteDockWidget);
+            if (mWarningsDock && mWarningsDock->dockAreaWidget())
+                mDockManager->addDockWidgetTabToArea(paletteDockWidget, mWarningsDock->dockAreaWidget());
+            else
+                mDockManager->addDockWidget(ads::BottomDockWidgetArea, paletteDockWidget);
+            paletteDockWidget->toggleView(false);
         }
         else
         {
