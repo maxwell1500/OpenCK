@@ -232,7 +232,9 @@ QString MatFile::colorTexture(const QString& materialPath, const QString& dataDi
     if (mat.isEmpty())
         return QString();
 
-    QString tex = textureSlots(mat).value(0);
+    // Slot 0 is the albedo map. See MatChannel for the full measured map and
+    // why no other slot may stand in for it.
+    QString tex = textureSlots(mat).value(MatChannel_Albedo);
     if (tex.isEmpty())
         return QString();
 
