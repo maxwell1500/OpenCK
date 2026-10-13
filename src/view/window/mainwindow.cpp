@@ -317,8 +317,8 @@ void MainWindow::setData(Data* data)
         mValidateBeforeSave = QSettings()
             .value(QStringLiteral("ValidateBeforeSave/Enabled"), false).toBool();
         updateUndoRedoActions();
+        updateWindowTitle();
         updateStatus("Data loaded");
-        
         // Create the 3D Viewport as the central widget (matches real CK layout)
         if (!nifViewportWidget)
             ensureViewport();
@@ -1510,6 +1510,7 @@ void MainWindow::updateUndoRedoActions()
 
     mUndoAction->setEnabled(mUndoStack->canUndo());
     mRedoAction->setEnabled(mUndoStack->canRedo());
+    updateWindowTitle();
 }
 
 void MainWindow::updateStatus(const QString& message)
@@ -2879,6 +2880,8 @@ void MainWindow::updateRecordCount(int count)
 
 void MainWindow::updatePluginInfo(const QString& pluginName)
 {
+    mCurrentPluginName = pluginName;
+    updateWindowTitle();
     if (mStatusPluginInfo)
     {
         if (pluginName.isEmpty())
@@ -2886,6 +2889,20 @@ void MainWindow::updatePluginInfo(const QString& pluginName)
         else
             mStatusPluginInfo->setText(QString("Plugin: %1").arg(pluginName));
     }
+}
+
+void MainWindow::updateWindowTitle()
+{
+    QString title = QStringLiteral("OpenCK");
+    if (!mCurrentPluginName.isEmpty())
+    {
+        title += QStringLiteral(" - %1").arg(mCurrentPluginName);
+    }
+    if (mUndoStack && !mUndoStack->isClean())
+    {
+        title += QStringLiteral(" *");
+    }
+    setWindowTitle(title);
 }
 
 void MainWindow::showProgress(int value, int maximum)
@@ -2906,10 +2923,35 @@ void MainWindow::hideProgress()
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
+    if (mUndoStack && !mUndoStack->isClean())
+    {
+        const QString docName = mCurrentPluginName.isEmpty() ? tr("the active plugin") : mCurrentPluginName;
+        auto res = QMessageBox::question(
+            this,
+            tr("Save Changes"),
+            tr("Save changes to %1 before closing?").arg(docName),
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+            QMessageBox::Save
+        );
+
+        if (res == QMessageBox::Save)
+        {
+            emit actionSave_triggered();
+            saveUiState();
+            event->accept();
+            return;
+        }
+        else if (res == QMessageBox::Cancel)
+        {
+            event->ignore();
+            return;
+        }
+        // Discard: proceed with closing
+    }
+
     saveUiState();
     event->accept();
 }
-
 void MainWindow::saveUiState()
 {
     QString configPath = QCoreApplication::applicationDirPath()
@@ -3821,6 +3863,65 @@ void MainWindow::loadCellIntoViewport(quint32 cellFormId)
     const qint32 cy = cell ? static_cast<qint32>(cell->cellY) : 0;
     constexpr double kCellUnits = 4096.0;
 
+    // Load exterior terrain and water plane if present
+    if (!isInterior && cell)
+    {
+        const auto& lands = mData->getLandCollection();
+        const LandRecord* matchingLand = nullptr;
+        for (int l = 0; l < lands.size(); ++l)
+        {
+            const auto& land = lands.getRecord(l).get();
+            if (land.cellX == cx && land.cellY == cy)
+            {
+                matchingLand = &land;
+                break;
+            }
+        }
+        if (matchingLand && matchingLand->hasHeightData)
+        {
+            nifViewportWidget->setTerrainHeightData(cx, cy, matchingLand->baseHeight, matchingLand->heightData);
+        }
+        else
+        {
+            nifViewportWidget->clearTerrain();
+        }
+
+        bool hasWater = (cell->hasWaterHeight || cell->hasXclw || (cell->flags & 2));
+        nifViewportWidget->setWaterPlane(hasWater, cell->waterHeight, cx, cy);
+    }
+    else
+    {
+        nifViewportWidget->clearTerrain();
+        bool hasWater = cell ? (cell->hasWaterHeight || cell->hasXclw || (cell->flags & 2)) : false;
+        nifViewportWidget->setWaterPlane(hasWater, cell ? cell->waterHeight : 0.0f, cx, cy);
+    }
+
+    // Load navmesh for cell if present
+    QVector<QVector3D> navmTriangles;
+    if (cellFormId != 0)
+    {
+        const auto& navms = mData->getNavmCollection();
+        for (int i = 0; i < navms.size(); ++i)
+        {
+            const auto& navm = navms.getRecord(i).get();
+            if (navm.cellFormId == cellFormId)
+            {
+                for (const auto& tri : navm.triangles)
+                {
+                    if (tri.v0 >= 0 && tri.v0 < navm.vertices.size() &&
+                        tri.v1 >= 0 && tri.v1 < navm.vertices.size() &&
+                        tri.v2 >= 0 && tri.v2 < navm.vertices.size())
+                    {
+                        navmTriangles.append(navm.vertices[tri.v0]);
+                        navmTriangles.append(navm.vertices[tri.v1]);
+                        navmTriangles.append(navm.vertices[tri.v2]);
+                    }
+                }
+            }
+        }
+    }
+    nifViewportWidget->setNavmeshData(navmTriangles);
+
     for (int i = 0; i < coll.size(); ++i)
     {
         if (coll.getRecord(i).isDeleted()) continue;
@@ -3947,9 +4048,26 @@ void MainWindow::onObjectDroppedIntoCell(quint32 baseFormId, const QString& base
     newRef.formId = newFormId;
     newRef.editorId = QStringLiteral("REFR_%1").arg(newFormId, 8, 16, QChar('0')).toUpper();
     newRef.baseId = baseFormId;
+    // Sample terrain elevation if placed on landscape
+    float groundZ = 0.0f;
+    const auto& lands = mData->getLandCollection();
+    int dropCellX = static_cast<int>(std::floor(worldPos.x() / 4096.0f));
+    int dropCellY = static_cast<int>(std::floor(worldPos.y() / 4096.0f));
+    for (int l = 0; l < lands.size(); ++l) {
+        const auto& land = lands.getRecord(l).get();
+        if (land.cellX == dropCellX && land.cellY == dropCellY && land.hasHeightData) {
+            float relX = (worldPos.x() - dropCellX * 4096.0f) / 4096.0f;
+            float relY = (worldPos.y() - dropCellY * 4096.0f) / 4096.0f;
+            int gx = qBound(0, static_cast<int>(relX * 32.0f), 32);
+            int gy = qBound(0, static_cast<int>(relY * 32.0f), 32);
+            groundZ = land.baseHeight + static_cast<float>(land.heightData[gy][gx]) * 8.0f;
+            break;
+        }
+    }
+
     newRef.posX = worldPos.x();
     newRef.posY = worldPos.y();
-    newRef.posZ = worldPos.z();
+    newRef.posZ = (worldPos.z() == 0.0f && groundZ != 0.0f) ? groundZ : worldPos.z();
     newRef.rotX = 0.0f;
     newRef.rotY = 0.0f;
     newRef.rotZ = 0.0f;

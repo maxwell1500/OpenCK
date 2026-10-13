@@ -5,6 +5,7 @@
 #include "../world/irecordcollection.hpp"
 #include "../world/basecollection.hpp"
 #include "../world/verbatimrecord.hpp"
+#include "../tools/undostack.hpp"
 #include "../../view/messageboxhelper.hpp"
 #include "logger.hpp"
 
@@ -138,6 +139,13 @@ void Document::save(const QString& savePath)
         if (!saveFile.commit())
         {
             LOG_ERROR(QString("Commit failed for %1").arg(savePath));
+        }
+        else
+        {
+            this->savePath = savePath;
+            this->newFile = false;
+            if (data && data->getUndoStack())
+                data->getUndoStack()->setClean();
         }
         return;
     }
@@ -593,6 +601,13 @@ void Document::save(const QString& savePath)
     {
         LOG_ERROR(QString("Commit failed for %1: %2")
                       .arg(savePath, saveFile.errorString()));
+    }
+    else
+    {
+        this->savePath = savePath;
+        this->newFile = false;
+        if (data && data->getUndoStack())
+            data->getUndoStack()->setClean();
     }
 }
 

@@ -115,6 +115,7 @@ void UndoStack::clear()
     }
     mHistory.clear();
     mPosition = -1;
+    mCleanIndex = -1;
 }
 
 UndoStack::~UndoStack()

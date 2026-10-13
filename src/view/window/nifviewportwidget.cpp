@@ -1075,6 +1075,146 @@ void NifViewportWidget::setCellReferences(const QVector<ViewportCellRef>& refs)
     glWidget->update();
 }
 
+void NifViewportWidget::setTerrainHeightData(qint32 cellX, qint32 cellY, float baseHeight, const qint8 heightData[33][33])
+{
+    m_terrain.hasTerrain = true;
+    m_terrain.cellX = cellX;
+    m_terrain.cellY = cellY;
+    m_terrain.baseHeight = baseHeight;
+
+    const float minX = cellX * 4096.0f;
+    const float minY = cellY * 4096.0f;
+
+    QVector3D worldPos[33][33];
+    for (int y = 0; y < 33; ++y) {
+        for (int x = 0; x < 33; ++x) {
+            float z = baseHeight + static_cast<float>(heightData[y][x]) * 8.0f;
+            m_terrain.heightGrid[y][x] = z;
+            worldPos[y][x] = QVector3D(minX + x * 128.0f, minY + y * 128.0f, z);
+        }
+    }
+
+    QVector<OverlayVertex> solidVerts;
+    solidVerts.reserve(32 * 32 * 6);
+    QVector<OverlayVertex> wireVerts;
+    wireVerts.reserve(32 * 32 * 4);
+
+    const QVector3D baseColor(0.28f, 0.35f, 0.22f); // Earthy foliage green
+    const QVector3D lightDir = QVector3D(0.3f, 0.4f, 0.86f).normalized();
+    const QVector3D wireColor(0.20f, 0.25f, 0.16f);
+
+    for (int y = 0; y < 32; ++y) {
+        for (int x = 0; x < 32; ++x) {
+            const QVector3D& p00 = worldPos[y][x];
+            const QVector3D& p10 = worldPos[y][x + 1];
+            const QVector3D& p11 = worldPos[y + 1][x + 1];
+            const QVector3D& p01 = worldPos[y + 1][x];
+
+            // Tri 1: p00, p10, p11
+            QVector3D n1 = QVector3D::crossProduct(p10 - p00, p11 - p00).normalized();
+            float diff1 = qBound(0.40f, 0.5f + 0.5f * QVector3D::dotProduct(n1, lightDir), 1.0f);
+            QVector3D c1 = baseColor * diff1;
+
+            solidVerts.append({p00, c1});
+            solidVerts.append({p10, c1});
+            solidVerts.append({p11, c1});
+
+            // Tri 2: p00, p11, p01
+            QVector3D n2 = QVector3D::crossProduct(p11 - p00, p01 - p00).normalized();
+            float diff2 = qBound(0.40f, 0.5f + 0.5f * QVector3D::dotProduct(n2, lightDir), 1.0f);
+            QVector3D c2 = baseColor * diff2;
+
+            solidVerts.append({p00, c2});
+            solidVerts.append({p11, c2});
+            solidVerts.append({p01, c2});
+
+            // Wire edges
+            wireVerts.append({p00, wireColor});
+            wireVerts.append({p10, wireColor});
+            wireVerts.append({p00, wireColor});
+            wireVerts.append({p01, wireColor});
+        }
+    }
+
+    m_terrainSolidVBO.build(solidVerts, GL_TRIANGLES);
+    m_terrainWireVBO.build(wireVerts, GL_LINES);
+    if (glWidget) glWidget->update();
+}
+
+void NifViewportWidget::clearTerrain()
+{
+    m_terrain.hasTerrain = false;
+    m_terrainSolidVBO.clear();
+    m_terrainWireVBO.clear();
+    if (glWidget) glWidget->update();
+}
+
+void NifViewportWidget::setWaterPlane(bool enabled, float waterHeight, qint32 cellX, qint32 cellY)
+{
+    m_terrain.hasWater = enabled;
+    m_terrain.waterHeight = waterHeight;
+    m_terrain.waterCellX = cellX;
+    m_terrain.waterCellY = cellY;
+
+    if (!enabled) {
+        m_waterSolidVBO.clear();
+        if (glWidget) glWidget->update();
+        return;
+    }
+
+    const float minX = cellX * 4096.0f;
+    const float minY = cellY * 4096.0f;
+    const float maxX = minX + 4096.0f;
+    const float maxY = minY + 4096.0f;
+    const float z = waterHeight;
+
+    const QVector3D waterCol(0.12f, 0.38f, 0.55f);
+    QVector<OverlayVertex> waterVerts;
+    waterVerts.reserve(6);
+
+    QVector3D w00(minX, minY, z);
+    QVector3D w10(maxX, minY, z);
+    QVector3D w11(maxX, maxY, z);
+    QVector3D w01(minX, maxY, z);
+
+    waterVerts.append({w00, waterCol});
+    waterVerts.append({w10, waterCol});
+    waterVerts.append({w11, waterCol});
+
+    waterVerts.append({w00, waterCol});
+    waterVerts.append({w11, waterCol});
+    waterVerts.append({w01, waterCol});
+
+    m_waterSolidVBO.build(waterVerts, GL_TRIANGLES);
+    if (glWidget) glWidget->update();
+}
+
+float NifViewportWidget::terrainHeightAt(float worldX, float worldY, float defaultZ) const
+{
+    if (!m_terrain.hasTerrain)
+        return defaultZ;
+
+    const float minX = m_terrain.cellX * 4096.0f;
+    const float minY = m_terrain.cellY * 4096.0f;
+    const float fx = (worldX - minX) / 128.0f;
+    const float fy = (worldY - minY) / 128.0f;
+    if (fx < 0.0f || fx > 32.0f || fy < 0.0f || fy > 32.0f)
+        return defaultZ;
+
+    int x0 = qBound(0, static_cast<int>(std::floor(fx)), 31);
+    int y0 = qBound(0, static_cast<int>(std::floor(fy)), 31);
+    int x1 = x0 + 1;
+    int y1 = y0 + 1;
+    float tx = fx - x0;
+    float ty = fy - y0;
+    float h00 = m_terrain.heightGrid[y0][x0];
+    float h10 = m_terrain.heightGrid[y0][x1];
+    float h01 = m_terrain.heightGrid[y1][x0];
+    float h11 = m_terrain.heightGrid[y1][x1];
+    float h0 = h00 * (1.0f - tx) + h10 * tx;
+    float h1 = h01 * (1.0f - tx) + h11 * tx;
+    return h0 * (1.0f - ty) + h1 * ty;
+}
 void NifViewportWidget::setSelectedRefIndex(int index)
 {
     if (index < -1 || index >= cellReferences.size()) {
@@ -1243,6 +1383,9 @@ void NifViewportWidget::clear()
         m_translateGizmoVBO.clear();
         m_rotateGizmoVBO.clear();
         m_scaleGizmoVBO.clear();
+        m_terrainSolidVBO.clear();
+        m_terrainWireVBO.clear();
+        m_waterSolidVBO.clear();
         clearTextures();
 
     hierarchyTree->clear();
@@ -2453,6 +2596,26 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
 
         glEnable(GL_DEPTH_TEST);
     }
+
+    // Render exterior terrain and water plane
+    if (m_terrain.hasTerrain && m_terrainSolidVBO.vertexCount > 0) {
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(2.0f, 2.0f);
+        m_terrainSolidVBO.draw(m_overlayShader, mvp);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+
+        if (m_terrainWireVBO.vertexCount > 0) {
+            glLineWidth(1.0f);
+            m_terrainWireVBO.draw(m_overlayShader, mvp);
+        }
+    }
+    if (m_terrain.hasWater && m_waterSolidVBO.vertexCount > 0) {
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        m_waterSolidVBO.draw(m_overlayShader, mvp);
+    }
     if (!cellReferences.isEmpty()) {
         QVector<bool> refHasModel(cellReferences.size(), false);
 
@@ -3415,7 +3578,20 @@ void NifViewportWidget::dropEvent(QDropEvent* event)
         const gizmo::PickRay ray = gizmo::pickRay(t, QPointF(dropPoint));
 
         QVector3D dropPos(0.0f, 0.0f, 0.0f);
-        if (std::abs(ray.direction.z()) > 1e-4f) {
+        if (m_terrain.hasTerrain) {
+            float zPlane = m_terrain.baseHeight;
+            if (std::abs(ray.direction.z()) > 1e-4f) {
+                float s = (zPlane - ray.origin.z()) / ray.direction.z();
+                if (s > 0.0f) {
+                    QVector3D hit = ray.origin + ray.direction * s;
+                    hit.setZ(terrainHeightAt(hit.x(), hit.y(), hit.z()));
+                    dropPos = hit;
+                } else {
+                    dropPos = ray.origin + ray.direction * 500.0f;
+                    dropPos.setZ(terrainHeightAt(dropPos.x(), dropPos.y(), 0.0f));
+                }
+            }
+        } else if (std::abs(ray.direction.z()) > 1e-4f) {
             float s = -ray.origin.z() / ray.direction.z();
             if (s > 0.0f) {
                 dropPos = ray.origin + ray.direction * s;

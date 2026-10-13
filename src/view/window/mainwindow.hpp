@@ -186,9 +186,10 @@ private:
     void updateUndoRedoActions();
     void saveUiState();
     void restoreUiState();
-
+    void updateWindowTitle();
     QString resolveNifFilePath(const QString& relPath) const;
     quint32 mLoadedCellFormId = 0;
+    QString mCurrentPluginName;
     Ui::mainwindow *ui;
     Data* mData;
     Document* mDocument = nullptr;

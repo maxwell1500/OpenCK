@@ -169,7 +169,11 @@ public:
     void setCellReferences(const QVector<ViewportCellRef>& refs);
     void setDataDir(const QString& dir);
     QString dataDir() const { return mDataDir; }
-
+    void setTerrainHeightData(qint32 cellX, qint32 cellY, float baseHeight, const qint8 heightData[33][33]);
+    void clearTerrain();
+    void setWaterPlane(bool enabled, float waterHeight, qint32 cellX = 0, qint32 cellY = 0);
+    float terrainHeightAt(float worldX, float worldY, float defaultZ = 0.0f) const;
+    bool hasTerrain() const { return m_terrain.hasTerrain; }
     // Renders a standalone preview primitive (cube/cylinder/plane/sphere)
     // centered at the origin, replacing any loaded NIF mesh display.
     void showPreviewPrimitive(PrimitiveMeshGenerator::Type type, float size = 1.0f);
@@ -326,8 +330,24 @@ private:
     OverlayVBO m_cellRefVBO;
     OverlayVBO m_cellRefSolidVBO;
     OverlayVBO m_nodeAxisVBO_R, m_nodeAxisVBO_G, m_nodeAxisVBO_B;
+    OverlayVBO m_terrainSolidVBO;
+    OverlayVBO m_terrainWireVBO;
+    OverlayVBO m_waterSolidVBO;
     OverlayVBO m_primitiveVBO;
     OverlayVBO m_marqueeVBO;
+
+    struct ViewportTerrain {
+        bool hasTerrain = false;
+        qint32 cellX = 0;
+        qint32 cellY = 0;
+        float baseHeight = 0.0f;
+        float heightGrid[33][33] = {};
+        bool hasWater = false;
+        float waterHeight = 0.0f;
+        qint32 waterCellX = 0;
+        qint32 waterCellY = 0;
+    };
+    ViewportTerrain m_terrain;
 
     QSplitter* mainSplitter;
     QTreeWidget* hierarchyTree;

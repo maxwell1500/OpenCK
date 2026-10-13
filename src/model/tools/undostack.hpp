@@ -19,7 +19,8 @@ public:
     bool canRedo() const;
     int undoCount() const;
     int redoCount() const;
-    
+    bool isClean() const { return mPosition == mCleanIndex; }
+    void setClean() { mCleanIndex = mPosition; }
     QString currentDescription() const;
     QString lastDescription() const;
 
@@ -32,6 +33,7 @@ public:
 private:
     QVector<Command*> mHistory;
     int mPosition;
+    int mCleanIndex = -1;
     int mMaxDepth;
 };
 
