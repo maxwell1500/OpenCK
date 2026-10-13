@@ -205,8 +205,8 @@ NifViewportWidget::NifViewportWidget(QWidget* parent) :
     vbo(QOpenGLBuffer::VertexBuffer),
     ibo(QOpenGLBuffer::IndexBuffer),
     meshBuilt(false),
-    rotationX(0),
-    rotationY(0),
+    rotationX(-60.0f),
+    rotationY(-45.0f),
     zoom(1.0f),
     cameraPos(0.0f, 0.0f, 0.0f),
     dragging(false),
@@ -814,6 +814,10 @@ void NifViewportWidget::setSelectedRefIndex(int index)
 void NifViewportWidget::focusOnReference(const QVector3D& gameUnitsPos)
 {
     cameraPos = gameUnitsPos * 0.01f;  // cameraPos lives in view space where model scales 0.01
+    if (qAbs(rotationX) < 5.0f) {
+        rotationX = -60.0f;
+        rotationY = -45.0f;
+    }
     updateCamera();
 }
 
@@ -1864,7 +1868,8 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
     const QMatrix4x4 mvp = proj * modelView;
 
     glWidget->makeCurrent();
-    const QColor clearCol = (m_skyEnabled || !mDefaultLighting) ? mSkyColor : QColor(90, 130, 180);
+    vao.bind();
+    const QColor clearCol = (m_skyEnabled && !mDefaultLighting) ? mSkyColor : QColor(42, 46, 54);
     glClearColor(clearCol.redF(), clearCol.greenF(), clearCol.blueF(), 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -2184,12 +2189,12 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
                 const QMatrix4x4 rot = refRotationMatrix(ref);
                 const float half = (selected ? 36.0f : 28.0f) * qMax(0.1f, ref.scale);
 
-                QVector3D baseCol(0.40f, 0.60f, 0.85f);
-                QVector3D edgeCol(0.15f, 0.25f, 0.40f);
+                QVector3D baseCol(0.78f, 0.74f, 0.68f);
+                QVector3D edgeCol(0.20f, 0.20f, 0.24f);
                 float armLen = 32.0f;
                 if (selected) {
-                    baseCol = QVector3D(0.20f, 0.90f, 0.95f);
-                    edgeCol = QVector3D(0.0f, 1.0f, 1.0f);
+                    baseCol = QVector3D(0.0f, 0.90f, 1.0f);
+                    edgeCol = QVector3D(1.0f, 0.85f, 0.0f);
                     armLen = 52.0f;
                 } else if (hovered) {
                     baseCol = QVector3D(0.95f, 0.95f, 1.0f);
@@ -2255,11 +2260,14 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
             m_cellRefVBO.build(lineVerts, GL_LINES);
         }
 
-        // Draw solid 3D reference shapes with depth test
+        // Draw solid 3D reference shapes with depth test and polygon offset to eliminate Z-fighting
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(1.0f, 1.0f);
         m_cellRefSolidVBO.draw(m_overlayShader, mvp);
+        glDisable(GL_POLYGON_OFFSET_FILL);
 
-        // Draw wireframe outlines with slight line width
+        // Draw wireframe outlines cleanly in front
         glLineWidth(1.5f);
         m_cellRefVBO.draw(m_overlayShader, mvp);
         glLineWidth(1.0f);
@@ -2324,6 +2332,7 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         m_particleRenderer->render(m_particleSystem, modelView, proj);
     }
 
+    vao.release();
     glWidget->doneCurrent();
 
     if (axisEnabled) {
@@ -2702,24 +2711,12 @@ void NifViewportWidget::mousePressEvent(QMouseEvent* event)
         mMarqueeStart = event->pos();
         mMarqueeCurrent = event->pos();
         return;
-    } else if (event->button() == Qt::RightButton && highlightEnabled) {
-        if (shapeIndexRanges.isEmpty()) return;
-        selectedShape++;
-        if (selectedShape >= shapeIndexRanges.size()) {
-            selectedShape = -1;
-        }
-        m_bboxVBO.dirty = true;
-        if (m_shapePickerCombo) {
-            m_shapePickerCombo->blockSignals(true);
-            m_shapePickerCombo->setCurrentIndex(selectedShape);
-            m_shapePickerCombo->blockSignals(false);
-        }
-        rebuildPivot();
-        updatePivotInfo();
-        if (glWidget) glWidget->update();
+    } else if (event->button() == Qt::RightButton || event->button() == Qt::MiddleButton) {
+        dragging = true;
+        lastMousePos = event->pos();
+        return;
     }
 }
-
 void NifViewportWidget::mouseMoveEvent(QMouseEvent* event)
 {
     if (mGizmoDragging && mGizmoAxis >= 0) {
@@ -2786,9 +2783,9 @@ void NifViewportWidget::mouseReleaseEvent(QMouseEvent* event)
                 selectMarqueeRect(QRect(mMarqueeStart, mMarqueeCurrent));
             if (glWidget) glWidget->update();
         }
-        dragging = false;
-        unsetCursor();
     }
+    dragging = false;
+    unsetCursor();
     QWidget::mouseReleaseEvent(event);
 }
 
@@ -2937,8 +2934,8 @@ void NifViewportWidget::zoomCamera(float factor)
 
 void NifViewportWidget::resetCamera()
 {
-    rotationX = 0.0f;
-    rotationY = 0.0f;
+    rotationX = -60.0f;
+    rotationY = -45.0f;
     zoom = 1.0f;
     cameraPos = QVector3D(0.0f, 0.0f, 0.0f);
     updateCamera();
