@@ -3855,6 +3855,10 @@ void MainWindow::loadCellIntoViewport(quint32 cellFormId)
     // materials resolve like loose ones.
     MatFile::setContentResources(mData->getPaths().programDir.absolutePath()
                                  + QStringLiteral("/Tools/ContentResources.zip"));
+    // Materials that ship in neither of those places are in the compiled
+    // database inside the materials archive.
+    MatFile::setMaterialDatabase(AssetResolver::resolveOrExtract(
+        QStringLiteral("materials/materialsbeta.cdb"), mData->getPaths().dataDir.absolutePath()));
     QVector<ViewportCellRef> cellRefs;
     const auto& coll = mData->getRefrCollection();
     QVector3D avgPos(0, 0, 0);

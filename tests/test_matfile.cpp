@@ -27,6 +27,7 @@ private slots:
     void testNotReadable();
     void testContentResourcesZip();
     void testRealBaseGameMaterials();
+    void testCompiledMaterialDatabase();
 };
 
 void TestMatFile::testTextureSetJoin()
@@ -244,6 +245,39 @@ void TestMatFile::testRealBaseGameMaterials()
     QVERIFY(bevelsSet.contains(1));
     QVERIFY(bevelsSet.contains(2));
     QVERIFY(!bevelsSet.contains(0));
+}
+
+void TestMatFile::testCompiledMaterialDatabase()
+{
+    // Starfield - Materials.ba2 extracts materialsbeta.cdb; probe it if
+    // present on disk (extracted by AssetResolver or manually).
+    const QStringList cands = {
+        QStringLiteral("C:/Temp/materialsbeta.cdb"),
+        QStringLiteral("C:/XboxGames/Starfield/Content/Data/.openck_cache/materialsbeta.cdb"),
+    };
+    QString cdb;
+    for (const QString& c : cands)
+        if (QFileInfo::exists(c)) { cdb = c; break; }
+    if (cdb.isEmpty())
+        QSKIP("materialsbeta.cdb not present on disk");
+
+    MatFile::setMaterialDatabase(cdb);
+
+    QTemporaryDir cache;
+    QVERIFY(cache.isValid());
+
+    // Computer_Cabinets_Computer is authored in the CDB.
+    const QString tex = MatFile::colorTexture(
+        QStringLiteral("Materials\\SetDressing\\Computer_Cabinets\\Computer_Cabinets_Computer.mat"),
+        cache.path());
+    QCOMPARE(tex, QStringLiteral("Textures\\SetDressing\\computer_cabinets\\computer_cabinets_computer_color.DDS"));
+
+    // GlowDecal_White01 carries colour in slot 7 in the authored zip, but its
+    // CDB texture set directly associates with the colour map.
+    const QString glow = MatFile::colorTexture(
+        QStringLiteral("Materials\\StarStations\\Emissives\\GlowDecal_White01.mat"),
+        cache.path());
+    QCOMPARE(glow, QStringLiteral("Textures\\architecture\\generic\\common\\DecalLightBlur01_color.dds"));
 }
 
 QTEST_MAIN(TestMatFile)

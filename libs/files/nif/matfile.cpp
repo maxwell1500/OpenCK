@@ -1,6 +1,7 @@
 #include "matfile.hpp"
 
 #include "../data/zipreader.hpp"
+#include "matdatabase.hpp"
 
 #include <QFile>
 #include <QJsonArray>
@@ -116,6 +117,10 @@ QString g_contentResourcesPath;
 ZipReader* g_contentResources = nullptr;
 bool g_contentResourcesTried = false;
 
+QString g_materialDatabasePath;
+MatDatabase* g_materialDatabase = nullptr;
+bool g_materialDatabaseTried = false;
+
 ZipReader* contentResources()
 {
     if (!g_contentResourcesTried) {
@@ -172,6 +177,30 @@ QMap<int, QString> MatFile::textureSlots(const QString& absPath)
     return out;
 }
 
+namespace {
+MatDatabase* materialDatabase()
+{
+    if (!g_materialDatabaseTried) {
+        g_materialDatabaseTried = true;
+        if (!g_materialDatabasePath.isEmpty())
+            g_materialDatabase = new MatDatabase(g_materialDatabasePath);
+    }
+    return g_materialDatabase;
+}
+
+// The texture set a material owns is named after the material file, the same
+// convention the loose .mat files follow.
+QString materialDocument(const QString& rel)
+{
+    MatDatabase* db = materialDatabase();
+    if (!db)
+        return QString();
+
+    const QString base = QFileInfo(rel).completeBaseName();
+    return db->matDocument(base + QStringLiteral("_TextureSet1"));
+}
+} // namespace
+
 QString MatFile::findLoose(const QString& materialPath, const QString& dataDir)
 {
     if (materialPath.isEmpty() || dataDir.isEmpty())
@@ -197,6 +226,19 @@ QString MatFile::findLoose(const QString& materialPath, const QString& dataDir)
     // Base-game materials ship only inside the Creation Kit's
     // ContentResources.zip, so pull out the single entry we need and cache it
     // next to the extracted meshes and textures.
+    // Base-game materials have no loose file anywhere: their objects live in
+    // the compiled database. Read the texture set out of it and write it in the
+    // same JSON a loose file uses, so textureSlots() reads it unchanged.
+    const QString doc = materialDocument(rel);
+    if (!doc.isEmpty()) {
+        const QString cache = QDir::cleanPath(dataDir + QLatin1String("/.openck_cache/materials/") + rel);
+        QDir().mkpath(QFileInfo(cache).absolutePath());
+        QFile out(cache);
+        if (out.open(QIODevice::WriteOnly) && out.write(doc.toUtf8()) == doc.toUtf8().size())
+            return cache;
+        return QString();
+    }
+
     if (ZipReader* zr = contentResources()) {
         const QString cache = QDir::cleanPath(dataDir + QLatin1String("/.openck_cache/materials/") + rel);
         if (QFileInfo::exists(cache))
@@ -223,6 +265,16 @@ void MatFile::setContentResources(const QString& zipPath)
         delete g_contentResources;
         g_contentResources = nullptr;
         g_contentResourcesTried = false;
+    }
+}
+
+void MatFile::setMaterialDatabase(const QString& cdbPath)
+{
+    if (g_materialDatabasePath != cdbPath) {
+        g_materialDatabasePath = cdbPath;
+        delete g_materialDatabase;
+        g_materialDatabase = nullptr;
+        g_materialDatabaseTried = false;
     }
 }
 

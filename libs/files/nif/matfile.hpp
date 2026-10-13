@@ -81,6 +81,13 @@ public:
     // fine. Pass an empty path to forget a previously set one.
     static void setContentResources(const QString& zipPath);
 
+    // Points the reader at a compiled materialsbeta.cdb (extracted from
+    // Starfield - Materials.ba2). The base game's material objects live there
+    // rather than in loose files, so this is what covers materials that ship in
+    // neither the data dir nor the Creation Kit's ContentResources.zip. Opened
+    // and indexed lazily on first use.
+    static void setMaterialDatabase(const QString& cdbPath);
+
     // Convenience: colour-map path for a material referenced by a NIF, or an
     // empty string.
     static QString colorTexture(const QString& materialPath, const QString& dataDir);
