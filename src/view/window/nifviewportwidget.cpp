@@ -215,6 +215,7 @@ struct CellModelSubShape {
     QString texturePath;
     QString materialPath;
     QOpenGLTexture* texture = nullptr;
+    QOpenGLTexture* alphaTexture = nullptr;  // slot-2 mask, alpha-cutout decals
 };
 
 struct CellModel {
@@ -240,6 +241,10 @@ struct CellModel {
             if (s.texture) {
                 delete s.texture;
                 s.texture = nullptr;
+            }
+            if (s.alphaTexture) {
+                delete s.alphaTexture;
+                s.alphaTexture = nullptr;
             }
         }
         shapes.clear();
@@ -372,6 +377,31 @@ void NifViewportWidget::uploadCellModelGpu(CellModel& model, const QString& nifD
     model.ibo.allocate(model.indices.constData(), model.indices.size() * sizeof(quint32));
     model.ibo.release();
 
+    // Resolves an install-relative texture path to a file on disk, trying the
+    // path as given, then the directory the NIF came from, then the data dir's
+    // archives.
+    auto resolveTextureFile = [&](const QString& rel) -> QString {
+        if (rel.isEmpty())
+            return QString();
+        if (QFileInfo::exists(rel))
+            return rel;
+        if (!nifDir.isEmpty()) {
+            const QString cand = nifDir + "/" + QFileInfo(rel).fileName();
+            if (QFileInfo::exists(cand))
+                return cand;
+        }
+        if (mDataDir.isEmpty())
+            return QString();
+        QString resolved = AssetResolver::resolveOrExtract(rel, mDataDir);
+        if (resolved.isEmpty() &&
+            !rel.startsWith(QStringLiteral("textures/"), Qt::CaseInsensitive) &&
+            !rel.startsWith(QStringLiteral("textures\\"), Qt::CaseInsensitive))
+        {
+            resolved = AssetResolver::resolveOrExtract(QStringLiteral("textures/") + rel, mDataDir);
+        }
+        return resolved;
+    };
+
     for (auto& shape : model.shapes) {
         // Starfield NIFs name a .mat instead of a texture or a colour. Its
         // layer graph gives the albedo map and a tint; a painted material has
@@ -385,31 +415,31 @@ void NifViewportWidget::uploadCellModelGpu(CellModel& model, const QString& nifD
         }
 
         if (!shape.texturePath.isEmpty() && !shape.texture) {
-            QString resolvedTex;
-            if (QFileInfo::exists(shape.texturePath)) {
-                resolvedTex = shape.texturePath;
-            } else {
-                if (!nifDir.isEmpty()) {
-                    const QString cand = nifDir + "/" + QFileInfo(shape.texturePath).fileName();
-                    if (QFileInfo::exists(cand))
-                        resolvedTex = cand;
-                }
-                if (resolvedTex.isEmpty() && !mDataDir.isEmpty()) {
-                    resolvedTex = AssetResolver::resolveOrExtract(shape.texturePath, mDataDir);
-                    if (resolvedTex.isEmpty() &&
-                        !shape.texturePath.startsWith("textures/", Qt::CaseInsensitive) &&
-                        !shape.texturePath.startsWith("textures\\", Qt::CaseInsensitive))
-                    {
-                        resolvedTex = AssetResolver::resolveOrExtract(QStringLiteral("textures/") + shape.texturePath, mDataDir);
-                    }
-                }
-            }
-
-            if (!resolvedTex.isEmpty() && QFileInfo::exists(resolvedTex)) {
+            if (const QString resolvedTex = resolveTextureFile(shape.texturePath);
+                !resolvedTex.isEmpty() && QFileInfo::exists(resolvedTex))
+            {
                 QImage img = loadTextureImage(resolvedTex);
                 if (!img.isNull()) {
                     shape.texture = new QOpenGLTexture(img);
                     applyFilterToTexture(*shape.texture);
+                }
+            }
+        }
+
+        // An alpha cutout mask is what an alpha-only decal is made of; it is
+        // only ever read by the alpha-test discard, never as colour.
+        if (!shape.alphaTexture && !shape.materialPath.isEmpty()) {
+            if (const QString mask = MatFile::opacityTexture(shape.materialPath, mDataDir);
+                !mask.isEmpty())
+            {
+                if (const QString resolvedMask = resolveTextureFile(mask);
+                    !resolvedMask.isEmpty() && QFileInfo::exists(resolvedMask))
+                {
+                    QImage img = loadTextureImage(resolvedMask);
+                    if (!img.isNull()) {
+                        shape.alphaTexture = new QOpenGLTexture(img);
+                        applyFilterToTexture(*shape.alphaTexture);
+                    }
                 }
             }
         }
@@ -1546,10 +1576,19 @@ void NifViewportWidget::setupShaders()
         uniform float specularStrength;
         uniform vec3 specularColor;
         uniform sampler2D tex;
+        uniform sampler2D alphaTex;
         uniform bool useTexture;
+        uniform bool useAlphaMask;
 
         void main()
         {
+            // Alpha-only decals (bump/normal maps stamped onto a surface) carry
+            // their mask in the red channel and no colour at all: discarding the
+            // transparent part keeps the surface they decal visible instead of
+            // covering it with an opaque block.
+            if (useAlphaMask && texture(alphaTex, vTexCoord).r < 0.5)
+                discard;
+
             vec3 normal = normalize(vNormal);
             if (!gl_FrontFacing) normal = -normal;
             vec3 lightDirection = normalize(lightDir);
@@ -2051,6 +2090,10 @@ void NifViewportWidget::renderMesh()
     shaderProgram->setUniformValue("ambientStrength", mDefaultLighting ? 0.75f : mAmbientStrength);
     shaderProgram->setUniformValue("shininess", 32.0f);
     shaderProgram->setUniformValue("tex", 0);
+    // This path never uploads a mask, so the discard must stay off here; the
+    // uniform is set per shape below and would otherwise keep the last value.
+    shaderProgram->setUniformValue("alphaTex", 1);
+    shaderProgram->setUniformValue("useAlphaMask", false);
 
     if (wireframeMode) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -2648,6 +2691,8 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
         shaderProgram->setUniformValue("specularStrength", 1.0f);
         shaderProgram->setUniformValue("uSkinned", false);
         shaderProgram->setUniformValue("tex", 0);
+        shaderProgram->setUniformValue("alphaTex", 1);
+        shaderProgram->setUniformValue("useAlphaMask", false);
         ensureDefaultTexture();
 
         glEnable(GL_DEPTH_TEST);
@@ -2706,6 +2751,15 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
                     defaultTexture->bind(0);
                     shaderProgram->setUniformValue("useTexture", false);
                 }
+
+                // Alpha cutout is the only use of the mask, so sampling it only
+                // when there is no albedo keeps textured decals on one stream.
+                bool hasAlphaMask = false;
+                if (sub.alphaTexture && sub.alphaTexture->isCreated() && !(sub.texture && sub.texture->isCreated())) {
+                    sub.alphaTexture->bind(1);
+                    hasAlphaMask = true;
+                }
+                shaderProgram->setUniformValue("useAlphaMask", hasAlphaMask);
 
                 glDrawElements(GL_TRIANGLES, sub.indexCount, GL_UNSIGNED_INT,
                                reinterpret_cast<void*>(static_cast<quintptr>(sub.indexStart * sizeof(quint32))));

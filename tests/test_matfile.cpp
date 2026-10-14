@@ -29,6 +29,7 @@ private slots:
     void testRealBaseGameMaterials();
     void testCompiledMaterialDatabase();
     void testLayeredInheritance();
+    void testOpacityCutout();
 };
 
 void TestMatFile::testTextureSetJoin()
@@ -265,6 +266,15 @@ void TestMatFile::testRealBaseGameMaterials()
     // is empty and inherits colour, normal and opacity from another file.
     QVERIFY(MatFile::colorTexture(QStringLiteral("Materials\\Common\\Decal\\DecalMetalBevels04n.mat"), cache.path())
                 .endsWith(QStringLiteral("DecalMetalBevels04_color.DDS"), Qt::CaseInsensitive));
+
+    // Alpha-only decals have no colour and no tint: their whole appearance is
+    // the opacity mask, which must come back so the viewport cuts a hole
+    // instead of drawing an opaque block over the surface.
+    const QString overlay = QStringLiteral("Materials\\Common\\Decal\\DecalMetalBevels01n.mat");
+    QCOMPARE(MatFile::colorTexture(overlay, cache.path()), QString());
+    QVERIFY(!MatFile::baseTint(overlay, cache.path()).isValid());
+    QVERIFY(MatFile::opacityTexture(overlay, cache.path())
+                .endsWith(QStringLiteral("decalmetalbevels01_opacity.DDS"), Qt::CaseInsensitive));
 }
 
 void TestMatFile::testCompiledMaterialDatabase()
@@ -344,6 +354,44 @@ void TestMatFile::testLayeredInheritance()
     QCOMPARE(tint, QColor::fromRgbF(0.5, 0.25, 0.75));
     // The base itself is untinted.
     QVERIFY(!MatFile::baseTint(QStringLiteral("Materials\\base.mat"), dir.path()).isValid());
+}
+
+void TestMatFile::testOpacityCutout()
+{
+    // An alpha-only decal carries an opacity mask and no colour at all. It has to
+    // be drawable as a cutout, so the mask must resolve even though there is no
+    // albedo to read.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QDir().mkpath(dir.path() + "/Materials");
+    const QString path = dir.path() + "/Materials/overlay.mat";
+    QFile f(path);
+    QVERIFY(f.open(QIODevice::WriteOnly));
+    f.write(R"MAT({"Objects":[
+      {"Parent":"materials\\layered\\root\\layeredmaterials.mat","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"Overlay"}},
+        {"Index":0,"Type":"BSMaterial::LayerID","Data":{"ID":"res:00000010:00000001:00000001"}}]},
+      {"ID":"res:00000010:00000001:00000001","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"Overlay_Layer1"}},
+        {"Index":0,"Type":"BSMaterial::MaterialID","Data":{"ID":"res:00000020:00000001:00000001"}},
+        {"Index":0,"Type":"BSMaterial::UVStreamID","Data":{"ID":"res:00000030:00000001:00000001"}}]},
+      {"ID":"res:00000020:00000001:00000001","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"Overlay_Material1"}},
+        {"Index":0,"Type":"BSMaterial::TextureSetID","Data":{"ID":"res:00000040:00000001:00000001"}}]},
+      {"ID":"res:00000040:00000001:00000001","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"Overlay_TextureSet1"}},
+        {"Index":1,"Type":"BSMaterial::MRTextureFile","Data":{"FileName":"Data\\Textures\\overlay_normal.dds"}},
+        {"Index":2,"Type":"BSMaterial::MRTextureFile","Data":{"FileName":"Data\\Textures\\overlay_opacity.dds"}}]},
+      {"ID":"res:00000030:00000001:00000001","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"Overlay_UVStream1"}}]}
+    ]})MAT");
+    f.close();
+
+    // No colour of its own: normal and opacity only.
+    QCOMPARE(MatFile::colorTexture(QStringLiteral("Materials\\overlay.mat"), dir.path()), QString());
+    QVERIFY(!MatFile::baseTint(QStringLiteral("Materials\\overlay.mat"), dir.path()).isValid());
+    QCOMPARE(MatFile::opacityTexture(QStringLiteral("Materials\\overlay.mat"), dir.path()),
+             QStringLiteral("Textures\\overlay_opacity.dds"));
 }
 
 QTEST_MAIN(TestMatFile)

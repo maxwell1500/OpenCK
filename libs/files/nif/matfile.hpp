@@ -100,4 +100,9 @@ public:
     // base-game materials carry their paint colour only here: their base layer
     // has a tint and no colour map.
     static QColor baseTint(const QString& materialPath, const QString& dataDir);
+
+    // Base layer's alpha mask (slot 2, Format "MatChannel_Opacity"), or an empty
+    // string. Alpha-only decals have this and no colour map, so without it they
+    // would be drawn as opaque blocks over the surface they stamp onto.
+    static QString opacityTexture(const QString& materialPath, const QString& dataDir);
 };

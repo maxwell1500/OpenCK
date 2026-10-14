@@ -139,6 +139,7 @@ ZipReader* contentResources()
 struct MatAppearance
 {
     QString albedo;     // install-relative texture path, empty if none
+    QString opacity;    // alpha mask (slot 2), empty if none
     QColor tint;        // multiplier for the albedo; invalid when untinted
 };
 // shortcut: keyed by resolved .mat path, never invalidated by edits to a loose
@@ -490,6 +491,7 @@ MatAppearance appearanceOf(const QVector<LayerInfo>& layers)
 
     const LayerInfo& base = layers.first();
     out.albedo = albedoOf(base.files);
+    out.opacity = base.files.value(MatChannel_Opacity);
     if (out.albedo.isEmpty() && !base.hasColor) {
         for (int i = 1; i < layers.size() && out.albedo.isEmpty(); ++i)
             out.albedo = albedoOf(layers.at(i).files);
@@ -542,6 +544,8 @@ MatAppearance resolveAppearance(const QString& materialPath, const QString& data
     }
     if (!out.albedo.isEmpty())
         out.albedo = dataRelative(out.albedo);
+    if (!out.opacity.isEmpty())
+        out.opacity = dataRelative(out.opacity);
 
     g_appearanceCache.insert(mat, out);
     return out;
@@ -557,4 +561,9 @@ QString MatFile::colorTexture(const QString& materialPath, const QString& dataDi
 QColor MatFile::baseTint(const QString& materialPath, const QString& dataDir)
 {
     return resolveAppearance(materialPath, dataDir).tint;
+}
+
+QString MatFile::opacityTexture(const QString& materialPath, const QString& dataDir)
+{
+    return resolveAppearance(materialPath, dataDir).opacity;
 }
