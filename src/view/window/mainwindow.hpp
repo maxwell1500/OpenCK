@@ -188,7 +188,9 @@ private:
     void restoreUiState();
     void updateWindowTitle();
     QString resolveNifFilePath(const QString& relPath) const;
+    void configureViewportData();
     quint32 mLoadedCellFormId = 0;
+    bool mViewportDataConfigured = false;
     QString mCurrentPluginName;
     Ui::mainwindow *ui;
     Data* mData;

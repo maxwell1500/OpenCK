@@ -1378,6 +1378,7 @@ void NifViewportWidget::clear()
     shapeIndexRanges.clear();
     shapeBaseColors.clear();
     shapeTexturePaths.clear();
+    shapeAlphaMaskPaths.clear();
     shapeAlphaModes.clear();
     shapeOpacity.clear();
     shapeSpecularColors.clear();
@@ -1637,6 +1638,7 @@ void NifViewportWidget::buildMesh()
     shapeIndexRanges.clear();
     shapeBaseColors.clear();
     shapeTexturePaths.clear();
+    shapeAlphaMaskPaths.clear();
     shapeAlphaModes.clear();
     shapeOpacity.clear();
     shapeSpecularColors.clear();
@@ -1733,6 +1735,10 @@ void NifViewportWidget::clearTextures()
         if (tex) delete tex;
     }
     shapeTextures.clear();
+    for (auto* tex : shapeMaskTextures) {
+        if (tex) delete tex;
+    }
+    shapeMaskTextures.clear();
 }
 
 void NifViewportWidget::buildMeshFromNode(Nif::Node* node, const QMatrix4x4& parentTransform)
@@ -1827,6 +1833,26 @@ void NifViewportWidget::buildMeshFromNode(Nif::Node* node, const QMatrix4x4& par
             }
         }
         shapeTexturePaths.append(resolvedPath);
+        // A Starfield NIF names a .mat instead of a texture or a colour, and
+        // the same layer graph the cell-model path walks gives the real albedo
+        // map and paint tint. shape.texture stays empty on these files, so
+        // without this the model draws flat grey. A painted material has no
+        // albedo, only the tint, and an alpha-only decal carries only a mask.
+        shapeAlphaMaskPaths.append(QString());
+        if (!shape.materialPath.isEmpty() && !mDataDir.isEmpty()) {
+            const QColor tint = MatFile::baseTint(shape.materialPath, mDataDir);
+            if (tint.isValid()) {
+                shapeBaseColors.last() = tint;
+            }
+            const QString albedo = MatFile::colorTexture(shape.materialPath, mDataDir);
+            if (!albedo.isEmpty()) {
+                shapeTexturePaths.last() = albedo;
+            } else {
+                const QString mask = MatFile::opacityTexture(shape.materialPath, mDataDir);
+                if (!mask.isEmpty())
+                    shapeAlphaMaskPaths.last() = mask;
+            }
+        }
         shapeAlphaModes.append(static_cast<int>(shape.alphaMode));
         shapeOpacity.append(shape.baseColor.a);
         shapeSpecularColors.append(QVector3D(shape.specularColor.r, shape.specularColor.g, shape.specularColor.b));
@@ -1873,10 +1899,16 @@ void NifViewportWidget::ensureDefaultTexture()
 
 void NifViewportWidget::ensureTexture(int index, const QString& path)
 {
-    while (shapeTextures.size() <= index) {
-        shapeTextures.append(nullptr);
+    ensureTextureIn(shapeTextures, index, path);
+}
+
+void NifViewportWidget::ensureTextureIn(QVector<QOpenGLTexture*>& cache,
+                                       int index, const QString& path)
+{
+    while (cache.size() <= index) {
+        cache.append(nullptr);
     }
-    if (shapeTextures[index]) return;
+    if (cache[index]) return;
 
     QString resolvedPath = path;
     {
@@ -1921,7 +1953,7 @@ void NifViewportWidget::ensureTexture(int index, const QString& path)
     }
     auto* tex = new QOpenGLTexture(img);
     applyFilterToTexture(*tex);
-    shapeTextures[index] = tex;
+    cache[index] = tex;
     LOG_INFO(QString("Loaded texture: %1").arg(path));
 }
 
@@ -2128,6 +2160,19 @@ void NifViewportWidget::renderMesh()
             defaultTexture->bind(0);
             shaderProgram->setUniformValue("useTexture", false);
         }
+
+        // An alpha-only decal has no colour of its own: sampling its mask and
+        // discarding the transparent half keeps the surface it decals on top
+        // of visible instead of covering it with an opaque block.
+        const QString maskPath = (s < shapeAlphaMaskPaths.size())
+                                     ? shapeAlphaMaskPaths[s] : QString();
+        QOpenGLTexture* maskTex = nullptr;
+        if (!maskPath.isEmpty()) {
+            ensureTextureIn(shapeMaskTextures, s, maskPath);
+            maskTex = (s < shapeMaskTextures.size()) ? shapeMaskTextures[s] : nullptr;
+        }
+        if (maskTex) maskTex->bind(1);
+        shaderProgram->setUniformValue("useAlphaMask", maskTex != nullptr);
 
         if (isHighlighted) {
             shaderProgram->setUniformValue("emissionColor", QVector3D(0.3f, 0.3f, 0.1f));

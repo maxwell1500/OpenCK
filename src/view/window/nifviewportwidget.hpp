@@ -229,6 +229,9 @@ private:
     void setupShaders();
     void clearTextures();
     void ensureTexture(int index, const QString& path);
+    // Same load-and-cache, into a separate array so an alpha mask does not take
+    // the albedo's slot for its shape.
+    void ensureTextureIn(QVector<QOpenGLTexture*>& cache, int index, const QString& path);
     void ensureDefaultTexture();
     void applyFilterToTexture(QOpenGLTexture& tex);
 
@@ -259,6 +262,11 @@ private:
     QVector<QPair<int, int>> shapeIndexRanges;
     QVector<QColor> shapeBaseColors;
     QVector<QString> shapeTexturePaths;
+    // Alpha-cutout masks for alpha-only decals, resolved from the same .mat.
+    // Parallel to shapeTexturePaths: entry is empty unless the shape has no
+    // albedo and its material supplies an opacity map.
+    QVector<QString> shapeAlphaMaskPaths;
+    QVector<QOpenGLTexture*> shapeMaskTextures;
     QVector<QOpenGLTexture*> shapeTextures;
     QVector<int> shapeAlphaModes;
     QVector<float> shapeOpacity;

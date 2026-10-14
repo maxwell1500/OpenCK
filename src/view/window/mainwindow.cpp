@@ -310,6 +310,9 @@ bool MainWindow::saveActiveDocument()
 void MainWindow::setData(Data* data)
 {
     mData = data;
+    // The data dir and material sources are per-install; a new document can
+    // point at a different install, so re-derive them.
+    mViewportDataConfigured = false;
     if (mData)
     {
         mUndoStack = mData->getUndoStack();
@@ -536,6 +539,11 @@ void MainWindow::setData(Data* data)
                 if (nifViewportWidget && mLoadedCellFormId == 0)
                 {
                     nifViewportWidget->setCellReferences({});
+                    // Set the data dir and material sources before resolving the
+                    // model: this path runs before any cell is loaded, so the
+                    // cell loader has not configured them yet and .mat names in
+                    // the NIF would resolve to nothing.
+                    configureViewportData();
                     QString modelPath = objectWindowDock->getModelPathForRecord(cat, rec);
                     bool loaded = false;
                     if (!modelPath.isEmpty() && mData)
@@ -3845,11 +3853,14 @@ QString MainWindow::resolveNifFilePath(const QString& relPath) const
     return AssetResolver::resolveOrExtract(relPath, dataDir);
 }
 
-void MainWindow::loadCellIntoViewport(quint32 cellFormId)
+// Points the viewport and the material reader at the active install. Both the
+// cell path and the object-palette preview need this, and the preview runs
+// first whenever a user clicks a record before loading a cell.
+void MainWindow::configureViewportData()
 {
-    mLoadedCellFormId = cellFormId;
-    if (!mData || !nifViewportWidget) return;
-    nifViewportWidget->setDataDir(mData->getPaths().dataDir.absolutePath());
+    if (!mData || !nifViewportWidget || mViewportDataConfigured) return;
+    const QString dataDir = mData->getPaths().dataDir.absolutePath();
+    nifViewportWidget->setDataDir(dataDir);
     // Base-game materials ship as JSON in the Creation Kit's
     // Tools\ContentResources.zip; point the material reader at it so those
     // materials resolve like loose ones.
@@ -3858,7 +3869,15 @@ void MainWindow::loadCellIntoViewport(quint32 cellFormId)
     // Materials that ship in neither of those places are in the compiled
     // database inside the materials archive.
     MatFile::setMaterialDatabase(AssetResolver::resolveOrExtract(
-        QStringLiteral("materials/materialsbeta.cdb"), mData->getPaths().dataDir.absolutePath()));
+        QStringLiteral("materials/materialsbeta.cdb"), dataDir));
+    mViewportDataConfigured = true;
+}
+
+void MainWindow::loadCellIntoViewport(quint32 cellFormId)
+{
+    mLoadedCellFormId = cellFormId;
+    if (!mData || !nifViewportWidget) return;
+    configureViewportData();
     QVector<ViewportCellRef> cellRefs;
     const auto& coll = mData->getRefrCollection();
     QVector3D avgPos(0, 0, 0);

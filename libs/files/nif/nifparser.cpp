@@ -1577,17 +1577,19 @@ bool isHexWord(const QString& s)
 MeshArchiveResolver MeshArchiveResolver::forNif(const QString& nifPath)
 {
     MeshArchiveResolver r;
+    // The data dir is whichever ancestor actually owns the mesh archives. Naming
+    // a "meshes" folder is not enough: AssetResolver hands over NIFs from
+    // <dataDir>/.openck_cache/meshes/..., and that cache contains a "meshes" dir
+    // of its own, so taking the first match derives the cache as the data dir,
+    // finds no *Meshes*.ba2, and strips every BSGeometry of its geometry.
     QDir d = QFileInfo(nifPath).absoluteDir();
-    for (int i = 0; i < 6; ++i) {
-        if (d.dirName().compare(QStringLiteral("meshes"), Qt::CaseInsensitive) == 0) {
-            QDir data = d;
-            data.cdUp();
-            r.m_dataDir = data.absolutePath();
+    for (int i = 0; i < 8 && !d.isRoot(); ++i) {
+        if (!QDir(d).entryList(QStringList({ QStringLiteral("*Meshes*.ba2") }),
+                               QDir::Files).isEmpty()) {
+            r.m_dataDir = d.absolutePath();
             break;
         }
-        QDir parent = d;
-        if (!parent.cdUp() || parent == d) break;
-        d = parent;
+        if (!d.cdUp()) break;
     }
     if (r.m_dataDir.isEmpty()) {
         const QString env = qEnvironmentVariable("OPENCK_DATA_DIR",
