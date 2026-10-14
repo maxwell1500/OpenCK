@@ -568,8 +568,16 @@ void MainWindow::setData(Data* data)
                     }
                 }
             });
+
+            // Double-clicking a record is the "show me this" gesture: preview
+            // the model, then frame it so it fills the viewport.
+            connect(objectWindowDock, &ObjectWindowDialog::recordFitToWindow,
+                    this, [this]() {
+                        if (nifViewportWidget)
+                            nifViewportWidget->zoomToFit();
+                    });
         }
-        
+
         // Create Landscape Editor dock widget tabbed at bottom
         if (!landscapeEditor)
         {

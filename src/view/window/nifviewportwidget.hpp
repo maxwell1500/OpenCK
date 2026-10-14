@@ -212,6 +212,10 @@ public:
     void setDefaultLightingEnabled(bool enabled);
     bool isDefaultLightingEnabled() const { return mDefaultLighting; }
     void resetViewToObject();
+    // Re-frames whatever is currently shown (loaded NIF or preview primitive)
+    // so it fills the viewport. The preview camera sizes its ortho window to the
+    // mesh's bounding sphere, so this is a zoom reset plus a recenter.
+    void zoomToFit();
 
     void setCameraSpeedMultiplier(float mult) { m_cameraSpeedMultiplier = mult; }
     float cameraSpeedMultiplier() const { return m_cameraSpeedMultiplier; }
@@ -277,6 +281,13 @@ private:
     QVector<QString> shapeNames;
     QOpenGLTexture* defaultTexture = nullptr;
     bool texturesBuilt;
+
+    // Bounding sphere of the loaded mesh in view space, so the preview can
+    // frame the object instead of assuming it is a particular size. Starfield
+    // NIFs are ~2-3 units across, so scaling them to a 50-unit ortho window
+    // pins them to a single pixel.
+    QVector3D m_modelCentre = QVector3D(0.0f, 0.0f, 0.0f);
+    float m_modelRadius = 0.0f;
 
     float rotationX, rotationY;
     float zoom;

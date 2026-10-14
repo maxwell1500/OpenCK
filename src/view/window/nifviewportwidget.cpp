@@ -943,8 +943,23 @@ void NifViewportWidget::refreshMesh()
 
 void NifViewportWidget::showPreviewPrimitive(PrimitiveMeshGenerator::Type type, float size)
 {
+    // A primitive stands in for a real model, so it has to be framed the same
+    // way: this is what the placeholder looks like when the model will not
+    // resolve, and an unframed one is invisible at any zoom.
     const PrimitiveMeshGenerator::Mesh mesh =
         PrimitiveMeshGenerator::generate(type, size);
+
+    m_modelRadius = 0.0f;
+    m_modelCentre = QVector3D(0.0f, 0.0f, 0.0f);
+    if (!mesh.vertices.isEmpty()) {
+        QVector3D lo = mesh.vertices.first(), hi = mesh.vertices.first();
+        for (const QVector3D& v : mesh.vertices) {
+            lo.setX(qMin(lo.x(), v.x())); lo.setY(qMin(lo.y(), v.y())); lo.setZ(qMin(lo.z(), v.z()));
+            hi.setX(qMax(hi.x(), v.x())); hi.setY(qMax(hi.y(), v.y())); hi.setZ(qMax(hi.z(), v.z()));
+        }
+        m_modelCentre = (lo + hi) * 0.5f;
+        m_modelRadius = 0.5f * (hi - lo).length();
+    }
 
     QVector<OverlayVertex> verts;
     verts.reserve(mesh.vertices.size());
@@ -978,6 +993,16 @@ void NifViewportWidget::resetViewToObject()
     zoom = 1.0f;
     rotationX = 20.0f;
     rotationY = 45.0f;
+    if (glWidget) glWidget->update();
+}
+
+void NifViewportWidget::zoomToFit()
+{
+    // The preview camera builds its ortho window from the mesh bounding sphere,
+    // so a zoom of 1 with the model centred is the fit. Anything already framed
+    // keeps its rotation; only the distance and pan are reset.
+    zoom = 1.0f;
+    cameraPos = QVector3D(0.0f, 0.0f, 0.0f);
     if (glWidget) glWidget->update();
 }
 
@@ -1721,6 +1746,22 @@ void NifViewportWidget::buildMesh()
     meshBuilt = !vertices.isEmpty();
     restVertices = vertices;
     restNormals = normals;
+
+    // Framing bounds come from the world-space vertices, not the per-shape
+    // local bounds: this is what the preview camera needs to fit the object.
+    if (vertices.isEmpty()) {
+        m_modelCentre = QVector3D(0.0f, 0.0f, 0.0f);
+        m_modelRadius = 0.0f;
+    } else {
+        QVector3D lo = vertices.first(), hi = vertices.first();
+        for (const QVector3D& v : vertices) {
+            lo.setX(qMin(lo.x(), v.x())); lo.setY(qMin(lo.y(), v.y())); lo.setZ(qMin(lo.z(), v.z()));
+            hi.setX(qMax(hi.x(), v.x())); hi.setY(qMax(hi.y(), v.y())); hi.setZ(qMax(hi.z(), v.z()));
+        }
+        m_modelCentre = (lo + hi) * 0.5f;
+        m_modelRadius = 0.5f * (hi - lo).length();
+    }
+
     m_meshDirty = true;
     m_bboxVBO.dirty = true;
     m_collisionVBO.dirty = true;
@@ -3073,8 +3114,12 @@ gizmo::ViewTransform NifViewportWidget::currentViewTransform() const
     }
     else
     {
-        const float halfExtent = 50.0f / qMax(0.01f, zoom);
-        model.scale(0.01f);
+        // Frame the mesh itself: put its bounding sphere in view and size the
+        // ortho window to it. A fixed window plus a fixed scale only works for
+        // objects of one particular size, and Starfield NIFs are ~2-3 units.
+        const float radius = qMax(1.0f, m_modelRadius * 1.25f);
+        const float halfExtent = radius / qMax(0.01f, zoom);
+        model.translate(-m_modelCentre);
         float rotXRad = rotationX * 3.14159265f / 180.0f;
         float rotYRad = rotationY * 3.14159265f / 180.0f;
         QMatrix4x4 rotXMatrix;
@@ -3083,7 +3128,8 @@ gizmo::ViewTransform NifViewportWidget::currentViewTransform() const
         rotYMatrix.rotate(rotYRad, 0.0f, 1.0f, 0.0f);
         view = rotYMatrix * rotXMatrix;
         view.translate(-cameraPos);
-        proj.ortho(-halfExtent * aspect, halfExtent * aspect, -halfExtent, halfExtent, -5000.0f, 5000.0f);
+        proj.ortho(-halfExtent * aspect, halfExtent * aspect, -halfExtent, halfExtent,
+                   -5000.0f, 5000.0f);
     }
 
     return { view, model, proj, glWidget ? glWidget->size() : QSize(800, 600) };

@@ -49,6 +49,9 @@ public:
 
 signals:
     void recordSelected(int categoryId, int recordIndex, const QString& editorId);
+    // Emitted when a record is double-clicked: the caller previews the model
+    // and re-frames the viewport so it fills the window.
+    void recordFitToWindow();
 
 public slots:
     void filterChanged(const QString& text);

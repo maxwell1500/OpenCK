@@ -513,7 +513,7 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
 
         if (count <= 1)
         {
-            QAction* editAction = mContextMenu->addAction(tr("Edit..."));
+            QAction* editAction = mContextMenu->addAction(tr("Properties..."));
             editAction->setShortcut(QKeySequence(Qt::Key_Return));
             QAction* duplicateAction = mContextMenu->addAction(tr("Duplicate"));
             duplicateAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
@@ -1988,7 +1988,14 @@ void ObjectWindowDialog::onDoubleClick(const QModelIndex& index)
 
     if (mModel->isRecord(index))
     {
-        editSelected();
+        // Double-click previews the model and fits it to the viewport. The
+        // record's properties moved to the right-click menu, which is where a
+        // deliberate lookup belongs; double-click is the "show me this" gesture.
+        int categoryId = mModel->getCategoryIndex(index);
+        int recordIndex = mModel->getRecordIndex(index);
+        QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
+        emit recordSelected(categoryId, recordIndex, editorId);
+        emit recordFitToWindow();
     }
     else
     {
