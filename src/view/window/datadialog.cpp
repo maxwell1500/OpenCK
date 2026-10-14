@@ -93,6 +93,14 @@ void DataDialog::populateGameSelector()
         combo->insertItem(0, "Select detected game...", QVariant());
         combo->setCurrentIndex(0);
     }
+
+    // Pointing at a directory by hand is the alternative to an auto-detected
+    // install, so it sits directly after the detected list rather than behind
+    // the Browse button alone.
+    combo->insertSeparator(combo->count());
+    combo->addItem("Open another directory...", QVariant());
+    combo->setItemData(combo->count() - 1,
+        QVariant::fromValue(static_cast<int>(Game_None)), Qt::UserRole + 1);
 }
 
 void DataDialog::newSelection(const QModelIndex& current, const QModelIndex& previous)
@@ -277,10 +285,23 @@ void DataDialog::on_gameSelector_currentIndexChanged(int index)
 
     QComboBox* combo = gameSelector();
     QString path = combo->currentData().toString();
+
+    if (path.isEmpty())
+    {
+        // "Open another directory..." was picked: run the same browse, then
+        // rebuild the list so a cancelled browse does not leave the combo
+        // parked on a placeholder.
+        const QString before = dataPath;
+        on_browseButton_clicked();
+        if (dataPath == before)
+            populateGameSelector();
+        return;
+    }
+
     int gameIdInt = combo->itemData(index, Qt::UserRole + 1).toInt();
     GameId gameId = static_cast<GameId>(gameIdInt);
 
-    if (!path.isEmpty() && QDir(path).exists())
+    if (QDir(path).exists())
     {
         dataPath = path;
         currentGame = gameId;

@@ -11,6 +11,7 @@ private slots:
     void testGameName();
     void testDetectGameFromVersion();
     void testDataDirKey();
+    void testDetectGamesAreGroupedByGame();
 };
 
 void TestConfigPaths::testGameName()
@@ -46,6 +47,37 @@ void TestConfigPaths::testDataDirKey()
     QCOMPARE(FilePaths::dataDirKey(Game_Fallout4), QString("Fallout4DataDirectory"));
     QCOMPARE(FilePaths::dataDirKey(Game_Starfield), QString("StarfieldDataDirectory"));
     QCOMPARE(FilePaths::dataDirKey(Game_None), QString("DataDirectory"));
+}
+
+// The list drives a picker the user reads top to bottom, so installs of the
+// same title must not be interleaved with unrelated ones.
+void TestConfigPaths::testDetectGamesAreGroupedByGame()
+{
+    const auto found = FilePaths::detectGames();
+
+    QString previousGame;
+    QString previousPath;
+    for (const auto& entry : found)
+    {
+        const QString game = FilePaths::gameName(entry.gameId);
+        QVERIFY(!game.isEmpty() && game != QLatin1String("Unknown"));
+
+        const int byGame = QString::compare(game, previousGame);
+        if (byGame < 0)
+            QFAIL(qPrintable(QStringLiteral("unexpected game order: %1 after %2")
+                    .arg(game, previousGame)));
+        if (byGame > 0)
+        {
+            previousGame = game;
+            previousPath.clear();
+        }
+        else if (QString::compare(entry.dataPath, previousPath, Qt::CaseInsensitive) < 0)
+        {
+            QFAIL(qPrintable(QStringLiteral("unexpected path order: %1 after %2 in %3")
+                    .arg(entry.dataPath, previousPath, game)));
+        }
+        previousPath = entry.dataPath;
+    }
 }
 
 #include "test_configpaths.moc"

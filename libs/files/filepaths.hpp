@@ -14,6 +14,7 @@
 #include <QPair>
 #include <QVector>
 #include <QSet>
+#include <algorithm>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -479,16 +480,19 @@ struct FilePaths
         struct FolderMap {
             QString name;
             GameId gameId;
+            QString dataSub;
         };
         QVector<FolderMap> knownFolders = {
-            {"Skyrim", Game_Skyrim},
-            {"Skyrim Special Edition", Game_SkyrimSpecialEdition},
-            {"Skyrim Anniversary Edition", Game_SkyrimAnniversaryEdition},
-            {"Oblivion", Game_Oblivion},
-            {"Fallout 4", Game_Fallout4},
-            {"Fallout 3 GOTY", Game_Fallout3},
-            {"Fallout New Vegas", Game_FalloutNewVegas},
-            {"Starfield", Game_Starfield},
+            {"Skyrim", Game_Skyrim, QStringLiteral("Data")},
+            {"Skyrim Special Edition", Game_SkyrimSpecialEdition, QStringLiteral("Data")},
+            {"Skyrim Anniversary Edition", Game_SkyrimAnniversaryEdition, QStringLiteral("Data")},
+            {"Oblivion", Game_Oblivion, QStringLiteral("Data")},
+            {"Fallout 4", Game_Fallout4, QStringLiteral("Data")},
+            {"Fallout 3 GOTY", Game_Fallout3, QStringLiteral("Data")},
+            {"Fallout New Vegas", Game_FalloutNewVegas, QStringLiteral("Data")},
+            {"Starfield", Game_Starfield, QStringLiteral("Data")},
+            // Steam's Morrowind keeps its content in "Data Files", not "Data".
+            {"Morrowind", Game_Morrowind, QStringLiteral("Data Files")},
         };
 
         // Search Steam library paths for known game folders
@@ -501,7 +505,7 @@ struct FilePaths
             for (const auto& folder : knownFolders)
             {
                 QString gameDir = baseDir.absolutePath() + "/" + folder.name;
-                QString dataDir = gameDir + "/Data";
+                QString dataDir = gameDir + "/" + folder.dataSub;
                 if (QDir(dataDir).exists())
                 {
                     found.append({dataDir, folder.gameId});
@@ -536,6 +540,18 @@ struct FilePaths
                 deduped.append(f);
             }
         }
+
+        // Group by game, then by install path, so several installs of the same
+        // title (Steam and Xbox side by side) read as one entry the user can
+        // pick between instead of an arbitrary interleaving.
+        std::sort(deduped.begin(), deduped.end(),
+            [](const GameDetect& a, const GameDetect& b) {
+                const int byGame = QString::compare(FilePaths::gameName(a.gameId),
+                                                    FilePaths::gameName(b.gameId));
+                if (byGame != 0)
+                    return byGame < 0;
+                return QString::compare(a.dataPath, b.dataPath, Qt::CaseInsensitive) < 0;
+            });
 
         return deduped;
     }
