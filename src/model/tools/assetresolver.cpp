@@ -168,6 +168,18 @@ QString AssetResolver::resolveOrExtract(const QString& relativePath, const QStri
     while (norm.startsWith(QLatin1Char('/')))
         norm.remove(0, 1);
 
+    // Records in shipped plugins name their model and texture paths with the
+    // install root on the front ("Data\Meshes\...", "Data\Textures\..."), which
+    // never matches an archive entry or the data dir. Strip it so those paths
+    // resolve like the bare relative ones.
+    if (norm.startsWith(QLatin1String("data/"), Qt::CaseInsensitive) &&
+        norm.size() > 5)
+    {
+        norm.remove(0, 5);
+        while (norm.startsWith(QLatin1Char('/')))
+            norm.remove(0, 1);
+    }
+
     if (dataDir.isEmpty())
         return QString();
 
