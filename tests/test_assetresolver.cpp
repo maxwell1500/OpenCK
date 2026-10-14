@@ -21,6 +21,7 @@ private slots:
     void testMissingPath();
     void testMorrowind();
     void testEmptyDir();
+    void testLazyArchiveResolveAcrossArchives();
 };
 
 void TestAssetResolver::initTestCase()
@@ -153,6 +154,41 @@ void TestAssetResolver::testEmptyDir()
     QVERIFY(res.isEmpty());
     QCOMPARE(res.archiveCount(), 0);
     QVERIFY(!res.contains("anything.nif"));
+}
+
+void TestAssetResolver::testLazyArchiveResolveAcrossArchives()
+{
+    const QString sfDataDir = QStringLiteral("C:/XboxGames/Starfield/Content/Data");
+    if (QFileInfo::exists(sfDataDir))
+    {
+        const QString m = QStringLiteral("meshes/setdressing/digitaltables/digitaltable01a.nif");
+        const QString t1 = QStringLiteral("textures/common/metal/metalAlu_color.DDS");
+        const QString t2 = QStringLiteral("textures/setdressing/manufactured_goods/vac_grade_explosive/vac_grade_explosive_base_color.dds");
+
+        // Clear cached extractions so resolution has to hit the archives
+        QFile::remove(sfDataDir + QStringLiteral("/.openck_cache/") + m);
+        QFile::remove(sfDataDir + QStringLiteral("/.openck_cache/") + t1);
+        QFile::remove(sfDataDir + QStringLiteral("/.openck_cache/") + t2);
+
+        // Resolving an asset in Meshes01.ba2 must not prevent later lookups in Textures05.ba2 or Textures10.ba2
+        const QString resM = AssetResolver::resolveOrExtract(m, sfDataDir);
+        QVERIFY2(!resM.isEmpty() && QFileInfo::exists(resM), "mesh in Meshes01.ba2 must resolve");
+
+        const QString resT1 = AssetResolver::resolveOrExtract(t1, sfDataDir);
+        QVERIFY2(!resT1.isEmpty() && QFileInfo::exists(resT1), "texture in Textures05.ba2 must resolve after mesh");
+
+        const QString resT2 = AssetResolver::resolveOrExtract(t2, sfDataDir);
+        QVERIFY2(!resT2.isEmpty() && QFileInfo::exists(resT2), "texture in Textures10.ba2 must resolve after Textures05");
+    }
+    else if (QFileInfo::exists(sDataDir))
+    {
+        const QString mesh = AssetResolver::resolveOrExtract(QStringLiteral("meshes/actors/character/character assets/skeleton.nif"), sDataDir);
+        QVERIFY(!mesh.isEmpty() && QFileInfo::exists(mesh));
+    }
+    else
+    {
+        QSKIP("No Starfield or Skyrim SE install available");
+    }
 }
 
 QTEST_MAIN(TestAssetResolver)

@@ -4,7 +4,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
-
+#include <QSet>
 #include "../../../libs/files/ba2/bsaarchive.hpp"
 #include "../../../libs/files/ba2/ba2archive.hpp"
 
@@ -201,60 +201,15 @@ QString AssetResolver::resolveOrExtract(const QString& relativePath, const QStri
     };
     static QHash<QString, ArchiveEntryRef> s_index;
     static QString s_cachedDir;
-    static bool s_scanned = false;
+    static QStringList s_archiveFiles;
+    static QSet<QString> s_indexedArchives;
 
     if (s_cachedDir != dataDir) {
         s_index.clear();
+        s_archiveFiles.clear();
+        s_indexedArchives.clear();
         s_cachedDir = dataDir;
-        s_scanned = false;
-    }
 
-    const QString canon = canonical(norm);
-
-    // Archives are indexed lazily, one open() per archive, because a single
-    // open() parses that archive's whole name table. The shipped install has
-    // 107 BA2s and roughly 750k entries between them; indexing every one of
-    // them on the first lookup blocks the UI thread for the length of a cell
-    // load. The archive *names* are cheap, so cache those instead and open
-    // each on demand, stopping at the first archive that holds the path.
-    auto indexArchive = [canon, index = &s_index](const QString& fullArch, bool ba2) -> bool {
-        if (s_index.contains(canon))
-            return true;                        // already found
-        if (ba2) {
-            Ba2Archive a;
-            if (!a.open(fullArch))
-                return false;
-            const auto& entries = a.entries();
-            for (int i = 0; i < entries.size(); ++i) {
-                const QString c = canonical(entries[i].relativePath);
-                if (!s_index.contains(c))
-                    s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
-            }
-            if (a.isTexture()) {
-                const auto& tx = a.textureEntries();
-                for (int i = 0; i < tx.size(); ++i) {
-                    const QString c = canonical(tx[i].relativePath);
-                    if (!s_index.contains(c))
-                        s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
-                }
-            }
-        } else {
-            BsaArchive a;
-            if (!a.open(fullArch))
-                return false;
-            const auto& entries = a.entries();
-            for (int i = 0; i < entries.size(); ++i) {
-                const QString c = canonical(entries[i].fullPath);
-                if (!s_index.contains(c))
-                    s_index.insert(c, {fullArch, static_cast<quint32>(i), false});
-            }
-        }
-        return s_index.contains(canon);
-    };
-
-    ArchiveEntryRef ref = s_index.value(canon);
-    if (ref.archivePath.isEmpty() && !s_scanned)
-    {
         // Mesh archives first: a NIF never lands in a Textures*.ba2, and those
         // are the largest ones, so trying them first wastes the most time.
         QStringList searchDirs{dataDir};
@@ -270,27 +225,73 @@ QString AssetResolver::resolveOrExtract(const QString& relativePath, const QStri
             const QStringList archives = dir.entryList({QStringLiteral("*.ba2"), QStringLiteral("*.bsa")}, QDir::Files);
             for (const QString& archFile : archives)
             {
-                const QString fullArch = dir.filePath(archFile);
-                const bool ba2 = archFile.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive);
-                if (!ba2 && !archFile.endsWith(QStringLiteral(".bsa"), Qt::CaseInsensitive))
-                    continue;
-                if (indexArchive(fullArch, ba2))
-                    break;                      // found; stop opening archives
+                if (archFile.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive) ||
+                    archFile.endsWith(QStringLiteral(".bsa"), Qt::CaseInsensitive))
+                {
+                    s_archiveFiles.append(dir.filePath(archFile));
+                }
             }
-            if (s_index.contains(canon))
-                break;
         }
-        s_scanned = true;
-        ref = s_index.value(canon);
     }
 
+    const QString canon = canonical(norm);
+    const QString canonMesh = canonical(QStringLiteral("meshes/") + norm);
+    const QString canonTex = canonical(QStringLiteral("textures/") + norm);
+
+    auto findEntry = [&]() -> ArchiveEntryRef {
+        ArchiveEntryRef r = s_index.value(canon);
+        if (r.archivePath.isEmpty())
+            r = s_index.value(canonMesh);
+        if (r.archivePath.isEmpty())
+            r = s_index.value(canonTex);
+        return r;
+    };
+
+    ArchiveEntryRef ref = findEntry();
     if (ref.archivePath.isEmpty())
     {
-        ref = s_index.value(canonical(QStringLiteral("meshes/") + norm));
-        if (ref.archivePath.isEmpty())
-            ref = s_index.value(canonical(QStringLiteral("textures/") + norm));
-    }
+        for (const QString& fullArch : s_archiveFiles)
+        {
+            if (s_indexedArchives.contains(fullArch))
+                continue;
 
+            s_indexedArchives.insert(fullArch);
+            const bool ba2 = fullArch.endsWith(QStringLiteral(".ba2"), Qt::CaseInsensitive);
+            if (ba2) {
+                Ba2Archive a;
+                if (!a.open(fullArch))
+                    continue;
+                const auto& entries = a.entries();
+                for (int i = 0; i < entries.size(); ++i) {
+                    const QString c = canonical(entries[i].relativePath);
+                    if (!s_index.contains(c))
+                        s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
+                }
+                if (a.isTexture()) {
+                    const auto& tx = a.textureEntries();
+                    for (int i = 0; i < tx.size(); ++i) {
+                        const QString c = canonical(tx[i].relativePath);
+                        if (!s_index.contains(c))
+                            s_index.insert(c, {fullArch, static_cast<quint32>(i), true});
+                    }
+                }
+            } else {
+                BsaArchive a;
+                if (!a.open(fullArch))
+                    continue;
+                const auto& entries = a.entries();
+                for (int i = 0; i < entries.size(); ++i) {
+                    const QString c = canonical(entries[i].fullPath);
+                    if (!s_index.contains(c))
+                        s_index.insert(c, {fullArch, static_cast<quint32>(i), false});
+                }
+            }
+
+            ref = findEntry();
+            if (!ref.archivePath.isEmpty())
+                break; // Found; stop opening further archives.
+        }
+    }
     if (!ref.archivePath.isEmpty())
     {
         QDir().mkpath(QFileInfo(cachePath).absolutePath());
