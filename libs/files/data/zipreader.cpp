@@ -101,7 +101,7 @@ ZipReader::ZipReader(const QString& filePath)
             break;
 
         e.localOffset = static_cast<qint64>(le32(cd.constData() + pos + 42));
-        m_entries.insert(QString::fromUtf8(cd.constData() + pos + 46, static_cast<int>(nlen)), e);
+        m_entries.insert(QString::fromUtf8(cd.constData() + pos + 46, static_cast<int>(nlen)).toLower(), e);
         pos += 46 + nlen + elen + clen;
     }
 
@@ -149,7 +149,7 @@ QByteArray ZipReader::readEntry(const QString& nameInArchive)
     if (!m_file || !m_valid)
         return QByteArray();
 
-    auto it = m_entries.constFind(nameInArchive);
+    auto it = m_entries.constFind(nameInArchive.toLower());
     if (it == m_entries.constEnd())
         return QByteArray();
 

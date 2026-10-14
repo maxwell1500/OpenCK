@@ -10,7 +10,9 @@ class QFile;
 // Reads single members out of an existing ZIP archive. Only what is needed to
 // extract one entry by name: the central directory is parsed once on open and
 // the entry's bytes are inflated on demand, so large archives cost no memory
-// beyond the index.
+// beyond the index. Names match case-insensitively, as asset paths do on
+// Windows (a NIF names "paintedmetalpanel01_orange01.mat", the zip stores
+// "PaintedMetalPanel01_Orange01.mat").
 class ZipReader
 {
 public:
@@ -25,7 +27,7 @@ public:
     bool isValid() const { return m_valid; }
 
     bool hasEntry(const QString& nameInArchive) const
-    { return m_entries.contains(nameInArchive); }
+    { return m_entries.contains(nameInArchive.toLower()); }
 
     // Returns the decompressed bytes of one entry, or an empty array if the
     // archive has no such entry or decoding fails.

@@ -28,6 +28,7 @@ private slots:
     void testContentResourcesZip();
     void testRealBaseGameMaterials();
     void testCompiledMaterialDatabase();
+    void testLayeredInheritance();
 };
 
 void TestMatFile::testTextureSetJoin()
@@ -245,6 +246,25 @@ void TestMatFile::testRealBaseGameMaterials()
     QVERIFY(bevelsSet.contains(1));
     QVERIFY(bevelsSet.contains(2));
     QVERIFY(!bevelsSet.contains(0));
+
+    // The paint family has no colour map on its base layer: the colour is the
+    // layer's tint. The lowercase NIF spelling must still find the zip entry,
+    // whose name is mixed case.
+    QCOMPARE(MatFile::colorTexture(QStringLiteral("Materials\\SetDressing\\DigitalTables\\paintedmetalpanel01_orange01.mat"), cache.path()), QString());
+    const QColor orange = MatFile::baseTint(QStringLiteral("Materials\\SetDressing\\DigitalTables\\paintedmetalpanel01_orange01.mat"), cache.path());
+    QVERIFY(orange.isValid());
+    QVERIFY(orange.red() > orange.green() && orange.green() > orange.blue());
+
+    // white01 has a Color with w=0 and no albedo on its base. A later detail
+    // layer does carry metalAlu_color, which must not stand in for the paint.
+    const QString white = QStringLiteral("Materials\\SetDressing\\DigitalTables\\paintedmetalpanel01_white01.mat");
+    QCOMPARE(MatFile::colorTexture(white, cache.path()), QString());
+    QVERIFY(MatFile::baseTint(white, cache.path()).isValid());
+
+    // Albedo that only the Parent chain carries: the decal's own texture set
+    // is empty and inherits colour, normal and opacity from another file.
+    QVERIFY(MatFile::colorTexture(QStringLiteral("Materials\\Common\\Decal\\DecalMetalBevels04n.mat"), cache.path())
+                .endsWith(QStringLiteral("DecalMetalBevels04_color.DDS"), Qt::CaseInsensitive));
 }
 
 void TestMatFile::testCompiledMaterialDatabase()
@@ -278,6 +298,52 @@ void TestMatFile::testCompiledMaterialDatabase()
         QStringLiteral("Materials\\StarStations\\Emissives\\GlowDecal_White01.mat"),
         cache.path());
     QCOMPARE(glow, QStringLiteral("Textures\\architecture\\generic\\common\\DecalLightBlur01_color.dds"));
+}
+
+void TestMatFile::testLayeredInheritance()
+{
+    // variant.mat imports base.mat. Its texture set has no files and names the
+    // base's texture set as Parent, so the albedo can only come from following
+    // the Parent id across files. The tint is variant's own.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    QDir().mkpath(dir.path() + "/Materials");
+    auto write = [&](const QString& name, const char* json) {
+        QFile f(dir.path() + "/Materials/" + name);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(json);
+    };
+    write("base.mat", R"MAT({"Objects":[
+      {"Parent":"Data\\Materials\\shader.mat","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"base"}},
+        {"Index":0,"Type":"BSMaterial::LayerID","Data":{"ID":"res:00000001:00000001:00000001"}}]},
+      {"ID":"res:00000001:00000001:00000001","Parent":"res:0A","Components":[
+        {"Index":0,"Type":"BSMaterial::MaterialID","Data":{"ID":"res:00000002:00000001:00000001"}}]},
+      {"ID":"res:00000002:00000001:00000001","Parent":"res:0B","Components":[
+        {"Index":0,"Type":"BSMaterial::TextureSetID","Data":{"ID":"res:00000003:00000001:00000001"}}]},
+      {"ID":"res:00000003:00000001:00000001","Parent":"res:0C","Components":[
+        {"Index":0,"Type":"BSMaterial::MRTextureFile","Data":{"FileName":"Data\\Textures\\base_color.dds"}}]}
+    ]})MAT");
+    write("variant.mat", R"MAT({"Import":["Data\\Materials\\base.mat"],"Objects":[
+      {"Parent":"Data\\Materials\\base.mat","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"variant"}},
+        {"Index":0,"Type":"BSMaterial::LayerID","Data":{"ID":"res:00000011:00000001:00000001"}}]},
+      {"ID":"res:00000011:00000001:00000001","Parent":"res:00000001:00000001:00000001","Components":[
+        {"Index":0,"Type":"BSMaterial::MaterialID","Data":{"ID":"res:00000012:00000001:00000001"}}]},
+      {"ID":"res:00000012:00000001:00000001","Parent":"res:00000002:00000001:00000001","Components":[
+        {"Index":0,"Type":"BSMaterial::TextureSetID","Data":{"ID":"res:00000013:00000001:00000001"}},
+        {"Index":0,"Type":"BSMaterial::Color","Data":{"Value":{"Type":"XMFLOAT4","Data":{"x":"0.5","y":"0.25","z":"0.75","w":"1"}}}}]},
+      {"ID":"res:00000013:00000001:00000001","Parent":"res:00000003:00000001:00000001","Components":[
+        {"Index":0,"Type":"BSComponentDB::CTName","Data":{"Name":"variant_TextureSet1"}}]}
+    ]})MAT");
+
+    QCOMPARE(MatFile::colorTexture(QStringLiteral("Materials\\variant.mat"), dir.path()),
+             QStringLiteral("Textures\\base_color.dds"));
+    const QColor tint = MatFile::baseTint(QStringLiteral("Materials\\variant.mat"), dir.path());
+    QVERIFY(tint.isValid());
+    QCOMPARE(tint, QColor::fromRgbF(0.5, 0.25, 0.75));
+    // The base itself is untinted.
+    QVERIFY(!MatFile::baseTint(QStringLiteral("Materials\\base.mat"), dir.path()).isValid());
 }
 
 QTEST_MAIN(TestMatFile)

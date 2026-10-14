@@ -2,6 +2,7 @@
 
 #include <QMap>
 #include <QString>
+#include <QColor>
 
 // Readers for Starfield `.mat` material files. A .mat is a JSON dump of the
 // material's component database sub-graph: objects named "<Family>_Material1",
@@ -41,11 +42,12 @@
 //  19 SecondaryOpacity    823
 //  20 HairID              12
 //
-// Colour is only slot 0. Falling back to "whichever slot is populated" would
+// Colour is slot 0. Falling back to "whichever slot is populated" would
 // be wrong for the 2,352 texture sets whose only entry is a normal (slot 1),
 // opacity (2) or roughness (3) map: they would be drawn in the colour slot.
-// The emissive materials above need the shader model to tell them apart, and
-// that lives only in the component database, so they stay untextured.
+// The one exception is slot 7 when its file is itself a "_color" map, which is
+// how unlit effect materials such as GlowDecal_* carry their colour; a slot 7
+// "_emissive" file is a glow mask and is not colour.
 enum MatChannel
 {
     MatChannel_Albedo = 0,
@@ -89,6 +91,13 @@ public:
     static void setMaterialDatabase(const QString& cdbPath);
 
     // Convenience: colour-map path for a material referenced by a NIF, or an
-    // empty string.
+    // empty string. Follows the material's layer graph (see MatFile::baseTint
+    // for the tint half of it).
     static QString colorTexture(const QString& materialPath, const QString& dataDir);
+
+    // Colour multiplier for a material's albedo (or its flat colour when it has
+    // no albedo), or an invalid colour when the material is untinted. Painted
+    // base-game materials carry their paint colour only here: their base layer
+    // has a tint and no colour map.
+    static QColor baseTint(const QString& materialPath, const QString& dataDir);
 };

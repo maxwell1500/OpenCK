@@ -373,11 +373,16 @@ void NifViewportWidget::uploadCellModelGpu(CellModel& model, const QString& nifD
     model.ibo.release();
 
     for (auto& shape : model.shapes) {
-        // Starfield NIFs name a .mat instead of a texture; when that .mat is a
-        // loose file its texture set is readable, otherwise the shape stays
-        // untextured and falls back to its material colour.
-        if (shape.texturePath.isEmpty() && !shape.materialPath.isEmpty())
-            shape.texturePath = MatFile::colorTexture(shape.materialPath, mDataDir);
+        // Starfield NIFs name a .mat instead of a texture or a colour. Its
+        // layer graph gives the albedo map and a tint; a painted material has
+        // only the tint, so the shape still gets its paint colour.
+        if (!shape.materialPath.isEmpty()) {
+            if (shape.texturePath.isEmpty())
+                shape.texturePath = MatFile::colorTexture(shape.materialPath, mDataDir);
+            const QColor tint = MatFile::baseTint(shape.materialPath, mDataDir);
+            if (tint.isValid())
+                shape.baseColor = QVector3D(float(tint.redF()), float(tint.greenF()), float(tint.blueF()));
+        }
 
         if (!shape.texturePath.isEmpty() && !shape.texture) {
             QString resolvedTex;

@@ -12,7 +12,11 @@
 #include <QFileInfo>
 #include <QVector>
 #include <QRegularExpression>
+#include <algorithm>
 #include <QStringList>
+#include <QColor>
+#include <QHash>
+#include <QSet>
 
 namespace {
 
@@ -27,8 +31,8 @@ struct MatObject
 // the only reliable marker of either schema: a loose mod .mat names the parent
 // file ("...\\texturesets.mat") while the Creation Kit's dumps it as a
 // resource id ("res:DC239E25:...").
-const QRegularExpression textureSetNameRe(QStringLiteral("_TextureSet\\d+$", QRegularExpression::CaseInsensitiveOption));
-const QRegularExpression roleSuffixRe(QStringLiteral("_(Material|TextureSet|Layer|Blender|UVStream)\\d+$", QRegularExpression::CaseInsensitiveOption));
+const QRegularExpression textureSetNameRe(QStringLiteral("_TextureSet\\d+$"), QRegularExpression::CaseInsensitiveOption);
+const QRegularExpression roleSuffixRe(QStringLiteral("_(Material|TextureSet|Layer|Blender|UVStream)\\d+$"), QRegularExpression::CaseInsensitiveOption);
 
 bool isTextureSet(const MatObject& o)
 {
@@ -130,6 +134,16 @@ ZipReader* contentResources()
     }
     return g_contentResources;
 }
+
+// What a material resolves to once its layer graph has been walked.
+struct MatAppearance
+{
+    QString albedo;     // install-relative texture path, empty if none
+    QColor tint;        // multiplier for the albedo; invalid when untinted
+};
+// shortcut: keyed by resolved .mat path, never invalidated by edits to a loose
+// file while the app runs; reopen the cell to pick up a changed material.
+QHash<QString, MatAppearance> g_appearanceCache;
 } // namespace
 
 QMap<int, QString> MatFile::textureSlots(const QString& absPath)
@@ -225,41 +239,42 @@ QString MatFile::findLoose(const QString& materialPath, const QString& dataDir)
 
     // Base-game materials ship only inside the Creation Kit's
     // ContentResources.zip, so pull out the single entry we need and cache it
-    // next to the extracted meshes and textures.
-    // Base-game materials have no loose file anywhere: their objects live in
-    // the compiled database. Read the texture set out of it and write it in the
-    // same JSON a loose file uses, so textureSlots() reads it unchanged.
-    const QString doc = materialDocument(rel);
-    if (!doc.isEmpty()) {
-        const QString cache = QDir::cleanPath(dataDir + QLatin1String("/.openck_cache/materials/") + rel);
-        QDir().mkpath(QFileInfo(cache).absolutePath());
-        QFile out(cache);
-        if (out.open(QIODevice::WriteOnly) && out.write(doc.toUtf8()) == doc.toUtf8().size())
-            return cache;
-        return QString();
-    }
+    // next to the extracted meshes and textures. The zip holds the full layered
+    // graph, so it is tried before the compiled database below, which can only
+    // supply a bare texture set.
+    const QString cache = QDir::cleanPath(dataDir + QLatin1String("/.openck_cache/materials/") + rel);
+    if (QFileInfo::exists(cache))
+        return cache;
 
     if (ZipReader* zr = contentResources()) {
-        const QString cache = QDir::cleanPath(dataDir + QLatin1String("/.openck_cache/materials/") + rel);
-        if (QFileInfo::exists(cache))
-            return cache;
-
         // Entries in the archive use forward slashes.
         const QByteArray body = zr->readEntry(QString(rel).replace(QLatin1Char('\\'), QLatin1Char('/')));
-        if (body.isEmpty())
+        if (!body.isEmpty()) {
+            QDir().mkpath(QFileInfo(cache).absolutePath());
+            QFile out(cache);
+            if (out.open(QIODevice::WriteOnly) && out.write(body) == body.size())
+                return cache;
             return QString();
+        }
+    }
 
+    // Materials in neither place live only in the compiled database. Read the
+    // texture set out of it and write it in the same JSON a loose file uses, so
+    // textureSlots() reads it unchanged.
+    const QString doc = materialDocument(rel);
+    if (!doc.isEmpty()) {
         QDir().mkpath(QFileInfo(cache).absolutePath());
         QFile out(cache);
-        if (!out.open(QIODevice::WriteOnly) || out.write(body) != body.size())
-            return QString();
-        return cache;
+        const QByteArray bytes = doc.toUtf8();
+        if (out.open(QIODevice::WriteOnly) && out.write(bytes) == bytes.size())
+            return cache;
     }
     return QString();
 }
 
 void MatFile::setContentResources(const QString& zipPath)
 {
+    g_appearanceCache.clear();
     if (g_contentResourcesPath != zipPath) {
         g_contentResourcesPath = zipPath;
         delete g_contentResources;
@@ -270,6 +285,7 @@ void MatFile::setContentResources(const QString& zipPath)
 
 void MatFile::setMaterialDatabase(const QString& cdbPath)
 {
+    g_appearanceCache.clear();
     if (g_materialDatabasePath != cdbPath) {
         g_materialDatabasePath = cdbPath;
         delete g_materialDatabase;
@@ -278,26 +294,267 @@ void MatFile::setMaterialDatabase(const QString& cdbPath)
     }
 }
 
+namespace {
+
+// "Data\\Textures\\x.dds" -> "Textures\\x.dds". .mat paths are written
+// relative to the install root while dataDir IS the Data folder, so the leading
+// component has to go for the asset resolver and findLoose() to find the file.
+QString dataRelative(const QString& p)
+{
+    static const QRegularExpression sepRun(QStringLiteral("[\\\\/]+"));
+    const QStringList parts = QString(p).replace(sepRun, QStringLiteral("\\"))
+                                  .split(QLatin1Char('\\'), Qt::SkipEmptyParts);
+    if (parts.size() > 1 && parts.first().compare(QLatin1String("data"), Qt::CaseInsensitive) == 0)
+        return parts.mid(1).join(QLatin1Char('\\'));
+    return p;
+}
+
+// A layered material is a graph of objects spread over several files: the
+// root names a file as its Parent and lists LayerIDs; each layer names a
+// material, which names a texture set. Objects reference each other by "res:"
+// id, ids are unique across the whole set, and an object that does not carry a
+// component itself inherits it from the object its own Parent id names (often
+// in another file). A variation such as "PaintedMetalPanel01_Grey01" therefore
+// has texture sets with no files of their own.
+using ObjectIndex = QHash<QString, QJsonObject>; // lowercased "res:" id -> object
+
+constexpr int kMaxFiles = 64;     // an Import chain is a handful of files
+constexpr int kMaxInherit = 32;   // Parent chains are a handful of objects
+
+// Indexes `path` and everything it Imports. Objects of `path` itself are
+// returned through rootObjects.
+void indexClosure(const QString& path, const QString& dataDir, QSet<QString>& seen,
+                  ObjectIndex& ids, QJsonArray* rootObjects)
+{
+    const QString key = QDir::cleanPath(path).toLower();
+    if (seen.contains(key) || seen.size() >= kMaxFiles)
+        return;
+    seen.insert(key);
+
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return;
+    const QJsonObject doc = QJsonDocument::fromJson(f.readAll()).object();
+
+    const QJsonArray objs = doc.value(QLatin1String("Objects")).toArray();
+    for (const QJsonValue& v : objs) {
+        const QJsonObject o = v.toObject();
+        const QString id = o.value(QLatin1String("ID")).toString();
+        if (!id.isEmpty())
+            ids.insert(id.toLower(), o);
+    }
+    if (rootObjects)
+        *rootObjects = objs;
+
+    const QJsonArray imports = doc.value(QLatin1String("Import")).toArray();
+    for (const QJsonValue& imp : imports) {
+        const QString p = MatFile::findLoose(dataRelative(imp.toString()), dataDir);
+        if (!p.isEmpty())
+            indexClosure(p, dataDir, seen, ids, nullptr);
+    }
+}
+
+// The material's own object: it names a file as Parent and has no id, because
+// nothing references it.
+QJsonObject findRoot(const QJsonArray& objs)
+{
+    for (const QJsonValue& v : objs) {
+        const QJsonObject o = v.toObject();
+        if (o.value(QLatin1String("Parent")).toString().endsWith(QLatin1String(".mat"), Qt::CaseInsensitive)
+            && !o.contains(QLatin1String("ID")))
+            return o;
+    }
+    return QJsonObject();
+}
+
+QJsonObject parentOf(const QJsonObject& o, const ObjectIndex& ids)
+{
+    const QString p = o.value(QLatin1String("Parent")).toString().toLower();
+    return p.startsWith(QLatin1String("res:")) ? ids.value(p) : QJsonObject();
+}
+
+QJsonObject referenced(const QJsonObject& component, const ObjectIndex& ids)
+{
+    return ids.value(component.value(QLatin1String("Data")).toObject()
+                         .value(QLatin1String("ID")).toString().toLower());
+}
+
+// The components of `type` on the nearest object up the Parent chain that has
+// any, in Index order.
+QVector<QJsonObject> inheritedComponents(QJsonObject o, const char* type, const ObjectIndex& ids)
+{
+    for (int depth = 0; !o.isEmpty() && depth < kMaxInherit; ++depth) {
+        QVector<QJsonObject> out;
+        const QJsonArray comps = o.value(QLatin1String("Components")).toArray();
+        for (const QJsonValue& c : comps) {
+            const QJsonObject co = c.toObject();
+            if (co.value(QLatin1String("Type")).toString() == QLatin1String(type))
+                out.append(co);
+        }
+        if (!out.isEmpty()) {
+            std::sort(out.begin(), out.end(), [](const QJsonObject& a, const QJsonObject& b) {
+                return a.value(QLatin1String("Index")).toInt() < b.value(QLatin1String("Index")).toInt();
+            });
+            return out;
+        }
+        o = parentOf(o, ids);
+    }
+    return {};
+}
+
+QMap<int, QString> inheritedFiles(QJsonObject o, const ObjectIndex& ids)
+{
+    for (int depth = 0; !o.isEmpty() && depth < kMaxInherit; ++depth) {
+        QMap<int, QString> files;
+        const QJsonArray comps = o.value(QLatin1String("Components")).toArray();
+        for (const QJsonValue& c : comps) {
+            const QJsonObject co = c.toObject();
+            const QString fn = textureFileOf(co);
+            if (!fn.isEmpty())
+                files.insert(co.value(QLatin1String("Index")).toInt(), fn);
+        }
+        if (!files.isEmpty())
+            return files;
+        o = parentOf(o, ids);
+    }
+    return {};
+}
+
+double number(const QJsonValue& v)
+{
+    return v.isString() ? v.toString().toDouble() : v.toDouble();
+}
+
+struct LayerInfo
+{
+    QMap<int, QString> files;
+    bool hasColor = false;
+    double r = 1, g = 1, b = 1, w = 1;  // w: how strongly the tint applies
+};
+
+QVector<LayerInfo> layersOf(const QJsonObject& root, const ObjectIndex& ids)
+{
+    QVector<LayerInfo> out;
+    for (const QJsonObject& lc : inheritedComponents(root, "BSMaterial::LayerID", ids)) {
+        LayerInfo li;
+        const QJsonObject layer = referenced(lc, ids);
+        const QVector<QJsonObject> mc = inheritedComponents(layer, "BSMaterial::MaterialID", ids);
+        const QJsonObject mat = mc.isEmpty() ? QJsonObject() : referenced(mc.first(), ids);
+        const QVector<QJsonObject> tc = inheritedComponents(mat, "BSMaterial::TextureSetID", ids);
+        if (!tc.isEmpty())
+            li.files = inheritedFiles(referenced(tc.first(), ids), ids);
+
+        const QVector<QJsonObject> cc = inheritedComponents(mat, "BSMaterial::Color", ids);
+        if (!cc.isEmpty()) {
+            const QJsonObject c = cc.first().value(QLatin1String("Data")).toObject()
+                                      .value(QLatin1String("Value")).toObject()
+                                      .value(QLatin1String("Data")).toObject();
+            li.hasColor = c.contains(QLatin1String("x"));
+            li.r = number(c.value(QLatin1String("x")));
+            li.g = number(c.value(QLatin1String("y")));
+            li.b = number(c.value(QLatin1String("z")));
+            if (c.contains(QLatin1String("w")))
+                li.w = number(c.value(QLatin1String("w")));
+        }
+        out.append(li);
+    }
+    return out;
+}
+
+// A layer's colour map. Slot 0, or slot 7 when it holds a colour map: unlit and
+// emissive effect materials (GlowDecal_*) file their colour there. Measured over
+// the 516 base layers that have slot 7 and no slot 0, 225 are "_color" files
+// and 268 are "_emissive" glow masks, so the file's own suffix is the test; an
+// emissive mask must not be drawn as albedo.
+QString albedoOf(const QMap<int, QString>& files)
+{
+    if (files.contains(MatChannel_Albedo))
+        return files.value(MatChannel_Albedo);
+    const QString emissive = files.value(MatChannel_Emissive);
+    if (QFileInfo(emissive).completeBaseName().endsWith(QLatin1String("_color"), Qt::CaseInsensitive))
+        return emissive;
+    return QString();
+}
+
+// The first layer is the base. Its albedo is the colour; the later layers are
+// detail (grunge, scratches, a metal under paint) mixed in by masks this
+// viewer does not evaluate, so their albedo must not stand in for the base.
+// A painted base has no albedo at all, only a Color: that colour is the surface.
+// shortcut: a base with no albedo and no Color at all (eyes: iris on layer 2)
+// takes the first later layer's albedo; the blend masks are not read.
+MatAppearance appearanceOf(const QVector<LayerInfo>& layers)
+{
+    MatAppearance out;
+    if (layers.isEmpty())
+        return out;
+
+    const LayerInfo& base = layers.first();
+    out.albedo = albedoOf(base.files);
+    if (out.albedo.isEmpty() && !base.hasColor) {
+        for (int i = 1; i < layers.size() && out.albedo.isEmpty(); ++i)
+            out.albedo = albedoOf(layers.at(i).files);
+    }
+
+    // shortcut: w is read as the tint strength, which is inferred, not read from
+    // the CK. Measured: w is independent of the layer's override colour type
+    // (Multiply occurs with w=0 and w=1 about equally). Over an albedo, w=0 means
+    // "no tint": that never blackens a surface (the glow decals are black with
+    // w=0). With no albedo the colour is all there is, so w only scales it when
+    // positive, and a black w=0 colour (50 base materials) is taken as unset.
+    // Upgrade when the component's field is documented.
+    const bool unsetBlack = base.w == 0 && base.r == 0 && base.g == 0 && base.b == 0;
+    const bool overAlbedo = !out.albedo.isEmpty();
+    const bool apply = base.hasColor && (overAlbedo ? base.w > 0 : !unsetBlack);
+    if (apply) {
+        const double s = base.w > 0 ? base.w : 1.0;
+        auto mix = [&](double c) { return qBound(0.0, 1.0 + (c - 1.0) * s, 1.0); };
+        out.tint = QColor::fromRgbF(mix(base.r), mix(base.g), mix(base.b));
+    }
+    return out;
+}
+
+MatAppearance resolveAppearance(const QString& materialPath, const QString& dataDir)
+{
+    const QString mat = MatFile::findLoose(materialPath, dataDir);
+    if (mat.isEmpty())
+        return {};
+
+    const auto cached = g_appearanceCache.constFind(mat);
+    if (cached != g_appearanceCache.constEnd())
+        return cached.value();
+
+    QSet<QString> seen;
+    ObjectIndex ids;
+    QJsonArray rootObjects;
+    indexClosure(mat, dataDir, seen, ids, &rootObjects);
+
+    MatAppearance out;
+    const QJsonObject root = findRoot(rootObjects);
+    const QVector<LayerInfo> layers = root.isEmpty() ? QVector<LayerInfo>() : layersOf(root, ids);
+    if (!layers.isEmpty()) {
+        out = appearanceOf(layers);
+    } else {
+        // No layer graph: a loose single-material file, or a texture set the
+        // compiled database synthesised. Read the texture sets directly.
+        // Slot 0 is the albedo map. See MatChannel for the full measured map
+        // and why no other slot may stand in for it.
+        out.albedo = MatFile::textureSlots(mat).value(MatChannel_Albedo);
+    }
+    if (!out.albedo.isEmpty())
+        out.albedo = dataRelative(out.albedo);
+
+    g_appearanceCache.insert(mat, out);
+    return out;
+}
+
+} // namespace
+
 QString MatFile::colorTexture(const QString& materialPath, const QString& dataDir)
 {
-    const QString mat = findLoose(materialPath, dataDir);
-    if (mat.isEmpty())
-        return QString();
+    return resolveAppearance(materialPath, dataDir).albedo;
+}
 
-    // Slot 0 is the albedo map. See MatChannel for the full measured map and
-    // why no other slot may stand in for it.
-    QString tex = textureSlots(mat).value(MatChannel_Albedo);
-    if (tex.isEmpty())
-        return QString();
-
-    // .mat texture paths are written relative to the install root
-    // ("Data\Textures\...") while dataDir IS that Data folder, so the leading
-    // component has to go for the asset resolver to find the file.
-    static const QRegularExpression sepRun(QStringLiteral("[\\\\/]+"));
-    const QStringList parts = QString(tex).replace(sepRun, QStringLiteral("\\"))
-                                     .split(QLatin1Char('\\'), Qt::SkipEmptyParts);
-    if (parts.size() > 1 && parts.first().compare(QLatin1String("data"),
-                                                 Qt::CaseInsensitive) == 0)
-        return parts.mid(1).join(QLatin1Char('\\'));
-    return tex;
+QColor MatFile::baseTint(const QString& materialPath, const QString& dataDir)
+{
+    return resolveAppearance(materialPath, dataDir).tint;
 }
