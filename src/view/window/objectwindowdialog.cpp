@@ -554,11 +554,14 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
             int categoryId = getSelectedCategoryId(index);
             CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
             
-            bool hasModel = (type == CkId::Type_Weap_ || type == CkId::Type_Armor_ || 
+            bool hasModel = (type == CkId::Type_Weap_ || type == CkId::Type_Armor_ ||
                            type == CkId::Type_Stat_ || type == CkId::Type_Tree_ ||
-                           type == CkId::Type_Acti_ || type == CkId::Type_Misc_ ||
-                           type == CkId::Type_Book_ || type == CkId::Type_Ingr_ ||
-                           type == CkId::Type_Alch_ || type == CkId::Type_Cont_);
+                           type == CkId::Type_Mstt_ || type == CkId::Type_Acti_ ||
+                           type == CkId::Type_Misc_ || type == CkId::Type_Book_ ||
+                           type == CkId::Type_Ingr_ || type == CkId::Type_Alch_ ||
+                           type == CkId::Type_Cont_ || type == CkId::Type_Door_ ||
+                           type == CkId::Type_Furn_ || type == CkId::Type_Flor_ ||
+                           type == CkId::Type_Ligh_);
             
             if (hasModel && BlenderLauncher::isBlenderAvailable()) {
                 QAction* blenderAction = mContextMenu->addAction("Open in Blender...");
@@ -2112,6 +2115,20 @@ QString ObjectWindowDialog::getModelPathForRecord(int categoryId, int recordInde
     case CkId::Type_Flor_:
     {
         auto& collection = mData->getFlorCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+            return collection.getRecord(recordIndex).get().modelPath;
+        break;
+    }
+    case CkId::Type_Ligh_:
+    {
+        auto& collection = mData->getLighCollection();
+        if (recordIndex >= 0 && recordIndex < collection.size())
+            return collection.getRecord(recordIndex).get().modelPath;
+        break;
+    }
+    case CkId::Type_Mstt_:
+    {
+        auto& collection = mData->getMsttCollection();
         if (recordIndex >= 0 && recordIndex < collection.size())
             return collection.getRecord(recordIndex).get().modelPath;
         break;
