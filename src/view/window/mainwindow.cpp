@@ -73,6 +73,7 @@
 #include "worldspacedialog.hpp"
 #include "cellsdialog.hpp"
 #include "objectwindowdialog.hpp"
+#include <QTableView>
 #include "qtformdialogmanager.hpp"
 #include "../../model/tools/formcomponentsresolver.hpp"
 #include "exportdialog.hpp"
@@ -87,6 +88,7 @@
 #include "inspectorwidget.hpp"
 #include "testlogdialog.hpp"
 #include "warningsdockwidget.hpp"
+#include "previewwindowdock.hpp"
 #include "../../model/tools/assetvalidator.hpp"
 #include "../../model/tools/assetdependencyscanner.hpp"
 #include "../../model/tools/batchtools.hpp"
@@ -535,31 +537,37 @@ void MainWindow::setData(Data* data)
                     mStatusSelectedObject->setText(QStringLiteral("%1: %2")
                         .arg(lookup.recordType, eid));
 
-                // Preview selected object in the 3D Render Viewport ONLY if no cell is currently loaded
+                // Dedicated 3D Preview Window (Creation Kit Dialog 315)
+                ensurePreviewWindowDock();
+                QString modelPath = objectWindowDock->getModelPathForRecord(cat, rec);
+                QString resolved = (!modelPath.isEmpty()) ? resolveNifFilePath(modelPath) : QString();
+                CkId::Type type = static_cast<CkId::Type>(objectWindowDock->getCategoryType(cat));
+                quint32 formId = 0;
+                if (mData)
+                {
+                    BaseCollection* coll = mData->getCollectionByType(type);
+                    if (coll && rec >= 0 && rec < coll->size())
+                        formId = coll->getFormId(rec);
+                }
+                if (previewWindowDock)
+                {
+                    previewWindowDock->previewRecord(eid, formId, modelPath, resolved, type);
+                }
+
+                // Fallback: Preview in 3D Render Viewport ONLY if no cell is loaded
                 if (nifViewportWidget && mLoadedCellFormId == 0)
                 {
                     nifViewportWidget->setCellReferences({});
-                    // Set the data dir and material sources before resolving the
-                    // model: this path runs before any cell is loaded, so the
-                    // cell loader has not configured them yet and .mat names in
-                    // the NIF would resolve to nothing.
                     configureViewportData();
-                    QString modelPath = objectWindowDock->getModelPathForRecord(cat, rec);
                     bool loaded = false;
-                    if (!modelPath.isEmpty() && mData)
+                    if (!resolved.isEmpty() && QFileInfo::exists(resolved))
                     {
-                        QString resolved = resolveNifFilePath(modelPath);
-                        if (!resolved.isEmpty() && QFileInfo::exists(resolved))
-                        {
-                            nifViewportWidget->loadNif(resolved);
-                            loaded = true;
-                        }
+                        nifViewportWidget->loadNif(resolved);
+                        loaded = true;
                     }
                     if (!loaded)
                     {
-                        // Render an informative 3D preview primitive matching the category type
                         PrimitiveMeshGenerator::Type prim = PrimitiveMeshGenerator::Type::Cube;
-                        CkId::Type type = static_cast<CkId::Type>(objectWindowDock->getCategoryType(cat));
                         if (type == CkId::Type_Weap_) prim = PrimitiveMeshGenerator::Type::Cylinder;
                         else if (type == CkId::Type_Spel_ || type == CkId::Type_Ligh_) prim = PrimitiveMeshGenerator::Type::Sphere;
                         else if (type == CkId::Type_Acti_ || type == CkId::Type_Door_) prim = PrimitiveMeshGenerator::Type::Cylinder;
@@ -573,7 +581,9 @@ void MainWindow::setData(Data* data)
             // the model, then frame it so it fills the viewport.
             connect(objectWindowDock, &ObjectWindowDialog::recordFitToWindow,
                     this, [this]() {
-                        if (nifViewportWidget)
+                        if (previewWindowDock && mPreviewDock && !mPreviewDock->isClosed())
+                            previewWindowDock->zoomToFit();
+                        if (nifViewportWidget && mLoadedCellFormId == 0)
                             nifViewportWidget->zoomToFit();
                     });
         }
@@ -1415,7 +1425,7 @@ void MainWindow::applyShortcuts()
     // ========================================================================
     // DISABLED ACTIONS (kept disabled; tooltips explain why)
     // ========================================================================
-    ui->actionPreviewWindow->setToolTip(tr("Preview a NIF file in the render window"));
+    ui->actionPreviewWindow->setToolTip(tr("Toggle the 3D Preview Window (Dialog 315)"));
     ui->actionLighting->setToolTip(tr("Lighting editor (not available)"));
     ui->actionNpcEditor->setToolTip(tr("Create a new NPC record and open its editor"));
     ui->actionRaceEditor->setToolTip(tr("Create a new race record and open its editor"));
@@ -2582,10 +2592,22 @@ void MainWindow::on_actionDelete_triggered()
 
 void MainWindow::on_actionSelectAll_triggered()
 {
-    if (objectWindowDock && objectWindowDock->getTreeView())
+    if (objectWindowDock && objectWindowDock->getRecordTable())
     {
-        objectWindowDock->getTreeView()->selectAll();
+        objectWindowDock->getRecordTable()->selectAll();
     }
+}
+
+// Find Next/Previous: Editor ID substring search driven by the Object Window filter text.
+static void findInObjectWindow(MainWindow* window, ObjectWindowDialog* dock, bool forward, const char* title)
+{
+    if (!dock || !dock->getFilterEdit())
+        return;
+    const QString searchText = dock->getFilterEdit()->text();
+    if (searchText.isEmpty())
+        return;
+    if (!dock->findRecordText(searchText, forward))
+        QMessageBox::information(window, title, QString("No more matches for '%1'.").arg(searchText));
 }
 
 void MainWindow::on_actionFindNext_triggered()
@@ -2595,76 +2617,7 @@ void MainWindow::on_actionFindNext_triggered()
         QMessageBox::information(this, "Find Next", "No document loaded.");
         return;
     }
-
-    if (!objectWindowDock || !objectWindowDock->getFilterEdit() || !objectWindowDock->getTreeView())
-    {
-        return;
-    }
-
-    QString searchText = objectWindowDock->getFilterEdit()->text();
-    if (searchText.isEmpty())
-    {
-        return;
-    }
-
-    QTreeView* tree = objectWindowDock->getTreeView();
-    QModelIndex current = tree->currentIndex();
-
-    // Start searching from the next item after current
-    int startCategory = -1;
-    int startRow = -1;
-
-    if (current.isValid())
-    {
-        startCategory = current.parent().row();
-        startRow = current.row();
-    }
-
-    // Iterate through all visible items starting after current position
-    QAbstractItemModel* model = tree->model();
-    int totalCategories = model->rowCount();
-
-    for (int cat = (startCategory >= 0 ? startCategory : 0); cat < totalCategories; ++cat)
-    {
-        QModelIndex catIndex = model->index(cat, 0);
-        int totalRows = model->rowCount(catIndex);
-        int startRowForCat = (cat == startCategory && startRow >= 0) ? startRow + 1 : 0;
-
-        for (int row = startRowForCat; row < totalRows; ++row)
-        {
-            QModelIndex idx = model->index(row, 0, catIndex);
-            QString editorId = model->data(idx).toString();
-
-            if (editorId.contains(searchText, Qt::CaseInsensitive))
-            {
-                tree->setCurrentIndex(idx);
-                tree->scrollTo(idx);
-                return;
-            }
-        }
-    }
-
-    // Wrap around: search from beginning
-    for (int cat = 0; cat < totalCategories; ++cat)
-    {
-        QModelIndex catIndex = model->index(cat, 0);
-        int totalRows = model->rowCount(catIndex);
-
-        for (int row = 0; row < totalRows; ++row)
-        {
-            QModelIndex idx = model->index(row, 0, catIndex);
-            QString editorId = model->data(idx).toString();
-
-            if (editorId.contains(searchText, Qt::CaseInsensitive))
-            {
-                tree->setCurrentIndex(idx);
-                tree->scrollTo(idx);
-                return;
-            }
-        }
-    }
-
-    QMessageBox::information(this, "Find Next", QString("No more matches for '%1'.").arg(searchText));
+    findInObjectWindow(this, objectWindowDock, true, "Find Next");
 }
 
 void MainWindow::on_actionFindPrevious_triggered()
@@ -2674,134 +2627,42 @@ void MainWindow::on_actionFindPrevious_triggered()
         QMessageBox::information(this, "Find Previous", "No document loaded.");
         return;
     }
+    findInObjectWindow(this, objectWindowDock, false, "Find Previous");
+}
 
-    if (!objectWindowDock || !objectWindowDock->getFilterEdit() || !objectWindowDock->getTreeView())
-    {
+// Record navigation moves through the record table (the tree holds categories only).
+static void selectTableRow(ObjectWindowDialog* dock, int (*pick)(int current, int count))
+{
+    QTableView* table = dock ? dock->getRecordTable() : nullptr;
+    if (!table || !table->model())
         return;
-    }
-
-    QString searchText = objectWindowDock->getFilterEdit()->text();
-    if (searchText.isEmpty())
-    {
+    const int count = table->model()->rowCount();
+    const int row = pick(table->currentIndex().isValid() ? table->currentIndex().row() : -1, count);
+    if (row < 0 || row >= count)
         return;
-    }
-
-    QTreeView* tree = objectWindowDock->getTreeView();
-    QModelIndex current = tree->currentIndex();
-
-    int startCategory = -1;
-    int startRow = -1;
-
-    if (current.isValid())
-    {
-        startCategory = current.parent().row();
-        startRow = current.row();
-    }
-
-    QAbstractItemModel* model = tree->model();
-    int totalCategories = model->rowCount();
-
-    // Search backward from current position
-    for (int cat = (startCategory >= 0 ? startCategory : totalCategories - 1); cat >= 0; --cat)
-    {
-        QModelIndex catIndex = model->index(cat, 0);
-        int totalRows = model->rowCount(catIndex);
-        int endRow = (cat == startCategory && startRow >= 0) ? startRow - 1 : totalRows - 1;
-
-        for (int row = endRow; row >= 0; --row)
-        {
-            QModelIndex idx = model->index(row, 0, catIndex);
-            QString editorId = model->data(idx).toString();
-
-            if (editorId.contains(searchText, Qt::CaseInsensitive))
-            {
-                tree->setCurrentIndex(idx);
-                tree->scrollTo(idx);
-                return;
-            }
-        }
-    }
-
-    // Wrap around: search from end
-    for (int cat = totalCategories - 1; cat >= 0; --cat)
-    {
-        QModelIndex catIndex = model->index(cat, 0);
-        int totalRows = model->rowCount(catIndex);
-
-        for (int row = totalRows - 1; row >= 0; --row)
-        {
-            QModelIndex idx = model->index(row, 0, catIndex);
-            QString editorId = model->data(idx).toString();
-
-            if (editorId.contains(searchText, Qt::CaseInsensitive))
-            {
-                tree->setCurrentIndex(idx);
-                tree->scrollTo(idx);
-                return;
-            }
-        }
-    }
-
-    QMessageBox::information(this, "Find Previous", QString("No more matches for '%1'.").arg(searchText));
+    const QModelIndex idx = table->model()->index(row, 0);
+    table->setCurrentIndex(idx);
+    table->scrollTo(idx);
 }
 
 void MainWindow::on_actionNextRecord_triggered()
 {
-    if (objectWindowDock && objectWindowDock->getTreeView())
-    {
-        QTreeView* tree = objectWindowDock->getTreeView();
-        QModelIndex current = tree->currentIndex();
-        if (current.isValid())
-        {
-            QModelIndex next = tree->model()->index(current.row() + 1, current.column(), current.parent());
-            if (next.isValid())
-            {
-                tree->setCurrentIndex(next);
-            }
-        }
-    }
+    selectTableRow(objectWindowDock, [](int cur, int) { return cur + 1; });
 }
 
 void MainWindow::on_actionPreviousRecord_triggered()
 {
-    if (objectWindowDock && objectWindowDock->getTreeView())
-    {
-        QTreeView* tree = objectWindowDock->getTreeView();
-        QModelIndex current = tree->currentIndex();
-        if (current.isValid() && current.row() > 0)
-        {
-            QModelIndex prev = tree->model()->index(current.row() - 1, current.column(), current.parent());
-            if (prev.isValid())
-            {
-                tree->setCurrentIndex(prev);
-            }
-        }
-    }
+    selectTableRow(objectWindowDock, [](int cur, int) { return cur < 0 ? -1 : cur - 1; });
 }
 
 void MainWindow::on_actionFirstRecord_triggered()
 {
-    if (objectWindowDock && objectWindowDock->getTreeView())
-    {
-        QModelIndex first = objectWindowDock->getTreeView()->model()->index(0, 0);
-        if (first.isValid())
-        {
-            objectWindowDock->getTreeView()->setCurrentIndex(first);
-        }
-    }
+    selectTableRow(objectWindowDock, [](int, int) { return 0; });
 }
 
 void MainWindow::on_actionLastRecord_triggered()
 {
-    if (objectWindowDock && objectWindowDock->getTreeView())
-    {
-        QModelIndex last = objectWindowDock->getTreeView()->model()->index(
-            objectWindowDock->getTreeView()->model()->rowCount() - 1, 0);
-        if (last.isValid())
-        {
-            objectWindowDock->getTreeView()->setCurrentIndex(last);
-        }
-    }
+    selectTableRow(objectWindowDock, [](int, int count) { return count - 1; });
 }
 
 void MainWindow::on_actionExpandAll_triggered()
@@ -3023,16 +2884,52 @@ void MainWindow::on_actionShortcuts_triggered()
     dlg.exec();
 }
 
+void MainWindow::ensurePreviewWindowDock()
+{
+    if (previewWindowDock && mPreviewDock)
+        return;
+
+    configureViewportData();
+
+    previewWindowDock = new PreviewWindowDock(this);
+    if (mData)
+        previewWindowDock->setDataDir(mData->getPaths().dataDir.absolutePath());
+
+    mPreviewDock = new ads::CDockWidget(QStringLiteral("Preview"));
+    mPreviewDock->setWidget(previewWindowDock);
+    mPreviewDock->setObjectName(QStringLiteral("Preview Window Dock"));
+    mPreviewDock->setFeature(ads::CDockWidget::DockWidgetClosable, true);
+
+    if (mInspectorDock && mInspectorDock->dockAreaWidget())
+        mDockManager->addDockWidgetTabToArea(mPreviewDock, mInspectorDock->dockAreaWidget());
+    else if (mCellViewDock && mCellViewDock->dockAreaWidget())
+        mDockManager->addDockWidgetTabToArea(mPreviewDock, mCellViewDock->dockAreaWidget());
+    else
+        mDockManager->addDockWidget(ads::RightDockWidgetArea, mPreviewDock);
+
+    mPreviewDock->toggleView(false);
+}
+
 void MainWindow::on_actionPreviewWindow_triggered()
 {
-    if (!nifViewportWidget)
-        return;
-    QString filePath = QFileDialog::getOpenFileName(this, tr("Preview NIF File"),
-        QString(), tr("NIF Files (*.nif);;All Files (*)"));
-    if (filePath.isEmpty())
-        return;
-    nifViewportWidget->loadNif(filePath);
-    LOG_INFO(QString("Preview NIF: %1").arg(filePath));
+    ensurePreviewWindowDock();
+    if (mPreviewDock)
+    {
+        mPreviewDock->toggleView(mPreviewDock->isClosed());
+        if (!mPreviewDock->isClosed())
+        {
+            mPreviewDock->setAsCurrentTab();
+            // If a record is selected in the Object Window, frame and show it immediately
+            if (objectWindowDock && previewWindowDock)
+            {
+                QModelIndex cur = objectWindowDock->currentIndex();
+                if (cur.isValid())
+                {
+                    previewWindowDock->zoomToFit();
+                }
+            }
+        }
+    }
 }
 
 void MainWindow::createAndOpenRecord(CkId::Type type, const QString& recordTypeName,
@@ -3866,9 +3763,12 @@ QString MainWindow::resolveNifFilePath(const QString& relPath) const
 // first whenever a user clicks a record before loading a cell.
 void MainWindow::configureViewportData()
 {
-    if (!mData || !nifViewportWidget || mViewportDataConfigured) return;
+    if (!mData || mViewportDataConfigured) return;
     const QString dataDir = mData->getPaths().dataDir.absolutePath();
-    nifViewportWidget->setDataDir(dataDir);
+    if (nifViewportWidget)
+        nifViewportWidget->setDataDir(dataDir);
+    if (previewWindowDock)
+        previewWindowDock->setDataDir(dataDir);
     // Base-game materials ship as JSON in the Creation Kit's
     // Tools\ContentResources.zip; point the material reader at it so those
     // materials resolve like loose ones.

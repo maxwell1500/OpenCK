@@ -931,7 +931,14 @@ void NifViewportWidget::scaleMesh(float factor)
 
 int NifViewportWidget::vertexCount() const
 {
+    if (m_primitiveVBO.vertexCount > 0)
+        return m_primitiveVBO.vertexCount;
     return nifParser ? nifParser->totalVertexCount() : 0;
+}
+
+int NifViewportWidget::triangleCount() const
+{
+    return vertexCount() / 3;
 }
 
 void NifViewportWidget::refreshMesh()
@@ -1454,6 +1461,7 @@ void NifViewportWidget::clear()
         m_cellGridVBO.clear();
         m_cellRefVBO.clear();
         m_cellRefSolidVBO.clear();
+        m_primitiveVBO.clear();
         m_nodeAxisVBO_R.clear();
         m_nodeAxisVBO_G.clear();
         m_nodeAxisVBO_B.clear();
@@ -2645,10 +2653,10 @@ void NifViewportWidget::paintEvent(QPaintEvent* event)
             if (m_gridVBO.dirty) {
                 QVector<OverlayVertex> verts;
                 for (int i = -5; i <= 5; i++) {
-                    verts.append({QVector3D(-5.0f, 0.0f, static_cast<float>(i)), QVector3D(0.3f, 0.3f, 0.3f)});
-                    verts.append({QVector3D(5.0f, 0.0f, static_cast<float>(i)), QVector3D(0.3f, 0.3f, 0.3f)});
-                    verts.append({QVector3D(static_cast<float>(i), 0.0f, -5.0f), QVector3D(0.3f, 0.3f, 0.3f)});
-                    verts.append({QVector3D(static_cast<float>(i), 0.0f, 5.0f), QVector3D(0.3f, 0.3f, 0.3f)});
+                    verts.append({QVector3D(-5.0f, mGridHeight, static_cast<float>(i)), QVector3D(0.3f, 0.3f, 0.3f)});
+                    verts.append({QVector3D(5.0f, mGridHeight, static_cast<float>(i)), QVector3D(0.3f, 0.3f, 0.3f)});
+                    verts.append({QVector3D(static_cast<float>(i), mGridHeight, -5.0f), QVector3D(0.3f, 0.3f, 0.3f)});
+                    verts.append({QVector3D(static_cast<float>(i), mGridHeight, 5.0f), QVector3D(0.3f, 0.3f, 0.3f)});
                 }
                 m_gridVBO.build(verts, GL_LINES);
             }
@@ -4452,6 +4460,14 @@ void NifViewportWidget::setGridEnabled(bool enabled)
     if (btn && btn->isChecked() != enabled) btn->setChecked(enabled);
     if (glWidget) glWidget->update();
     emit displayFlagsChanged();
+}
+
+void NifViewportWidget::setGridHeight(float height)
+{
+    if (qFuzzyCompare(mGridHeight, height)) return;
+    mGridHeight = height;
+    m_gridVBO.dirty = true;
+    if (glWidget) glWidget->update();
 }
 
 void NifViewportWidget::setBoundsEnabled(bool enabled)

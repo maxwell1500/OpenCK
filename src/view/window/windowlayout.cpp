@@ -64,6 +64,10 @@ void WindowLayout::applyDefaultLayout(QMainWindow* window)
     placeTabIfUnplaced(manager, QStringLiteral("Inspector"), QStringLiteral("Cell View"),
                        ads::RightDockWidgetArea, false);
 
+    // Preview Window tabbed behind Cell View on the right (Dialog 315, hidden by default)
+    placeTabIfUnplaced(manager, QStringLiteral("Preview"), QStringLiteral("Cell View"),
+                       ads::RightDockWidgetArea, false);
+
     // Warnings bottom (hidden until errors/warnings occur)
     placeIfUnplaced(manager, QStringLiteral("Warnings"), ads::BottomDockWidgetArea, false);
 

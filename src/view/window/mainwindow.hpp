@@ -36,6 +36,7 @@ class BashedPatchDialog;
 class CellViewPanel;
 class InspectorWidget;
 class WarningsDockWidget;
+class PreviewWindowDock;
 class Document;
 struct CellRecord;
 
@@ -189,6 +190,7 @@ private:
     void updateWindowTitle();
     QString resolveNifFilePath(const QString& relPath) const;
     void configureViewportData();
+    void ensurePreviewWindowDock();
     quint32 mLoadedCellFormId = 0;
     bool mViewportDataConfigured = false;
     QString mCurrentPluginName;
@@ -223,6 +225,8 @@ private:
     WarningsDockWidget* mWarningsWidget;
     InspectorWidget* mInspectorWidget;
     ads::CDockWidget* mInspectorDock;
+    PreviewWindowDock* previewWindowDock = nullptr;
+    ads::CDockWidget* mPreviewDock = nullptr;
     ads::CDockManager* mDockManager;
     QLabel* mStatusRecordCount;
     QLabel* mStatusPluginInfo;

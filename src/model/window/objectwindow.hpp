@@ -12,6 +12,16 @@
 
 class Data;
 
+/// A folder in a category's model-directory tree (MODL paths minus the
+/// Data\Meshes prefix). `path` is lowercase, '/'-separated; `count` includes
+/// every record in the folder's subtree.
+struct ModelFolder
+{
+    QString path;
+    QString name;
+    int count = 0;
+};
+
 /// Tree model presenting records grouped by category for the Object Window.
 class ObjectWindowModel : public QAbstractItemModel
 {
@@ -27,6 +37,7 @@ public:
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
     Qt::ItemFlags flags(const QModelIndex& index) const override;
     QStringList mimeTypes() const override;
     QMimeData* mimeData(const QModelIndexList& indexes) const override;
@@ -44,6 +55,22 @@ public:
     QModelIndex getRecordIndexModel(int categoryId, int recordIndex) const;
     const QString& getRecordEditorId(int categoryId, int recordIndex) const;
     const QString& getRecordFormId(int categoryId, int recordIndex) const;
+    QString getRecordModelPath(int categoryId, int recordIndex) const;
+    int getCategoryCount() const { return mCategories.size(); }
+    int getRecordCountForCategory(int categoryId) const;
+    int getRecordActualIndex(int categoryId, int visibleIndex) const;
+    const QString& getVisibleRecordEditorId(int categoryId, int visibleIndex) const;
+    const QString& getVisibleRecordFormId(int categoryId, int visibleIndex) const;
+    QString getVisibleRecordModelPath(int categoryId, int visibleIndex) const;
+    QString getCategoryName(int categoryId) const;
+    /// Lowercase '/'-separated directory of a MODL path, without the
+    /// Data\Meshes prefix; empty when the path has no directory.
+    static QString modelFolder(const QString& modelPath);
+    /// Pseudo-folder path for records whose model path has no directory
+    /// (or no model at all); only listed when the category has real folders.
+    static inline const QString NoFolder = QStringLiteral("/");
+    /// Folder tree of the category's visible records, parents sorted before children.
+    QVector<ModelFolder> getModelFolders(int categoryId) const;
 
     bool findRecord(const QString& idOrFormId, int& outCategoryId, int& outRecordIndex, QModelIndex& outIndex) const;
     bool isRecord(const QModelIndex& index) const;

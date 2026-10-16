@@ -12,7 +12,15 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QList>
+#include <QHash>
 
+class QTableView;
+class QSplitter;
+class QTimer;
+class QStandardItem;
+class QStandardItemModel;
+class RecordFolderProxyModel;
+class ObjectRecordTableModel;
 class ObjectWindowModel;
 class Data;
 struct CellRecord;
@@ -75,9 +83,13 @@ public slots:
 
 public:
     QTreeView* getTreeView() const { return mTreeView; }
+    QTableView* getRecordTable() const { return mRecordTable; }
     QLineEdit* getFilterEdit() const { return mFilterEdit; }
     CellRecord* getSelectedCell() const;
     bool selectRecord(const QString& idOrFormId);
+    /// Case-insensitive Editor ID substring search across all categories,
+    /// wrapping around; selects the match. Returns false when nothing matches.
+    bool findRecordText(const QString& text, bool forward);
     QString getModelPathForRecord(int categoryId, int recordIndex) const;
     int getCategoryType(int categoryId) const;
     struct RecordLookupResult {
@@ -111,9 +123,25 @@ private:
     QByteArray captureColumnState() const;
     void applyColumnState(const QByteArray& state);
 
+    // Left tree: groups > categories > model-directory folders. Mirrors the
+    // category structure of mModel; folders exist only under the active category.
+    bool selectRecordAt(int categoryId, int recordIndex);
+    void rebuildNav();
+    void refreshNav();
+    void rebuildFolders(int categoryId);
+    void updateStatus();
+    QModelIndex navToSource(const QModelIndex& navIndex) const;
+
     Data* mData;
     ObjectWindowModel* mModel;
     QTreeView* mTreeView;
+    QSplitter* mSplitter = nullptr;
+    QTableView* mRecordTable = nullptr;
+    ObjectRecordTableModel* mRecordTableModel = nullptr;
+    RecordFolderProxyModel* mRecordProxyModel = nullptr;
+    QStandardItemModel* mNavModel = nullptr;
+    QHash<int, QStandardItem*> mCategoryItems;
+    QTimer* mRefreshTimer = nullptr;
     QLineEdit* mFilterEdit;
     QComboBox* mSavedFilterCombo;
     QComboBox* mColumnLayoutCombo;

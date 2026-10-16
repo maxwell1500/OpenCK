@@ -1,4 +1,15 @@
 #include "objectwindowdialog.hpp"
+#include <QSplitter>
+#include <QTableView>
+#include <QSortFilterProxyModel>
+#include <QAbstractTableModel>
+#include <QHeaderView>
+#include <QStandardItemModel>
+#include <QTimer>
+#include <QSignalBlocker>
+#include <QSet>
+
+
 #include "livesyncdialog.hpp"
 #include "../../model/tools/blenderbridge.hpp"
 
@@ -41,6 +52,177 @@
 #include "navmesheditordialog.hpp"
 #include "rawsubrecordwidget.hpp"
 #include "tes3recorddatawidget.hpp"
+
+#include "../../model/world/ckid.hpp"
+
+// Record table filter by model-directory folder. Text filtering already
+// happens in ObjectWindowModel, so rows stay 1:1 with the category's visible
+// records and every proxy -> source row mapping in the dialog stays a
+// visible-record index.
+class RecordFolderProxyModel : public QSortFilterProxyModel
+{
+public:
+    static constexpr int kModelColumn = 3;
+
+    using QSortFilterProxyModel::QSortFilterProxyModel;
+
+    const QString& folder() const { return mFolder; }
+    void setFolder(const QString& folder)
+    {
+        if (folder == mFolder)
+            return;
+        mFolder = folder;
+        invalidateFilter();
+    }
+
+protected:
+    bool filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const override
+    {
+        if (!mFolder.isEmpty())
+        {
+            const QString dir = ObjectWindowModel::modelFolder(
+                sourceModel()->index(sourceRow, kModelColumn, sourceParent).data().toString());
+            const bool inFolder = mFolder == ObjectWindowModel::NoFolder
+                ? dir.isEmpty()
+                : dir == mFolder || dir.startsWith(mFolder + QLatin1Char('/'));
+            if (!inFolder)
+                return false;
+        }
+        return QSortFilterProxyModel::filterAcceptsRow(sourceRow, sourceParent);
+    }
+
+    bool lessThan(const QModelIndex& source_left, const QModelIndex& source_right) const override
+    {
+        if (source_left.column() == 1 && source_right.column() == 1)
+        {
+            bool ok1 = false, ok2 = false;
+            quint32 fid1 = source_left.data().toString().toUInt(&ok1, 16);
+            quint32 fid2 = source_right.data().toString().toUInt(&ok2, 16);
+            if (ok1 && ok2)
+                return fid1 < fid2;
+        }
+        const QString leftStr = source_left.data().toString();
+        const QString rightStr = source_right.data().toString();
+        return QString::compare(leftStr, rightStr, Qt::CaseInsensitive) < 0;
+    }
+
+private:
+    QString mFolder;
+};
+
+// Left-tree node roles (QStandardItemModel built by rebuildNav/rebuildFolders).
+enum NavKind { NavGroup, NavCategory, NavFolder };
+constexpr int kNavKindRole = Qt::UserRole + 1;
+constexpr int kNavCategoryRole = Qt::UserRole + 2; // flat category id
+constexpr int kNavFolderRole = Qt::UserRole + 3;   // lowercase folder path
+
+class ObjectRecordTableModel : public QAbstractTableModel
+{
+public:
+    explicit ObjectRecordTableModel(ObjectWindowModel* sourceModel, QObject* parent = nullptr)
+        : QAbstractTableModel(parent), mSourceModel(sourceModel), mCategoryId(-1) {}
+
+    void setSourceModel(ObjectWindowModel* sourceModel)
+    {
+        beginResetModel();
+        mSourceModel = sourceModel;
+        endResetModel();
+    }
+
+    void setCategory(int categoryId)
+    {
+        beginResetModel();
+        mCategoryId = categoryId;
+        endResetModel();
+    }
+
+    void refresh()
+    {
+        beginResetModel();
+        endResetModel();
+    }
+
+    int categoryId() const { return mCategoryId; }
+
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override
+    {
+        if (parent.isValid() || !mSourceModel || mCategoryId < 0)
+            return 0;
+        return mSourceModel->getRecordCountForCategory(mCategoryId);
+    }
+
+    int columnCount(const QModelIndex& /*parent*/ = QModelIndex()) const override
+    {
+        return 4;
+    }
+
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override
+    {
+        if (orientation != Qt::Horizontal || role != Qt::DisplayRole)
+            return QVariant();
+        switch (section)
+        {
+        case 0: return QStringLiteral("Editor ID");
+        case 1: return QStringLiteral("Form ID");
+        case 2: return QStringLiteral("Type");
+        case 3: return QStringLiteral("Model");
+        default: return QVariant();
+        }
+    }
+
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override
+    {
+        if (!index.isValid() || !mSourceModel || mCategoryId < 0 || role != Qt::DisplayRole)
+            return QVariant();
+
+        int row = index.row();
+        switch (index.column())
+        {
+        case 0: return mSourceModel->getVisibleRecordEditorId(mCategoryId, row);
+        case 1: return mSourceModel->getVisibleRecordFormId(mCategoryId, row);
+        case 2: {
+            int typeId = mSourceModel->getCategoryType(mCategoryId);
+            return (typeId == CkId::Type_None) ? QStringLiteral("-") : CkId(static_cast<CkId::Type>(typeId)).getTypeName();
+        }
+        case 3: return mSourceModel->getVisibleRecordModelPath(mCategoryId, row);
+        default: return QVariant();
+        }
+    }
+
+    Qt::ItemFlags flags(const QModelIndex& index) const override
+    {
+        if (!index.isValid())
+            return Qt::NoItemFlags;
+        return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled;
+    }
+
+    QStringList mimeTypes() const override
+    {
+        return { QStringLiteral("application/x-openck-record"), QStringLiteral("text/plain") };
+    }
+
+    QMimeData* mimeData(const QModelIndexList& indexes) const override
+    {
+        if (indexes.isEmpty() || !mSourceModel || mCategoryId < 0)
+            return nullptr;
+        int row = indexes.first().row();
+        int actualIndex = mModelActualIndex(row);
+        QModelIndex srcIdx = mSourceModel->getRecordIndexModel(mCategoryId, actualIndex);
+        if (srcIdx.isValid())
+            return mSourceModel->mimeData({srcIdx});
+        return nullptr;
+    }
+
+    int mModelActualIndex(int visibleRow) const
+    {
+        return mSourceModel ? mSourceModel->getRecordActualIndex(mCategoryId, visibleRow) : visibleRow;
+    }
+
+private:
+    ObjectWindowModel* mSourceModel;
+    int mCategoryId;
+};
+
 #include "../../../libs/files/esm/effectshaderrecord.hpp"
 #include "../../../libs/files/esm/imagespacerecord.hpp"
 #include "../../../libs/files/esm/scenrecord.hpp"
@@ -394,17 +576,6 @@ void ObjectWindowDialog::setupUI()
 
     mainLayout->addLayout(filterLayout);
 
-    connect(mFilterEdit, &QLineEdit::textChanged, mModel, &ObjectWindowModel::applyFilter);
-    connect(saveFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::saveFilter);
-    connect(mSavedFilterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-        this, &ObjectWindowDialog::loadFilter);
-    connect(deleteFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSavedFilter);
-    connect(loadFilterFileButton, &QPushButton::clicked,
-        this, &ObjectWindowDialog::loadFilterFile);
-    connect(saveFilterFileButton, &QPushButton::clicked,
-        this, &ObjectWindowDialog::saveFilterFile);
-    refreshSavedFilters();
-
     auto* layoutRow = new QHBoxLayout();
     layoutRow->addWidget(new QLabel("Layout:"));
     mColumnLayoutCombo = new QComboBox();
@@ -420,22 +591,61 @@ void ObjectWindowDialog::setupUI()
     layoutRow->addStretch();
     mainLayout->addLayout(layoutRow);
 
-    mTreeView = new QTreeView();
-    mTreeView->setAlternatingRowColors(true);
-    mTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    mTreeView->setRootIsDecorated(true);
-    mTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
-    mTreeView->setDragEnabled(true);
-    mTreeView->setDragDropMode(QAbstractItemView::DragOnly);
     mModel = new ObjectWindowModel(this);
     mModel->setData(mData);
-    mTreeView->setModel(mModel);
 
-    mTreeView->header()->setSectionResizeMode(0, QHeaderView::Stretch);
-    mTreeView->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    mTreeView->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    // Two-pane horizontal split: Left = Category Tree, Right = Record Table (Dialog 122)
+    mSplitter = new QSplitter(Qt::Horizontal, centralWidget);
 
-    mainLayout->addWidget(mTreeView, 1);
+    auto* leftPane = new QWidget(mSplitter);
+    auto* leftLayout = new QVBoxLayout(leftPane);
+    leftLayout->setContentsMargins(0, 0, 0, 0);
+
+    mTreeView = new QTreeView(leftPane);
+    mTreeView->setAlternatingRowColors(true);
+    mTreeView->setSelectionMode(QAbstractItemView::SingleSelection);
+    mTreeView->setRootIsDecorated(true);
+    mTreeView->setHeaderHidden(true);
+    mTreeView->setContextMenuPolicy(Qt::CustomContextMenu);
+    mTreeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+
+    mNavModel = new QStandardItemModel(this);
+    mTreeView->setModel(mNavModel);
+
+    leftLayout->addWidget(mTreeView, 1);
+    mSplitter->addWidget(leftPane);
+
+    auto* rightPane = new QWidget(mSplitter);
+    auto* rightLayout = new QVBoxLayout(rightPane);
+    rightLayout->setContentsMargins(0, 0, 0, 0);
+
+    mRecordTable = new QTableView(rightPane);
+    mRecordTable->setAlternatingRowColors(true);
+    mRecordTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    mRecordTable->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    mRecordTable->verticalHeader()->setVisible(false);
+    mRecordTable->setSortingEnabled(true);
+    mRecordTable->setContextMenuPolicy(Qt::CustomContextMenu);
+    mRecordTable->setDragEnabled(true);
+    mRecordTable->setDragDropMode(QAbstractItemView::DragOnly);
+
+    mRecordTableModel = new ObjectRecordTableModel(mModel, this);
+    mRecordProxyModel = new RecordFolderProxyModel(this);
+    mRecordProxyModel->setSourceModel(mRecordTableModel);
+    mRecordProxyModel->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    mRecordProxyModel->setFilterKeyColumn(-1);
+    mRecordTable->setModel(mRecordProxyModel);
+
+    mRecordTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    mRecordTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    mRecordTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    mRecordTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+
+    rightLayout->addWidget(mRecordTable, 1);
+    mSplitter->addWidget(rightPane);
+
+    mSplitter->setSizes({220, 680});
+    mainLayout->addWidget(mSplitter, 1);
 
     auto* buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
@@ -461,6 +671,21 @@ void ObjectWindowDialog::setupUI()
     mStatusLabel = new QLabel();
     mainLayout->addWidget(mStatusLabel);
 
+    connect(mFilterEdit, &QLineEdit::textChanged, this, [this](const QString& text) {
+        if (mModel)
+            mModel->applyFilter(text);
+        updateStatus();
+    });
+    connect(saveFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::saveFilter);
+    connect(mSavedFilterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+        this, &ObjectWindowDialog::loadFilter);
+    connect(deleteFilterButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSavedFilter);
+    connect(loadFilterFileButton, &QPushButton::clicked,
+        this, &ObjectWindowDialog::loadFilterFile);
+    connect(saveFilterFileButton, &QPushButton::clicked,
+        this, &ObjectWindowDialog::saveFilterFile);
+    refreshSavedFilters();
+
     connect(mEditButton, &QPushButton::clicked, this, &ObjectWindowDialog::editSelected);
     connect(mDeleteButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteSelected);
     connect(mCloneButton, &QPushButton::clicked, this, &ObjectWindowDialog::cloneSelected);
@@ -470,28 +695,99 @@ void ObjectWindowDialog::setupUI()
         this, &ObjectWindowDialog::loadColumnLayout);
     connect(deleteLayoutButton, &QPushButton::clicked, this, &ObjectWindowDialog::deleteColumnLayout);
     refreshColumnLayouts();
-    connect(mTreeView, &QTreeView::expanded, this, [this](const QModelIndex& idx) {
-        if (mModel && mModel->canFetchMore(idx)) {
-            mModel->fetchMore(idx);
-        }
+
+    mRefreshTimer = new QTimer(this);
+    mRefreshTimer->setSingleShot(true);
+    mRefreshTimer->setInterval(150);
+    connect(mRefreshTimer, &QTimer::timeout, this, [this]() {
+        mRecordTableModel->refresh();
+        refreshNav();
+    });
+    connect(mModel, &QAbstractItemModel::layoutChanged, this, [this]() {
+        mRecordTableModel->refresh();
+        refreshNav();
+    });
+    connect(mModel, &QAbstractItemModel::modelReset, this, [this]() { rebuildNav(); });
+    // Deferred-master categories fill in time slices; coalesce into one refresh.
+    connect(mModel, &QAbstractItemModel::rowsInserted, mRefreshTimer, qOverload<>(&QTimer::start));
+    connect(mModel, &QAbstractItemModel::dataChanged, mRefreshTimer, qOverload<>(&QTimer::start));
+
+    connect(mTreeView, &QTreeView::expanded, this, [this](const QModelIndex& navIdx) {
+        const QModelIndex src = navToSource(navIdx);
+        if (mModel->canFetchMore(src))
+            mModel->fetchMore(src);
     });
     connect(mTreeView, &QTreeView::doubleClicked, this, &ObjectWindowDialog::onDoubleClick);
     connect(mTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this,
         [this](const QModelIndex& current, const QModelIndex&) {
-            updateAddButton(current);
-            if (current.isValid() && mModel->isRecord(current)) {
-                int cat = mModel->getCategoryIndex(current);
-                int rec = mModel->getRecordIndex(current);
-                QString eid = mModel->getRecordEditorId(cat, rec);
-                emit recordSelected(cat, rec, eid);
+            const QModelIndex src = navToSource(current);
+            updateAddButton(src);
+            if (!current.isValid() || current.data(kNavKindRole).toInt() == NavGroup)
+                return;
+            const int cat = current.data(kNavCategoryRole).toInt();
+            const bool isFolder = current.data(kNavKindRole).toInt() == NavFolder;
+            if (mModel->canFetchMore(src))
+                mModel->fetchMore(src);
+            mRecordProxyModel->setFolder(isFolder ? current.data(kNavFolderRole).toString() : QString());
+            if (mRecordTableModel->categoryId() != cat)
+            {
+                mRecordTableModel->setCategory(cat);
+                rebuildFolders(cat);
+                QStandardItem* catItem = mCategoryItems.value(cat, nullptr);
+                if (catItem && catItem->rowCount())
+                    mTreeView->expand(catItem->index());
+            }
+            updateStatus();
+        });
+
+    connect(mRecordTable->selectionModel(), &QItemSelectionModel::currentChanged, this,
+        [this](const QModelIndex& current, const QModelIndex&) {
+            if (!current.isValid() || !mRecordProxyModel || !mRecordTableModel || !mModel)
+                return;
+            QModelIndex srcIdx = mRecordProxyModel->mapToSource(current);
+            int visibleRow = srcIdx.row();
+            int cat = mRecordTableModel->categoryId();
+            if (cat >= 0 && visibleRow >= 0 && visibleRow < mModel->getRecordCountForCategory(cat)) {
+                int actualIndex = mModel->getRecordActualIndex(cat, visibleRow);
+                QString eid = mModel->getVisibleRecordEditorId(cat, visibleRow);
+                emit recordSelected(cat, actualIndex, eid);
             }
         });
+
+    connect(mRecordTable, &QTableView::doubleClicked, this, [this](const QModelIndex& proxyIdx) {
+        if (!proxyIdx.isValid() || !mRecordProxyModel || !mRecordTableModel || !mModel)
+            return;
+        QModelIndex srcIdx = mRecordProxyModel->mapToSource(proxyIdx);
+        int visibleRow = srcIdx.row();
+        int cat = mRecordTableModel->categoryId();
+        if (cat >= 0 && visibleRow >= 0 && visibleRow < mModel->getRecordCountForCategory(cat)) {
+            int actualIndex = mModel->getRecordActualIndex(cat, visibleRow);
+            QString eid = mModel->getVisibleRecordEditorId(cat, visibleRow);
+            emit recordSelected(cat, actualIndex, eid);
+            emit recordFitToWindow();
+        }
+    });
+
+    connect(mRecordTable, &QTableView::customContextMenuRequested, this, [this](const QPoint& pos) {
+        QModelIndex proxyIdx = mRecordTable->indexAt(pos);
+        QModelIndex modelIdx;
+        if (proxyIdx.isValid() && mRecordProxyModel && mRecordTableModel && mModel) {
+            QModelIndex srcIdx = mRecordProxyModel->mapToSource(proxyIdx);
+            int visibleRow = srcIdx.row();
+            int cat = mRecordTableModel->categoryId();
+            int actualIndex = mModel->getRecordActualIndex(cat, visibleRow);
+            modelIdx = mModel->getRecordIndexModel(cat, actualIndex);
+        }
+        updateContextMenu(modelIdx);
+        mContextMenu->exec(mRecordTable->viewport()->mapToGlobal(pos));
+    });
+
     connect(mTreeView, &QTreeView::customContextMenuRequested, this, [this](const QPoint& pos) {
-        QModelIndex index = mTreeView->indexAt(pos);
-        updateContextMenu(index);
+        updateContextMenu(navToSource(mTreeView->indexAt(pos)));
         mContextMenu->exec(mTreeView->viewport()->mapToGlobal(pos));
     });
 
+    rebuildNav();
     updateContextMenu(QModelIndex());
 
     setWidget(centralWidget);
@@ -630,6 +926,127 @@ void ObjectWindowDialog::updateContextMenu(const QModelIndex& index)
         connect(expandAllAction, &QAction::triggered, mTreeView, &QTreeView::expandAll);
     }
 }
+QModelIndex ObjectWindowDialog::navToSource(const QModelIndex& navIndex) const
+{
+    if (!navIndex.isValid() || !mModel)
+        return QModelIndex();
+    if (navIndex.data(kNavKindRole).toInt() == NavGroup)
+        return mModel->index(navIndex.row(), 0);
+    return mModel->getCategoryIndexModel(navIndex.data(kNavCategoryRole).toInt());
+}
+
+void ObjectWindowDialog::rebuildNav()
+{
+    mCategoryItems.clear();
+    mNavModel->clear();
+    mRecordProxyModel->setFolder(QString());
+    mRecordTableModel->setCategory(-1);
+    for (int g = 0; g < mModel->rowCount(); ++g)
+    {
+        const QModelIndex groupIdx = mModel->index(g, 0);
+        auto* groupItem = new QStandardItem(mModel->data(groupIdx).toString());
+        groupItem->setData(NavGroup, kNavKindRole);
+        for (int c = 0; c < mModel->rowCount(groupIdx); ++c)
+        {
+            const QModelIndex catIdx = mModel->index(c, 0, groupIdx);
+            const int cat = mModel->getCategoryIndex(catIdx);
+            auto* catItem = new QStandardItem(mModel->data(catIdx).toString());
+            catItem->setData(NavCategory, kNavKindRole);
+            catItem->setData(cat, kNavCategoryRole);
+            groupItem->appendRow(catItem);
+            mCategoryItems.insert(cat, catItem);
+        }
+        mNavModel->appendRow(groupItem);
+    }
+    updateStatus();
+}
+
+void ObjectWindowDialog::refreshNav()
+{
+    const auto setText = [](QStandardItem* item, const QString& text) {
+        if (item->text() != text)
+            item->setText(text);
+    };
+    for (int g = 0; g < mNavModel->rowCount(); ++g)
+        setText(mNavModel->item(g), mModel->data(mModel->index(g, 0)).toString());
+    for (auto it = mCategoryItems.cbegin(); it != mCategoryItems.cend(); ++it)
+        setText(it.value(), mModel->data(mModel->getCategoryIndexModel(it.key())).toString());
+    rebuildFolders(mRecordTableModel->categoryId());
+}
+
+void ObjectWindowDialog::rebuildFolders(int categoryId)
+{
+    QStandardItem* catItem = mCategoryItems.value(categoryId, nullptr);
+    // The selection model is the tree's own; silence it so removing the
+    // selected folder does not re-enter the category/folder switch.
+    QSignalBlocker blocker(mTreeView->selectionModel());
+
+    for (auto it = mCategoryItems.cbegin(); it != mCategoryItems.cend(); ++it)
+        if (it.value() != catItem && it.value()->rowCount())
+            it.value()->removeRows(0, it.value()->rowCount());
+    if (!catItem)
+        return;
+
+    QSet<QString> expanded;
+    const std::function<void(QStandardItem*)> collect = [&](QStandardItem* parent) {
+        for (int r = 0; r < parent->rowCount(); ++r)
+        {
+            QStandardItem* child = parent->child(r);
+            if (mTreeView->isExpanded(child->index()))
+                expanded.insert(child->data(kNavFolderRole).toString());
+            collect(child);
+        }
+    };
+    collect(catItem);
+    catItem->removeRows(0, catItem->rowCount());
+
+    QHash<QString, QStandardItem*> byPath;
+    for (const ModelFolder& f : mModel->getModelFolders(categoryId))
+    {
+        const int slash = f.path.lastIndexOf(QLatin1Char('/'));
+        QStandardItem* parent = slash <= 0 ? catItem : byPath.value(f.path.left(slash), catItem);
+        auto* item = new QStandardItem(QStringLiteral("%1 (%2)").arg(f.name).arg(f.count));
+        item->setData(NavFolder, kNavKindRole);
+        item->setData(categoryId, kNavCategoryRole);
+        item->setData(f.path, kNavFolderRole);
+        parent->appendRow(item);
+        byPath.insert(f.path, item);
+    }
+    for (const QString& path : expanded)
+        if (QStandardItem* item = byPath.value(path, nullptr))
+            mTreeView->expand(item->index());
+
+    const QString selected = mRecordProxyModel->folder();
+    if (!selected.isEmpty())
+    {
+        if (QStandardItem* item = byPath.value(selected, nullptr))
+            mTreeView->setCurrentIndex(item->index());
+        else
+        {
+            mRecordProxyModel->setFolder(QString());
+            mTreeView->setCurrentIndex(catItem->index());
+        }
+    }
+    mTreeView->viewport()->update();
+}
+
+void ObjectWindowDialog::updateStatus()
+{
+    if (!mStatusLabel)
+        return;
+    const int cat = mRecordTableModel->categoryId();
+    if (cat < 0)
+    {
+        mStatusLabel->clear();
+        return;
+    }
+    QString where = mModel->getCategoryName(cat);
+    if (!mRecordProxyModel->folder().isEmpty())
+        where += QLatin1Char('/') + (mRecordProxyModel->folder() == ObjectWindowModel::NoFolder
+                                         ? tr("(no folder)") : mRecordProxyModel->folder());
+    mStatusLabel->setText(tr("%1: %2 records").arg(where).arg(mRecordProxyModel->rowCount()));
+}
+
 void ObjectWindowDialog::updateAddButton(const QModelIndex& index)
 {
     bool enabled = false;
@@ -650,7 +1067,7 @@ void ObjectWindowDialog::addRecordInSelectedCategory()
 {
     if (!mData || !mModel)
         return;
-    const QModelIndex index = mTreeView ? mTreeView->currentIndex() : QModelIndex();
+    const QModelIndex index = mTreeView ? navToSource(mTreeView->currentIndex()) : QModelIndex();
     if (!index.isValid() || mModel->isRecord(index))
         return;
 
@@ -791,24 +1208,13 @@ void ObjectWindowDialog::addRecordInSelectedCategory()
 
 void ObjectWindowDialog::editSelected()
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid())
         return;
 
     if (!mModel->isRecord(index))
     {
-        if (mTreeView->isExpanded(index))
-        {
-            mTreeView->collapse(index);
-        }
-        else
-        {
-            mTreeView->expand(index);
-            if (mModel && mModel->canFetchMore(index))
-            {
-                mModel->fetchMore(index);
-            }
-        }
+        onDoubleClick(mTreeView->currentIndex());
         return;
     }
 
@@ -1530,7 +1936,7 @@ void ObjectWindowDialog::editSelected()
 }
 void ObjectWindowDialog::deleteSelected()
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid() || !mModel->isRecord(index))
         return;
 
@@ -1860,15 +2266,19 @@ void ObjectWindowDialog::saveFilterFile()
 
 QByteArray ObjectWindowDialog::captureColumnState() const
 {
+    if (mRecordTable && mRecordTable->horizontalHeader())
+        return mRecordTable->horizontalHeader()->saveState();
     return mTreeView ? mTreeView->header()->saveState() : QByteArray();
 }
 
 void ObjectWindowDialog::applyColumnState(const QByteArray& state)
 {
-    if (mTreeView && !state.isEmpty())
-    {
+    if (state.isEmpty())
+        return;
+    if (mRecordTable && mRecordTable->horizontalHeader())
+        mRecordTable->horizontalHeader()->restoreState(state);
+    else if (mTreeView && mTreeView->header())
         mTreeView->header()->restoreState(state);
-    }
 }
 
 void ObjectWindowDialog::refreshColumnLayouts()
@@ -1955,7 +2365,7 @@ void ObjectWindowDialog::deleteColumnLayout()
 
 void ObjectWindowDialog::cloneSelected()
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid() || !mModel->isRecord(index))
         return;
 
@@ -1984,38 +2394,14 @@ void ObjectWindowDialog::cloneSelected()
     }
 }
 
-void ObjectWindowDialog::onDoubleClick(const QModelIndex& index)
+void ObjectWindowDialog::onDoubleClick(const QModelIndex& navIndex)
 {
-    if (!index.isValid())
+    // Tree rows are groups, categories and folders; records open from the table.
+    if (!navIndex.isValid())
         return;
-
-    if (mModel->isRecord(index))
-    {
-        // Double-click previews the model and fits it to the viewport. The
-        // record's properties moved to the right-click menu, which is where a
-        // deliberate lookup belongs; double-click is the "show me this" gesture.
-        int categoryId = mModel->getCategoryIndex(index);
-        int recordIndex = mModel->getRecordIndex(index);
-        QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
-        emit recordSelected(categoryId, recordIndex, editorId);
-        emit recordFitToWindow();
-    }
-    else
-    {
-        if (mTreeView->isExpanded(index))
-        {
-            mTreeView->collapse(index);
-        }
-        else
-        {
-            mTreeView->expand(index);
-            if (mModel && mModel->canFetchMore(index))
-            {
-                mModel->fetchMore(index);
-            }
-        }
-    }
+    mTreeView->setExpanded(navIndex, !mTreeView->isExpanded(navIndex));
 }
+
 int ObjectWindowDialog::getCategoryType(int categoryId) const
 {
     return mModel ? mModel->getCategoryType(categoryId) : 0;
@@ -2024,125 +2410,14 @@ int ObjectWindowDialog::getCategoryType(int categoryId) const
 
 QString ObjectWindowDialog::getModelPathForRecord(int categoryId, int recordIndex) const
 {
-    CkId::Type type = static_cast<CkId::Type>(mModel->getCategoryType(categoryId));
-
-    switch (type)
-    {
-    case CkId::Type_Weap_:
-    {
-        auto& collection = mData->getWeaponCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Armor_:
-    {
-        auto& collection = mData->getArmorCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Stat_:
-    {
-        auto& collection = mData->getStatCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Tree_:
-    {
-        auto& collection = mData->getTreeCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Acti_:
-    {
-        auto& collection = mData->getActiCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Misc_:
-    {
-        auto& collection = mData->getMiscCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Book_:
-    {
-        auto& collection = mData->getBookCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Ingr_:
-    {
-        auto& collection = mData->getIngrCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Alch_:
-    {
-        auto& collection = mData->getAlchCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Cont_:
-    {
-        auto& collection = mData->getContCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Door_:
-    {
-        auto& collection = mData->getDoorCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Furn_:
-    {
-        auto& collection = mData->getFurnCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Flor_:
-    {
-        auto& collection = mData->getFlorCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Ligh_:
-    {
-        auto& collection = mData->getLighCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    case CkId::Type_Mstt_:
-    {
-        auto& collection = mData->getMsttCollection();
-        if (recordIndex >= 0 && recordIndex < collection.size())
-            return collection.getRecord(recordIndex).get().modelPath;
-        break;
-    }
-    default:
-        break;
-    }
-
+    if (mModel)
+        return mModel->getRecordModelPath(categoryId, recordIndex);
     return QString();
 }
 
 void ObjectWindowDialog::openInBlender()
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid() || !mModel->isRecord(index))
         return;
 
@@ -2186,7 +2461,7 @@ void ObjectWindowDialog::openInBlender()
 
 void ObjectWindowDialog::openInBlenderLiveSync()
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid() || !mModel->isRecord(index))
         return;
 
@@ -2228,7 +2503,7 @@ void ObjectWindowDialog::openInBlenderLiveSync()
 
 void ObjectWindowDialog::previewNif()
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid() || !mModel->isRecord(index))
         return;
 
@@ -2263,7 +2538,7 @@ void ObjectWindowDialog::previewNif()
 
 void ObjectWindowDialog::compareNifs()
 {
-    QModelIndex index1 = mTreeView->currentIndex();
+    QModelIndex index1 = currentIndex();
     if (!index1.isValid() || !mModel->isRecord(index1))
         return;
 
@@ -2312,7 +2587,26 @@ void ObjectWindowDialog::compareNifs()
 
 QModelIndex ObjectWindowDialog::currentIndex() const
 {
-    return mTreeView->currentIndex();
+    if (mRecordTable && mRecordTable->selectionModel() && mRecordProxyModel && mRecordTableModel && mModel)
+    {
+        QModelIndex current = mRecordTable->selectionModel()->currentIndex();
+        if (current.isValid())
+        {
+            QModelIndex srcIdx = mRecordProxyModel->mapToSource(current);
+            int visibleRow = srcIdx.row();
+            int catId = mRecordTableModel->categoryId();
+            if (catId >= 0 && visibleRow >= 0 && visibleRow < mModel->getRecordCountForCategory(catId))
+            {
+                int actualIndex = mModel->getRecordActualIndex(catId, visibleRow);
+                return mModel->getRecordIndexModel(catId, actualIndex);
+            }
+        }
+    }
+    if (mTreeView && mTreeView->selectionModel())
+    {
+        return navToSource(mTreeView->selectionModel()->currentIndex());
+    }
+    return QModelIndex();
 }
 
 int ObjectWindowDialog::getSelectedCategoryId(const QModelIndex& index) const
@@ -2349,7 +2643,7 @@ void ObjectWindowDialog::clearClipboardData()
 
 void ObjectWindowDialog::copyRecord()
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid() || !mModel->isRecord(index))
         return;
 
@@ -2828,7 +3122,7 @@ void ObjectWindowDialog::cutRecord()
     copyRecord();
     if (sHasClipboardData)
     {
-        QModelIndex index = mTreeView->currentIndex();
+        QModelIndex index = currentIndex();
         if (!index.isValid() || !mModel->isRecord(index))
             return;
 
@@ -2941,21 +3235,33 @@ void ObjectWindowDialog::pasteRecord()
 }
 void ObjectWindowDialog::enableMultiSelect(bool enabled)
 {
-    if (enabled)
-        mTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    else
-        mTreeView->setSelectionMode(QAbstractItemView::SingleSelection);
+    mRecordTable->setSelectionMode(enabled ? QAbstractItemView::ExtendedSelection
+                                           : QAbstractItemView::SingleSelection);
 }
 
 QList<QModelIndex> ObjectWindowDialog::getSelectedIndices() const
 {
     QList<QModelIndex> indices;
-    QModelIndexList selected = mTreeView->selectionModel()->selectedIndexes();
-    for (const QModelIndex& idx : selected)
+    if (mRecordTable && mRecordTable->selectionModel() && mRecordProxyModel && mRecordTableModel && mModel)
     {
-        if (idx.isValid() && mModel->isRecord(idx))
+        QModelIndexList selectedRows = mRecordTable->selectionModel()->selectedRows();
+        int catId = mRecordTableModel->categoryId();
+        if (catId >= 0)
         {
-            indices.append(idx);
+            for (const QModelIndex& proxyIdx : selectedRows)
+            {
+                QModelIndex srcIdx = mRecordProxyModel->mapToSource(proxyIdx);
+                int visibleRow = srcIdx.row();
+                if (visibleRow >= 0 && visibleRow < mModel->getRecordCountForCategory(catId))
+                {
+                    int actualIndex = mModel->getRecordActualIndex(catId, visibleRow);
+                    QModelIndex recIdx = mModel->getRecordIndexModel(catId, actualIndex);
+                    if (recIdx.isValid())
+                        indices.append(recIdx);
+                }
+            }
+            if (!indices.isEmpty())
+                return indices;
         }
     }
     return indices;
@@ -3128,7 +3434,7 @@ void ObjectWindowDialog::batchReferenceActions()
 
 CellRecord* ObjectWindowDialog::getSelectedCell() const
 {
-    QModelIndex index = mTreeView->currentIndex();
+    QModelIndex index = currentIndex();
     if (!index.isValid() || !mModel->parent(index).isValid())
         return nullptr;
 
@@ -3242,7 +3548,7 @@ ObjectWindowDialog::RecordLookupResult ObjectWindowDialog::getFormComponentsForI
 
 bool ObjectWindowDialog::selectRecord(const QString& idOrFormId)
 {
-    if (!mModel || !mTreeView || idOrFormId.isEmpty())
+    if (!mModel || idOrFormId.isEmpty())
         return false;
 
     int categoryId = -1;
@@ -3259,20 +3565,100 @@ bool ObjectWindowDialog::selectRecord(const QString& idOrFormId)
     if (!found || !modelIndex.isValid())
         return false;
 
-    QModelIndex parent = modelIndex.parent();
-    while (parent.isValid())
+    selectRecordAt(categoryId, recordIndex);
+    this->raise();
+    this->activateWindow();
+    return true;
+}
+
+bool ObjectWindowDialog::findRecordText(const QString& text, bool forward)
+{
+    if (!mModel || text.isEmpty())
+        return false;
+    const int cats = mModel->getCategoryCount();
+    if (cats <= 0)
+        return false;
+
+    // Start after/before the current record; with only a category selected, start at its edge.
+    int startCat = mRecordTableModel->categoryId();
+    int startRow = -1;
+    const QModelIndex cur = mRecordTable->currentIndex();
+    if (startCat >= 0 && cur.isValid())
+        startRow = mRecordProxyModel->mapToSource(cur).row();
+    else
     {
-        mTreeView->expand(parent);
-        parent = parent.parent();
+        startCat = forward ? 0 : cats - 1;
+        startRow = forward ? -1 : mModel->getRecordCountForCategory(startCat);
     }
 
-    mTreeView->setCurrentIndex(modelIndex);
-    mTreeView->scrollTo(modelIndex, QAbstractItemView::PositionAtCenter);
+    // cats + 1 passes: the last one returns to the start category for the wrapped half.
+    const int step = forward ? 1 : -1;
+    for (int k = 0; k <= cats; ++k)
+    {
+        const int cat = ((startCat + step * k) % cats + cats) % cats;
+        const int count = mModel->getRecordCountForCategory(cat);
+        int lo = 0, hi = count - 1;
+        if (forward)
+        {
+            if (k == 0) lo = startRow + 1;
+            else if (k == cats) hi = qMin(startRow, hi);
+        }
+        else
+        {
+            if (k == 0) hi = startRow - 1;
+            else if (k == cats) lo = qMax(startRow, 0);
+        }
+        for (int row = forward ? lo : hi; forward ? row <= hi : row >= lo; row += step)
+        {
+            if (mModel->getVisibleRecordEditorId(cat, row).contains(text, Qt::CaseInsensitive))
+                return selectRecordAt(cat, mModel->getRecordActualIndex(cat, row));
+        }
+    }
+    return false;
+}
+
+bool ObjectWindowDialog::selectRecordAt(int categoryId, int recordIndex)
+{
+    // Selecting the category node drops any folder filter and switches the table.
+    if (QStandardItem* catItem = mCategoryItems.value(categoryId, nullptr))
+    {
+        const QModelIndex catNavIdx = catItem->index();
+        mTreeView->expand(catNavIdx.parent());
+        mTreeView->setCurrentIndex(catNavIdx);
+        mTreeView->scrollTo(catNavIdx);
+    }
+    mRecordProxyModel->setFolder(QString());
+
+    if (mRecordTableModel)
+    {
+        mRecordTableModel->setCategory(categoryId);
+    }
+
+    if (mRecordTable && mRecordProxyModel)
+    {
+        int rowInCat = -1;
+        int count = mModel->getRecordCountForCategory(categoryId);
+        for (int i = 0; i < count; i++)
+        {
+            if (mModel->getRecordActualIndex(categoryId, i) == recordIndex)
+            {
+                rowInCat = i;
+                break;
+            }
+        }
+        if (rowInCat >= 0)
+        {
+            QModelIndex tableSrcIdx = mRecordTableModel->index(rowInCat, 0);
+            QModelIndex tableProxyIdx = mRecordProxyModel->mapFromSource(tableSrcIdx);
+            if (tableProxyIdx.isValid())
+            {
+                mRecordTable->setCurrentIndex(tableProxyIdx);
+                mRecordTable->scrollTo(tableProxyIdx, QAbstractItemView::PositionAtCenter);
+            }
+        }
+    }
 
     QString editorId = mModel->getRecordEditorId(categoryId, recordIndex);
     emit recordSelected(categoryId, recordIndex, editorId);
-
-    this->raise();
-    this->activateWindow();
     return true;
 }

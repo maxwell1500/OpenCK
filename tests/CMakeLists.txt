@@ -590,6 +590,12 @@ target_link_libraries(test_warningsdock PRIVATE openck_view openck_model test_st
 target_include_directories(test_warningsdock PRIVATE ${TEST_INCLUDE_DIRS})
 openck_add_test(test_warningsdock)
 
+# Preview window dock widget tests (Dialog 315)
+add_executable(test_previewwindowdock test_previewwindowdock.cpp)
+target_link_libraries(test_previewwindowdock PRIVATE openck_view openck_model openck_files test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)
+target_include_directories(test_previewwindowdock PRIVATE ${TEST_INCLUDE_DIRS})
+openck_add_test(test_previewwindowdock)
+
 # PACK/WRLD/LCTN specialized editor widgets
 add_executable(test_specialized_widgets test_specialized_widgets.cpp)
 target_link_libraries(test_specialized_widgets PRIVATE openck_view openck_model test_stubs Qt6::Test Qt6::Widgets Qt6::OpenGL OpenGL32)

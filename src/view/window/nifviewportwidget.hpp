@@ -94,6 +94,7 @@ public:
     void scaleMesh(float factor);
     void refreshMesh();
     int vertexCount() const;
+    int triangleCount() const;
     QString currentFile() const { return currentNifFile; }
 
 signals:
@@ -193,6 +194,8 @@ public:
     bool isWireframeMode() const { return wireframeMode; }
     void setGridEnabled(bool enabled);
     bool isGridEnabled() const { return gridEnabled; }
+    void setGridHeight(float height);
+    float gridHeight() const { return mGridHeight; }
     void setBoundsEnabled(bool enabled);
     bool isBoundsEnabled() const { return boundsEnabled; }
     void setCollisionEnabled(bool enabled);
@@ -302,6 +305,7 @@ private:
     TexFilter currentFilter = TexFilter::Linear;
     bool wireframeMode = false;
     bool gridEnabled = false;
+    float mGridHeight = 0.0f;
     bool axisEnabled = false;
     bool boundsEnabled = false;
 

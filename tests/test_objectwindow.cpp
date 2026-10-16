@@ -1,5 +1,7 @@
 #include <QtTest>
 #include <QTemporaryDir>
+#include <QElapsedTimer>
+#include <QDebug>
 
 #include "../../src/model/world/idcollection.hpp"
 #include "../../libs/files/esm/weaprecord.hpp"
@@ -13,6 +15,11 @@
 #include "../../libs/files/esm/alchrecord.hpp"
 #include "../../libs/files/esm/contrecord.hpp"
 #include "../../libs/files/esm/refrecord.hpp"
+#include "../../libs/files/esm/doorrecord.hpp"
+#include "../../libs/files/esm/furnrecord.hpp"
+#include "../../src/view/window/objectwindowdialog.hpp"
+#include <QTableView>
+#include <QSplitter>
 #include "../../src/model/world/data.hpp"
 #include "../../src/model/window/objectwindow.hpp"
 #include "../../src/view/window/useinfodialog.hpp"
@@ -35,6 +42,13 @@ private slots:
     void testHierarchyGroupNodes();
     void testFilterWildcardAndReset();
     void testUseInfoDialog();
+    void testNonStatRecordsExposeDataAndFilter();
+    void testHeaderData();
+    void testSplitPaneDialog();
+    void testModelFolderNormalization();
+    void testFolderTreeFiltersTable();
+    void test50kFolderBuildPerformance();
+    void testTableSorting();
 };
 void TestObjectWindowModelPath::testWeaponModelPath()
 {
@@ -312,6 +326,280 @@ void TestObjectWindowModelPath::testUseInfoDialog()
 
     UseInfoDialog dlg(&data, stat.formId, stat.editorId);
     QCOMPARE(dlg.totalUsesCount(), 2);
+}
+
+void TestObjectWindowModelPath::testNonStatRecordsExposeDataAndFilter()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+
+    DoorRecord door;
+    door.editorId = "DungeonIronDoor";
+    door.formId = 0x00040001;
+    door.modelPath = "meshes/doors/irondoor01.nif";
+    data.getDoorCollection().add(door);
+
+    FurnRecord furn;
+    furn.editorId = "LuxuryChair";
+    furn.formId = 0x00040002;
+    furn.modelPath = "meshes/furniture/chair01.nif";
+    data.getFurnCollection().add(furn);
+
+    ObjectWindowModel model;
+    model.setData(&data);
+
+    int catId = -1, recIdx = -1;
+    QModelIndex foundIdx;
+
+    // Both non-STAT records must be present
+    QVERIFY(model.findRecord("DungeonIronDoor", catId, recIdx, foundIdx));
+    QCOMPARE(model.getRecordEditorId(catId, recIdx), QString("DungeonIronDoor"));
+    QCOMPARE(model.getRecordFormId(catId, recIdx), QString("0x00040001"));
+    QCOMPARE(model.getRecordModelPath(catId, recIdx), QString("meshes/doors/irondoor01.nif"));
+
+    QVERIFY(model.findRecord("LuxuryChair", catId, recIdx, foundIdx));
+    QCOMPARE(model.getRecordEditorId(catId, recIdx), QString("LuxuryChair"));
+    QCOMPARE(model.getRecordFormId(catId, recIdx), QString("0x00040002"));
+    QCOMPARE(model.getRecordModelPath(catId, recIdx), QString("meshes/furniture/chair01.nif"));
+
+    // Applying a filter must NOT blank out non-STAT records
+    model.applyFilter("*Door*");
+    QVERIFY(model.findRecord("DungeonIronDoor", catId, recIdx, foundIdx));
+    QCOMPARE(model.getRecordEditorId(catId, recIdx), QString("DungeonIronDoor"));
+    QCOMPARE(model.getRecordFormId(catId, recIdx), QString("0x00040001"));
+    QVERIFY(!model.findRecord("LuxuryChair", catId, recIdx, foundIdx));
+
+    // Resetting filter restores both
+    model.applyFilter("");
+    QVERIFY(model.findRecord("DungeonIronDoor", catId, recIdx, foundIdx));
+    QCOMPARE(model.getRecordEditorId(catId, recIdx), QString("DungeonIronDoor"));
+    QVERIFY(model.findRecord("LuxuryChair", catId, recIdx, foundIdx));
+    QCOMPARE(model.getRecordEditorId(catId, recIdx), QString("LuxuryChair"));
+}
+
+void TestObjectWindowModelPath::testHeaderData()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+    ObjectWindowModel model;
+    model.setData(&data);
+
+    QCOMPARE(model.columnCount(), 4);
+    QCOMPARE(model.headerData(0, Qt::Horizontal).toString(), QString("Editor ID"));
+    QCOMPARE(model.headerData(1, Qt::Horizontal).toString(), QString("Form ID"));
+    QCOMPARE(model.headerData(2, Qt::Horizontal).toString(), QString("Type"));
+    QCOMPARE(model.headerData(3, Qt::Horizontal).toString(), QString("Model"));
+}
+
+void TestObjectWindowModelPath::testSplitPaneDialog()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+
+    DoorRecord door;
+    door.editorId = "TestVaultDoor";
+    door.formId = 0x00050001;
+    door.modelPath = "meshes/doors/vaultdoor01.nif";
+    data.getDoorCollection().add(door);
+
+    ObjectWindowDialog dlg(&data);
+    QVERIFY(dlg.getTreeView() != nullptr);
+    QVERIFY(dlg.getRecordTable() != nullptr);
+
+    // selectRecord finds the record across the two-pane model
+    QVERIFY(dlg.selectRecord("TestVaultDoor"));
+    QVERIFY(dlg.getRecordTable()->currentIndex().isValid());
+}
+
+void TestObjectWindowModelPath::testModelFolderNormalization()
+{
+    QCOMPARE(ObjectWindowModel::modelFolder("Meshes\\Armor\\Iron\\Helm.nif"), QString("armor/iron"));
+    QCOMPARE(ObjectWindowModel::modelFolder("Data\\Meshes\\Armor\\x.nif"), QString("armor"));
+    QCOMPARE(ObjectWindowModel::modelFolder("armor/x.nif"), QString("armor"));
+    QCOMPARE(ObjectWindowModel::modelFolder("meshes/x.nif"), QString());
+    QCOMPARE(ObjectWindowModel::modelFolder("x.nif"), QString());
+    QCOMPARE(ObjectWindowModel::modelFolder(QString()), QString());
+}
+
+void TestObjectWindowModelPath::testFolderTreeFiltersTable()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+
+    const char* models[] = { "meshes/Doors/Vault/a.nif", "meshes\\doors\\vault\\b.nif",
+                             "meshes/doors/wood/c.nif", "d.nif" };
+    quint32 formId = 0x00060001;
+    for (const char* model : models)
+    {
+        DoorRecord door;
+        door.editorId = QString("Door_%1").arg(formId);
+        door.formId = formId++;
+        door.modelPath = model;
+        data.getDoorCollection().add(door);
+    }
+
+    ObjectWindowDialog dlg(&data);
+    QVERIFY(dlg.selectRecord("Door_393217"));
+
+    QTreeView* tree = dlg.getTreeView();
+    QAbstractItemModel* nav = tree->model();
+    const QModelIndex category = tree->currentIndex();
+    QVERIFY(category.isValid());
+
+    // (no folder) (1), doors (3) > vault (2), wood (1)
+    QCOMPARE(nav->rowCount(category), 2);
+    const QModelIndex noFolder = nav->index(0, 0, category);
+    QCOMPARE(nav->data(noFolder).toString(), QString("(no folder) (1)"));
+    const QModelIndex doors = nav->index(1, 0, category);
+    QCOMPARE(nav->data(doors).toString(), QString("Doors (3)"));
+    QCOMPARE(nav->rowCount(doors), 2);
+    const QModelIndex vault = nav->index(0, 0, doors);
+    QCOMPARE(nav->data(vault).toString(), QString("Vault (2)"));
+
+    QAbstractItemModel* table = dlg.getRecordTable()->model();
+    QCOMPARE(table->rowCount(), 4);
+
+    tree->setCurrentIndex(vault);
+    QCOMPARE(table->rowCount(), 2);
+    tree->setCurrentIndex(doors);
+    QCOMPARE(table->rowCount(), 3);
+    tree->setCurrentIndex(noFolder);
+    QCOMPARE(table->rowCount(), 1);
+
+    // A record picked from a filtered table resolves to a real record (edit/clone/delete path).
+    tree->setCurrentIndex(vault);
+    dlg.getRecordTable()->setCurrentIndex(table->index(0, 0));
+    QVERIFY(dlg.currentIndex().isValid());
+
+    tree->setCurrentIndex(category);
+    QCOMPARE(table->rowCount(), 4);
+
+    // A partial filter keeps its matches (no anchoring) and the folder tree follows it.
+    dlg.getFilterEdit()->setText("Door_39321");
+    QCOMPARE(table->rowCount(), 3);
+    dlg.getFilterEdit()->clear();
+    QCOMPARE(table->rowCount(), 4);
+
+    // Find Next/Previous walk Editor IDs and wrap.
+    QSignalSpy selected(&dlg, &ObjectWindowDialog::recordSelected);
+    QVERIFY(dlg.findRecordText("393219", true));
+    QCOMPARE(selected.last().at(2).toString(), QString("Door_393219"));
+    QVERIFY(dlg.findRecordText("Door_", false));
+    QCOMPARE(selected.last().at(2).toString(), QString("Door_393218"));
+    QVERIFY(dlg.findRecordText("393217", false));
+    QVERIFY(dlg.findRecordText("Door_", false)); // wraps from the first record to the last
+    QCOMPARE(selected.last().at(2).toString(), QString("Door_393220"));
+    QVERIFY(dlg.findRecordText("Door_", true));  // and forward again to the first
+    QCOMPARE(selected.last().at(2).toString(), QString("Door_393217"));
+    QVERIFY(!dlg.findRecordText("NoSuchEditorId", true));
+}
+
+
+void TestObjectWindowModelPath::test50kFolderBuildPerformance()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+
+    static const char* kDirs[] = {
+        "meshes/architecture/whiterun/houses/wrhouse%1.nif",
+        "meshes/architecture/solitude/walls/solwall%1.nif",
+        "meshes/dungeons/caves/rocks/rock%1.nif",
+        "meshes/clutter/books/tome%1.nif",
+        "meshes/weapons/iron/sword%1.nif",
+        "meshes/armor/steel/cuirass%1.nif",
+        "meshes/landscape/trees/tree%1.nif",
+        "meshes/actors/character/hair/hair%1.nif",
+        "meshes/root_model%1.nif",
+        ""
+    };
+
+    auto& coll = data.getStatCollection();
+    for (int i = 0; i < 50000; ++i)
+    {
+        StatRecord stat;
+        stat.editorId = QString("Stat_%1").arg(i);
+        stat.formId = 0x00100000 + i;
+        const char* pattern = kDirs[i % 10];
+        if (pattern[0] != '\0')
+            stat.modelPath = QString(pattern).arg(i % 100);
+        coll.add(stat);
+    }
+
+    ObjectWindowModel model;
+    model.setData(&data);
+
+    int statCat = -1;
+    for (int c = 0; c < model.getCategoryCount(); ++c)
+    {
+        if (model.getCategoryType(c) == CkId::Type_Stat_)
+        {
+            statCat = c;
+            break;
+        }
+    }
+    QVERIFY(statCat >= 0);
+    QCOMPARE(model.getRecordCountForCategory(statCat), 50000);
+
+    QElapsedTimer timer;
+    timer.start();
+    QVector<ModelFolder> folders = model.getModelFolders(statCat);
+    const qint64 elapsedMs = timer.elapsed();
+
+    qInfo() << "50,000 records folder build took:" << elapsedMs << "ms, found" << folders.size() << "folders";
+
+    QVERIFY(!folders.isEmpty());
+    QCOMPARE(folders[0].path, ObjectWindowModel::NoFolder);
+    QCOMPARE(folders[0].count, 10000);
+    QVERIFY(elapsedMs < 500);
+}
+
+void TestObjectWindowModelPath::testTableSorting()
+{
+    const FilePaths paths;
+    Data data(QStringList(), paths);
+    auto& coll = data.getStatCollection();
+
+    StatRecord s1;
+    s1.editorId = "Stat_Z";
+    s1.formId = 0x00020000;
+    s1.modelPath = "meshes/clutter/vase.nif";
+    coll.add(s1);
+
+    StatRecord s2;
+    s2.editorId = "Stat_A";
+    s2.formId = 0x00010000;
+    s2.modelPath = "meshes/clutter/apple.nif";
+    coll.add(s2);
+
+    ObjectWindowDialog dlg(&data);
+    QVERIFY(dlg.selectRecord("Stat_A"));
+
+    QTableView* table = dlg.findChild<QTableView*>();
+    QVERIFY(table != nullptr);
+
+    auto* proxyModel = qobject_cast<QSortFilterProxyModel*>(table->model());
+    QVERIFY(proxyModel != nullptr);
+    QCOMPARE(proxyModel->rowCount(), 2);
+
+    // Sort ascending by Editor ID (column 0): Stat_A before Stat_Z
+    table->sortByColumn(0, Qt::AscendingOrder);
+    QCOMPARE(proxyModel->data(proxyModel->index(0, 0)).toString(), QStringLiteral("Stat_A"));
+    QCOMPARE(proxyModel->data(proxyModel->index(1, 0)).toString(), QStringLiteral("Stat_Z"));
+
+    // Sort descending by Editor ID (column 0): Stat_Z before Stat_A
+    table->sortByColumn(0, Qt::DescendingOrder);
+    QCOMPARE(proxyModel->data(proxyModel->index(0, 0)).toString(), QStringLiteral("Stat_Z"));
+    QCOMPARE(proxyModel->data(proxyModel->index(1, 0)).toString(), QStringLiteral("Stat_A"));
+
+    // Sort ascending by Form ID (column 1): 00010000 before 00020000
+    table->sortByColumn(1, Qt::AscendingOrder);
+    QCOMPARE(proxyModel->data(proxyModel->index(0, 0)).toString(), QStringLiteral("Stat_A"));
+    QCOMPARE(proxyModel->data(proxyModel->index(1, 0)).toString(), QStringLiteral("Stat_Z"));
+
+    // Sort descending by Form ID (column 1): 00020000 before 00010000
+    table->sortByColumn(1, Qt::DescendingOrder);
+    QCOMPARE(proxyModel->data(proxyModel->index(0, 0)).toString(), QStringLiteral("Stat_Z"));
+    QCOMPARE(proxyModel->data(proxyModel->index(1, 0)).toString(), QStringLiteral("Stat_A"));
 }
 
 #include "test_objectwindow.moc"

@@ -1073,6 +1073,7 @@ src/view/window/referencebatchdialog.cpp
     src/view/window/worldspacedatawidget.cpp
     src/view/window/locationdatawidget.cpp
     src/view/window/warningsdockwidget.cpp
+    src/view/window/previewwindowdock.cpp
     src/view/window/rawsubrecordwidget.cpp
     src/view/window/searchdialog.cpp
     src/view/world/enumdelegate.cpp
@@ -1202,6 +1203,7 @@ set(VIEW_HEADERS
     src/view/window/worldspacedatawidget.hpp
     src/view/window/locationdatawidget.hpp
     src/view/window/warningsdockwidget.hpp
+    src/view/window/previewwindowdock.hpp
     src/view/window/rawsubrecordwidget.hpp
     src/view/window/searchdialog.hpp
     src/view/world/delegatefactory.hpp
